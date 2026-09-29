@@ -144,7 +144,7 @@
     {"id":"russian_twist","name_ko":"러시안 트위스트","family":"rotation","part":"코어","muscles":["복사근"],"pattern":"CORE","mechanics":"isolation","equipment":["bodyweight"],"default_reps":[10,20]},
     {"id":"incline_db_fly","name_ko":"인클라인 덤벨 플라이","family":"chest_fly","part":"가슴","muscles":["대흉근 상부"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["dumbbell"]},
     {"id":"seal_row","name_ko":"실 로우","family":"supported_row","part":"등","muscles":["광배근","능형근","중부 승모근"],"pattern":"H_PULL","mechanics":"compound","equipment":["barbell","other"],"default_reps":[8,12]},
-    {"id":"machine_high_row","name_ko":"하이 로우 머신","family":"machine_high_row","part":"등","muscles":["광배근","대원근"],"pattern":"V_PULL","mechanics":"compound","equipment":["machine"],"default_reps":[8,12]},
+    {"id":"machine_high_row","name_ko":"하이 로우 머신","family":"machine_high_row","part":"등","muscles":["광배근","대원근"],"pattern":"V_PULL","mechanics":"compound","equipment":["machine"],"default_reps":[8,12],"note":"위에서 비스듬히 당기는 동작. 광배 위주라 앱에서는 수직 당기기로 분류"},
     {"id":"y_raise","name_ko":"Y 레이즈","family":"y_raise","part":"어깨","muscles":["하부 승모근","측면 삼각근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["dumbbell"],"default_reps":[10,15]},
     {"id":"ez_preacher_curl","name_ko":"EZ바 프리처 컬","family":"curl_short","part":"이두","muscles":["이두 단두"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["barbell"]},
     {"id":"overhead_cable_curl","name_ko":"오버헤드 케이블 컬","family":"curl_short","part":"이두","muscles":["이두"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["cable"]},

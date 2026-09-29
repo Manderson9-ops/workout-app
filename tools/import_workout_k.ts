@@ -40,11 +40,20 @@ const out = {
 writeFileSync(join(ROOT, 'data/exercises.workout_k.json'), JSON.stringify(out, null, 1) + '\n', 'utf8');
 const hashAfter = hashAll();
 const untouched = hashBefore.every((h, i) => h === hashAfter[i]);
+// 지난 실행과 비교 (실행 사이에 WORK_OUT_K가 바뀐 파일 목록)
+const hashFile = join(ROOT, 'reports/source_hashes.json');
+let prev: Record<string, string> = {};
+try { prev = readJson(hashFile); } catch { prev = {}; }
+const nowHashes = Object.fromEntries(files.map((f, i) => [f, hashAfter[i]!]));
+const changedSinceLast = files.filter((f) => prev[f] && prev[f] !== nowHashes[f]);
+const newSinceLast = files.filter((f) => !prev[f]);
+const removedSinceLast = Object.keys(prev).filter((f) => !nowHashes[f]);
 
 const byId = new Map(base.map((e: any) => [e.id, e]));
 const esc = (s: string) => String(s).replace(/\|/g, '/');
 const L: string[] = [];
-L.push('# WORK_OUT_K 가져오기 리포트', '', `- 원본: \`${WK_DIR}\` (읽기만 함). 실행 전후 해시 ${untouched ? '**동일 (원본 변경 없음)**' : '**다름 (확인 필요)**'}`);
+L.push('# WORK_OUT_K 가져오기 리포트', '', `- 원본: \`${WK_DIR}\` (읽기만 함). 이번 실행 전후 해시 ${untouched ? '**동일 (이 스크립트는 원본을 바꾸지 않음)**' : '**다름 (확인 필요)**'}`);
+L.push(`- 지난 실행 이후 원본 변화: ${Object.keys(prev).length ? `바뀜 ${changedSinceLast.length}개${changedSinceLast.length ? ' (' + changedSinceLast.join(', ') + ')' : ''}, 새 파일 ${newSinceLast.length}개${newSinceLast.length ? ' (' + newSinceLast.join(', ') + ')' : ''}, 없어진 파일 ${removedSinceLast.length}개` : '첫 실행 (비교 기준 없음)'}. WORK_OUT_K에 영상이 추가·수정되면 여기에 나타난다`);
 L.push(`- 영상 ${records.length}개, 기본 종목 ${base.length}개, 운동 묶음(family) ${Object.keys(families).length}개`);
 L.push(`- 티어 항목 ${res.tierItemCount}개 → 연결 ${res.mapped.filter((m) => m[0] !== '분할').length}개 + 결정 대기로 미적용 ${res.unapplied.filter((u) => u.grade).length}개`);
 L.push(`- 영상 등급이 붙은 운동 ${Object.keys(res.grades).length}개 (등급 ${Object.values(res.grades).flat().length}개), 자세 포인트가 붙은 운동 ${Object.keys(res.guides).length}개`);
@@ -57,6 +66,20 @@ L.push('## 티어 항목 연결표', '', '| 주제 | 영상 속 이름 | 등급 
 for (const m of res.mapped) L.push(`| ${m.map(esc).join(' | ')} |`);
 L.push('', '## 한 운동에 영상 등급이 여러 개인 경우', '');
 for (const [id, gs] of Object.entries(res.grades)) if (gs.length > 1) L.push(`- ${(byId.get(id) as any).name_ko}: ${gs.map((g) => `${g.value}(${g.levels.join('·') || '전체'}, ${g.purpose_part}${g.purpose_note ? '/' + g.purpose_note : ''}${g.sub_goal_only ? ', 세부목표 전용' : ''}${g.primary_topic ? '' : ', 참고용'})`).join(', ')}`);
+L.push('', '## 등급 동률 주의 (같은 목적 부위·수준에 등급이 여럿이라 낮은 등급이 쓰이는 경우, 전완·악력 제외)', '');
+const ties: string[] = [];
+for (const [id, gs] of Object.entries(res.grades)) {
+  const general = gs.filter((g) => !g.sub_goal_only && g.primary_topic && g.purpose_part !== '전완·악력');
+  for (const lv of ['초보', '중급', '상급']) {
+    for (const part of new Set(general.map((g) => g.purpose_part))) {
+      const inPart = general.filter((g) => g.purpose_part === part);
+      const byLevel = inPart.filter((g) => g.levels.includes(lv as never));
+      const picked = byLevel.length ? byLevel : inPart.filter((g) => g.levels.length === 0);
+      if (picked.length > 1) ties.push(`- ${(byId.get(id) as any).name_ko} (${part}, ${lv}): ${picked.map((g) => g.value).join(', ')}`);
+    }
+  }
+}
+L.push(...(ties.length ? ties : ['- 없음']));
 L.push('', '## 운동 묶음(family) 표 (M-08)', '', '한 플랜에는 같은 묶음에서 1개만 들어간다.', '', '| 묶음 | 운동 |', '|---|---|');
 for (const [f, label] of Object.entries(families)) L.push(`| ${label} | ${base.filter((e: any) => e.family === f).map((e: any) => e.name_ko).join(', ')} |`);
 L.push('', '## 분할 템플릿', '', '| 템플릿 | 요일별 부위 | 영상 등급 |', '|---|---|---|');
@@ -65,6 +88,7 @@ L.push('', '코어·전완은 템플릿 요일에 기본으로 넣지 않았다.
 L.push('', '## 원본 파일 해시 (SHA-256)', '', ...files.map((f, i) => `- ${f}: \`${hashAfter[i]}\``));
 mkdirSync(join(ROOT, 'reports'), { recursive: true });
 writeFileSync(join(ROOT, 'reports/import_report.md'), L.join('\n') + '\n', 'utf8');
+writeFileSync(hashFile, JSON.stringify(nowHashes, null, 1) + '\n', 'utf8');
 
 console.log(`영상 ${records.length}, 티어 항목 ${res.tierItemCount}, 등급 운동 ${Object.keys(res.grades).length}, 가이드 운동 ${Object.keys(res.guides).length}, 연결 실패 ${res.unresolved.length}, 미적용 ${res.unapplied.length}, 원본 변경 ${untouched ? '없음' : '있음'}`);
 if (res.unresolved.length || !untouched) { console.error(res.unresolved.join('\n')); process.exit(1); }

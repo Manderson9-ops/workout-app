@@ -3,7 +3,7 @@
  * 데이터 검증(validateExerciseData)은 테스트와 빌드에서 함께 쓴다.
  */
 import { PARTS, EQUIPMENT, PATTERNS, LEVELS, DEFAULTS } from './types';
-import type { Exercise, BuiltExercise, GradeEntry, GuideItem, Part, Level } from './types';
+import type { Exercise, BuiltExercise, GradeEntry, GuideItem, Part, Level, Equipment } from './types';
 import { GRADES } from './version';
 import type { Grade } from './version';
 
@@ -58,6 +58,16 @@ export function resolveGrade(e: BuiltExercise, part: Part, level: Level, subGoal
   // 같은 조건에 여럿이면 보수적으로 낮은 등급 (BLUEPRINT 3.3: 같은 목적 부위에 등급이 둘 이상이고 세부 목표를 안 고른 경우)
   const pick = [...cands].sort((a, b) => GRADES.indexOf(b.value) - GRADES.indexOf(a.value))[0]!;
   return { value: pick.value, source: 'VIDEO', estimated: false, entry: pick, others: forPart.filter((g) => g !== pick) };
+}
+
+/** 장비 조건: 운동에 적힌 장비가 모두 있어야 한다 (예: 실 로우 = 바벨 + 기타(전용 벤치)) */
+export function equipmentAvailable(e: Exercise, available: readonly Equipment[]): boolean {
+  return e.equipment.every((q) => available.includes(q));
+}
+
+/** 무거운 힌지 (M-12 제안: 한 플랜에 1개) */
+export function isHeavyHinge(e: Exercise): boolean {
+  return !!e.heavy && e.pattern === 'HINGE';
 }
 
 export function defaultReps(e: Exercise): [number, number] {

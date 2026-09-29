@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import baseFile from '../data/exercises.base.json';
 import familyFile from '../data/families.json';
 import wkFile from '../data/exercises.workout_k.json';
-import { buildExercises, eligibleParts, resolveGrade, validateExerciseData, defaultReps } from '../src/core/exercises';
+import { buildExercises, eligibleParts, resolveGrade, validateExerciseData, defaultReps, equipmentAvailable, isHeavyHinge } from '../src/core/exercises';
 import type { Exercise, BuiltExercise, GradeEntry } from '../src/core/types';
 import { EQUIPMENT_RANK } from '../src/core/types';
 import type { WorkoutKData } from '../src/core/exercises';
@@ -131,5 +131,20 @@ describe('등급 고르기 (BLUEPRINT 3.3)', () => {
     for (let i = 1; i < order.length; i++) expect(EQUIPMENT_RANK[order[i]!]).toBeGreaterThanOrEqual(EQUIPMENT_RANK[order[i - 1]!]);
     expect(EQUIPMENT_RANK.cable).toBe(EQUIPMENT_RANK.machine);
     expect(EQUIPMENT_RANK.machine).toBeLessThan(EQUIPMENT_RANK.smith);
+  });
+});
+
+describe('장비·무거운 힌지·묶음 고정', () => {
+  it('장비는 적힌 것이 모두 있어야 가능 (실 로우 = 바벨 + 기타)', () => {
+    expect(equipmentAvailable(get('seal_row'), ['barbell'])).toBe(false);
+    expect(equipmentAvailable(get('seal_row'), ['barbell', 'other'])).toBe(true);
+    expect(equipmentAvailable(get('lat_pulldown'), ['cable', 'machine'])).toBe(true);
+  });
+  it('무거운 힌지 판별 (M-12)', () => {
+    const heavyHinges = all.filter(isHeavyHinge).map((e) => e.id).sort();
+    expect(heavyHinges).toEqual(['deadlift', 'good_morning', 'rack_pull', 'romanian_deadlift', 'sumo_deadlift', 'trap_bar_deadlift']);
+  });
+  it('운동 → 묶음 전체 스냅샷 (묶음이 바뀌면 검토 후 스냅샷 갱신)', () => {
+    expect(Object.fromEntries(base.map((e) => [e.id, e.family]))).toMatchSnapshot();
   });
 });
