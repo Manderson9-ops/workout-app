@@ -9,6 +9,7 @@ import { SettingsScreen } from './screens/Settings';
 import { RoutineEditor } from './screens/RoutineEditor';
 import { mmss } from './components';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
+import { useUpdateAvailable } from './update';
 
 export function useHash(): string {
   const [h, set] = useState(location.hash || '#/');
@@ -45,8 +46,14 @@ export function App() {
     <a href={h} class={on ? 'on' : ''} aria-label={label}><span class="ico">{ico}</span>{label}</a>
   );
   const onWorkout = path.startsWith('/workout');
+  const [update, applyUpdate] = useUpdateAvailable();
   return (
     <>
+      {update && !onWorkout && (
+        <div class="card" role="status" style={{ position: 'sticky', top: 0, zIndex: 30, margin: 0, borderRadius: 0 }}>
+          <div class="row between"><span>새 버전이 있어요</span><button class="primary" onClick={() => { if (!active || confirm('운동 중이에요. 기록은 저장돼 있어요. 새 버전으로 바꿀까요?')) applyUpdate(); }}>적용</button></div>
+        </div>
+      )}
       {screen}
       {active && !onWorkout && (
         <a class="banner" href="#/workout" aria-label="운동 계속하기">

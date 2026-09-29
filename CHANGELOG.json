@@ -1,1 +1,4 @@
-{ "versions": [ { "version": "0.0.1", "date": "2026-09-30", "changes": ["P0 프로젝트 뼈대"], "feedback_ids": [] } ] }
+{ "versions": [
+  { "version": "0.1.0-preview", "date": "2026-09-30", "changes": ["미리 보기 배포: 플랜 만들기, 운동 기록·휴식 타이머, 운동 종목·영상 등급, 루틴 편집, 설정", "홈 화면 설치(아이콘), 오프라인 열기, 새 버전 안내"], "feedback_ids": [], "decisions": ["D-016", "D-017", "D-018"] },
+  { "version": "0.0.1", "date": "2026-09-30", "changes": ["P0 프로젝트 뼈대"], "feedback_ids": [] }
+] }
