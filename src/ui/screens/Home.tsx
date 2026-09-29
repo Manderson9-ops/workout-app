@@ -4,7 +4,7 @@ import { catalog } from '../catalog';
 import { startRoutine } from '../actions';
 import { emptyRoutine } from '../../core/session';
 import { backupDue } from '../../core/backup';
-import { saveBackupFile } from '../backupActions';
+import { BackupBanner } from './BackupSection';
 import { newId } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
@@ -31,9 +31,7 @@ export function Home({ s }: { s: AppState }) {
         </div>
       )}
       {backupDue(s.settings.lastBackupAt, historyOf(s).length, Date.now()) && (
-        <div class="card" role="note" aria-label="백업 알림">
-          <div class="row between"><span class="small">{s.settings.lastBackupAt ? '마지막 백업 후 7일이 지났어요' : '아직 백업한 적이 없어요'}</span><button class="primary" onClick={() => void saveBackupFile()}>지금 백업</button></div>
-        </div>
+        <BackupBanner s={s} />
       )}
       <div class="row between"><h2>내 루틴</h2><div class="row"><button onClick={async () => { const r = emptyRoutine(newId('r'), '새 루틴', new Date().toISOString()); await mutate((d) => d.routines.put(r)); go(`#/routine/${encodeURIComponent(r.id)}`); }}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
       {!s.routines.length && (

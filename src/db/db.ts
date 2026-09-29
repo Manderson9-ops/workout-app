@@ -81,22 +81,26 @@ export async function requestPersist(): Promise<boolean> {
 
 // ---------- 백업 (BLUEPRINT 4.6) ----------
 
+/** 읽기 트랜잭션 하나로 읽어서, 읽는 도중 기록이 바뀌어도 서로 어긋나지 않게 */
 export async function exportAll(db: WorkoutDB): Promise<BackupData> {
-  const [routines, workouts, meta, custom, settings, bodyweight] = await Promise.all([
-    db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.settings.toArray(), db.bodyweight.toArray(),
-  ]);
-  return { routines, workouts, meta, custom: custom as unknown as Record<string, unknown>[], settings: settings as unknown as Record<string, unknown>[], bodyweight };
+  return db.transaction('r', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight], async () => {
+    const [routines, workouts, meta, custom, settings, bodyweight] = await Promise.all([
+      db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.settings.toArray(), db.bodyweight.toArray(),
+    ]);
+    return { routines, workouts, meta, custom: custom as unknown as Record<string, unknown>[], settings: settings as unknown as Record<string, unknown>[], bodyweight };
+  });
 }
-
 /** 백업으로 전부 바꾸기. 한 트랜잭션이라 중간에 실패하면 아무것도 바뀌지 않음 */
-export async function importAll(db: WorkoutDB, d: BackupData): Promise<void> {
+export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackupAt?: string } = {}): Promise<void> {
   await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight], async () => {
     await Promise.all([db.routines.clear(), db.workouts.clear(), db.meta.clear(), db.custom.clear(), db.settings.clear(), db.bodyweight.clear()]);
     await db.routines.bulkPut(d.routines);
     await db.workouts.bulkPut(d.workouts);
     await db.meta.bulkPut(d.meta as ExerciseMeta[]);
     await db.custom.bulkPut(d.custom as unknown as CustomExercise[]);
-    await db.settings.bulkPut(d.settings as unknown as Settings[]);
+    const st = (d.settings as unknown as Settings[]).map((x) => (opts.lastBackupAt ? { ...x, lastBackupAt: opts.lastBackupAt } : x));
+    if (!st.length && opts.lastBackupAt) st.push({ ...DEFAULT_SETTINGS, lastBackupAt: opts.lastBackupAt });
+    await db.settings.bulkPut(st);
     await db.bodyweight.bulkPut(d.bodyweight);
   });
 }

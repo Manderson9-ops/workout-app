@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
-import { activeOf, historyOf, mutate } from '../store';
+import { activeOf, historyOf, mutate, flushPending, getState } from '../store';
 import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
@@ -100,7 +100,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           <div class="row small" style={{ margin: '4px 0 6px 42px' }}>
             <span class="sub">남은 횟수 여유(RIR)</span>
             {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
-            <button class="chip" aria-label={`${label} 원판 계산`} onClick={() => setPlate(x.weight ?? 20)}>원판</button>
+            {byId.get(it.exerciseId)?.equipment.some((e) => e === 'barbell' || e === 'smith') && <button class="chip" aria-label={`${label} 원판 계산`} onClick={async () => { await flushPending(); setPlate(activeOf(getState())?.blocks[b]?.items[i]?.sets[k]?.weight ?? 20); }}>원판</button>}
             <button class="chip" aria-label={`${label} 메모`} onClick={() => setMemo({ title: `${label} 메모`, value: x.memo, save: (m) => void upd((cw) => updateSet(cw, st, { memo: m })) })}>메모</button>
           </div>
         )}

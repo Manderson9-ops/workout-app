@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { plateCalc, oneRMTable } from '../../core/stats';
+import { plateCalc, oneRMTable, ONE_RM_MAX_REPS } from '../../core/stats';
 import { NumInput, Sheet } from '../components';
 
 const BARS = [20, 15, 10, 0];
@@ -38,7 +38,7 @@ export function PlateCalculator({ initial }: { initial?: number }) {
 export function OneRMCalculator() {
   const [w, setW] = useState<number | undefined>(80);
   const [reps, setReps] = useState<number | undefined>(5);
-  const t = w && reps ? oneRMTable(w, reps) : undefined;
+  const t = w && reps && reps >= 1 && reps <= 50 ? oneRMTable(w, reps) : undefined;
   return (
     <div>
       <div class="grid2">
@@ -47,7 +47,8 @@ export function OneRMCalculator() {
       </div>
       {t && (
         <div class="card" aria-label="1RM 계산 결과">
-          <p style={{ fontSize: '18px' }}><strong>추정 1RM {t.oneRM}kg</strong> <span class="sub small">(Epley 공식 추정, 10회 넘으면 오차 커짐)</span></p>
+          <p style={{ fontSize: '18px' }}><strong>추정 1RM {t.oneRM}kg</strong> <span class="sub small">(Epley 공식 추정)</span></p>
+          {!t.reliable && <p class="small" role="alert" style={{ color: 'var(--warn)' }}>{ONE_RM_MAX_REPS}회보다 많으면 추정 오차가 커요. {ONE_RM_MAX_REPS}회 이하로 든 세트로 계산하세요.</p>}
           <div class="grid2 small">{t.rows.map((r) => <div key={r.pct}>{r.pct}% · {r.kg}kg · 약 {r.reps}회</div>)}</div>
         </div>
       )}

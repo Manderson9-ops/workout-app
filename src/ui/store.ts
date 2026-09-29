@@ -54,9 +54,14 @@ export async function flushKey(key: string): Promise<void> {
   const fn = pending.get(key); pending.delete(key);
   if (fn) await fn();
 }
+/** 이미 저장이 시작된 입력 (예: 입력칸에서 포커스가 빠질 때 시작된 저장). flushPending이 이것까지 기다림 */
+const inflight = new Set<Promise<unknown>>();
+export function trackInflight(p: Promise<unknown>): void { inflight.add(p); void p.finally(() => inflight.delete(p)); }
 export async function flushPending(): Promise<void> {
   const fns = [...pending.values()]; pending.clear();
   for (const fn of fns) await fn();
+  // 버튼을 누르면 입력칸 포커스가 먼저 빠지며 저장이 시작되므로, 그 저장이 끝날 때까지 기다린다
+  while (inflight.size) await Promise.allSettled([...inflight]);
 }
 
 export function useAppState(): AppState {
@@ -75,6 +80,9 @@ export async function askPersistOnce(): Promise<void> {
   persistAsked = true;
   await requestPersist();
 }
+
+/** 지금 메모리 상태 (바뀔 때마다 새 객체라서, 같은 객체면 데이터도 같음) */
+export const getState = () => state;
 
 export const activeOf = (s: AppState) => s.workouts.find((w) => !w.endedAt);
 export const historyOf = (s: AppState) => s.workouts.filter((w) => w.endedAt);

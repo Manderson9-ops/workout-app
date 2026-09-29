@@ -8,7 +8,9 @@ export function LineChart({ points, unit, label, height = 140 }: { points: Point
   const w = 340, h = height, pad = { l: 36, r: 8, t: 10, b: 22 };
   const vals = points.map((p) => p.value);
   let min = Math.min(...vals), max = Math.max(...vals);
-  if (min === max) { min -= 1; max += 1; }
+  if (max - min < 1) { const mid = (max + min) / 2; min = mid - 0.5; max = mid + 0.5; }
+  // 범위가 좁으면 축에 소수 한 자리 (예: 72.0 ~ 73.0)
+  const fmt = (v: number) => (max - min < 10 ? v.toFixed(1) : String(Math.round(v)));
   const x = (i: number) => pad.l + (points.length === 1 ? (w - pad.l - pad.r) / 2 : (i * (w - pad.l - pad.r)) / (points.length - 1));
   const y = (v: number) => pad.t + (1 - (v - min) / (max - min)) * (h - pad.t - pad.b);
   const d = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
@@ -17,8 +19,8 @@ export function LineChart({ points, unit, label, height = 140 }: { points: Point
     <svg viewBox={`0 0 ${w} ${h}`} width="100%" role="img" aria-label={`${label}: ${points.map((p) => `${p.label} ${p.value}${unit}`).join(', ')}`}>
       <line x1={pad.l} x2={w - pad.r} y1={y(max)} y2={y(max)} stroke="#2e3342" />
       <line x1={pad.l} x2={w - pad.r} y1={y(min)} y2={y(min)} stroke="#2e3342" />
-      <text x={pad.l - 4} y={y(max) + 4} fill="#9aa3b5" font-size="10" text-anchor="end">{Math.round(max)}</text>
-      <text x={pad.l - 4} y={y(min) + 4} fill="#9aa3b5" font-size="10" text-anchor="end">{Math.round(min)}</text>
+      <text x={pad.l - 4} y={y(max) + 4} fill="#9aa3b5" font-size="10" text-anchor="end">{fmt(max)}</text>
+      <text x={pad.l - 4} y={y(min) + 4} fill="#9aa3b5" font-size="10" text-anchor="end">{fmt(min)}</text>
       <path d={d} fill="none" stroke="#3b82f6" stroke-width="2.5" />
       {points.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.value)} r="3" fill="#3b82f6" />)}
       <text x={pad.l} y={h - 6} fill="#9aa3b5" font-size="10">{points[0]!.label}</text>

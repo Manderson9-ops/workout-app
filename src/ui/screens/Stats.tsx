@@ -2,8 +2,9 @@ import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf } from '../store';
 import { catalog } from '../catalog';
-import { summarize, weeklyPartSets, monthDays, weekStreak, localDate, weekStart } from '../../core/stats';
+import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart } from '../../core/stats';
 import type { WorkoutSummary } from '../../core/stats';
+import { BW_MIN, BW_MAX } from '../../core/backup';
 import { PARTS } from '../../core/types';
 import { LineChart, BarChart } from '../charts';
 import { NumInput, mmss } from '../components';
@@ -13,6 +14,8 @@ import type { Routine } from '../../core/session';
 import { go } from '../nav';
 
 const WD = ['월', '화', '수', '목', '금', '토', '일'];
+const md = (d: string) => d.slice(5).replace('-', '/');
+const shortPart = (p: string) => (p === '전완·악력' ? '전완' : p);
 
 export function Stats({ s }: { s: AppState }) {
   const all = catalog(s.custom);
@@ -21,10 +24,11 @@ export function Stats({ s }: { s: AppState }) {
   const today = localDate(Date.now());
   const [ym, setYm] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; });
   const [day, setDay] = useState<number | null>(null);
-  const [bwText, setBwText] = useState<number | undefined>(undefined);
   const sums = done.map((w) => summarize(w, byId, s.bodyweight));
   const weeks = weeklyPartSets(done, byId, today, 4);
   const thisWeek = weeks[weeks.length - 1]!;
+  const totals = weeklyTotals(done, byId, today, 8, s.bodyweight);
+  const pva = plannedVsActual(sums);
   const days = monthDays(done, ym.y, ym.m);
   const first = new Date(ym.y, ym.m - 1, 1);
   const lead = (first.getDay() + 6) % 7;
@@ -32,8 +36,7 @@ export function Stats({ s }: { s: AppState }) {
   const dayList = day ? sums.filter((x) => x.date === `${ym.y}-${String(ym.m).padStart(2, '0')}-${String(day).padStart(2, '0')}`) : [];
   const move = (d: number) => { setDay(null); setYm(({ y, m }) => { const n = new Date(y, m - 1 + d, 1); return { y: n.getFullYear(), m: n.getMonth() + 1 }; }); };
   const thisWeekCount = sums.filter((x) => weekStart(x.date) === weekStart(today)).length;
-  const bwSorted = [...s.bodyweight].sort((a, b) => (a.date < b.date ? -1 : 1));
-  const todayBw = s.bodyweight.find((b) => b.date === today)?.kg;
+  const activeParts = PARTS.filter((p) => weeks.some((w) => w.parts[p] > 0));
 
   return (
     <main>
@@ -68,19 +71,33 @@ export function Stats({ s }: { s: AppState }) {
 
       <h2>이번 주 부위별 세트</h2>
       <div class="card">
-        <BarChart label="이번 주 부위별 작업 세트" unit="세트" highlightLast={false} points={PARTS.map((p) => ({ label: p === '전완·악력' ? '전완' : p, value: thisWeek.parts[p] }))} />
-        <p class="sub small">최근 4주 합계: {weeks.map((w) => `${w.week.slice(5).replace('-', '/')}~ ${w.total}`).join(' · ')}</p>
+        <BarChart label="이번 주 부위별 작업 세트" unit="세트" highlightLast={false} points={PARTS.map((p) => ({ label: shortPart(p), value: thisWeek.parts[p] }))} />
+        {activeParts.length > 0 && (
+          <table class="trend" aria-label="최근 4주 부위별 작업 세트">
+            <thead><tr><th>주</th>{activeParts.map((p) => <th key={p}>{shortPart(p)}</th>)}<th>합계</th></tr></thead>
+            <tbody>{weeks.map((w) => <tr key={w.week}><td>{md(w.week)}~</td>{activeParts.map((p) => <td key={p}>{w.parts[p] || '·'}</td>)}<td><strong>{w.total}</strong></td></tr>)}</tbody>
+          </table>
+        )}
       </div>
 
-      <h2>체중</h2>
+      <h2>주간 볼륨</h2>
       <div class="card">
-        <div class="row">
-          <div class="grow"><NumInput label="오늘 체중" value={bwText ?? todayBw} suffix="kg" onChange={(v) => setBwText(v)} /></div>
-          <button class="primary" disabled={!(bwText ?? 0)} onClick={async () => { const kg = bwText!; await mutate((d) => d.bodyweight.put({ date: today, kg })); setBwText(undefined); }}>기록</button>
-        </div>
-        <LineChart label="체중" unit="kg" points={bwSorted.slice(-30).map((b) => ({ label: b.date.slice(5).replace('-', '/'), value: b.kg }))} />
-        <p class="sub small">맨몸 운동(풀업 등)에 무게를 비워 두면 그날 체중으로 볼륨을 계산해요.</p>
+        <BarChart label="최근 8주 주간 볼륨" unit="kg" points={totals.map((t) => ({ label: md(t.week), value: Math.round(t.volume) }))} />
+        <p class="sub small">볼륨 = 무게 × 횟수 합계 (웜업 제외). 이번 주 {totals[totals.length - 1]!.sets}세트 · {totals[totals.length - 1]!.count}회 운동</p>
       </div>
+
+      {pva && (
+        <>
+          <h2>예상 시간 대비 실제</h2>
+          <div class="card" aria-label="예상 시간 대비 실제">
+            <p>최근 {pva.n}회 평균: {Math.abs(pva.avgDiffSec) < 60 ? '예상과 거의 같아요' : `예상보다 ${Math.round(Math.abs(pva.avgDiffSec) / 60)}분 ${pva.avgDiffSec > 0 ? '더 걸려요' : '덜 걸려요'}`} <span class="sub small">(실제 ÷ 예상 = {pva.avgRatio})</span></p>
+            <BarChart label="최근 운동 실제 시간(분)" unit="분" points={sums.filter((x) => x.plannedSec).slice(0, 8).reverse().map((x) => ({ label: md(x.date), value: Math.round(x.durationSec / 60) }))} />
+            <p class="sub small">플랜의 예상 시간과 비교해요. 차이가 계속 크면 알려 주세요 (시간 계산을 고칠 수 있어요).</p>
+          </div>
+        </>
+      )}
+
+      <Bodyweight s={s} today={today} />
 
       <h2>운동 기록</h2>
       {!sums.length && <div class="empty">아직 끝낸 운동이 없어요</div>}
@@ -89,16 +106,58 @@ export function Stats({ s }: { s: AppState }) {
   );
 }
 
+function Bodyweight({ s, today }: { s: AppState; today: string }) {
+  const [date, setDate] = useState(today);
+  const [kg, setKg] = useState<number | undefined>(undefined);
+  const [err, setErr] = useState('');
+  const sorted = [...s.bodyweight].sort((a, b) => (a.date < b.date ? -1 : 1));
+  const existing = s.bodyweight.find((b) => b.date === date)?.kg;
+  const save = async () => {
+    const v = kg ?? existing;
+    if (v === undefined || v < BW_MIN || v > BW_MAX) { setErr(`${BW_MIN}~${BW_MAX}kg 사이로 적어 주세요`); return; }
+    if (date > today) { setErr('앞으로의 날짜는 적을 수 없어요'); return; }
+    setErr('');
+    await mutate((d) => d.bodyweight.put({ date, kg: v }));
+    setKg(undefined);
+  };
+  return (
+    <>
+      <h2>체중</h2>
+      <div class="card">
+        <input class="date" type="date" aria-label="체중 날짜" style={{ width: '100%', marginBottom: '6px' }} value={date} max={today} onInput={(e) => { setDate((e.target as HTMLInputElement).value || today); setKg(undefined); }} />
+        <div class="row">
+          <div class="grow" style={{ minWidth: 0 }}><NumInput label="체중" value={kg ?? existing} suffix="kg" onChange={(v) => setKg(v)} /></div>
+          <button class="primary" onClick={save}>{existing !== undefined ? '고치기' : '기록'}</button>
+        </div>
+        {err && <p role="alert" class="small" style={{ color: 'var(--bad)' }}>{err}</p>}
+        <LineChart label="체중" unit="kg" points={sorted.slice(-30).map((b) => ({ label: md(b.date), value: b.kg }))} />
+        {sorted.length > 0 && (
+          <details>
+            <summary class="small sub" style={{ minHeight: '44px', display: 'flex', alignItems: 'center' }}>체중 기록 {sorted.length}개 보기·지우기</summary>
+            {[...sorted].reverse().slice(0, 30).map((b) => (
+              <div class="row between small" key={b.date}>
+                <span>{b.date} · {b.kg}kg</span>
+                <button class="ghost" aria-label={`${b.date} 체중 지우기`} onClick={() => { if (confirm(`${b.date} 체중(${b.kg}kg)을 지울까요?`)) void mutate((d) => d.bodyweight.delete(b.date)); }}>지우기</button>
+              </div>
+            ))}
+          </details>
+        )}
+        <p class="sub small">맨몸 운동(풀업 등)에 무게를 비워 두면 그날 체중으로 볼륨을 계산해요.</p>
+      </div>
+    </>
+  );
+}
+
 function SummaryRow({ x }: { x: WorkoutSummary }) {
   const diff = x.plannedSec ? x.durationSec - x.plannedSec : undefined;
   return (
-    <div class="list-item" role="button" aria-label={`${x.date} ${x.name}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
+    <button class="list-item" aria-label={`${x.date} ${x.name}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
       <div class="grow">
-        <div>{x.name} <span class="pill">{x.date.slice(5).replace('-', '/')}</span></div>
+        <div>{x.name} <span class="pill">{md(x.date)}</span></div>
         <div class="pill">{mmss(x.durationSec)}{diff !== undefined && Math.abs(diff) >= 60 ? ` (예상보다 ${Math.round(Math.abs(diff) / 60)}분 ${diff > 0 ? '김' : '짧음'})` : ''} · 작업 세트 {x.workSets} · 볼륨 {x.volume.toLocaleString()}kg</div>
       </div>
       <span class="sub">›</span>
-    </div>
+    </button>
   );
 }
 

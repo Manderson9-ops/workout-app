@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, monthDays, weekStreak, plateCalc, oneRMTable } from '../src/core/stats';
+import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
 
@@ -96,8 +96,68 @@ describe('도구', () => {
   it('1RM 표: 100×5 → 116.7, 비율별 무게는 2.5kg 단위', () => {
     const t = oneRMTable(100, 5);
     expect(t.oneRM).toBe(116.7);
-    expect(t.rows[0]).toEqual({ pct: 100, kg: 117.5, reps: 1 });
+    expect(t.rows[0]).toEqual({ pct: 100, kg: 116.7, reps: 1 }); // 100%는 추정값 그대로
+    expect(t.reliable).toBe(true);
+    expect(oneRMTable(60, 20).reliable).toBe(false);
     expect(t.rows.find((r) => r.pct === 85)).toEqual({ pct: 85, kg: 100, reps: 5 });
-    expect(t.rows.every((r) => (r.kg * 10) % 25 === 0)).toBe(true);
+    expect(t.rows.slice(1).every((r) => (r.kg * 10) % 25 === 0)).toBe(true);
   });
+});
+
+describe('원판 계산: 모든 조합 검사 (검토 M4)', () => {
+  it('큰 것부터 채우면 놓치는 정확한 조합을 찾음', () => {
+    expect(plateCalc(60, 20, [15, 10])).toEqual({ perSide: [10, 10], achieved: 60, remainder: 0 });
+    expect(plateCalc(80, 20, [25, 20, 15, 10])).toEqual({ perSide: [20, 10], achieved: 80, remainder: 0 }); // 25+5 불가 → 20+10
+  });
+  it('정확한 조합 중 원판 수가 가장 적은 것', () => {
+    expect(plateCalc(100, 20, [20, 15, 10, 5]).perSide).toEqual([20, 20]);
+    expect(plateCalc(70, 20, [20, 15, 10, 5]).perSide).toEqual([20, 5]);
+  });
+  it('쌍 개수 제한 안에서, 못 만들면 목표 아래 가장 가까운 무게', () => {
+    expect(plateCalc(100, 20, [20, 5], { '20': 1, '5': 1 })).toEqual({ perSide: [20, 5], achieved: 70, remainder: 30 });
+    expect(plateCalc(21, 20, [1.25])).toEqual({ perSide: [], achieved: 20, remainder: 1 });
+    expect(plateCalc(22.5, 20, [1.25])).toEqual({ perSide: [1.25], achieved: 22.5, remainder: 0 });
+    expect(plateCalc(25, 20, [])).toEqual({ perSide: [], achieved: 20, remainder: 5 });
+  });
+  it('무거운 목표도 빠르게 (300kg, 모든 원판)', () => {
+    const t0 = performance.now();
+    expect(plateCalc(300, 20).achieved).toBe(300);
+    expect(performance.now() - t0).toBeLessThan(200);
+  });
+});
+
+describe('주간 합계·예상 대비 실제', () => {
+  const w = (id: string, start: string, sets: SetLog[], min: number, planned?: number) => wk(id, start, [{ id: 'bench', sets }], min, planned ? { plannedSec: planned } : {});
+  const a = w('a', at(2026, 9, 29), [s(60, 10), s(60, 10)], 50, 3000);
+  const b = w('b', at(2026, 9, 30), [s(50, 10)], 70, 3000);
+  const old = w('o', at(2026, 8, 3), [s(40, 10)], 30);
+  it('주별 볼륨·세트·운동 수 (8주, 범위 밖 제외)', () => {
+    const t = weeklyTotals([a, b, old], byId, '2026-09-30', 8);
+    expect(t).toHaveLength(8);
+    expect(t[7]).toEqual({ week: '2026-09-28', volume: 1700, sets: 3, count: 2 });
+    expect(t.slice(0, 7).every((x) => x.count === 0)).toBe(true);
+  });
+  it('예상이 있는 운동만 평균 (최신순 입력)', () => {
+    const sums = [b, a, old].map((x) => summarize(x, byId));
+    expect(plannedVsActual(sums)).toEqual({ n: 2, avgDiffSec: 600, avgRatio: 1.2 }); // +20분, -10분 → 평균 +10분
+    expect(plannedVsActual([summarize(old, byId)])).toBeUndefined();
+  });
+});
+
+describe('다른 시간대에서도 날짜가 같음 (검토: 시간대)', () => {
+  const orig = process.env.TZ;
+  for (const tz of ['UTC', 'America/Los_Angeles', 'Asia/Seoul', 'Pacific/Kiritimati']) {
+    it(tz, () => {
+      process.env.TZ = tz;
+      try {
+        // 현지 밤 11시 운동은 그 현지 날짜, 월요일 시작, 달력 날짜 일치
+        const late = at(2026, 9, 27, 23); // 일요일 밤
+        expect(localDate(late)).toBe('2026-09-27');
+        expect(weekStart('2026-09-27')).toBe('2026-09-21');
+        const x = wk('tz', late, [{ id: 'bench', sets: [s(60, 5)] }], 30);
+        expect([...monthDays([x], 2026, 9).keys()]).toEqual([27]);
+        expect(weeklyPartSets([x], byId, '2026-09-30', 2)[0]!.parts.가슴).toBe(1);
+      } finally { process.env.TZ = orig; }
+    });
+  }
 });

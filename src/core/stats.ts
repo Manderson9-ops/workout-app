@@ -132,32 +132,85 @@ export function weekStreak(workouts: Workout[], today: string): number {
 
 // ---------- 도구 (4.6) ----------
 
+const biggerFirst = (a: number[], b: number[]) => { for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i]! > b[i]!; return false; };
 export interface PlateResult { perSide: number[]; achieved: number; remainder: number }
+export const ONE_RM_MAX_REPS = 12;
 /**
- * 원판 계산: 목표 무게를 만들기 위해 한쪽에 끼울 원판 (큰 것부터). 정확히 안 되면 가장 가까운 아래 무게와 남는 무게.
+ * 원판 계산: 목표 무게를 만들기 위해 한쪽에 끼울 원판 (큰 것부터).
+ * 가진 원판으로 **정확히** 만들 수 있으면 원판 수가 가장 적은 조합, 안 되면 목표 아래에서 가장 가까운 무게.
+ * (큰 것부터 채우는 방식은 [15, 10]으로 한쪽 20kg을 못 찾는 문제가 있어 동적 계획법으로 모든 조합을 봄)
  * plates: 쓸 수 있는 원판 무게, pairs: 원판별 쌍 개수 (없으면 무제한)
  */
 export function plateCalc(target: number, bar: number, plates: number[] = [25, 20, 15, 10, 5, 2.5, 1.25], pairs?: Record<string, number>): PlateResult {
-  let side = Math.round(((target - bar) / 2) * 1000) / 1000;
-  const perSide: number[] = [];
+  const U = 0.25; // 계산 단위 kg (1.25·2.5·0.5 원판 모두 정수로)
+  const side = Math.floor(((target - bar) / 2) / U + 1e-9);
   // 목표가 바 무게 이하: 원판 없음. remainder가 음수면 바만으로도 목표보다 무거움
-  if (side <= 0) return { perSide, achieved: bar, remainder: Math.round((target - bar) * 100) / 100 };
-  for (const p of [...plates].sort((a, b) => b - a)) {
-    let left = pairs?.[String(p)] ?? Infinity;
-    while (side >= p - 1e-9 && left > 0) { perSide.push(p); side = Math.round((side - p) * 1000) / 1000; left--; }
+  if (side <= 0) return { perSide: [], achieved: bar, remainder: Math.round((target - bar) * 100) / 100 };
+  // 한쪽에 쓸 수 있는 원판 목록 (쌍 개수만큼, 한쪽 목표를 넘지 않는 만큼만)
+  const items: number[] = [];
+  for (const p of [...new Set(plates)].filter((p) => p > 0).sort((a, b) => b - a)) {
+    const u = Math.round(p / U);
+    const n = Math.min(pairs?.[String(p)] ?? Infinity, Math.floor(side / u));
+    for (let i = 0; i < n; i++) items.push(u);
   }
+  // best[w] = 한쪽 무게 w를 만드는 최소 원판 수, from[w] = 마지막에 넣은 원판 (0/1 배낭)
+  const best = new Array<number>(side + 1).fill(Infinity); best[0] = 0;
+  const pick: number[][] = Array.from({ length: side + 1 }, () => []);
+  for (const u of items) {
+    for (let w = side; w >= u; w--) {
+      const n = best[w - u]! + 1;
+      if (n > best[w]!) continue;
+      const cand = [...pick[w - u]!, u].sort((a, b) => b - a);
+      // 원판 수가 같으면 큰 원판 먼저인 조합 (25+15를 20+20보다 먼저: 끼우고 빼기 쉬움, 헬스장 관례)
+      if (n < best[w]! || biggerFirst(cand, pick[w]!)) { best[w] = n; pick[w] = cand; }
+    }
+  }
+  let w = side; while (w > 0 && best[w] === Infinity) w--;
+  const perSide = pick[w]!.map((u) => u * U).sort((a, b) => b - a);
   const achieved = Math.round((bar + 2 * perSide.reduce((s, x) => s + x, 0)) * 100) / 100;
   return { perSide, achieved, remainder: Math.round((target - achieved) * 100) / 100 };
 }
 
-/** 1RM 계산기: Epley 추정과 %별 무게 (2.5kg 단위 반올림) */
-export function oneRMTable(weight: number, reps: number): { oneRM: number; rows: { pct: number; kg: number; reps: number }[] } {
+/**
+ * 1RM 계산기: Epley 추정과 %별 무게. 100% 줄은 추정값 그대로, 나머지는 2.5kg 단위 반올림.
+ * Epley는 1~12회 정도에서만 믿을 만해서 그보다 많은 횟수는 reliable=false (화면에 경고)
+ */
+export function oneRMTable(weight: number, reps: number): { oneRM: number; reliable: boolean; rows: { pct: number; kg: number; reps: number }[] } {
   const oneRM = epley1RM(weight, reps);
   const rows = [100, 95, 90, 85, 80, 75, 70, 65, 60, 50].map((pct) => {
-    const kg = Math.round((oneRM * pct) / 100 / 2.5) * 2.5;
+    const kg = pct === 100 ? oneRM : Math.round((oneRM * pct) / 100 / 2.5) * 2.5;
     // Epley 역산: 이 무게로 할 수 있는 대략의 횟수
-    const r = pct >= 100 ? 1 : Math.max(1, Math.round(30 * (oneRM / ((oneRM * pct) / 100) - 1)));
+    const r = pct >= 100 ? 1 : Math.max(1, Math.round(30 * (100 / pct - 1)));
     return { pct, kg, reps: r };
   });
-  return { oneRM, rows };
+  return { oneRM, reliable: reps >= 1 && reps <= ONE_RM_MAX_REPS, rows };
+}
+
+/** 주별 총 볼륨·작업 세트·운동 수 (최근 weeks 주, 오래된 순). 볼륨 추이 그래프용 */
+export function weeklyTotals(workouts: Workout[], byId: Map<string, Exercise>, today: string, weeks = 8, bw: BodyweightEntry[] = []): { week: string; volume: number; sets: number; count: number }[] {
+  const starts: string[] = [];
+  let cur = weekStart(today);
+  for (let i = 0; i < weeks; i++) {
+    starts.unshift(cur);
+    const [y, m, d] = cur.split('-').map(Number);
+    cur = localDate(new Date(y!, m! - 1, d! - 7));
+  }
+  const out = new Map(starts.map((w) => [w, { week: w, volume: 0, sets: 0, count: 0 }]));
+  for (const w of workouts) {
+    if (!w.endedAt) continue;
+    const row = out.get(weekStart(localDate(w.startedAt)));
+    if (!row) continue;
+    const s = summarize(w, byId, bw);
+    row.volume += s.volume; row.sets += s.workSets; row.count++;
+  }
+  return [...out.values()];
+}
+
+/** 예상 대비 실제 시간: 예상이 있는 끝난 운동들의 평균 차이(초, +면 더 오래 걸림)와 개수 */
+export function plannedVsActual(sums: WorkoutSummary[], last = 10): { n: number; avgDiffSec: number; avgRatio: number } | undefined {
+  const xs = sums.filter((x) => x.plannedSec && x.durationSec > 0).slice(0, last);
+  if (!xs.length) return undefined;
+  const avgDiffSec = Math.round(xs.reduce((s, x) => s + (x.durationSec - x.plannedSec!), 0) / xs.length);
+  const avgRatio = Math.round((xs.reduce((s, x) => s + x.durationSec / x.plannedSec!, 0) / xs.length) * 100) / 100;
+  return { n: xs.length, avgDiffSec, avgRatio };
 }
