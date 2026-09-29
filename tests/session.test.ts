@@ -4,7 +4,7 @@ import { toChosung, matchesQuery } from '../src/core/search';
 import {
   planToRoutine, startWorkout, steps, currentStep, restAfter, completeSet, undoSet, addSet, removeSet, skipItem, replaceItem,
   appendExercise, adjustTimer, clearTimer, timerRemaining, finishWorkout, progress, lastSets, updateSet, epley1RM,
-  emptyRoutine, routineEstimate, mergeWithNext, splitBlock, applyRestToAll,
+  emptyRoutine, routineEstimate, mergeWithNext, splitBlock, applyRestToAll, stepSet,
 } from '../src/core/session';
 import { patternFor } from '../src/core/exercises';
 import type { Exercise } from '../src/core/types';
@@ -222,6 +222,13 @@ describe('P3 검토 반영', () => {
     expect(sp.blocks.map((b) => [b.kind, b.restSec])).toEqual([['single', 150], ['single', 90], ['single', 60], ['single', 90]]);
     expect(splitBlock(routine, 0, () => 1)).toBe(routine);
     expect(applyRestToAll(routine, 75, 100).blocks.every((b) => b.restSec === 75 && b.roundRestSec === 100)).toBe(true);
+  });
+  it('−/+는 저장된 최신 값에 더함, 0 아래 금지, 무게를 바꾸면 자동 값 아님', () => {
+    const w = updateSet(startWorkout('w1', routine, now, []), { block: 0, item: 0, set: 0 }, { weight: 40 });
+    const x = stepSet(stepSet(w, { block: 0, item: 0, set: 0 }, 'weight', 2.5), { block: 0, item: 0, set: 0 }, 'weight', 2.5);
+    expect(x.blocks[0]!.items[0]!.sets[0]).toMatchObject({ weight: 45, auto: false });
+    expect(stepSet(w, { block: 0, item: 0, set: 1 }, 'reps', -20).blocks[0]!.items[0]!.sets[1]!.reps).toBe(0);
+    expect(stepSet(w, { block: 2, item: 0, set: 0 }, 'seconds', 5).blocks[2]!.items[0]!.sets[0]!.seconds).toBe(50);
   });
   it('직접 추가 운동의 동작 유형', () => {
     expect(patternFor('가슴', 'compound')).toBe('H_PUSH');

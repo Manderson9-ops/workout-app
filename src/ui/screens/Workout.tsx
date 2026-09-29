@@ -4,7 +4,7 @@ import { activeOf, historyOf, mutate } from '../store';
 import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
-  currentStep, completeSet, undoSet, updateSet, addSet, removeSet, skipItem, replaceItem, appendExercise,
+  currentStep, completeSet, undoSet, updateSet, stepSet, addSet, removeSet, skipItem, replaceItem, appendExercise,
   adjustTimer, clearTimer, timerRemaining, progress, finishWorkout, restAfter, lastSets,
 } from '../../core/session';
 import { setTime, targetReps } from '../../core/time';
@@ -26,7 +26,9 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const warned = useRef<number>(0);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
 
-  const rem = w ? timerRemaining(w.timer, now) : 0;
+  // 표시 시각은 렌더 순간의 현재 시각 (250ms 틱은 다시 그리기용). 오래된 시각이면 설정보다 1초 길게 보일 수 있음
+  const nowMs = Math.max(now, Date.now());
+  const rem = w ? timerRemaining(w.timer, nowMs) : 0;
   const curKey = w ? JSON.stringify(currentStep(w) ?? null) : '';
   useEffect(() => {
     // 현재 세트가 타이머에 가리지 않게 화면 가운데로
@@ -58,7 +60,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const cur = currentStep(w);
   const openIdx = open ?? cur?.block ?? 0;
   const history = historyOf(s);
-  const prog = progress(w, now, (id, reps) => { const e = byId.get(id); return e ? setTime(e, reps) : 40; });
+  const prog = progress(w, nowMs, (id, reps) => { const e = byId.get(id); return e ? setTime(e, reps) : 40; });
   const nameOf = (id: string) => byId.get(id)?.name_ko ?? id;
   const complete = (st: Step) => { unlockAudio(); setEnded(false); void upd((cw) => completeSet(cw, st, Date.now())); setOpen(null); };
   const curItem = cur ? w.blocks[cur.block]!.items[cur.item]! : undefined;
@@ -85,10 +87,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         </div>
         {isCur && (
           <div class="grid2" style={{ margin: '4px 0 2px' }}>
-            <Stepper pendingKey={`${b}-${i}-${k}-w2`} label={`${label} 무게 조절`} value={x.weight} step={2.5} suffix="kg" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
+            <Stepper pendingKey={`${b}-${i}-${k}-w2`} label={`${label} 무게 조절`} value={x.weight} step={2.5} suffix="kg" onStep={(d) => void upd((cw) => stepSet(cw, st, 'weight', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
             {timeEx
-              ? <Stepper integer pendingKey={`${b}-${i}-${k}-s2`} label={`${label} 초 조절`} value={x.seconds} step={5} suffix="초" onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
-              : <Stepper integer pendingKey={`${b}-${i}-${k}-r2`} label={`${label} 횟수 조절`} value={x.reps} step={1} suffix="회" onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
+              ? <Stepper integer pendingKey={`${b}-${i}-${k}-s2`} label={`${label} 초 조절`} value={x.seconds} step={5} suffix="초" onStep={(d) => void upd((cw) => stepSet(cw, st, 'seconds', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
+              : <Stepper integer pendingKey={`${b}-${i}-${k}-r2`} label={`${label} 횟수 조절`} value={x.reps} step={1} suffix="회" onStep={(d) => void upd((cw) => stepSet(cw, st, 'reps', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
           </div>
         )}
         {isCur && !x.warmup && (

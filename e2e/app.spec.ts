@@ -191,4 +191,31 @@ test('시간이 너무 짧으면 이유를 보여줌, 부위 없이 만들 수 �
   await noHorizontalScroll(page);
 });
 
+test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 −/+', async ({ page }) => {
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByRole('button', { name: '운동 사이 늘리기' }).click(); // 60 → 75
+  await page.getByRole('button', { name: '단관절 세트 간 줄이기' }).click(); // 90 → 75
+  await page.getByRole('link', { name: '홈' }).click();
+  await page.getByRole('button', { name: '+ 직접' }).click();
+  for (const q of ['해머 컬', '케이블 크런치']) {
+    await page.getByRole('button', { name: '+ 운동 추가' }).click();
+    await page.getByLabel('운동 검색').fill(q);
+    await page.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
+  }
+  await expect(page.getByText('75초').first()).toBeVisible(); // 새로 추가한 단관절 블록 = 설정값
+  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '세트 줄이기' }).first().click(); // 해머 컬 1세트
+  await page.getByRole('button', { name: '저장하고 시작' }).click();
+  await expect(page).toHaveURL(/#\/workout/);
+  // 입력 직후(포커스 유지) + 버튼: 입력값 12.5에 2.5를 더해 15
+  await page.getByLabel('해머 컬 1세트 무게', { exact: true }).click();
+  await page.getByLabel('해머 컬 1세트 무게', { exact: true }).pressSequentially('12.5');
+  await page.getByRole('button', { name: '해머 컬 1세트 무게 조절 늘리기' }).dispatchEvent('click');
+  await expect(page.getByLabel('해머 컬 1세트 무게', { exact: true })).toHaveValue('15');
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await expect(page.getByRole('timer')).toContainText('다음 운동으로 이동');
+  const sec = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
+  expect(sec).toBeGreaterThanOrEqual(73); // 운동 사이 휴식 = 설정 75초
+  expect(sec).toBeLessThanOrEqual(75);
+});
+
 void makeRoutine;

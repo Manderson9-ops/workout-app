@@ -133,6 +133,11 @@ function patchSet(w: Workout, s: Step, patch: Partial<SetLog>): Workout {
 }
 
 /** 사용자 입력. 무게를 직접 고치면 더 이상 자동 값이 아님 */
+/** 저장된 최신 값에 변화량을 더함 (−/+ 버튼). 0 아래로는 내려가지 않음 */
+export function stepSet(w: Workout, s: Step, field: 'weight' | 'reps' | 'seconds', delta: number): Workout {
+  const cur = w.blocks[s.block]!.items[s.item]!.sets[s.set]![field] ?? 0;
+  return updateSet(w, s, { [field]: Math.max(0, Math.round((cur + delta) * 10) / 10) });
+}
 export function updateSet(w: Workout, s: Step, patch: Partial<SetLog>): Workout { return patchSet(w, s, 'weight' in patch ? { ...patch, auto: false } : patch); }
 
 /** 세트 완료 → 휴식 타이머 자동 시작. 같은 운동의 뒤 세트 중 무게가 비었거나 자동 값이면 이번 무게로 채움 (웜업·직접 입력한 값은 제외) */

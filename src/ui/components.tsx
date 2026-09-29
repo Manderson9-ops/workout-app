@@ -15,26 +15,25 @@ export function GradeBadge({ g }: { g: Pick<ResolvedGrade, 'value' | 'source' | 
   return <span class={`badge ${cls}`} title={title} aria-label={`등급 ${g.value} ${title}`}>{g.value}{g.estimated ? ' 추정' : ''}</span>;
 }
 
-export function Stepper({ value, step, min = 0, onChange, label, suffix, integer, pendingKey }: { value: number | undefined; step: number; min?: number; onChange: (v: number) => void; label: string; suffix?: string; integer?: boolean; pendingKey?: string }) {
+/**
+ * −/+ 숫자 조절. onStep이 있으면 버튼은 "얼마나 바꿀지"만 넘기고, 받는 쪽이 저장된 최신 값에 더한다
+ * (입력 중인 값과 순서가 꼬이지 않게: 입력값 먼저 저장 → 최신 값 + 변화량). onStep이 없으면 화면 값 기준.
+ */
+export function Stepper({ value, step, min = 0, onChange, onStep, label, suffix, integer, pendingKey }: { value: number | undefined; step: number; min?: number; onChange: (v: number) => void; onStep?: (delta: number) => void; label: string; suffix?: string; integer?: boolean; pendingKey?: string }) {
   const key = pendingKey ?? label;
-  // −/+ 전에 이 칸에 입력 중인 값을 먼저 저장 (늦게 도착한 입력값이 −/+ 결과를 덮지 않게)
-  // 방금 입력한 값 (저장되기 전이라 props에 아직 없을 수 있음)
-  const typed = useRef<number | undefined>(undefined);
   const bump = async (d: number) => {
+    if (onStep) { onStep(d); return; }
     await flushKey(key);
-    const base = typed.current ?? value ?? 0;
-    typed.current = undefined;
-    onChange(Math.max(min, Math.round((base + d) * 10) / 10));
+    onChange(Math.max(min, Math.round(((value ?? 0) + d) * 10) / 10));
   };
   return (
     <div class="stepper" aria-label={label}>
       <button aria-label={`${label} 줄이기`} onClick={() => void bump(-step)}>−</button>
-      <NumInput label={label} pendingKey={key} value={value} suffix={suffix ?? ''} integer={integer} onChange={(n) => { typed.current = n; onChange(Math.max(min, n ?? min)); }} />
+      <NumInput label={label} pendingKey={key} value={value} suffix={suffix ?? ''} integer={integer} onChange={(n) => onChange(Math.max(min, n ?? min))} />
       <button aria-label={`${label} 늘리기`} onClick={() => void bump(step)}>+</button>
     </div>
   );
 }
-
 /**
  * 숫자 입력 (탭하면 숫자 키패드). 입력하는 대로 저장하되 0.3초 늦춰 모아서 저장한다(디바운스).
  * 세트 완료를 누르면 늦춘 저장을 먼저 끝낸다(flushPending). 아이폰 사파리는 버튼을 눌러도 입력칸 포커스가 안 빠지기 때문.
@@ -50,6 +49,8 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
     if (latest.current !== null) { const v = latest.current; latest.current = null; await Promise.resolve(onChange(v)); }
   };
   useEffect(() => () => { void flush(); }, []);
+  // 저장된 값이 다른 경로(−/+, 앞 세트 이어받기)로 바뀌면, 저장 대기 중인 입력이 없을 때 화면 글자도 맞춤
+  useEffect(() => { if (text !== null && latest.current === null) setText(value === undefined ? '' : String(value)); }, [value]);
   const shown = text ?? (value === undefined ? '' : String(value));
   return (
     <div style={{ position: 'relative' }}>
