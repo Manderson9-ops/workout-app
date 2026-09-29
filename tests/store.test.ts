@@ -32,4 +32,17 @@ describe('입력 저장 기다리기 (D-017, 검토 N1)', () => {
     await within(flushPending());
     expect(order).toEqual(['save-w', 'after-inner']);
   });
+
+  it('입력칸 두 개가 동시에 대기 중이어도 멈추지 않음 (검토 3차 시나리오)', async () => {
+    let aDone = false;
+    // A: 포커스가 빠지며 시작된 저장. 안에서 flushPending(세트 변경 경로)
+    const a = (async () => { await flushPending(); await tick(5); aDone = true; })();
+    trackInflight(a);
+    // C1, C2: 대기 중인 입력. 각자 저장하며 flushPending을 다시 부름
+    registerPending('c1', async () => { await tick(5); await flushPending(); });
+    registerPending('c2', async () => { await flushPending(); });
+    await within(flushPending());
+    await within(a);
+    expect(aDone).toBe(true);
+  });
 });
