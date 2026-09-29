@@ -6,3 +6,7 @@ reports/coverage/
 feedback/
 *.backup.json
 .env*
+
+test-results/
+playwright-report/
+reports/screens/

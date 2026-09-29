@@ -1,0 +1,92 @@
+import { useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
+import type { BuiltExercise, Part } from '../core/types';
+import { PARTS, EQUIPMENT_LABEL } from '../core/types';
+import type { ResolvedGrade } from '../core/exercises';
+import { resolveGrade, eligibleParts, equipmentAvailable } from '../core/exercises';
+import { matchesQuery } from '../core/search';
+import { GRADES } from '../core/version';
+import type { AppState } from './store';
+
+export function GradeBadge({ g }: { g: Pick<ResolvedGrade, 'value' | 'source' | 'estimated'> }) {
+  const cls = g.source === 'USER' ? 'user' : g.estimated ? 'est' : 'video';
+  const title = g.source === 'USER' ? '내가 정한 등급' : g.estimated ? '추정 (영상 없음)' : '영상 등급';
+  return <span class={`badge ${cls}`} title={title} aria-label={`등급 ${g.value} ${title}`}>{g.value}{g.estimated ? ' 추정' : ''}</span>;
+}
+
+export function Stepper({ value, step, min = 0, onChange, label, suffix }: { value: number | undefined; step: number; min?: number; onChange: (v: number) => void; label: string; suffix?: string }) {
+  const v = value ?? 0;
+  return (
+    <div class="stepper" aria-label={label}>
+      <button aria-label={`${label} 줄이기`} onClick={() => onChange(Math.max(min, Math.round((v - step) * 10) / 10))}>−</button>
+      <NumInput label={label} value={value} suffix={suffix ?? ''} onChange={(n) => onChange(Math.max(min, n ?? min))} />
+      <button aria-label={`${label} 늘리기`} onClick={() => onChange(Math.round((v + step) * 10) / 10)}>+</button>
+    </div>
+  );
+}
+
+/** 숫자 입력 (탭하면 숫자 키패드). 입력하는 즉시 저장한다: 아이폰 사파리는 버튼을 눌러도 입력칸 포커스가 안 빠져 change 이벤트가 늦게 오기 때문 */
+export function NumInput({ value, onChange, label, suffix }: { value: number | undefined; onChange: (v: number | undefined) => void; label: string; suffix: string }) {
+  const [text, setText] = useState<string | null>(null);
+  const shown = text ?? (value === undefined ? '' : String(value));
+  return (
+    <div style={{ position: 'relative' }}>
+      <input inputMode="decimal" aria-label={label} value={shown} placeholder="-" style={{ textAlign: 'center', paddingRight: '26px' }}
+        onFocus={() => setText(shown)} onBlur={() => setText(null)}
+        onInput={(e) => {
+          const t = (e.target as HTMLInputElement).value.replace(',', '.');
+          setText(t);
+          if (t.trim() === '') { onChange(undefined); return; }
+          const n = parseFloat(t);
+          if (Number.isFinite(n) && n >= 0) onChange(n);
+        }} />
+      <span class="pill" style={{ position: 'absolute', right: '8px', top: '13px', pointerEvents: 'none' }}>{suffix}</span>
+    </div>
+  );
+}
+export function Sheet({ onClose, title, children }: { onClose: () => void; title: string; children: ComponentChildren }) {
+  return (
+    <>
+      <div class="sheet-bg" onClick={onClose} />
+      <div class="sheet" role="dialog" aria-label={title}>
+        <div class="row between"><h3>{title}</h3><button class="ghost" onClick={onClose} aria-label="닫기">✕</button></div>
+        {children}
+      </div>
+    </>
+  );
+}
+
+/** 운동 고르기 (교체·추가). part가 있으면 그 부위 후보를 등급 순으로 먼저 */
+export function ExercisePicker({ s, all, part, exclude, onPick, onClose, title }: {
+  s: AppState; all: BuiltExercise[]; part?: Part; exclude?: string[]; onPick: (e: BuiltExercise) => void; onClose: () => void; title: string;
+}) {
+  const [q, setQ] = useState('');
+  const [p, setP] = useState<Part | undefined>(part);
+  const level = s.settings.level;
+  const list = all
+    .filter((e) => !(exclude ?? []).includes(e.id) && !s.meta.get(e.id)?.excluded && equipmentAvailable(e, s.settings.equipment))
+    .filter((e) => (p ? eligibleParts(e).includes(p) : true))
+    .filter((e) => matchesQuery(q, [e.name_ko, ...(e.aliases ?? [])]))
+    .map((e) => ({ e, g: resolveGrade(e, p ?? e.part, level, undefined, s.meta.get(e.id)?.userGrade) }))
+    .sort((a, b) => GRADES.indexOf(a.g.value) - GRADES.indexOf(b.g.value) || (a.g.estimated ? 1 : 0) - (b.g.estimated ? 1 : 0) || a.e.name_ko.localeCompare(b.e.name_ko))
+    .slice(0, 60);
+  return (
+    <Sheet onClose={onClose} title={title}>
+      <input placeholder="검색 (초성 가능: ㄹㅍㄷ)" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} aria-label="운동 검색" />
+      <div class="row wrap" style={{ margin: '8px 0' }}>
+        <button class={`chip ${!p ? 'on' : ''}`} onClick={() => setP(undefined)}>전체</button>
+        {PARTS.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} onClick={() => setP(x)}>{x}</button>)}
+      </div>
+      {list.map(({ e, g }) => (
+        <div class="list-item" key={e.id} onClick={() => onPick(e)} role="button" aria-label={e.name_ko}>
+          <GradeBadge g={g} />
+          <div class="grow"><div>{e.name_ko}</div><div class="pill">{e.part} · {e.equipment.map((q2) => EQUIPMENT_LABEL[q2]).join(', ')}</div></div>
+        </div>
+      ))}
+      {!list.length && <div class="empty">조건에 맞는 운동이 없어요</div>}
+    </Sheet>
+  );
+}
+
+export const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.max(0, Math.round(sec)) % 60).padStart(2, '0')}`;
+export const minutes = (sec: number) => `${Math.round(sec / 60)}분`;
