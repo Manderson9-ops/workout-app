@@ -1,0 +1,26 @@
+{
+  "name": "workout-app",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "iPhone PWA workout logger with rule-based plan generator. Rules: G:\\내 드라이브\\WORK_OUT_APP\\AGENTS.md",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "dexie": "^4.4.6",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@vitest/coverage-v8": "^5.0.2",
+    "fake-indexeddb": "^6.2.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  }
+}
