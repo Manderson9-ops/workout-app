@@ -1,0 +1,13 @@
+{
+  "_note": "앱 기본 추천 순서 (M-14). 영상 등급이 없어 모두 B '추정'인 운동끼리 순서를 정할 때만 쓴다(영상 등급 운동의 순서에는 영향 없음). 앱의 판단이며 영상 근거가 아니다. 부위별로 앞에 있을수록 먼저 뽑힌다. 여기 없는 운동은 그 뒤에 장비 순서·이름 순서로. 바꾸려면 decision-change 절차",
+  "order": {
+    "가슴": ["bench_press", "incline_db_press", "cable_fly", "machine_chest_press", "db_bench_press", "incline_machine_press", "pec_deck", "dip", "push_up"],
+    "등": ["seated_cable_row", "machine_high_row", "straight_arm_pulldown", "close_grip_lat_pulldown", "db_shrug", "back_extension", "inverted_row"],
+    "어깨": ["db_shoulder_press", "db_lateral_raise", "reverse_pec_deck", "machine_shoulder_press", "cable_lateral_raise", "face_pull", "barbell_ohp", "db_rear_delt_fly"],
+    "이두": ["incline_db_curl", "ez_bar_curl", "hammer_curl", "preacher_curl_machine", "bayesian_curl", "cable_curl", "db_curl"],
+    "삼두": ["oh_cable_ext_rope", "triceps_ext_machine", "reverse_grip_pushdown", "db_skull_crusher"],
+    "전완·악력": ["wrist_curl", "reverse_curl", "farmers_walk", "dead_hang", "reverse_wrist_curl"],
+    "하체": ["back_squat", "romanian_deadlift", "leg_press", "lying_leg_curl", "bulgarian_split_squat", "leg_extension", "hip_thrust", "standing_calf_raise", "hack_squat", "seated_leg_curl", "goblet_squat"],
+    "코어": ["hanging_leg_raise", "cable_crunch", "plank", "ab_wheel", "pallof_press", "side_plank"]
+  }
+}

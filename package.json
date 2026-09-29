@@ -12,7 +12,9 @@
     "test": "vitest run --coverage",
     "import:workout-k": "node tools/import_workout_k.ts",
     "data:check": "vitest run tests/data.test.ts tests/wkImport.test.ts",
-    "decisions:check": "node tools/check_decisions.ts"
+    "decisions:check": "node tools/check_decisions.ts",
+    "test:plans": "vitest run tests/planner.test.ts",
+    "samples": "vitest run tools/sample_plans.gen.ts"
   },
   "dependencies": {
     "dexie": "^4.4.6",

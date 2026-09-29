@@ -75,6 +75,8 @@ export interface Exercise {
   sec_per_rep?: number;
   setup_sec?: number;
   note?: string;
+  /** 앱 기본 추천 순서 (M-14, data/staples.json). 영상 등급 없는 운동끼리만 적용. 작을수록 먼저 */
+  staple?: Partial<Record<Part, number>>;
 }
 
 /** 빌드 결과(앱이 쓰는 형태) */

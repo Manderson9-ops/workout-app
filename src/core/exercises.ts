@@ -14,8 +14,10 @@ export interface WorkoutKData {
   combos: unknown[];
 }
 
-export function buildExercises(base: Exercise[], wk: WorkoutKData): BuiltExercise[] {
-  return base.map((e) => ({ ...e, grades: wk.grades[e.id] ?? [], guide: wk.guides[e.id] ?? [] }));
+export function buildExercises(base: Exercise[], wk: WorkoutKData, staples?: Partial<Record<Part, string[]>>): BuiltExercise[] {
+  const rank = new Map<string, Partial<Record<Part, number>>>();
+  for (const [part, ids] of Object.entries(staples ?? {}) as [Part, string[]][]) ids.forEach((id, i) => rank.set(id, { ...rank.get(id), [part]: i + 1 }));
+  return base.map((e) => ({ ...e, ...(rank.has(e.id) ? { staple: rank.get(e.id) } : {}), grades: wk.grades[e.id] ?? [], guide: wk.guides[e.id] ?? [] }));
 }
 
 /** 운동이 후보가 될 수 있는 부위: 기본 부위 + 영상 등급의 목적 부위 (예: 딥스 → 가슴, 삼두) */
@@ -112,5 +114,21 @@ export function validateExerciseData(base: Exercise[], families: Record<string, 
     }
   }
   for (const id of Object.keys(wk.guides)) if (!ids.has(id)) errs.push(`가이드 대상 운동 없음: ${id}`);
+  return errs;
+}
+
+/** 앱 기본 추천 순서(staples.json) 검증: 없는 운동, 해당 부위 후보가 아닌 운동, 중복 */
+export function validateStaples(all: BuiltExercise[], staples: Partial<Record<Part, string[]>>): string[] {
+  const errs: string[] = [];
+  const byId = new Map(all.map((e) => [e.id, e]));
+  for (const [part, ids] of Object.entries(staples) as [Part, string[]][]) {
+    if (!PARTS.includes(part)) errs.push(`부위 값: ${part}`);
+    if (new Set(ids).size !== ids.length) errs.push(`중복: ${part}`);
+    for (const id of ids) {
+      const e = byId.get(id);
+      if (!e) errs.push(`없는 운동: ${part} ${id}`);
+      else if (!eligibleParts(e).includes(part)) errs.push(`부위 후보 아님: ${part} ${id}`);
+    }
+  }
   return errs;
 }

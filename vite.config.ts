@@ -6,7 +6,7 @@ export default defineConfig({
   base: '/workout-app/',
   plugins: [preact()],
   test: {
-    include: ['tests/**/*.test.ts'],
+    include: process.env.SAMPLES_OUT ? ['tools/**/*.gen.ts'] : ['tests/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/core/**'],
