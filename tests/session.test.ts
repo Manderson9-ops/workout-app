@@ -4,7 +4,7 @@ import { toChosung, matchesQuery } from '../src/core/search';
 import {
   planToRoutine, startWorkout, steps, currentStep, restAfter, completeSet, undoSet, addSet, removeSet, skipItem, replaceItem,
   appendExercise, adjustTimer, clearTimer, timerRemaining, finishWorkout, progress, lastSets, updateSet, epley1RM,
-  emptyRoutine, routineEstimate, mergeWithNext, splitBlock, applyRestToAll, stepSet, setItemMemo,
+  emptyRoutine, routineEstimate, mergeWithNext, splitBlock, applyRestToAll, stepSet, setItemMemo, setWorkoutMemo,
 } from '../src/core/session';
 import { patternFor } from '../src/core/exercises';
 import type { Exercise } from '../src/core/types';
@@ -231,6 +231,7 @@ describe('P3 검토 반영', () => {
     expect(stepSet(w, { block: 2, item: 0, set: 0 }, 'seconds', 5).blocks[2]!.items[0]!.sets[0]!.seconds).toBe(50);
     expect(stepSet(updateSet(w, { block: 0, item: 0, set: 1 }, { reps: 7.6 }), { block: 0, item: 0, set: 1 }, 'reps', 1).blocks[0]!.items[0]!.sets[1]!.reps).toBe(9); // 횟수는 정수
     expect(setItemMemo(w, 0, 0, '그립 넓게').blocks[0]!.items[0]!.memo).toBe('그립 넓게');
+    expect(setWorkoutMemo(w, '컨디션 좋음').memo).toBe('컨디션 좋음');
   });
   it('직접 추가 운동의 동작 유형', () => {
     expect(patternFor('가슴', 'compound')).toBe('H_PUSH');

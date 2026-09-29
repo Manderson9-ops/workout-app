@@ -117,3 +117,17 @@ export function ExercisePicker({ s, all, part, exclude, onPick, onClose, title }
 
 export const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.max(0, Math.round(sec)) % 60).padStart(2, '0')}`;
 export const minutes = (sec: number) => `${Math.round(sec / 60)}분`;
+
+/** 메모 입력 시트 (한 손으로: 큰 입력칸, 아래쪽 버튼). prompt() 대신 */
+export function MemoSheet({ title, value, onSave, onClose }: { title: string; value?: string; onSave: (m: string | undefined) => void; onClose: () => void }) {
+  const [t, setT] = useState(value ?? '');
+  return (
+    <Sheet title={title} onClose={onClose}>
+      <textarea aria-label={title} value={t} onInput={(e) => setT((e.target as HTMLTextAreaElement).value)} placeholder="예: 그립을 조금 넓게, 오른쪽 어깨 불편" />
+      <div class="row" style={{ marginTop: '10px' }}>
+        {value && <button class="danger" onClick={() => { onSave(undefined); onClose(); }}>지우기</button>}
+        <button class="primary grow" onClick={() => { onSave(t.trim() || undefined); onClose(); }}>저장</button>
+      </div>
+    </Sheet>
+  );
+}

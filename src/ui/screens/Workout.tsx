@@ -4,11 +4,11 @@ import { activeOf, historyOf, mutate } from '../store';
 import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
-  currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, addSet, removeSet, skipItem, replaceItem, appendExercise,
+  currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, setWorkoutMemo, addSet, removeSet, skipItem, replaceItem, appendExercise,
   adjustTimer, clearTimer, timerRemaining, progress, finishWorkout, restAfter, lastSets,
 } from '../../core/session';
 import { setTime, targetReps } from '../../core/time';
-import { GradeBadge, Stepper, NumInput, ExercisePicker, mmss } from '../components';
+import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, mmss } from '../components';
 import { resolveGrade } from '../../core/exercises';
 import { updateWorkoutAfterInputs } from '../actions';
 import { go } from '../nav';
@@ -23,6 +23,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [open, setOpen] = useState<number | null>(null);
   const [picker, setPicker] = useState<{ mode: 'swap'; b: number; i: number } | { mode: 'add' } | null>(null);
   const [ended, setEnded] = useState(false);
+  const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
 
@@ -97,7 +98,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           <div class="row small" style={{ margin: '4px 0 6px 42px' }}>
             <span class="sub">남은 횟수 여유(RIR)</span>
             {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
-            <button class="chip" aria-label={`${label} 메모`} onClick={() => { const m = prompt('세트 메모', x.memo ?? ''); if (m !== null) void upd((cw) => updateSet(cw, st, { memo: m || undefined })); }}>메모</button>
+            <button class="chip" aria-label={`${label} 메모`} onClick={() => setMemo({ title: `${label} 메모`, value: x.memo, save: (m) => void upd((cw) => updateSet(cw, st, { memo: m })) })}>메모</button>
           </div>
         )}
         {x.memo && <div class="pill" style={{ marginLeft: '36px' }}>📝 {x.memo}</div>}
@@ -116,7 +117,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     <main style={{ paddingBottom: 'calc(var(--nav-h) + 260px)' }}>
       <div class="row between">
         <h1 class="grow" style={{ margin: '4px 0' }}>{w.name}</h1>
-        <button aria-label="운동 메모" onClick={() => { const m = prompt('오늘 운동 메모', w.memo ?? ''); if (m !== null) void upd((cw) => ({ ...cw, memo: m || undefined })); }}>메모</button>
+        <button aria-label="운동 메모" onClick={() => setMemo({ title: '오늘 운동 메모', value: w.memo, save: (m) => void upd((cw) => setWorkoutMemo(cw, m)) })}>메모</button>
         <button class="danger" onClick={finish}>종료</button>
       </div>
       {w.memo && <p class="sub small">📝 {w.memo}</p>}
@@ -153,7 +154,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
                     {it.sets.length > 1 && !it.sets[it.sets.length - 1]!.done && <button onClick={() => upd((cw) => removeSet(cw, { block: bi, item: ii, set: it.sets.length - 1 }))}>− 세트</button>}
                     <button onClick={() => setPicker({ mode: 'swap', b: bi, i: ii })}>교체</button>
                     <button onClick={() => upd((cw) => skipItem(cw, bi, ii, !it.skipped))}>{it.skipped ? '되살리기' : '건너뛰기'}</button>
-                    <button onClick={() => { const m = prompt('메모', it.memo ?? ''); if (m !== null) void upd((cw) => setItemMemo(cw, bi, ii, m || undefined)); }}>메모</button>
+                    <button onClick={() => setMemo({ title: `${nameOf(it.exerciseId)} 메모`, value: it.memo, save: (m) => void upd((cw) => setItemMemo(cw, bi, ii, m)) })}>메모</button>
                   </div>
                   {it.memo && <p class="sub small">📝 {it.memo}</p>}
                 </div>
@@ -190,6 +191,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         )}
       </div>
 
+      {memo && <MemoSheet title={memo.title} value={memo.value} onSave={memo.save} onClose={() => setMemo(null)} />}
       {picker && (
         <ExercisePicker s={s} all={all} title={picker.mode === 'swap' ? '운동 교체' : '운동 추가'}
           part={picker.mode === 'swap' ? byId.get(w.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part : undefined}

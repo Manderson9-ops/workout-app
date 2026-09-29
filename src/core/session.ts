@@ -180,6 +180,8 @@ export function skipItem(w: Workout, block: number, item: number, skipped = true
   return patchItem(w, block, item, (it) => ({ ...it, skipped }));
 }
 
+export function setWorkoutMemo(w: Workout, memo: string | undefined): Workout { return { ...w, memo }; }
+
 export function setItemMemo(w: Workout, block: number, item: number, memo: string | undefined): Workout {
   return patchItem(w, block, item, (it) => ({ ...it, memo }));
 }

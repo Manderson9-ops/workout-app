@@ -118,6 +118,12 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   await expect(page.getByRole('button', { name: '현재 세트 완료' })).toContainText('웜업 완료');
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await expect(page.getByRole('timer')).toContainText('웜업 후 휴식');
+  // 메모 시트 (한 손 입력, prompt 대신)
+  await page.getByRole('button', { name: '운동 메모' }).click();
+  await page.getByRole('dialog', { name: '오늘 운동 메모' }).getByRole('textbox').fill('컨디션 좋음');
+  await touchTargets(page);
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByText('📝 컨디션 좋음')).toBeVisible();
 });
 
 test('운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링크, 즐겨찾기', async ({ page }) => {
