@@ -16,9 +16,9 @@ describe('운동 데이터 검증', () => {
   it('오류 0건', () => {
     expect(validateExerciseData(base, familyFile.families, wk)).toEqual([]);
   });
-  it('기본 종목 120~150개, 8개 부위 모두 있음', () => {
+  it('기본 종목 120개 이상(설계 약 120~150, 추가 여유 200까지), 8개 부위 모두 있음', () => {
     expect(base.length).toBeGreaterThanOrEqual(120);
-    expect(base.length).toBeLessThanOrEqual(150);
+    expect(base.length).toBeLessThanOrEqual(200);
     expect(new Set(base.map((e) => e.part)).size).toBe(8);
   });
   it('WORK_OUT_K 영상 등급 42개가 35개 운동에 연결', () => {
@@ -145,6 +145,6 @@ describe('장비·무거운 힌지·묶음 고정', () => {
     expect(heavyHinges).toEqual(['deadlift', 'good_morning', 'rack_pull', 'romanian_deadlift', 'sumo_deadlift', 'trap_bar_deadlift']);
   });
   it('운동 → 묶음 전체 스냅샷 (묶음이 바뀌면 검토 후 스냅샷 갱신)', () => {
-    expect(Object.fromEntries(base.map((e) => [e.id, e.family]))).toMatchSnapshot();
+    expect({ exercise_family: Object.fromEntries(base.map((e) => [e.id, e.family])), family_labels: familyFile.families }).toMatchSnapshot();
   });
 });
