@@ -230,7 +230,7 @@ describe('무작위 입력 500건 + 경계 사례: 검증 규칙 위반 0 (BLUEP
     expect(failures).toEqual([]);
     expect(edge.length).toBeGreaterThanOrEqual(30);
   });
-  it('성능: 500건 중 95%가 200ms 이하, 부위 8개 모두 높음·부위 4개 모두 높음 사례 200ms 이하', () => {
+  it('성능: 무작위 500건 p95 200ms 이하, 부위 8개 모두 높음(묶음 모두 허용, 120분) 200ms 이하, 부위 4개 모두 높음 200ms 이하', () => {
     const times = reqs.map((q) => { const t = performance.now(); generatePlan(q, real); return performance.now() - t; }).sort((a, b) => a - b);
     expect(timed(times[Math.floor(times.length * 0.95)]!)).toBeLessThan(200);
     const worst = edge[16]!;
@@ -395,12 +395,13 @@ describe('검토 지적 회귀 테스트', () => {
     // 여유가 없으면 상한 문구 없음
     expect(generatePlan(req571(undefined), ex571).reasons.some((x) => x.includes('에 걸려'))).toBe(false);
   });
-  it('최악 사례(부위 8개, 우선순위 섞음, 묶음 모두 허용, 120분) 200ms 이하', () => {
+  it('성능: 부위 8개 우선순위 섞음(후보 수 최대, 묶음 모두 허용, 120분) 200ms 이하', () => {
     const pr: Priority[] = ['high', 'normal', 'low'];
     const q: PlanRequest = { parts: PARTS.map((part, i) => ({ part, priority: pr[i % 3]! })), level: '중급', targetMinutes: 120, groupings: ['superset', 'compound'] };
     const t0 = performance.now(); const p = generatePlan(q, real); const ms = performance.now() - t0;
     expect(timed(ms)).toBeLessThan(200);
     expect(p.candidateCount).toBeGreaterThan(10000);
+    console.log(`성능(섞음 최악): ${ms.toFixed(1)}ms, 후보 ${p.candidateCount}개`);
     expect(validatePlan(p, q, real)).toEqual([]);
   });
 });
@@ -443,5 +444,19 @@ describe('P2 재검토 회귀 테스트', () => {
       const bw = eq.some((x) => x.every((y) => y === 'bodyweight' || y === 'other'));
       expect(b.twoStations).toBe(!shared && !bw);
     }
+  });
+});
+
+describe('목표 시간 없음 + 부위 간 겹침', () => {
+  it('겹침으로 기본안보다 적으면 "다른 부위와 겹쳐 제외" (시간 부족 아님)', () => {
+    const g = { value: 'S' as Grade, levels: [], purpose_part: '이두' as Part, source: 'VIDEO' as const, video_id: 'v', timestamp: '0' };
+    const mk = (id: string, part: Part, m: string, grades: BuiltExercise['grades'] = []): BuiltExercise => ({ id, name_ko: id, family: id, part, muscles: [m], pattern: 'ISOLATION', mechanics: 'isolation', equipment: ['cable'], grades, guide: [] });
+    const synth = [mk('x', '등', 'p', [g]), mk('a', '등', 'q'), mk('b', '이두', 'r')];
+    const q: PlanRequest = { parts: [{ part: '등', priority: 'high' }, { part: '이두', priority: 'normal' }], level: '중급' };
+    const p = generatePlan(q, synth);
+    const bi = p.reasons.find((r) => r.startsWith('이두:'))!;
+    expect(bi).toContain("다른 부위와 겹쳐 제외: 'x'");
+    expect(bi).not.toContain('시간 부족');
+    expect(validatePlan(p, q, synth)).toEqual([]);
   });
 });

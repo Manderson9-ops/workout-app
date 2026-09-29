@@ -94,5 +94,26 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
     if (x === y || x.part !== y.part || y.rank >= x.rank) continue;
     if (basePos.get(y)! < basePos.get(x)! && blockPos.get(y)! > blockPos.get(x)!) errs.push(`묶음 때문에 순서 뒤집힘 (D-014): ${y.name} 뒤에 ${x.name}`);
   }
+  // 순위(rank)가 생성 규칙과 맞는지 직접 확인: 잠금이 먼저, 그다음 등급(좋은 순) → 영상 등급 우선(M-09) → 추정끼리는 앱 추천 순서(M-14) → 즐겨찾기 → 최근 → 장비 → 이름
+  // 같은 등급의 영상 등급 운동끼리는 근육 분산 때문에 순서가 바뀔 수 있어 비교하지 않는다
+  const fav = new Set(req.favorites ?? []), recent = new Set(req.recent ?? []);
+  const EQR: Record<string, number> = { cable: 0, machine: 0, smith: 1, dumbbell: 2, bodyweight: 3, band: 4, barbell: 5, other: 6 };
+  const rankKey = (i: (typeof items)[number]) => {
+    const e = byId.get(i.exerciseId)!;
+    return [i.locked ? 0 : 1, GRADES.indexOf(i.grade), i.estimated ? 1 : 0, i.estimated ? (e.staple?.[i.part] ?? 99) : 0, fav.has(e.id) ? 0 : 1, recent.has(e.id) ? 0 : 1, Math.min(...e.equipment.map((q) => EQR[q]!))];
+  };
+  for (const { part } of req.parts) {
+    const mine = items.filter((i) => i.part === part && byId.has(i.exerciseId));
+    if (new Set(mine.map((i) => i.rank)).size !== mine.length) errs.push(`순위 중복: ${part}`);
+    for (const x of mine) for (const y of mine) {
+      if (x === y || x.locked || y.locked) continue;
+      const sameVideoGrade = x.grade === y.grade && !x.estimated && !y.estimated;
+      if (sameVideoGrade) continue;
+      const kx = rankKey(x), ky = rankKey(y);
+      const c0 = cmpKey(kx, ky) || (x.name < y.name ? -1 : x.name > y.name ? 1 : 0);
+      if (c0 < 0 && x.rank > y.rank) errs.push(`순위가 생성 규칙과 다름: ${part} ${x.name} / ${y.name}`);
+    }
+    for (const l of mine.filter((i) => i.locked)) if (mine.some((o) => !o.locked && o.rank < l.rank)) errs.push(`잠금이 순위 맨 앞이 아님: ${l.name}`);
+  }
   return errs;
 }
