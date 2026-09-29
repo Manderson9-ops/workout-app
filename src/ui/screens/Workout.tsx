@@ -4,7 +4,7 @@ import { activeOf, historyOf, mutate } from '../store';
 import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
-  currentStep, completeSet, undoSet, updateSet, stepSet, addSet, removeSet, skipItem, replaceItem, appendExercise,
+  currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, addSet, removeSet, skipItem, replaceItem, appendExercise,
   adjustTimer, clearTimer, timerRemaining, progress, finishWorkout, restAfter, lastSets,
 } from '../../core/session';
 import { setTime, targetReps } from '../../core/time';
@@ -153,7 +153,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
                     {it.sets.length > 1 && !it.sets[it.sets.length - 1]!.done && <button onClick={() => upd((cw) => removeSet(cw, { block: bi, item: ii, set: it.sets.length - 1 }))}>− 세트</button>}
                     <button onClick={() => setPicker({ mode: 'swap', b: bi, i: ii })}>교체</button>
                     <button onClick={() => upd((cw) => skipItem(cw, bi, ii, !it.skipped))}>{it.skipped ? '되살리기' : '건너뛰기'}</button>
-                    <button onClick={() => { const m = prompt('메모', it.memo ?? ''); if (m !== null) upd((cw) => ({ ...cw, blocks: cw.blocks.map((bb, x) => x !== bi ? bb : { ...bb, items: bb.items.map((y, z) => (z === ii ? { ...y, memo: m } : y)) }) })); }}>메모</button>
+                    <button onClick={() => { const m = prompt('메모', it.memo ?? ''); if (m !== null) void upd((cw) => setItemMemo(cw, bi, ii, m || undefined)); }}>메모</button>
                   </div>
                   {it.memo && <p class="sub small">📝 {it.memo}</p>}
                 </div>

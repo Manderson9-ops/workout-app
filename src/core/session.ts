@@ -123,85 +123,83 @@ export function restAfter(w: Workout, step: Step): { sec: number; kind: Timer['k
   return { sec: b.roundRestSec, kind: 'round', label: '라운드 후 휴식' };
 }
 
-function patchSet(w: Workout, s: Step, patch: Partial<SetLog>): Workout {
-  return {
-    ...w,
-    blocks: w.blocks.map((b, bi) => bi !== s.block ? b : {
-      ...b, items: b.items.map((it, ii) => ii !== s.item ? it : { ...it, sets: it.sets.map((x, si) => si !== s.set ? x : { ...x, ...patch }) }),
-    }),
-  };
+/** 운동 하나(블록 b의 i번째)만 바꾼 새 Workout. 모든 운동 단위 변경이 이 함수를 거친다 */
+export function patchItem(w: Workout, block: number, item: number, fn: (it: WorkoutItem) => WorkoutItem): Workout {
+  return { ...w, blocks: w.blocks.map((b, bi) => bi !== block ? b : { ...b, items: b.items.map((it, ii) => (ii === item ? fn(it) : it)) }) };
+}
+/** 세트 하나만 바꿈 */
+function patchSet(w: Workout, s: Step, fn: (x: SetLog) => SetLog): Workout {
+  return patchItem(w, s.block, s.item, (it) => ({ ...it, sets: it.sets.map((x, si) => (si === s.set ? fn(x) : x)) }));
 }
 
-/** 사용자 입력. 무게를 직접 고치면 더 이상 자동 값이 아님 */
-/** 저장된 최신 값에 변화량을 더함 (−/+ 버튼). 0 아래로는 내려가지 않음 */
+/** 저장된 최신 값에 변화량을 더함 (−/+ 버튼). 0 아래로는 내려가지 않음. 횟수·초는 정수 */
 export function stepSet(w: Workout, s: Step, field: 'weight' | 'reps' | 'seconds', delta: number): Workout {
   const cur = w.blocks[s.block]!.items[s.item]!.sets[s.set]![field] ?? 0;
-  return updateSet(w, s, { [field]: Math.max(0, Math.round((cur + delta) * 10) / 10) });
+  const v = field === 'weight' ? Math.round((cur + delta) * 10) / 10 : Math.round(cur + delta);
+  return updateSet(w, s, { [field]: Math.max(0, v) });
 }
-export function updateSet(w: Workout, s: Step, patch: Partial<SetLog>): Workout { return patchSet(w, s, 'weight' in patch ? { ...patch, auto: false } : patch); }
+/** 사용자 입력. 무게를 직접 고치면 더 이상 자동 값이 아님 */
+export function updateSet(w: Workout, s: Step, patch: Partial<SetLog>): Workout {
+  return patchSet(w, s, (x) => ({ ...x, ...patch, ...('weight' in patch ? { auto: false } : {}) }));
+}
 
 /** 세트 완료 → 휴식 타이머 자동 시작. 같은 운동의 뒤 세트 중 무게가 비었거나 자동 값이면 이번 무게로 채움 (웜업·직접 입력한 값은 제외) */
 export function completeSet(w: Workout, s: Step, nowMs: number): Workout {
   const cur = w.blocks[s.block]!.items[s.item]!.sets[s.set]!;
-  let done = patchSet(w, s, { done: true, doneAt: new Date(nowMs).toISOString() });
-  if (!cur.warmup && cur.weight !== undefined) {
-    done = { ...done, blocks: done.blocks.map((b, bi) => bi !== s.block ? b : { ...b, items: b.items.map((it, ii) => ii !== s.item ? it : { ...it, sets: it.sets.map((x, si) => (si > s.set && !x.done && !x.warmup && (x.weight === undefined || x.auto) ? { ...x, weight: cur.weight, auto: true } : x)) }) }) };
-  }
+  const carry = !cur.warmup && cur.weight !== undefined;
+  const done = patchItem(w, s.block, s.item, (it) => ({
+    ...it,
+    sets: it.sets.map((x, si) => {
+      if (si === s.set) return { ...x, done: true, doneAt: new Date(nowMs).toISOString() };
+      if (carry && si > s.set && !x.done && !x.warmup && (x.weight === undefined || x.auto)) return { ...x, weight: cur.weight, auto: true };
+      return x;
+    }),
+  }));
   const r = restAfter(w, s);
   return { ...done, timer: r ? { startedAt: nowMs, endsAt: nowMs + r.sec * 1000, label: r.label, kind: r.kind } : null };
 }
 
 export function undoSet(w: Workout, s: Step): Workout {
-  const { doneAt: _d, ...rest } = w.blocks[s.block]!.items[s.item]!.sets[s.set]!;
-  void _d;
-  const next = { ...w, blocks: w.blocks.map((b, bi) => bi !== s.block ? b : { ...b, items: b.items.map((it, ii) => ii !== s.item ? it : { ...it, sets: it.sets.map((x, si) => si !== s.set ? x : { ...rest, done: false }) }) }) };
+  const next = patchSet(w, s, ({ doneAt: _d, ...rest }) => ({ ...rest, done: false }));
   return { ...next, timer: null };
 }
 
 export function addSet(w: Workout, block: number, item: number, warmup = false): Workout {
-  return {
-    ...w,
-    blocks: w.blocks.map((b, bi) => bi !== block ? b : {
-      ...b, items: b.items.map((it, ii) => {
-        if (ii !== item) return it;
-        const last = it.sets.filter((x) => x.warmup === warmup).slice(-1)[0] ?? it.sets[0];
-        const ns: SetLog = { warmup, done: false, ...(last?.weight !== undefined ? { weight: warmup ? Math.round((last.weight * 0.5) / 2.5) * 2.5 : last.weight } : {}), ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : { reps: warmup ? 10 : it.target.reps }) };
-        return { ...it, sets: warmup ? [ns, ...it.sets] : [...it.sets, ns] };
-      }),
-    }),
-  };
+  return patchItem(w, block, item, (it) => {
+    const last = it.sets.filter((x) => x.warmup === warmup).slice(-1)[0] ?? it.sets[0];
+    const ns: SetLog = { warmup, done: false, ...(last?.weight !== undefined ? { weight: warmup ? Math.round((last.weight * 0.5) / 2.5) * 2.5 : last.weight } : {}), ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : { reps: warmup ? 10 : it.target.reps }) };
+    return { ...it, sets: warmup ? [ns, ...it.sets] : [...it.sets, ns] };
+  });
 }
 
 export function removeSet(w: Workout, s: Step): Workout {
-  return { ...w, blocks: w.blocks.map((b, bi) => bi !== s.block ? b : { ...b, items: b.items.map((it, ii) => ii !== s.item || it.sets.length <= 1 ? it : { ...it, sets: it.sets.filter((_, si) => si !== s.set) }) }) };
+  return patchItem(w, s.block, s.item, (it) => (it.sets.length <= 1 ? it : { ...it, sets: it.sets.filter((_, si) => si !== s.set) }));
 }
 
 export function skipItem(w: Workout, block: number, item: number, skipped = true): Workout {
-  return { ...w, blocks: w.blocks.map((b, bi) => bi !== block ? b : { ...b, items: b.items.map((it, ii) => (ii === item ? { ...it, skipped } : it)) }) };
+  return patchItem(w, block, item, (it) => ({ ...it, skipped }));
+}
+
+export function setItemMemo(w: Workout, block: number, item: number, memo: string | undefined): Workout {
+  return patchItem(w, block, item, (it) => ({ ...it, memo }));
 }
 
 export function replaceItem(w: Workout, block: number, item: number, exerciseId: string, history: Workout[]): Workout {
   const prev = lastSets(history, exerciseId);
-  return {
-    ...w, blocks: w.blocks.map((b, bi) => bi !== block ? b : {
-      ...b, items: b.items.map((it, ii) => {
-        if (ii !== item) return it;
-        let work = -1;
-        return {
-          ...it, exerciseId, skipped: false,
-          sets: it.sets.map((s) => {
-            if (!s.warmup) work++;
-            if (s.done) return s;
-            // 웜업 세트는 지난 작업 무게를 받지 않는다. 작업 세트는 작업 세트 순번으로 맞춤
-            const p = s.warmup ? undefined : prev[Math.min(work, prev.length - 1)];
-            return { warmup: s.warmup, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : { reps: s.warmup ? s.reps ?? 10 : p?.reps ?? it.target.reps }) };
-          }),
-        };
+  return patchItem(w, block, item, (it) => {
+    let work = -1;
+    return {
+      ...it, exerciseId, skipped: false,
+      sets: it.sets.map((s) => {
+        if (!s.warmup) work++;
+        if (s.done) return s;
+        // 웜업 세트는 지난 작업 무게를 받지 않는다. 작업 세트는 작업 세트 순번으로 맞춤
+        const p = s.warmup ? undefined : prev[Math.min(work, prev.length - 1)];
+        return { warmup: s.warmup, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : { reps: s.warmup ? s.reps ?? 10 : p?.reps ?? it.target.reps }) };
       }),
-    }),
-  };
+    };
+  });
 }
-
 export function appendExercise(w: Workout, exerciseId: string, sets: number, reps: number, restSec: number, history: Workout[], seconds?: number): Workout {
   const prev = lastSets(history, exerciseId);
   const item: WorkoutItem = {
