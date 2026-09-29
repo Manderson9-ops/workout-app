@@ -2,7 +2,7 @@ node_modules/
 dist/
 reports/coverage/
 .vite/
-# 개선 메모와 사용자 기록은 공개 저장소에 올리지 않는다 (AGENTS.md 규칙 3, D-003)
+# 개선 메모와 사용자 기록은 공개 저장소에 올리지 않는다 (AGENTS.md 위치 섹션, D-003)
 feedback/
 *.backup.json
 .env*
