@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "import:workout-k": "node tools/import_workout_k.ts",
-    "data:check": "vitest run tests/data.test.ts tests/wkImport.test.ts"
+    "data:check": "vitest run tests/data.test.ts tests/wkImport.test.ts",
+    "decisions:check": "node tools/check_decisions.ts"
   },
   "dependencies": {
     "dexie": "^4.4.6",

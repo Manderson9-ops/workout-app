@@ -21,9 +21,10 @@ describe('운동 데이터 검증', () => {
     expect(base.length).toBeLessThanOrEqual(200);
     expect(new Set(base.map((e) => e.part)).size).toBe(8);
   });
-  it('WORK_OUT_K 영상 등급 42개가 35개 운동에 연결', () => {
+  it('WORK_OUT_K 영상 등급 43개(티어 항목 전부)가 35개 운동에 연결, 미적용 0', () => {
     expect(Object.keys(wk.grades).length).toBe(35);
-    expect(Object.values(wk.grades).flat().length).toBe(42);
+    expect(Object.values(wk.grades).flat().length).toBe(43);
+    expect((wkFile as { unapplied: unknown[] }).unapplied).toEqual([]);
   });
   it('분할 템플릿 8개, 추천 조합 1개', () => {
     expect(wk.templates.length).toBe(8);
@@ -92,10 +93,14 @@ describe('등급 고르기 (BLUEPRINT 3.3)', () => {
     expect(resolveGrade(get('pull_up_wide'), '등', '중급').value).toBe('A');
     expect(resolveGrade(get('pull_up_wide'), '등', '중급', '광배 집중').value).toBe('D');
   });
-  it('수준 등급이 없으면 앱 기본값 B 추정: 어시스트 풀업 중급 (M-01 대기)', () => {
+  it('M-01 합침: 어시스트 풀업 (머신) 초보 S, 중급·상급 B+(피니셔)', () => {
     expect(resolveGrade(get('assisted_pull_up_machine'), '등', '초보').value).toBe('S');
-    const r = resolveGrade(get('assisted_pull_up_machine'), '등', '중급');
-    expect(r).toMatchObject({ value: 'B', estimated: true, source: 'APP_DEFAULT' });
+    expect(resolveGrade(get('assisted_pull_up_machine'), '등', '중급')).toMatchObject({ value: 'B+', estimated: false });
+    expect(resolveGrade(get('assisted_pull_up_machine'), '등', '상급').entry?.purpose_note).toBe('마지막 세트 피니셔');
+  });
+  it('수준에 맞는 등급이 없으면 앱 기본값 B 추정', () => {
+    const ex = { ...get('assisted_pull_up_machine'), grades: [get('assisted_pull_up_machine').grades[0]!] } as BuiltExercise;
+    expect(resolveGrade(ex, '등', '중급')).toMatchObject({ value: 'B', estimated: true, source: 'APP_DEFAULT' });
   });
   it('영상 없는 운동은 B 추정, 사용자 등급이 최우선', () => {
     expect(resolveGrade(get('leg_press'), '하체', '중급')).toMatchObject({ value: 'B', estimated: true });

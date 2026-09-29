@@ -266,6 +266,21 @@
     "video_id": "GclQVc4k4gU",
     "timestamp": "06:37",
     "primary_topic": true
+   },
+   {
+    "value": "B+",
+    "levels": [
+     "중급",
+     "상급"
+    ],
+    "purpose_part": "등",
+    "purpose_note": "마지막 세트 피니셔",
+    "source": "VIDEO",
+    "why": "중량·일반 풀업 뒤 마지막 세트를 어시스트로 해 등을 한계까지 털 수 있음.",
+    "target": "피니셔",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "06:37",
+    "primary_topic": true
    }
   ],
   "chin_up": [
@@ -1504,12 +1519,5 @@
    "text": "2개면 오버헤드 케이블 익스텐션(장두) + JM프레스(내측두), 3개면 긴 로프(또는 로프 2개) 푸시다운 추가"
   }
  ],
- "unapplied": [
-  {
-   "video_id": "GclQVc4k4gU",
-   "exercise": "어시스트 풀업 (마지막 세트 피니셔)",
-   "grade": "B+",
-   "reason": "결정 M-01 대기/거절로 미적용"
-  }
- ]
+ "unapplied": []
 }

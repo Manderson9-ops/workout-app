@@ -2,11 +2,11 @@
   "_note": "WORK_OUT_K에 나오는 이름 → 앱 운동(exercise) 또는 운동 묶음(families). 이름이 앱 운동 이름(name_ko)이나 aliases와 정확히 같으면 여기 없어도 된다. status: CONFIRMED(확정) | PROPOSED(사용자 확인 대기, 제안대로 임시 적용) | PENDING_MERGE(합치기 결정 전이라 적용 안 함)",
   "aliases": [
     {"name": "데드리프트 (등 운동으로 볼 때)", "exercise": "deadlift", "status": "CONFIRMED", "note": "등 목적 등급으로 가져옴 (grade_rules)"},
-    {"name": "어시스트 풀업 (마지막 세트 피니셔)", "exercise": "assisted_pull_up_machine", "status": "PENDING_MERGE", "decision": "M-01"},
-    {"name": "체스트 서포티드 로우", "families": ["supported_row"], "status": "PROPOSED", "decision": "M-06", "note": "등 영상 자세 포인트의 일반 명칭"},
+    {"name": "어시스트 풀업 (마지막 세트 피니셔)", "exercise": "assisted_pull_up_machine", "status": "CONFIRMED", "decision": "M-01"},
+    {"name": "체스트 서포티드 로우", "families": ["supported_row"], "status": "CONFIRMED", "decision": "M-06", "note": "등 영상 자세 포인트의 일반 명칭"},
     {"name": "라잉 트라이셉 익스텐션", "families": ["lying_ext"], "status": "CONFIRMED", "note": "삼두 영상 자세 포인트의 일반 명칭"},
     {"name": "오버헤드 트라이셉 익스텐션", "families": ["overhead_ext"], "status": "CONFIRMED", "note": "삼두 영상 자세 포인트의 일반 명칭"},
-    {"name": "스쿼트", "families": ["squat_barbell", "squat_light", "squat_machine"], "status": "PROPOSED", "decision": "M-05", "note": "초보 스쿼트 자세 영상의 일반 명칭"},
+    {"name": "스쿼트", "families": ["squat_barbell", "squat_light", "squat_machine"], "status": "CONFIRMED", "decision": "M-05", "note": "초보 스쿼트 자세 영상의 일반 명칭"},
     {"name": "오버헤드 케이블 익스텐션", "exercise": "oh_cable_ext_single", "status": "CONFIRMED", "note": "삼두 추천 조합 문구"},
     {"name": "긴 로프(또는 로프 2개) 푸시다운", "exercise": "long_rope_pushdown", "status": "CONFIRMED", "note": "삼두 추천 조합 문구"}
   ]
