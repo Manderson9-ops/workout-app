@@ -4,7 +4,7 @@
  */
 import type { BuiltExercise } from './types';
 import { EQUIPMENT } from './types';
-import { gradeAtLeast } from './version';
+import { gradeAtLeast, GRADES } from './version';
 import { isHeavyHinge, equipmentAvailable, eligibleParts, resolveGrade } from './exercises';
 import type { Plan, PlanRequest } from './planner';
 import { PART_SET_CAP } from './planner';
@@ -74,9 +74,25 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
   for (const m of plan.missingParts) {
     if (plan.status !== 'too_short' && !plan.reasons.some((r) => r.includes(m))) errs.push(`빠진 부위 이유 없음: ${m}`);
   }
-  if (plan.status === 'reduced' && !plan.reasons.some((r) => r.includes('부족'))) errs.push('reduced인데 부족 이유 없음');
+  if (plan.status === 'reduced' && !plan.reasons.some((r) => /\d+분 부족/.test(r))) errs.push('reduced인데 부족 이유 없음');
   if (plan.targetSec !== undefined && (plan.status === 'ok' || plan.status === 'reduced') && plan.estimatedSec > plan.targetSec) errs.push(`목표 시간 초과: ${plan.estimatedSec} > ${plan.targetSec}`);
   if (plan.targetSec !== undefined && plan.status === 'ok' && plan.estimatedSec < plan.targetSec - 300 && !plan.reasons.some((r) => r.includes('여유'))) errs.push('시간 창 밖인데 이유 없음');
   if (plan.status !== 'ok' && !plan.reasons.length) errs.push('상태 이유 없음');
+  // D-014: 묶음 때문에 같은 부위의 더 좋은 순위 운동이 뒤로 밀리지 않았는지 (묶음 없는 순서와 비교)
+  const PR = ['high', 'normal', 'low'];
+  const partInfo = new Map(req.parts.map((x, i) => [x.part, { pr: PR.indexOf(x.priority), order: i }]));
+  const key = (i: (typeof items)[number]) => {
+    const pi = partInfo.get(i.part) ?? { pr: 9, order: 99 };
+    const e = byId.get(i.exerciseId);
+    return [pi.pr, pi.order, e?.mechanics === 'compound' ? 0 : 1, GRADES.indexOf(i.grade), i.rank];
+  };
+  const cmpKey = (a: number[], b: number[]) => { for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k]! - b[k]!; return 0; };
+  const basePos = new Map([...items].sort((a, b) => cmpKey(key(a), key(b))).map((it, i) => [it, i]));
+  const blockPos = new Map<(typeof items)[number], number>();
+  plan.blocks.forEach((b, bi) => b.items.forEach((it) => blockPos.set(it, bi)));
+  for (const x of items) for (const y of items) {
+    if (x === y || x.part !== y.part || y.rank >= x.rank) continue;
+    if (basePos.get(y)! < basePos.get(x)! && blockPos.get(y)! > blockPos.get(x)!) errs.push(`묶음 때문에 순서 뒤집힘 (D-014): ${y.name} 뒤에 ${x.name}`);
+  }
   return errs;
 }

@@ -44,6 +44,8 @@ export interface PlanItem {
   /** 시간 운동(플랭크 등)의 세트당 초 */
   seconds?: number;
   grade: Grade; gradeSource: ResolvedGrade['source']; estimated: boolean; substituted: boolean; locked: boolean; why: string;
+  /** 부위 안 순위 (후보 풀 순서, 0이 가장 좋음). D-014 검증과 화면 정렬에 사용 */
+  rank: number;
 }
 export interface PlanBlock {
   kind: 'single' | 'superset' | 'compound'; items: PlanItem[];
@@ -68,7 +70,8 @@ export const PART_SET_CAP = 11;
 const MAX_SETS = 4, BASE_SETS = 3;
 const PRIORITY_ORDER: Priority[] = ['high', 'normal', 'low'];
 const ANTAGONISTS: [Part, Part][] = [['가슴', '등'], ['이두', '삼두']];
-const STATION_EQUIP: Equipment[] = ['cable', 'machine', 'smith', 'dumbbell', 'barbell', 'band'];
+/** 한 자리에서 같이 쓸 수 있는 장비 (케이블 타워, 덤벨 랙, 밴드). 머신·스미스·바벨은 서로 다른 자리로 본다 */
+const STATION_EQUIP: Equipment[] = ['cable', 'dumbbell', 'band'];
 
 interface PoolEntry { ex: BuiltExercise; grade: ResolvedGrade; substituted: boolean; locked?: number }
 interface PartState { part: Part; priority: Priority; order: number; pool: PoolEntry[]; baseCount: number; lockedCount: number; lockedSets: number }
@@ -193,6 +196,8 @@ function toBlocks(chosen: Chosen[], pairs: Pair[]): Chosen[][] {
 }
 
 const sameStation = (a: BuiltExercise, b: BuiltExercise) => a.equipment.some((q) => STATION_EQUIP.includes(q) && b.equipment.includes(q));
+/** 기구 두 개를 동시에 차지하는지: 둘 다 자리를 차지하는 장비인데 같은 자리가 아닐 때 (맨몸은 자리 차지 안 함) */
+const twoStations = (a: BuiltExercise, b: BuiltExercise) => !sameStation(a, b) && ![a, b].some((x) => x.equipment.every((q) => q === 'bodyweight' || q === 'other'));
 
 /** 5.5 짝 만들기: 품질 순서대로, 겹치지 않게, 같은 부위 순서를 뒤집지 않게(D-014). 슈퍼세트 짝이 없으면 컴파운드 세트로 */
 function makePairs(chosen: Chosen[], kinds: Grouping[], allowHeavy: boolean): Pair[] {
@@ -284,7 +289,10 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
   // K3: 우선순위 그룹마다 세트 값, K4: 부위별 운동 수
   const groups = PRIORITY_ORDER.filter((pr) => active.some((s) => s.priority === pr));
   const setOptions = targetSec === undefined ? [groups.map(() => BASE_SETS)] : cartesian(groups.map(() => [2, 3, 4]));
-  const countOptions = targetSec === undefined ? [active.map((s) => s.baseCount)] : cartesian(active.map((s) => range(Math.max(1, s.lockedCount), s.pool.length)));
+  // 목표 시간이 없으면 기본안(부위 간 겹침으로 못 채우면 그보다 적게)
+  const countOptions = targetSec === undefined
+    ? cartesian(active.map((s) => range(Math.max(1, s.lockedCount), s.baseCount)))
+    : cartesian(active.map((s) => range(Math.max(1, s.lockedCount), s.pool.length)));
 
   const between = p.betweenRestSec + p.moveSec;
   const stCache = new Map<PoolEntry, number>();
@@ -309,37 +317,32 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
   for (const setVals of setOptions) {
     const setsFor = (s: PartState) => setVals[groups.indexOf(s.priority)]!;
     for (const counts of countOptions) {
+      // 부위 우선순위 순서로 풀을 훑으며, 앞선 부위가 이미 쓴 운동·같은 묶음·무거운 힌지(M-12)는 건너뛰고 counts개를 채운다
       const chosen: Chosen[] = [];
       let valid = true;
-      const ids = new Set<string>(), fams = new Set<string>();
-      let lockedHeavy = 0, freeHeavy = 0;
+      const ids = new Set<string>();
+      const lockedAll = active.flatMap((s) => s.pool.filter((e) => e.locked !== undefined));
+      const fams = new Set<string>(lockedAll.map((e) => e.ex.family));
+      let heavyTaken = lockedAll.some((e) => isHeavyHinge(e.ex));
+      for (const e of lockedAll) ids.add(e.ex.id);
       active.forEach((s, k) => {
-        let total = 0;
-        for (let i = 0; i < counts[k]!; i++) {
+        let total = 0, taken = 0;
+        for (let i = 0; i < s.pool.length && taken < counts[k]!; i++) {
           const e = s.pool[i]!;
+          if (e.locked === undefined) {
+            if (ids.has(e.ex.id) || fams.has(e.ex.family) || (isHeavyHinge(e.ex) && heavyTaken)) continue;
+            ids.add(e.ex.id); fams.add(e.ex.family); if (isHeavyHinge(e.ex)) heavyTaken = true;
+          }
           const sets = e.locked ?? setsFor(s);
-          total += sets;
-          // 부위끼리 겹침: 같은 운동, 같은 묶음(잠금끼리는 허용), 무거운 힌지(M-12, 잠금은 예외)
-          if (ids.has(e.ex.id)) valid = false;
-          ids.add(e.ex.id);
-          if (e.locked === undefined) { if (fams.has(e.ex.family)) valid = false; fams.add(e.ex.family); }
-          if (isHeavyHinge(e.ex)) { if (e.locked !== undefined) lockedHeavy++; else freeHeavy++; }
+          total += sets; taken++;
           chosen.push({ entry: e, part: s, poolIdx: i, sets, reps: targetReps(e.ex) });
         }
-        if (total > Math.max(PART_SET_CAP, s.lockedSets)) valid = false;
+        if (taken < counts[k]! || total > Math.max(PART_SET_CAP, s.lockedSets)) valid = false;
       });
-      if (freeHeavy > (lockedHeavy ? 0 : 1)) valid = false;
       if (!valid) continue;
-      // 잠금 운동과 같은 묶음의 운동은 넣지 않음
-      const lockedFams = new Set(chosen.filter((c) => c.entry.locked !== undefined).map((c) => c.entry.ex.family));
-      if (chosen.some((c) => c.entry.locked === undefined && lockedFams.has(c.entry.ex.family))) continue;
-
       const removedEx = active.map((s, k) => Math.max(0, s.baseCount - counts[k]!));
-      const removedSets = active.map((s, k) => {
-        let r = 0;
-        for (let i = 0; i < Math.min(s.baseCount, counts[k]!); i++) { const e = s.pool[i]!; if (e.locked === undefined) r += Math.max(0, BASE_SETS - setsFor(s)); }
-        return r;
-      });
+      const removedSets = active.map((s, k) => chosen.filter((c) => c.part === s && c.entry.locked === undefined).slice(0, Math.min(s.baseCount, counts[k]!))
+        .reduce((r) => r + Math.max(0, BASE_SETS - setsFor(s)), 0));
       const ck = counts.join(',');
       let pairIdx = pairCache.get(ck);
       if (!pairIdx) {
@@ -375,6 +378,7 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
     }
   }
 
+  if (!best && targetSec === undefined) return emptyPlan('empty', [...reasons, '선택 부위끼리 운동이 겹쳐 구성할 수 없음'], req.parts.map((x) => x.part), targetSec, candidateCount, defaultRest);
   if (!best) {
     const highOnly = req.parts.filter((x) => x.priority === 'high');
     const fallbackParts = highOnly.length && highOnly.length < req.parts.length ? highOnly : req.parts.length > 1 ? [sortedParts(req)[0]!] : [];
@@ -404,18 +408,26 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
   if (targetSec !== undefined) {
     const baseDesc = active.map((s) => `${s.part} ${s.baseCount}개`).join(', ');
     reasons.push(`목표 ${req.targetMinutes}분: 기본안(${baseDesc} × ${BASE_SETS}세트, 기본 휴식)에서 시작해 예상 ${fmt(best.time)}로 맞춤`);
+  } else {
+    reasons.push(`목표 시간 없음: 기본안(${active.map((s) => `${s.part} ${s.baseCount}개`).join(', ')} × ${BASE_SETS}세트, 기본 휴식)으로 구성 (5.1), 예상 ${fmt(best.time)}`);
   }
   for (const s of active) {
     const mine = best.chosen.filter((c) => c.part === s);
     const free = mine.filter((c) => c.entry.locked === undefined);
+    const chosenSet = new Set(mine.map((m) => m.entry));
+    const others = best.chosen.filter((o) => o.part !== s);
+    const conflicts = (e: PoolEntry) => others.some((o) => o.entry.ex.id === e.ex.id || o.entry.ex.family === e.ex.family || (isHeavyHinge(e.ex) && isHeavyHinge(o.entry.ex)));
+    const lastIdx = Math.max(-1, ...mine.map((m) => m.poolIdx));
+    const overlapped = s.pool.filter((e, i) => !chosenSet.has(e) && conflicts(e) && (i <= lastIdx || i < s.baseCount));
     const added = mine.slice(s.baseCount);
-    const dropped = s.pool.slice(mine.length, s.baseCount);
+    const dropped = s.pool.filter((e) => chosenSet.has(e) || !conflicts(e)).slice(0, s.baseCount).filter((e) => !chosenSet.has(e));
     const n = mine.reduce((t, c) => t + c.sets, 0);
     const sets = free[0]?.sets;
     const parts: string[] = [`운동 ${mine.length}개, 총 ${n}세트`];
     if (sets !== undefined && sets !== BASE_SETS) parts.push(`세트 ${BASE_SETS}→${sets} (시간에 맞춤)`);
     if (added.length) parts.push(`남는 시간에 ${added.map((c) => `'${c.entry.ex.name_ko}'(${c.entry.grade.value})`).join(', ')} 추가`);
     if (dropped.length) parts.push(`시간 부족으로 ${dropped.map((e) => `'${e.ex.name_ko}'`).join(', ')} 뺌`);
+    if (overlapped.length) parts.push(`다른 부위와 겹쳐 제외: ${overlapped.map((e) => `'${e.ex.name_ko}'`).join(', ')}`);
     const slack = targetSec !== undefined && targetSec - best.time >= 60;
     const perEx = sets ?? 0;
     const capBound = slack && free.length > 0 && n + perEx > Math.max(PART_SET_CAP, s.lockedSets) && (perEx >= MAX_SETS || n + free.length > PART_SET_CAP);
@@ -425,12 +437,12 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
   }
   for (const pr of best.pairs) {
     const saved = single(pr.a) + single(pr.b) + between - group(pr.a, pr.b);
-    reasons.push(`${pr.a.entry.ex.name_ko} + ${pr.b.entry.ex.name_ko}: ${pr.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}로 묶음 (약 ${Math.round(saved / 60)}분 절약${sameStation(pr.a.entry.ex, pr.b.entry.ex) ? '' : ', 기구 두 개 동시 사용'})`);
+    reasons.push(`${pr.a.entry.ex.name_ko} + ${pr.b.entry.ex.name_ko}: ${pr.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}로 묶음 (약 ${saved < 90 ? `${Math.round(saved)}초` : `${Math.round(saved / 60)}분`} 절약${twoStations(pr.a.entry.ex, pr.b.entry.ex) ? ', 기구 두 개 동시 사용' : ''})`);
   }
   if (best.steps.c) reasons.push(`다관절 세트 간 휴식 ${p.restCompound}→${rest.compound}초`);
   if (best.steps.i) reasons.push(`단관절 세트 간 휴식 ${p.restIsolation}→${rest.isolation}초`);
   if (best.steps.r) reasons.push(`묶음 라운드 후 휴식 ${p.roundRest}→${rest.round}초`);
-  if (targetSec !== undefined && win(best)) reasons.push(`후보 수·세트 상한 때문에 목표보다 약 ${Math.floor((targetSec - best.time) / 60)}분 여유`);
+  if (targetSec !== undefined && win(best)) reasons.push(`목표보다 약 ${Math.floor((targetSec - best.time) / 60)}분 여유: 더 넣을 후보가 없거나(후보 수·부위당 세트 상한·다른 부위와 겹침) 하나 더 넣으면 목표를 넘음`);
   const est = best.chosen.filter((c) => c.entry.grade.estimated).length;
   if (est) reasons.push(`추정 등급 운동 ${est}개 포함: 영상 근거가 없어 B로 보고 앱 추천 순서로 고름 (M-09, M-14)`);
   const heavy = best.chosen.filter((c) => isHeavyHinge(c.entry.ex));
@@ -443,12 +455,12 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
       reps: c.entry.ex.measure === 'time' ? 0 : c.reps,
       ...(c.entry.ex.measure === 'time' ? { seconds: c.entry.ex.default_seconds ?? 30 } : {}),
       grade: c.entry.grade.value, gradeSource: c.entry.grade.source, estimated: c.entry.grade.estimated, substituted: c.entry.substituted, locked: c.entry.locked !== undefined,
-      why: whyText(c),
+      why: whyText(c), rank: c.poolIdx,
     }));
     const b = timed[i]!;
     if (m.length > 1) {
       const kind = pairOf.get(m[0]!)!.kind;
-      return { kind, items, roundRestSec: b.roundRest, transitionSec: p.transitionSec, timeSec: blockTime(b, p), twoStations: !sameStation(m[0]!.entry.ex, m[1]!.entry.ex) };
+      return { kind, items, roundRestSec: b.roundRest, transitionSec: p.transitionSec, timeSec: blockTime(b, p), twoStations: twoStations(m[0]!.entry.ex, m[1]!.entry.ex) };
     }
     return { kind: 'single', items, restSec: b.rest, timeSec: blockTime(b, p) };
   });

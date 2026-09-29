@@ -228,7 +228,7 @@ describe('무작위 입력 500건 + 경계 사례: 검증 규칙 위반 0 (BLUEP
     expect(failures).toEqual([]);
     expect(edge.length).toBeGreaterThanOrEqual(30);
   });
-  it('성능: 500건 중 95%가 200ms 이하, 최악 사례(부위 8개 모두 높음, 묶음 모두 허용, 120분) 200ms 이하', () => {
+  it('성능: 500건 중 95%가 200ms 이하, 부위 8개 모두 높음·부위 4개 모두 높음 사례 200ms 이하', () => {
     const times = reqs.map((q) => { const t = performance.now(); generatePlan(q, real); return performance.now() - t; }).sort((a, b) => a - b);
     expect(times[Math.floor(times.length * 0.95)]!).toBeLessThan(200);
     const worst = edge[16]!;
@@ -306,9 +306,13 @@ describe('손으로 계산한 시간 기준 사례 (7.1: 1초 이내 일치)', (
     ['웜업 목표 20분 하체', warmupFor(20, true, undefined).seconds, 360],
     ['웜업 목표 19분 세트', warmupFor(19, true, { exercise: U, sets: 1, reps: 10 }).seconds, 148],
     ['5.7.1 원암 랫풀다운 세트', setTime(ex571.find((x) => x.id === 'one_arm_lat_pulldown')!, 8), 76],
+    ['시간 운동 단일 3세트 휴식 60', blockTime({ kind: 'single', items: [{ exercise: T, sets: 3, reps: 0 }], rest: 60 }), 360],
+    ['한쪽씩 단일 3세트×10 휴식 90', blockTime({ kind: 'single', items: [{ exercise: U, sets: 3, reps: 10 }], rest: 90 }), 444],
+    ['묶음 4+2세트 한쪽씩+시간', blockTime({ kind: 'group', items: [{ exercise: U, sets: 4, reps: 8 }, { exercise: T, sets: 2, reps: 0 }], roundRest: 90 }), 2 * (76 + 80 + 10) + 2 * 76 + 3 * 90],
+    ['플랜 3블록 웜업 240', planTime(240, [{ kind: 'single', items: [{ exercise: A, sets: 1, reps: 8 }], rest: 0 }, { kind: 'single', items: [{ exercise: A, sets: 1, reps: 8 }], rest: 0 }, { kind: 'single', items: [{ exercise: A, sets: 1, reps: 8 }], rest: 0 }]), 240 + 3 * 44 + 2 * 90],
   ];
   it.each(cases)('%s', (_n, got, want) => expect(Math.abs(got - want)).toBeLessThanOrEqual(1));
-  it('기준 사례 20개 이상 (위 16개 + 5.7.1 플랜 4개)', () => expect(cases.length + 4).toBeGreaterThanOrEqual(20));
+  it('기준 사례 20개 이상 (시간 계산 20개 + 5.7.1 플랜 4개)', () => expect(cases.length).toBeGreaterThanOrEqual(20));
 });
 
 describe('휴식 줄이기 순서 (5.7 K2)', () => {
@@ -394,6 +398,48 @@ describe('검토 지적 회귀 테스트', () => {
     const q: PlanRequest = { parts: PARTS.map((part, i) => ({ part, priority: pr[i % 3]! })), level: '중급', targetMinutes: 120, groupings: ['superset', 'compound'] };
     const t0 = performance.now(); const p = generatePlan(q, real); const ms = performance.now() - t0;
     expect(ms).toBeLessThan(200);
+    expect(p.candidateCount).toBeGreaterThan(10000);
     expect(validatePlan(p, q, real)).toEqual([]);
+  });
+});
+
+describe('P2 재검토 회귀 테스트', () => {
+  it('두 부위 후보인 운동(딥스 S)이 부위를 날리지 않음: 가슴+삼두', () => {
+    const q: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }, { part: '삼두', priority: 'high' }], level: '중급', userGrades: { dip: 'S' } };
+    const p = generatePlan(q, real);
+    expect(p.status).toBe('ok');
+    expect(p.blocks.flatMap((b) => b.items).filter((i) => i.part === '삼두').length).toBeGreaterThanOrEqual(2);
+    expect(p.reasons.some((r) => r.includes('NaN'))).toBe(false);
+    expect(p.reasons.some((r) => r.startsWith('목표 시간 없음'))).toBe(true);
+    expect(validatePlan(p, q, real)).toEqual([]);
+    const p60 = generatePlan({ ...q, targetMinutes: 60 }, real);
+    expect(p60.reasons.some((r) => r.includes("시간 부족으로 '딥스'"))).toBe(false);
+    expect(validatePlan(p60, { ...q, targetMinutes: 60 }, real)).toEqual([]);
+  });
+  it('검증: 묶음 순서 뒤집힘(D-014)과 NaN 부족 이유를 잡음', () => {
+    const q: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }], level: '중급' };
+    const p = generatePlan(q, real);
+    const bad = JSON.parse(JSON.stringify(p)) as typeof p;
+    bad.blocks.reverse();
+    expect(validatePlan(bad, q, real).some((e) => e.includes('D-014'))).toBe(true);
+    const red = { ...JSON.parse(JSON.stringify(p)), status: 'reduced', reasons: ['선택 부위를 모두 넣기엔 NaN분 부족'] };
+    expect(validatePlan(red, q, real)).toContain('reduced인데 부족 이유 없음');
+  });
+  it('절약 시간이 90초 미만이면 초로 표시', () => {
+    const mk = (id: string, part: Part, m: string): BuiltExercise => ({ id, name_ko: id, family: id, part, muscles: [m], pattern: 'ISOLATION', mechanics: 'isolation', equipment: ['cable'], grades: [], guide: [], default_reps: [1, 1] });
+    const synth = [mk('a', '등', 'x'), mk('b', '이두', 'y')];
+    const p = generatePlan({ parts: [{ part: '등', priority: 'high' }, { part: '이두', priority: 'normal' }], level: '중급', groupings: ['superset'], groupingPreference: 'prefer', time: { roundRest: 170, roundRestMin: 170 } }, synth);
+    // 단일 3×23+2×90=249 두 개 + 이동 90 − 묶음(3×(23+23+10)+2×170=508) = 80초
+    expect(p.reasons.some((r) => /약 \d+초 절약/.test(r))).toBe(true);
+  });
+  it('기구 두 개 표시: 케이블+케이블은 한 자리, 머신+머신은 두 자리, 맨몸은 자리 차지 안 함', () => {
+    const q: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }, { part: '등', priority: 'high' }], level: '중급', targetMinutes: 40, groupings: ['superset'] };
+    const p = generatePlan(q, real);
+    for (const b of p.blocks.filter((x) => x.kind === 'superset')) {
+      const eq = b.items.map((i) => real.find((e) => e.id === i.exerciseId)!.equipment);
+      const shared = eq[0]!.some((x) => ['cable', 'dumbbell', 'band'].includes(x) && eq[1]!.includes(x));
+      const bw = eq.some((x) => x.every((y) => y === 'bodyweight' || y === 'other'));
+      expect(b.twoStations).toBe(!shared && !bw);
+    }
   });
 });
