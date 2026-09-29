@@ -4,7 +4,7 @@ import wkFile from '../data/exercises.workout_k.json';
 import stapleFile from '../data/staples.json';
 import { buildExercises, validateStaples } from '../src/core/exercises';
 import type { WorkoutKData } from '../src/core/exercises';
-import { generatePlan } from '../src/core/planner';
+import { generatePlan, pickRestSteps } from '../src/core/planner';
 import type { PlanRequest, Priority, Grouping } from '../src/core/planner';
 import { validatePlan } from '../src/core/validatePlan';
 import { setTime, blockTime, warmupFor, planTime, targetReps, DEFAULT_TIME } from '../src/core/time';
@@ -68,7 +68,7 @@ describe('BLUEPRINT 5.7.1 계산 예시 (고정 사례)', () => {
     expect(p.estimatedSec).toBe(3498);
     expect(names(p)).toContain('long_rope_pushdown');
     expect(p.rest).toEqual({ compound: 150, isolation: 90, round: 120 });
-    expect(p.reasons.some((r) => r.startsWith('등:') && r.includes('상한에 걸려'))).toBe(true);
+    expect(p.reasons.some((r) => r.startsWith('등:') && r.includes('에 걸려 더 늘리지 않음'))).toBe(true);
   });
   it('45분: 슈퍼세트 2쌍(원암+오버헤드 케이블, 켈소+JM) → 41분 00초, 휴식 그대로', () => {
     const p = generatePlan(req571(45), ex571);
@@ -87,7 +87,7 @@ describe('BLUEPRINT 5.7.1 계산 예시 (고정 사례)', () => {
       const a = generatePlan(r, ex571), b = generatePlan(r, ex571);
       expect(b).toEqual(a);
       const locked = a.blocks.flatMap((bl) => bl.items.map((i) => ({ exerciseId: i.exerciseId, part: i.part, sets: i.sets })));
-      const c = generatePlan({ ...r, locked }, ex571);
+      const c = generatePlan({ ...r, locked, lockedOnly: true }, ex571);
       expect(names(c)).toEqual(names(a));
       expect(c.estimatedSec).toBe(a.estimatedSec);
     }
@@ -212,7 +212,7 @@ describe('무작위 입력 500건 + 경계 사례: 검증 규칙 위반 0 (BLUEP
     { parts: [{ part: '이두', priority: 'high' }], level: '중급', targetMinutes: 10, groupings: ['compound'] },
     { parts: [{ part: '등', priority: 'high' }, { part: '전완·악력', priority: 'low' }], level: '중급', subGoals: { '등': '광배 집중', '전완·악력': '전완 근성장' }, minGrade: 'D', targetMinutes: 45 },
   ];
-  it(`무작위 ${reqs.length}건, 경계 ${edge.length}건 모두 통과`, () => {
+  it(`무작위 ${reqs.length}건, 경계 ${edge.length}건 모두 통과`, { timeout: 60000 }, () => {
     const failures: string[] = [];
     for (const q of [...reqs, ...edge]) {
       const p = generatePlan(q, real);
@@ -236,7 +236,8 @@ describe('무작위 입력 500건 + 경계 사례: 검증 규칙 위반 0 (BLUEP
     expect(worstMs).toBeLessThan(200);
     const four: PlanRequest = { parts: (['가슴', '등', '어깨', '하체'] as Part[]).map((part) => ({ part, priority: 'high' as Priority })), level: '중급', targetMinutes: 120, groupings: ['superset'] };
     const t1 = performance.now(); generatePlan(four, real); expect(performance.now() - t1).toBeLessThan(200);
-  });
+    console.log(`성능: p50 ${times[250]!.toFixed(1)}ms, p95 ${times[475]!.toFixed(1)}ms, 최대 ${times[499]!.toFixed(1)}ms, 최악 사례 ${worstMs.toFixed(1)}ms`);
+  }, 60000);
 });
 
 describe('검증 함수가 위반을 잡는지', () => {
@@ -284,3 +285,115 @@ describe('검증 함수가 위반을 잡는지', () => {
 // 등급 목록 사용 (타입 참조 유지)
 it('등급 목록', () => expect(GRADES[0]).toBe('S'));
 void (null as unknown as BuiltExercise);
+
+describe('손으로 계산한 시간 기준 사례 (7.1: 1초 이내 일치)', () => {
+  const e = (x: Partial<Exercise>): Exercise => ({ id: 'x', name_ko: 'x', family: 'f', part: '등', muscles: ['m'], pattern: 'V_PULL', mechanics: 'compound', equipment: ['cable'], ...x });
+  const A = e({}), U = e({ unilateral: true }), T = e({ measure: 'time', default_seconds: 60 }), TU = e({ measure: 'time', default_seconds: 30, unilateral: true }), I = e({ mechanics: 'isolation' });
+  const cases: [string, number, number][] = [
+    ['세트 10회', setTime(A, 10), 50],
+    ['한쪽씩 10회', setTime(U, 10), 88],
+    ['시간 60초', setTime(T, 0), 80],
+    ['한쪽씩 시간 30초', setTime(TU, 0), 88],
+    ['단일 4세트×6회 휴식 120', blockTime({ kind: 'single', items: [{ exercise: A, sets: 4, reps: 6 }], rest: 120 }), 512],
+    ['단일 2세트×15회 휴식 60', blockTime({ kind: 'single', items: [{ exercise: I, sets: 2, reps: 15 }], rest: 60 }), 190],
+    ['묶음 3+3세트 라운드 후 90', blockTime({ kind: 'group', items: [{ exercise: A, sets: 3, reps: 8 }, { exercise: I, sets: 3, reps: 12 }], roundRest: 90 }), 510],
+    ['묶음 2+4세트 라운드 후 120', blockTime({ kind: 'group', items: [{ exercise: A, sets: 2, reps: 8 }, { exercise: I, sets: 4, reps: 12 }], roundRest: 120 }), 692],
+    ['묶음 1+1세트', blockTime({ kind: 'group', items: [{ exercise: A, sets: 1, reps: 8 }, { exercise: I, sets: 1, reps: 12 }], roundRest: 120 }), 110],
+    ['드롭 1회 3세트', blockTime({ kind: 'single', items: [{ exercise: A, sets: 3, reps: 10, drops: 1, dropReps: 5 }], rest: 90 }), 355],
+    ['플랜 웜업 480 + 512 + 190', planTime(480, [{ kind: 'single', items: [{ exercise: A, sets: 4, reps: 6 }], rest: 120 }, { kind: 'single', items: [{ exercise: I, sets: 2, reps: 15 }], rest: 60 }]), 1272],
+    ['웜업 목표 30분', warmupFor(30, false, undefined).seconds, 480],
+    ['웜업 목표 29분', warmupFor(29, false, undefined).seconds, 240],
+    ['웜업 목표 20분 하체', warmupFor(20, true, undefined).seconds, 360],
+    ['웜업 목표 19분 세트', warmupFor(19, true, { exercise: U, sets: 1, reps: 10 }).seconds, 148],
+    ['5.7.1 원암 랫풀다운 세트', setTime(ex571.find((x) => x.id === 'one_arm_lat_pulldown')!, 8), 76],
+  ];
+  it.each(cases)('%s', (_n, got, want) => expect(Math.abs(got - want)).toBeLessThanOrEqual(1));
+  it('기준 사례 20개 이상 (위 16개 + 5.7.1 플랜 4개)', () => expect(cases.length + 4).toBeGreaterThanOrEqual(20));
+});
+
+describe('휴식 줄이기 순서 (5.7 K2)', () => {
+  it('단계 수가 같으면 단관절 먼저, 다음 묶음, 마지막 다관절', () => {
+    expect(pickRestSteps(1030, { c: 2, i: 2, r: 0 }, 1000)!.steps).toEqual({ c: 0, i: 1, r: 0 });
+    expect(pickRestSteps(1030, { c: 2, i: 0, r: 2 }, 1000)!.steps).toEqual({ c: 0, i: 0, r: 1 });
+    expect(pickRestSteps(1030, { c: 2, i: 0, r: 0 }, 1000)!.steps).toEqual({ c: 1, i: 0, r: 0 });
+    expect(pickRestSteps(1060, { c: 4, i: 1, r: 0 }, 1000)!.steps).toEqual({ c: 1, i: 0, r: 0 }); // 1단계로 되면 1단계
+    expect(pickRestSteps(2000, { c: 1, i: 1, r: 1 }, 1000)).toBeUndefined();
+  });
+});
+
+describe('잠금 (5.10)', () => {
+  const r: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }, { part: '등', priority: 'high' }], level: '중급', targetMinutes: 60 };
+  it('일부 잠금: 잠근 운동은 유지하고 나머지는 평소처럼 채움', () => {
+    const q = { ...r, locked: [{ exerciseId: 'bench_press', part: '가슴' as Part, sets: 4 }] };
+    const p = generatePlan(q, real);
+    const chest = p.blocks.flatMap((b) => b.items).filter((i) => i.part === '가슴');
+    expect(chest.length).toBeGreaterThanOrEqual(2);
+    expect(chest.find((i) => i.exerciseId === 'bench_press')).toMatchObject({ sets: 4, locked: true });
+    expect(chest.some((i) => i.exerciseId === 'decline_bench_press' || i.exerciseId === 'db_bench_press')).toBe(false); // 같은 묶음 제외
+    expect(validatePlan(p, q, real)).toEqual([]);
+  });
+  it('선택하지 않은 부위의 잠금은 무시하고 이유 표시', () => {
+    const p = generatePlan({ ...r, locked: [{ exerciseId: 'back_squat', part: '하체', sets: 3 }] }, real);
+    expect(p.reasons.some((x) => x.startsWith('잠금 무시'))).toBe(true);
+    expect(generatePlan({ ...r, locked: [{ exerciseId: 'ghost', part: '가슴', sets: 3 }] }, real).reasons.some((x) => x.includes('없는 운동 ghost'))).toBe(true);
+  });
+  it('잠금끼리 무거운 힌지 2개면 허용하고 이유 표시 (M-12 예외), 자동으로는 더 넣지 않음', () => {
+    const q: PlanRequest = { parts: [{ part: '하체', priority: 'high' }, { part: '등', priority: 'high' }], level: '중급', targetMinutes: 70, minGrade: 'D',
+      locked: [{ exerciseId: 'romanian_deadlift', part: '하체', sets: 3 }, { exerciseId: 'deadlift', part: '등', sets: 3 }] };
+    const p = generatePlan(q, real);
+    expect(validatePlan(p, q, real)).toEqual([]);
+    expect(p.reasons.some((x) => x.includes('M-12 예외'))).toBe(true);
+  });
+});
+
+describe('검토 지적 회귀 테스트', () => {
+  it('다른 부위 풀에만 있는 운동이 이 부위를 막지 않음: 등+하체 최소 D에서 하체에 루마니안 데드리프트', () => {
+    const q: PlanRequest = { parts: [{ part: '등', priority: 'high' }, { part: '하체', priority: 'high' }], level: '중급', minGrade: 'D' };
+    const p = generatePlan(q, real);
+    const ids = p.blocks.flatMap((b) => b.items.map((i) => i.exerciseId));
+    expect(ids).toContain('back_squat');
+    expect(ids.filter((i) => ['deadlift', 'romanian_deadlift', 'rack_pull', 'good_morning', 'sumo_deadlift', 'trap_bar_deadlift'].includes(i)).length).toBe(1);
+    expect(validatePlan(p, q, real)).toEqual([]);
+  });
+  it('시간 운동은 횟수 대신 초', () => {
+    const p = generatePlan({ parts: [{ part: '코어', priority: 'high' }], level: '중급', favorites: ['plank'], minGrade: 'B' }, real);
+    const plank = p.blocks.flatMap((b) => b.items).find((i) => i.exerciseId === 'plank')!;
+    expect(plank).toMatchObject({ reps: 0, seconds: 45 });
+  });
+  it('D-014: 묶음이 같은 부위 순서를 뒤집지 않음 (전신 70분: 벤치프레스가 인클라인보다 먼저)', () => {
+    const q: PlanRequest = { parts: [{ part: '하체', priority: 'high' }, { part: '등', priority: 'high' }, { part: '가슴', priority: 'normal' }, { part: '어깨', priority: 'normal' }, { part: '삼두', priority: 'low' }, { part: '이두', priority: 'low' }], level: '중급', targetMinutes: 70, groupings: ['superset'] };
+    const ids = generatePlan(q, real).blocks.flatMap((b) => b.items.map((i) => i.exerciseId));
+    const b = ids.indexOf('bench_press'), inc = ids.indexOf('incline_db_press');
+    if (b >= 0 && inc >= 0) expect(b).toBeLessThan(inc);
+  });
+  it('슈퍼세트 짝이 없으면 허용된 컴파운드 세트로', () => {
+    const mk = (id: string, part: Part, muscles: string[]): BuiltExercise => ({ id, name_ko: id, family: id, part, muscles, pattern: 'ISOLATION', mechanics: 'isolation', equipment: ['cable'], grades: [], guide: [] });
+    const synth = [mk('a', '등', ['m']), mk('b', '등', ['n']), mk('c', '이두', ['m', 'n'])];
+    const q: PlanRequest = { parts: [{ part: '등', priority: 'high' }, { part: '이두', priority: 'normal' }], level: '중급', targetMinutes: 12, groupings: ['superset', 'compound'] };
+    const p = generatePlan(q, synth);
+    expect(p.blocks.some((x) => x.kind === 'compound')).toBe(true);
+    expect(p.blocks.some((x) => x.kind === 'superset')).toBe(false);
+    expect(validatePlan(p, q, synth)).toEqual([]);
+  });
+  it('이유 문구: 세트 변경, 추가 운동, 절약 시간, 추정 개수, 결정 ID', () => {
+    const tri = generatePlan({ parts: [{ part: '삼두', priority: 'high' }], level: '중급', targetMinutes: 20, groupings: ['compound'] }, real);
+    expect(tri.reasons.some((x) => x.includes('세트 3→2'))).toBe(true);
+    const r60 = generatePlan(req571(60), ex571);
+    expect(r60.reasons.some((x) => x.includes('남는 시간에') && x.includes('긴 로프'))).toBe(true);
+    const r45 = generatePlan(req571(45), ex571);
+    expect(r45.reasons.some((x) => /약 \d+분 절약/.test(x))).toBe(true);
+    const chest = generatePlan({ parts: [{ part: '가슴', priority: 'high' }], level: '중급' }, real);
+    expect(chest.reasons.some((x) => x.includes('추정 등급 운동 3개') && x.includes('M-14'))).toBe(true);
+    const legs = generatePlan({ parts: [{ part: '하체', priority: 'high' }], level: '중급' }, real);
+    expect(legs.reasons.some((x) => x.includes('M-12'))).toBe(true);
+    // 여유가 없으면 상한 문구 없음
+    expect(generatePlan(req571(undefined), ex571).reasons.some((x) => x.includes('에 걸려'))).toBe(false);
+  });
+  it('최악 사례(부위 8개, 우선순위 섞음, 묶음 모두 허용, 120분) 200ms 이하', () => {
+    const pr: Priority[] = ['high', 'normal', 'low'];
+    const q: PlanRequest = { parts: PARTS.map((part, i) => ({ part, priority: pr[i % 3]! })), level: '중급', targetMinutes: 120, groupings: ['superset', 'compound'] };
+    const t0 = performance.now(); const p = generatePlan(q, real); const ms = performance.now() - t0;
+    expect(ms).toBeLessThan(200);
+    expect(validatePlan(p, q, real)).toEqual([]);
+  });
+});

@@ -1,10 +1,11 @@
 /**
- * 생성 결과 검증 (BLUEPRINT 5.9 + M-12). 오류가 없으면 빈 배열.
+ * 생성 결과 검증 (BLUEPRINT 5.9 + M-12 + D-014). 오류가 없으면 빈 배열.
+ * 잠금 운동은 사용자 선택이라 등급·세트·제외·장비·묶음(family) 검사에서 빠지고, 무거운 힌지는 "잠금이 있으면 추가로 넣지 않음"만 검사한다.
  */
 import type { BuiltExercise } from './types';
-import { gradeAtLeast } from './version';
-import { isHeavyHinge, equipmentAvailable } from './exercises';
 import { EQUIPMENT } from './types';
+import { gradeAtLeast } from './version';
+import { isHeavyHinge, equipmentAvailable, eligibleParts, resolveGrade } from './exercises';
 import type { Plan, PlanRequest } from './planner';
 import { PART_SET_CAP } from './planner';
 
@@ -13,47 +14,67 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
   const byId = new Map(all.map((e) => [e.id, e]));
   const items = plan.blocks.flatMap((b) => b.items);
   const minGrade = req.minGrade ?? 'B';
-  const exs = items.map((i) => byId.get(i.exerciseId));
-  if (exs.some((e) => !e)) errs.push('없는 운동 id');
+  const equip = req.equipment ?? [...EQUIPMENT];
+  if (items.some((i) => !byId.has(i.exerciseId))) errs.push('없는 운동 id');
   if ((plan.status === 'ok' || plan.status === 'reduced') && !items.length) errs.push('운동이 없음');
 
   for (const it of items) {
     const e = byId.get(it.exerciseId);
     if (!e) continue;
-    if (!it.locked && !it.substituted && !gradeAtLeast(it.grade, minGrade)) errs.push(`최소 등급 미만: ${it.name} ${it.grade}`);
-    if (!it.locked && it.sets < 2) errs.push(`운동당 2세트 미만: ${it.name}`);
-    if (!it.locked && it.sets > 4) errs.push(`운동당 4세트 초과: ${it.name}`);
-    if (!it.locked && (req.excluded ?? []).includes(it.exerciseId)) errs.push(`제외한 운동 포함: ${it.name}`);
-    if (!it.locked && !equipmentAvailable(e, req.equipment ?? [...EQUIPMENT])) errs.push(`없는 장비: ${it.name}`);
+    if (!it.locked) {
+      if (!it.substituted && !gradeAtLeast(it.grade, minGrade)) errs.push(`최소 등급 미만: ${it.name} ${it.grade}`);
+      if (it.sets < 2) errs.push(`운동당 2세트 미만: ${it.name}`);
+      if (it.sets > 4) errs.push(`운동당 4세트 초과: ${it.name}`);
+      if ((req.excluded ?? []).includes(it.exerciseId)) errs.push(`제외한 운동 포함: ${it.name}`);
+      if (!equipmentAvailable(e, equip)) errs.push(`없는 장비: ${it.name}`);
+      const g = resolveGrade(e, it.part, req.level, req.subGoals?.[it.part], req.userGrades?.[e.id]);
+      if (g.value !== it.grade || g.estimated !== it.estimated) errs.push(`등급 표시 불일치: ${it.name}`);
+      if (it.substituted) {
+        const existsOk = all.some((x) => eligibleParts(x).includes(it.part) && !(req.excluded ?? []).includes(x.id) && equipmentAvailable(x, equip) &&
+          gradeAtLeast(resolveGrade(x, it.part, req.level, req.subGoals?.[it.part], req.userGrades?.[x.id]).value, minGrade));
+        if (existsOk) errs.push(`대체가 필요 없는데 대체 표시: ${it.name}`);
+      }
+    }
     if (it.estimated !== (it.gradeSource === 'APP_DEFAULT')) errs.push(`추정 표시 불일치: ${it.name}`);
+    if ((e.measure === 'time') !== (it.seconds !== undefined) || (e.measure === 'time' && it.reps !== 0)) errs.push(`시간 운동 표시 오류: ${it.name}`);
   }
   const ids = items.map((i) => i.exerciseId);
   if (new Set(ids).size !== ids.length) errs.push('같은 운동 중복');
-  const fams = items.filter((i) => !i.locked && byId.has(i.exerciseId)).map((i) => byId.get(i.exerciseId)!.family);
-  if (new Set(fams).size !== fams.length) errs.push('같은 묶음(family) 중복');
-  if (exs.filter((e) => e && isHeavyHinge(e)).length > 1) errs.push('무거운 힌지 2개 이상 (M-12)');
+  const free = items.filter((i) => !i.locked && byId.has(i.exerciseId));
+  const lockedFams = new Set(items.filter((i) => i.locked && byId.has(i.exerciseId)).map((i) => byId.get(i.exerciseId)!.family));
+  const fams = free.map((i) => byId.get(i.exerciseId)!.family);
+  if (new Set(fams).size !== fams.length || fams.some((f) => lockedFams.has(f))) errs.push('같은 묶음(family) 중복');
+  const heavyFree = free.filter((i) => isHeavyHinge(byId.get(i.exerciseId)!)).length;
+  const heavyLocked = items.filter((i) => i.locked && byId.has(i.exerciseId) && isHeavyHinge(byId.get(i.exerciseId)!)).length;
+  if (heavyFree > (heavyLocked ? 0 : 1)) errs.push('무거운 힌지 2개 이상 (M-12)');
 
   for (const b of plan.blocks) {
     if (b.kind === 'single' && b.items.length !== 1) errs.push('단일 블록 운동 수 오류');
-    if (b.kind !== 'single') {
-      if (b.items.length < 2) errs.push('묶음 블록 운동 수 오류');
-      const [a, c] = b.items.map((i) => byId.get(i.exerciseId));
-      if (a && c) {
-        if (!req.allowHeavyInGroups && (a.heavy || c.heavy)) errs.push(`무거운 운동 묶음: ${a.name_ko}+${c.name_ko}`);
-        if (b.kind === 'superset') {
-          if (b.items[0]!.part === b.items[1]!.part) errs.push(`슈퍼세트가 같은 부위: ${a.name_ko}+${c.name_ko}`);
-          if (a.muscles.some((m) => c.muscles.includes(m))) errs.push(`슈퍼세트 주 근육 겹침: ${a.name_ko}+${c.name_ko}`);
-        }
-        if (b.kind === 'compound' && b.items[0]!.part !== b.items[1]!.part) errs.push(`컴파운드 세트가 다른 부위: ${a.name_ko}+${c.name_ko}`);
+    if (b.kind === 'single') continue;
+    if (b.items.length < 2) errs.push('묶음 블록 운동 수 오류');
+    const ex = b.items.map((i) => byId.get(i.exerciseId));
+    for (let x = 0; x < ex.length; x++) for (let y = x + 1; y < ex.length; y++) {
+      const a = ex[x], c = ex[y];
+      if (!a || !c) continue;
+      if (!req.allowHeavyInGroups && (a.heavy || c.heavy)) errs.push(`무거운 운동 묶음: ${a.name_ko}+${c.name_ko}`);
+      if (b.kind === 'superset') {
+        if (b.items[x]!.part === b.items[y]!.part) errs.push(`슈퍼세트가 같은 부위: ${a.name_ko}+${c.name_ko}`);
+        if (a.muscles.some((m) => c.muscles.includes(m))) errs.push(`슈퍼세트 주 근육 겹침: ${a.name_ko}+${c.name_ko}`);
       }
+      if (b.kind === 'compound' && b.items[x]!.part !== b.items[y]!.part) errs.push(`컴파운드 세트가 다른 부위: ${a.name_ko}+${c.name_ko}`);
     }
   }
   for (const { part } of req.parts) {
-    const n = items.filter((i) => i.part === part && !i.locked).reduce((s, i) => s + i.sets, 0);
-    if (n > PART_SET_CAP) errs.push(`부위당 세트 상한 초과: ${part} ${n}`);
-    const present = items.some((i) => i.part === part);
-    if (!present && !plan.missingParts.includes(part)) errs.push(`부위 누락(이유 없음): ${part}`);
+    const mine = items.filter((i) => i.part === part);
+    const n = mine.reduce((s, i) => s + i.sets, 0);
+    const lockedSets = mine.filter((i) => i.locked).reduce((s, i) => s + i.sets, 0);
+    if (n > Math.max(PART_SET_CAP, lockedSets)) errs.push(`부위당 세트 상한 초과: ${part} ${n}`);
+    if (!mine.length && !plan.missingParts.includes(part)) errs.push(`부위 누락(이유 없음): ${part}`);
   }
+  for (const m of plan.missingParts) {
+    if (plan.status !== 'too_short' && !plan.reasons.some((r) => r.includes(m))) errs.push(`빠진 부위 이유 없음: ${m}`);
+  }
+  if (plan.status === 'reduced' && !plan.reasons.some((r) => r.includes('부족'))) errs.push('reduced인데 부족 이유 없음');
   if (plan.targetSec !== undefined && (plan.status === 'ok' || plan.status === 'reduced') && plan.estimatedSec > plan.targetSec) errs.push(`목표 시간 초과: ${plan.estimatedSec} > ${plan.targetSec}`);
   if (plan.targetSec !== undefined && plan.status === 'ok' && plan.estimatedSec < plan.targetSec - 300 && !plan.reasons.some((r) => r.includes('여유'))) errs.push('시간 창 밖인데 이유 없음');
   if (plan.status !== 'ok' && !plan.reasons.length) errs.push('상태 이유 없음');
