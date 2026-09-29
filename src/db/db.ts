@@ -37,6 +37,8 @@ export class WorkoutDB extends Dexie {
   settings!: Table<Settings, string>;
   constructor(name = 'workout-app') {
     super(name);
+    // 스키마(색인) 변경 시에만 버전을 올린다. 설정에 필드를 더하는 것은 색인이 아니라 버전 변경이 필요 없고,
+    // getSettings가 기본값과 합쳐 옛 데이터를 채운다(테스트: '저장된 예전 설정에 휴식 기본값이 없어도 채워짐').
     this.version(1).stores({
       routines: 'id, updatedAt',
       workouts: 'id, startedAt, endedAt',

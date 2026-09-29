@@ -24,7 +24,7 @@ export function Home({ s }: { s: AppState }) {
       {!s.settings.storageNoticeSeen && (
         <div class="card" role="note" aria-label="저장 안내">
           <h3>기록은 이 아이폰에만 저장돼요</h3>
-          <p class="small">사파리에서 공유 → "홈 화면에 추가"로 설치해서 쓰세요. 홈 화면 아이콘을 지우면 기록도 지워지니, 백업 파일을 가끔 저장해 주세요(설정).</p>
+          <p class="small">사파리에서 공유 → "홈 화면에 추가"로 설치해서 쓰세요. 홈 화면 아이콘을 지우면 기록도 지워져요. 백업 파일 저장 기능은 곧 추가돼요.</p>
           <button onClick={() => mutate((d) => d.settings.put({ ...s.settings, key: 'main', storageNoticeSeen: true }))}>알겠어요</button>
         </div>
       )}

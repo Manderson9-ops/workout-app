@@ -10,7 +10,7 @@ import {
 import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, mmss } from '../components';
 import { resolveGrade } from '../../core/exercises';
-import { updateWorkout, updateWorkoutAfterInputs } from '../actions';
+import { updateWorkoutAfterInputs } from '../actions';
 import { go } from '../nav';
 
 import { unlockAudio, beep, wasAlerted, markAlerted } from '../device';
@@ -53,13 +53,14 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     );
   }
 
-  const upd = (fn: (x: Workout) => Workout) => updateWorkout(w.id, fn);
+  // 모든 변경은 입력 중인 값(늦춘 저장)을 먼저 저장한 뒤 적용 (아이폰은 버튼을 눌러도 입력칸 포커스가 안 빠짐)
+  const upd = (fn: (x: Workout) => Workout) => updateWorkoutAfterInputs(w.id, fn);
   const cur = currentStep(w);
   const openIdx = open ?? cur?.block ?? 0;
   const history = historyOf(s);
   const prog = progress(w, now, (id, reps) => { const e = byId.get(id); return e ? setTime(e, reps) : 40; });
   const nameOf = (id: string) => byId.get(id)?.name_ko ?? id;
-  const complete = (st: Step) => { unlockAudio(); setEnded(false); upd((cw) => completeSet(cw, st, Date.now())); setOpen(null); };
+  const complete = (st: Step) => { unlockAudio(); setEnded(false); void upd((cw) => completeSet(cw, st, Date.now())); setOpen(null); };
   const curItem = cur ? w.blocks[cur.block]!.items[cur.item]! : undefined;
   const nextRest = cur ? restAfter(w, cur) : null;
 
@@ -74,20 +75,20 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       <div key={k}>
         <div class={`set-row ${x.done ? 'done' : ''} ${isCur ? 'current' : ''}`}>
           <div class="set-no" aria-label={x.warmup ? '웜업 세트' : `${workNo}세트`}>{x.warmup ? 'W' : workNo}</div>
-          <NumInput label={`${label} 무게`} value={x.weight} suffix="kg" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
+          <NumInput pendingKey={`${b}-${i}-${k}-w`} label={`${label} 무게`} value={x.weight} suffix="kg" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
           {timeEx
-            ? <NumInput label={`${label} 초`} value={x.seconds} suffix="초" onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
-            : <NumInput label={`${label} 횟수`} value={x.reps} suffix="회" onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
+            ? <NumInput integer pendingKey={`${b}-${i}-${k}-s`} label={`${label} 초`} value={x.seconds} suffix="초" onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
+            : <NumInput integer pendingKey={`${b}-${i}-${k}-r`} label={`${label} 횟수`} value={x.reps} suffix="회" onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
           {x.done
             ? <button class="check" aria-label="완료 취소" onClick={() => upd((cw) => undoSet(cw, st))}>↺</button>
             : <button class={`check ${isCur ? 'ok' : ''}`} aria-label={`${nameOf(it.exerciseId)} ${x.warmup ? '웜업' : workNo + '세트'} 완료`} onClick={() => complete(st)}>✓</button>}
         </div>
         {isCur && (
           <div class="grid2" style={{ margin: '4px 0 2px' }}>
-            <Stepper label={`${label} 무게 조절`} value={x.weight} step={2.5} suffix="kg" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
+            <Stepper pendingKey={`${b}-${i}-${k}-w2`} label={`${label} 무게 조절`} value={x.weight} step={2.5} suffix="kg" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
             {timeEx
-              ? <Stepper label={`${label} 초 조절`} value={x.seconds} step={5} suffix="초" onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
-              : <Stepper label={`${label} 횟수 조절`} value={x.reps} step={1} suffix="회" onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
+              ? <Stepper integer pendingKey={`${b}-${i}-${k}-s2`} label={`${label} 초 조절`} value={x.seconds} step={5} suffix="초" onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
+              : <Stepper integer pendingKey={`${b}-${i}-${k}-r2`} label={`${label} 횟수 조절`} value={x.reps} step={1} suffix="회" onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
           </div>
         )}
         {isCur && !x.warmup && (

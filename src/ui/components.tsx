@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
-import { registerPending } from './store';
+import { registerPending, flushKey } from './store';
 import type { ComponentChildren } from 'preact';
 import type { BuiltExercise, Part } from '../core/types';
 import { PARTS, EQUIPMENT_LABEL } from '../core/types';
@@ -15,13 +15,22 @@ export function GradeBadge({ g }: { g: Pick<ResolvedGrade, 'value' | 'source' | 
   return <span class={`badge ${cls}`} title={title} aria-label={`등급 ${g.value} ${title}`}>{g.value}{g.estimated ? ' 추정' : ''}</span>;
 }
 
-export function Stepper({ value, step, min = 0, onChange, label, suffix, integer }: { value: number | undefined; step: number; min?: number; onChange: (v: number) => void; label: string; suffix?: string; integer?: boolean }) {
-  const v = value ?? 0;
+export function Stepper({ value, step, min = 0, onChange, label, suffix, integer, pendingKey }: { value: number | undefined; step: number; min?: number; onChange: (v: number) => void; label: string; suffix?: string; integer?: boolean; pendingKey?: string }) {
+  const key = pendingKey ?? label;
+  // −/+ 전에 이 칸에 입력 중인 값을 먼저 저장 (늦게 도착한 입력값이 −/+ 결과를 덮지 않게)
+  // 방금 입력한 값 (저장되기 전이라 props에 아직 없을 수 있음)
+  const typed = useRef<number | undefined>(undefined);
+  const bump = async (d: number) => {
+    await flushKey(key);
+    const base = typed.current ?? value ?? 0;
+    typed.current = undefined;
+    onChange(Math.max(min, Math.round((base + d) * 10) / 10));
+  };
   return (
     <div class="stepper" aria-label={label}>
-      <button aria-label={`${label} 줄이기`} onClick={() => onChange(Math.max(min, Math.round((v - step) * 10) / 10))}>−</button>
-      <NumInput label={label} value={value} suffix={suffix ?? ''} integer={integer} onChange={(n) => onChange(Math.max(min, n ?? min))} />
-      <button aria-label={`${label} 늘리기`} onClick={() => onChange(Math.round((v + step) * 10) / 10)}>+</button>
+      <button aria-label={`${label} 줄이기`} onClick={() => void bump(-step)}>−</button>
+      <NumInput label={label} pendingKey={key} value={value} suffix={suffix ?? ''} integer={integer} onChange={(n) => { typed.current = n; onChange(Math.max(min, n ?? min)); }} />
+      <button aria-label={`${label} 늘리기`} onClick={() => void bump(step)}>+</button>
     </div>
   );
 }
@@ -30,13 +39,14 @@ export function Stepper({ value, step, min = 0, onChange, label, suffix, integer
  * 숫자 입력 (탭하면 숫자 키패드). 입력하는 대로 저장하되 0.3초 늦춰 모아서 저장한다(디바운스).
  * 세트 완료를 누르면 늦춘 저장을 먼저 끝낸다(flushPending). 아이폰 사파리는 버튼을 눌러도 입력칸 포커스가 안 빠지기 때문.
  */
-export function NumInput({ value, onChange, label, suffix, integer }: { value: number | undefined; onChange: (v: number | undefined) => void; label: string; suffix: string; integer?: boolean }) {
+export function NumInput({ value, onChange, label, suffix, integer, pendingKey }: { value: number | undefined; onChange: (v: number | undefined) => void; label: string; suffix: string; integer?: boolean; pendingKey?: string }) {
+  const key = pendingKey ?? label;
   const [text, setText] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const latest = useRef<number | undefined | null>(null);
   const flush = async () => {
     if (timer.current) { clearTimeout(timer.current); timer.current = undefined; }
-    registerPending(label, null);
+    registerPending(key, null);
     if (latest.current !== null) { const v = latest.current; latest.current = null; await Promise.resolve(onChange(v)); }
   };
   useEffect(() => () => { void flush(); }, []);
@@ -54,7 +64,7 @@ export function NumInput({ value, onChange, label, suffix, integer }: { value: n
           else return;
           if (timer.current) clearTimeout(timer.current);
           timer.current = setTimeout(() => { void flush(); }, 300);
-          registerPending(label, flush);
+          registerPending(key, flush);
         }} />
       <span class="pill" style={{ position: 'absolute', right: '8px', top: '13px', pointerEvents: 'none' }}>{suffix}</span>
     </div>

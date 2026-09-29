@@ -49,6 +49,10 @@ export function setWorkoutLocal(w: Workout): void {
 /** 입력칸의 늦춘 저장(디바운스)을 모아 두었다가 세트 완료 전에 먼저 저장 */
 const pending = new Map<string, () => Promise<void>>();
 export function registerPending(key: string, fn: (() => Promise<void>) | null) { if (fn) pending.set(key, fn); else pending.delete(key); }
+export async function flushKey(key: string): Promise<void> {
+  const fn = pending.get(key); pending.delete(key);
+  if (fn) await fn();
+}
 export async function flushPending(): Promise<void> {
   const fns = [...pending.values()]; pending.clear();
   for (const fn of fns) await fn();

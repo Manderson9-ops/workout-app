@@ -8,7 +8,7 @@ import { WorkoutScreen } from './screens/Workout';
 import { SettingsScreen } from './screens/Settings';
 import { RoutineEditor } from './screens/RoutineEditor';
 import { mmss } from './components';
-import { useAudioUnlock, useWakeLock } from './device';
+import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
 
 export function useHash(): string {
   const [h, set] = useState(location.hash || '#/');
@@ -26,6 +26,7 @@ export function App() {
   const [, tick] = useState(0);
   const active = activeOf(s);
   useAudioUnlock();
+  useFlushOnHide();
   useWakeLock(!!active && s.settings.keepAwake);
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!s.ready) return <main><p class="sub">불러오는 중…</p></main>;

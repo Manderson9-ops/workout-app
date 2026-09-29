@@ -79,11 +79,15 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   // 7.1 핵심 흐름: 홈에서 시작 → 세트 3개 → 종료
   taps = 0;
   await tap(page.getByRole('button', { name: /등\+삼두 45분 시작/ }));
-  await expect(page.getByRole('heading', { name: '등+삼두 45분' })).toBeVisible();
+  await expect(page).toHaveURL(/#\/workout/);
+  await expect(page.getByRole('heading', { name: '등+삼두 45분', exact: true })).toBeVisible();
   await checkScreen(page, '03-workout');
   const big = page.getByRole('button', { name: '현재 세트 완료' });
-  await page.getByLabel('원암 랫풀다운 1세트 무게', { exact: true }).fill('40');
-  await tap(big);
+  // 아이폰처럼 입력칸 포커스를 빼지 않고 바로 완료 (blur 없이 click 이벤트만)
+  await page.getByLabel('원암 랫풀다운 1세트 무게', { exact: true }).click();
+  await page.getByLabel('원암 랫풀다운 1세트 무게', { exact: true }).pressSequentially('40');
+  taps++; await big.dispatchEvent('click');
+  await expect(page.getByLabel('원암 랫풀다운 1세트 무게', { exact: true })).toHaveValue('40');
   await expect(page.getByRole('timer')).toContainText('다음 운동으로 바로 (묶음)'); // 슈퍼세트 전환
   await expect(page.getByLabel('원암 랫풀다운 2세트 무게', { exact: true })).toHaveValue('40'); // 앞 세트 무게 이어받기
   await tap(big);
