@@ -6,12 +6,16 @@ import type { Level, Equipment } from '../../core/types';
 import { APP_VERSION } from '../../core/version';
 import { setMeta } from '../actions';
 import type { Settings } from '../../db/db';
+import { useState } from 'preact/hooks';
+import { saveBackupFile, readBackupFile, restoreBackup } from '../backupActions';
+import { go } from '../nav';
 
 export function SettingsScreen({ s }: { s: AppState }) {
   const st = s.settings;
   const put = (p: Partial<Settings>) => mutate((d) => d.settings.put({ ...st, ...p, key: 'main' }));
   const all = catalog(s.custom);
   const excluded = [...s.meta.values()].filter((m) => m.excluded);
+  const [msg, setMsg] = useState('');
   return (
     <main>
       <h1>설정</h1>
@@ -45,9 +49,28 @@ export function SettingsScreen({ s }: { s: AppState }) {
           <button onClick={() => setMeta(m.exerciseId, { excluded: false })}>되돌리기</button>
         </div>
       ))}
-      <h2>데이터</h2>
-      <p class="sub small">운동 기록은 이 아이폰 안에만 저장돼요. 홈 화면 아이콘을 지우면 기록도 지워지니 주의하세요. 백업 파일 저장은 다음 단계(P4)에서 추가돼요.</p>
-      <p class="sub small">앱 버전 {APP_VERSION}</p>
+      <h2>데이터 백업</h2>
+      <p class="sub small">운동 기록은 이 아이폰 안에만 저장돼요. 홈 화면 아이콘을 지우거나 폰을 바꾸면 사라지니 백업 파일을 가끔 저장하세요. "파일에 저장" → 구글 드라이브를 고르면 PC에서도 볼 수 있어요.</p>
+      <p class="small">마지막 백업: {st.lastBackupAt ? new Date(st.lastBackupAt).toLocaleString('ko-KR') : '없음'}</p>
+      <div class="row wrap">
+        <button class="primary" onClick={async () => { const r = await saveBackupFile(); setMsg(r === 'cancelled' ? '저장을 취소했어요' : '백업 파일을 저장했어요'); }}>백업 파일 저장</button>
+        <label class="btn" style={{ margin: 0 }}>
+          백업 불러오기
+          <input type="file" accept="application/json,.json" aria-label="백업 파일 고르기" style={{ display: 'none' }}
+            onChange={async (e) => {
+              const input = e.target as HTMLInputElement; const f = input.files?.[0]; input.value = '';
+              if (!f) return;
+              const r = await readBackupFile(f);
+              if (!r.ok) { setMsg(`불러오지 못했어요: ${r.error}`); return; }
+              const c = r.file.counts;
+              if (!confirm(`${new Date(r.file.exportedAt).toLocaleString('ko-KR')} 백업으로 바꿀까요?\n운동 기록 ${c.workouts}개, 루틴 ${c.routines}개, 체중 ${c.bodyweight}개\n\n지금 이 폰의 데이터는 모두 이 백업으로 바뀌어요. 먼저 "백업 파일 저장"으로 지금 데이터를 저장해 두는 것을 권해요.`)) return;
+              try { await restoreBackup(r.file); setMsg('백업을 불러왔어요'); } catch { setMsg('불러오는 중 문제가 생겨 아무것도 바꾸지 않았어요'); }
+            }} />
+        </label>
+      </div>
+      {msg && <p role="status" class="small" style={{ color: 'var(--ok)' }}>{msg}</p>}
+      <h2>도구</h2>
+      <button onClick={() => go('#/tools')}>원판 계산기 · 1RM 계산기</button>      <p class="sub small">앱 버전 {APP_VERSION}</p>
     </main>
   );
 }

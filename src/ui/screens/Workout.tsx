@@ -11,6 +11,7 @@ import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, mmss } from '../components';
 import { resolveGrade } from '../../core/exercises';
 import { updateWorkoutAfterInputs } from '../actions';
+import { PlateSheet } from './Tools';
 import { go } from '../nav';
 
 import { unlockAudio, beep, wasAlerted, markAlerted } from '../device';
@@ -23,6 +24,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [open, setOpen] = useState<number | null>(null);
   const [picker, setPicker] = useState<{ mode: 'swap'; b: number; i: number } | { mode: 'add' } | null>(null);
   const [ended, setEnded] = useState(false);
+  const [plate, setPlate] = useState<number | null>(null);
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
@@ -98,6 +100,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           <div class="row small" style={{ margin: '4px 0 6px 42px' }}>
             <span class="sub">남은 횟수 여유(RIR)</span>
             {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
+            <button class="chip" aria-label={`${label} 원판 계산`} onClick={() => setPlate(x.weight ?? 20)}>원판</button>
             <button class="chip" aria-label={`${label} 메모`} onClick={() => setMemo({ title: `${label} 메모`, value: x.memo, save: (m) => void upd((cw) => updateSet(cw, st, { memo: m })) })}>메모</button>
           </div>
         )}
@@ -191,6 +194,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         )}
       </div>
 
+      {plate !== null && <PlateSheet weight={plate} onClose={() => setPlate(null)} />}
       {memo && <MemoSheet title={memo.title} value={memo.value} onSave={memo.save} onClose={() => setMemo(null)} />}
       {picker && (
         <ExercisePicker s={s} all={all} title={picker.mode === 'swap' ? '운동 교체' : '운동 추가'}

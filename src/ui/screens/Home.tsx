@@ -3,6 +3,8 @@ import { mutate, activeOf, historyOf } from '../store';
 import { catalog } from '../catalog';
 import { startRoutine } from '../actions';
 import { emptyRoutine } from '../../core/session';
+import { backupDue } from '../../core/backup';
+import { saveBackupFile } from '../backupActions';
 import { newId } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
@@ -24,8 +26,13 @@ export function Home({ s }: { s: AppState }) {
       {!s.settings.storageNoticeSeen && (
         <div class="card" role="note" aria-label="저장 안내">
           <h3>기록은 이 아이폰에만 저장돼요</h3>
-          <p class="small">사파리에서 공유 → "홈 화면에 추가"로 설치해서 쓰세요. 홈 화면 아이콘을 지우면 기록도 지워져요. 백업 파일 저장 기능은 곧 추가돼요.</p>
+          <p class="small">사파리에서 공유 → "홈 화면에 추가"로 설치해서 쓰세요. 홈 화면 아이콘을 지우면 기록도 지워져요. 설정 → 백업 파일 저장으로 가끔 백업해 주세요.</p>
           <button onClick={() => mutate((d) => d.settings.put({ ...s.settings, key: 'main', storageNoticeSeen: true }))}>알겠어요</button>
+        </div>
+      )}
+      {backupDue(s.settings.lastBackupAt, historyOf(s).length, Date.now()) && (
+        <div class="card" role="note" aria-label="백업 알림">
+          <div class="row between"><span class="small">{s.settings.lastBackupAt ? '마지막 백업 후 7일이 지났어요' : '아직 백업한 적이 없어요'}</span><button class="primary" onClick={() => void saveBackupFile()}>지금 백업</button></div>
         </div>
       )}
       <div class="row between"><h2>내 루틴</h2><div class="row"><button onClick={async () => { const r = emptyRoutine(newId('r'), '새 루틴', new Date().toISOString()); await mutate((d) => d.routines.put(r)); go(`#/routine/${encodeURIComponent(r.id)}`); }}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>

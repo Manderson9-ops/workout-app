@@ -3,7 +3,7 @@
  */
 import { useEffect, useState } from 'preact/hooks';
 import { WorkoutDB, getSettings, DEFAULT_SETTINGS, requestPersist } from '../db/db';
-import type { Settings, ExerciseMeta, CustomExercise } from '../db/db';
+import type { Settings, ExerciseMeta, CustomExercise, BodyweightRow } from '../db/db';
 import type { Routine, Workout } from '../core/session';
 
 export const db = new WorkoutDB();
@@ -15,21 +15,22 @@ export interface AppState {
   workouts: Workout[];
   meta: Map<string, ExerciseMeta>;
   custom: CustomExercise[];
+  bodyweight: BodyweightRow[];
 }
 
-let state: AppState = { ready: false, settings: DEFAULT_SETTINGS, routines: [], workouts: [], meta: new Map(), custom: [] };
+let state: AppState = { ready: false, settings: DEFAULT_SETTINGS, routines: [], workouts: [], meta: new Map(), custom: [], bodyweight: [] };
 const listeners = new Set<(s: AppState) => void>();
 
 export async function load(): Promise<void> {
-  const [settings, routines, workouts, meta, custom] = await Promise.all([
-    getSettings(db), db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(),
+  const [settings, routines, workouts, meta, custom, bodyweight] = await Promise.all([
+    getSettings(db), db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.bodyweight.toArray(),
   ]);
   state = {
     ready: true, settings,
     routines: routines.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
     workouts: workouts.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1)),
     meta: new Map(meta.map((m) => [m.exerciseId, m])),
-    custom,
+    custom, bodyweight,
   };
   listeners.forEach((l) => l(state));
 }
