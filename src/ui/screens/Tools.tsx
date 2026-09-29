@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { plateCalc, oneRMTable, ONE_RM_MAX_REPS } from '../../core/stats';
+import { plateCalc, oneRMTable, ONE_RM_MAX_REPS, PLATE_MAX_KG } from '../../core/stats';
 import { NumInput, Sheet } from '../components';
 
 const BARS = [20, 15, 10, 0];
@@ -9,7 +9,8 @@ export function PlateCalculator({ initial }: { initial?: number }) {
   const [target, setTarget] = useState<number | undefined>(initial ?? 60);
   const [bar, setBar] = useState(() => Number(localStorage.getItem('tools.bar') ?? 20));
   const [have, setHave] = useState<number[]>(() => { try { return JSON.parse(localStorage.getItem('tools.plates') ?? '') as number[]; } catch { return PLATES; } });
-  const r = target !== undefined ? plateCalc(target, bar, have) : undefined;
+  const tooBig = target !== undefined && target > PLATE_MAX_KG;
+  const r = target !== undefined && !tooBig ? plateCalc(target, bar, have) : undefined;
   return (
     <div>
       <label>목표 무게</label>
@@ -21,6 +22,7 @@ export function PlateCalculator({ initial }: { initial?: number }) {
         const on = have.includes(p);
         return <button key={p} class={`chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => { const n = on ? have.filter((x) => x !== p) : [...have, p]; setHave(n); localStorage.setItem('tools.plates', JSON.stringify(n)); }}>{p}</button>;
       })}</div>
+      {tooBig && <p role="alert" class="small" style={{ color: 'var(--warn)' }}>{PLATE_MAX_KG}kg 이하로 적어 주세요</p>}
       {r && (
         <div class="card" aria-live="polite" aria-label="원판 계산 결과">
           {r.remainder < 0 ? <p>바({bar}kg)만으로도 목표보다 무거워요</p> : (

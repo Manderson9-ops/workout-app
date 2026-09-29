@@ -17,20 +17,25 @@ export type SaveResult = 'shared' | 'downloaded' | 'cancelled' | 'retry';
 
 let prepared: { file: File; state: AppState } | null = null;
 
-async function build(): Promise<File> {
+/** 파일과, 그 파일이 담은 데이터 시점의 상태. 상태는 **읽기 전에** 잡는다 (읽는 도중 바뀌면 다음에 다시 만들도록: 검토 N2) */
+async function build(): Promise<{ file: File; state: AppState }> {
   await flushPending();
+  const state = getState();
   const now = new Date();
-  const file = makeBackup(await exportAll(db), APP_VERSION, now.toISOString());
-  return new File([JSON.stringify(file)], backupFileName(now), { type: 'application/json' });
+  const data = makeBackup(await exportAll(db), APP_VERSION, now.toISOString());
+  return { file: new File([JSON.stringify(data)], backupFileName(now), { type: 'application/json' }), state };
 }
 
-/** 백업 버튼이 보이는 화면에서 미리 파일을 만들어 둠 (데이터가 바뀌면 다시 만듦) */
+let preparing: Promise<void> | null = null;
+/** 백업 버튼이 보이는 화면에서 미리 파일을 만들어 둠 (데이터가 바뀌면 다시 만듦, 동시에 하나만) */
 export async function prepareBackup(): Promise<void> {
   if (prepared && prepared.state === getState()) return;
-  const file = await build();
-  prepared = { file, state: getState() };
+  if (preparing) return preparing;
+  preparing = (async () => {
+    try { prepared = await build(); } finally { preparing = null; }
+  })();
+  return preparing;
 }
-
 async function markBackedUp() {
   const st = await getSettings(db);
   await mutate((d) => d.settings.put({ ...st, key: 'main', lastBackupAt: new Date().toISOString() }));
@@ -44,7 +49,7 @@ function download(f: File) {
 
 export async function saveBackupFile(): Promise<SaveResult> {
   // 미리 만든 파일이 지금 데이터와 같으면 기다림 없이 바로 공유 (탭 직후 = 사파리가 허락하는 때)
-  const f = prepared && prepared.state === getState() ? prepared.file : await build();
+  const f = prepared && prepared.state === getState() ? prepared.file : (await build()).file;
   prepared = null;
   const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
   if (nav.canShare?.({ files: [f] })) {

@@ -135,6 +135,7 @@ export function weekStreak(workouts: Workout[], today: string): number {
 const biggerFirst = (a: number[], b: number[]) => { for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i]! > b[i]!; return false; };
 export interface PlateResult { perSide: number[]; achieved: number; remainder: number }
 export const ONE_RM_MAX_REPS = 12;
+export const PLATE_MAX_KG = 500;
 /**
  * 원판 계산: 목표 무게를 만들기 위해 한쪽에 끼울 원판 (큰 것부터).
  * 가진 원판으로 **정확히** 만들 수 있으면 원판 수가 가장 적은 조합, 안 되면 목표 아래에서 가장 가까운 무게.
@@ -143,12 +144,14 @@ export const ONE_RM_MAX_REPS = 12;
  */
 export function plateCalc(target: number, bar: number, plates: number[] = [25, 20, 15, 10, 5, 2.5, 1.25], pairs?: Record<string, number>): PlateResult {
   const U = 0.25; // 계산 단위 kg (1.25·2.5·0.5 원판 모두 정수로)
-  const side = Math.floor(((target - bar) / 2) / U + 1e-9);
+  // 목표는 PLATE_MAX_KG까지만 계산 (잘못 친 10000kg에 화면이 멈추지 않게)
+  const side = Math.floor(((Math.min(target, PLATE_MAX_KG) - bar) / 2) / U + 1e-9);
   // 목표가 바 무게 이하: 원판 없음. remainder가 음수면 바만으로도 목표보다 무거움
   if (side <= 0) return { perSide: [], achieved: bar, remainder: Math.round((target - bar) * 100) / 100 };
   // 한쪽에 쓸 수 있는 원판 목록 (쌍 개수만큼, 한쪽 목표를 넘지 않는 만큼만)
   const items: number[] = [];
-  for (const p of [...new Set(plates)].filter((p) => p > 0).sort((a, b) => b - a)) {
+  // 0.25kg 단위로 딱 떨어지는 원판만 (0.1kg 같은 값은 무한 반복을 막기 위해 제외)
+  for (const p of [...new Set(plates)].filter((p) => p >= U && Math.abs(p / U - Math.round(p / U)) < 1e-9).sort((a, b) => b - a)) {
     const u = Math.round(p / U);
     const n = Math.min(pairs?.[String(p)] ?? Infinity, Math.floor(side / u));
     for (let i = 0; i < n; i++) items.push(u);

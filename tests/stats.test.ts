@@ -119,6 +119,12 @@ describe('원판 계산: 모든 조합 검사 (검토 M4)', () => {
     expect(plateCalc(22.5, 20, [1.25])).toEqual({ perSide: [1.25], achieved: 22.5, remainder: 0 });
     expect(plateCalc(25, 20, [])).toEqual({ perSide: [], achieved: 20, remainder: 5 });
   });
+  it('0.25kg로 안 떨어지는 원판은 무시, 너무 큰 목표는 500kg까지만 (멈춤 방지)', () => {
+    expect(plateCalc(60, 20, [0.1, 20])).toEqual({ perSide: [20], achieved: 60, remainder: 0 });
+    const t0 = performance.now();
+    expect(plateCalc(10000, 20).achieved).toBe(500);
+    expect(performance.now() - t0).toBeLessThan(500);
+  });
   it('무거운 목표도 빠르게 (300kg, 모든 원판)', () => {
     const t0 = performance.now();
     expect(plateCalc(300, 20).achieved).toBe(300);

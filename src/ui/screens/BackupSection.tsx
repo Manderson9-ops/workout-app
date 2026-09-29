@@ -3,13 +3,21 @@ import type { AppState } from '../store';
 import { activeOf } from '../store';
 import { saveBackupFile, readBackupFile, restoreBackup, resetAll, prepareBackup, SAVE_MESSAGE } from '../backupActions';
 
+/** 데이터가 바뀌고 잠시(0.8초) 조용하면 백업 파일을 미리 만듦 (입력 중에는 만들지 않음) */
+function usePreparedBackup(s: AppState) {
+  useEffect(() => {
+    const t = setTimeout(() => { void prepareBackup().catch(() => undefined); }, 800);
+    return () => clearTimeout(t);
+  }, [s]);
+}
+
 /** 설정의 "데이터 백업" 영역 (BLUEPRINT 4.6, D-021) */
 export function BackupSection({ s }: { s: AppState }) {
   const st = s.settings;
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // 누르자마자 공유 시트를 열 수 있게 파일을 미리 만들어 둠 (아이폰 사파리 제약)
-  useEffect(() => { void prepareBackup().catch(() => undefined); }, [s]);
+  usePreparedBackup(s);
   const active = activeOf(s);
 
   const onFile = async (e: Event) => {
@@ -51,7 +59,7 @@ export function BackupSection({ s }: { s: AppState }) {
 /** 홈의 7일 백업 알림 (결과도 여기서 보여 줌) */
 export function BackupBanner({ s }: { s: AppState }) {
   const [msg, setMsg] = useState<string | null>(null);
-  useEffect(() => { void prepareBackup().catch(() => undefined); }, [s]);
+  usePreparedBackup(s);
   return (
     <div class="card" role="note" aria-label="백업 알림">
       <div class="row between">

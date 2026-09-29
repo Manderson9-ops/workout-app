@@ -39,9 +39,15 @@ const num = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
 const optNum = (v: unknown) => v === undefined || (num(v) && (v as number) >= 0);
 const optStr = (v: unknown) => v === undefined || typeof v === 'string';
 const optBool = (v: unknown) => v === undefined || typeof v === 'boolean';
-const isoDate = (v: unknown) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
+/** 날짜+시각 (예: 2026-09-30T10:00:00.000Z). '2026'처럼 년도만 있는 값은 거절 */
+const isoDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v) && !Number.isNaN(Date.parse(v));
 const optIso = (v: unknown) => v === undefined || isoDate(v);
-const ymd = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+/** 실제 있는 날짜만 (2026-02-31 거절) */
+const ymd = (v: unknown) => {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const [y, m, d] = v.split('-').map(Number); const dt = new Date(Date.UTC(y!, m! - 1, d!));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m! - 1 && dt.getUTCDate() === d;
+};
 const KINDS = ['single', 'superset', 'compound'];
 const TIMER_KINDS = ['set', 'transition', 'round', 'between', 'warmup'];
 const GRADES = ['S', 'A', 'B', 'C', 'D'];

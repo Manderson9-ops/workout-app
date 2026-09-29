@@ -58,10 +58,12 @@ export async function flushKey(key: string): Promise<void> {
 const inflight = new Set<Promise<unknown>>();
 export function trackInflight(p: Promise<unknown>): void { inflight.add(p); void p.finally(() => inflight.delete(p)); }
 export async function flushPending(): Promise<void> {
+  // 버튼을 누르면 입력칸 포커스가 먼저 빠지며 저장이 시작되므로, 그 저장이 끝날 때까지 기다린다.
+  // 부른 시점에 이미 시작된 저장만 기다린다 (나중에 시작된 저장, 특히 자기 자신을 기다리면 영원히 멈춤: 검토 N1)
+  const before = [...inflight];
   const fns = [...pending.values()]; pending.clear();
   for (const fn of fns) await fn();
-  // 버튼을 누르면 입력칸 포커스가 먼저 빠지며 저장이 시작되므로, 그 저장이 끝날 때까지 기다린다
-  while (inflight.size) await Promise.allSettled([...inflight]);
+  await Promise.allSettled(before);
 }
 
 export function useAppState(): AppState {

@@ -1,6 +1,6 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
-import { mutate, historyOf } from '../store';
+import { mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
 import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart } from '../../core/stats';
 import type { WorkoutSummary } from '../../core/stats';
@@ -86,7 +86,7 @@ export function Stats({ s }: { s: AppState }) {
         <p class="sub small">볼륨 = 무게 × 횟수 합계 (웜업 제외). 이번 주 {totals[totals.length - 1]!.sets}세트 · {totals[totals.length - 1]!.count}회 운동</p>
       </div>
 
-      {pva && (
+      {pva && pva.n >= 2 && (
         <>
           <h2>예상 시간 대비 실제</h2>
           <div class="card" aria-label="예상 시간 대비 실제">
@@ -109,24 +109,27 @@ export function Stats({ s }: { s: AppState }) {
 function Bodyweight({ s, today }: { s: AppState; today: string }) {
   const [date, setDate] = useState(today);
   const [kg, setKg] = useState<number | undefined>(undefined);
+  // 아이폰은 버튼을 눌러도 입력칸 포커스가 안 빠져서, 저장 직전에 입력 대기분을 먼저 반영하고 ref로 최신 값을 읽음
+  const kgRef = useRef<number | undefined | null>(null);
   const [err, setErr] = useState('');
   const sorted = [...s.bodyweight].sort((a, b) => (a.date < b.date ? -1 : 1));
   const existing = s.bodyweight.find((b) => b.date === date)?.kg;
   const save = async () => {
-    const v = kg ?? existing;
+    await flushPending();
+    const v = kgRef.current === null ? existing : kgRef.current;
     if (v === undefined || v < BW_MIN || v > BW_MAX) { setErr(`${BW_MIN}~${BW_MAX}kg 사이로 적어 주세요`); return; }
     if (date > today) { setErr('앞으로의 날짜는 적을 수 없어요'); return; }
     setErr('');
     await mutate((d) => d.bodyweight.put({ date, kg: v }));
-    setKg(undefined);
+    setKg(undefined); kgRef.current = null;
   };
   return (
     <>
       <h2>체중</h2>
       <div class="card">
-        <input class="date" type="date" aria-label="체중 날짜" style={{ width: '100%', marginBottom: '6px' }} value={date} max={today} onInput={(e) => { setDate((e.target as HTMLInputElement).value || today); setKg(undefined); }} />
+        <input class="date" type="date" aria-label="체중 날짜" style={{ width: '100%', marginBottom: '6px' }} value={date} max={today} onInput={(e) => { setDate((e.target as HTMLInputElement).value || today); setKg(undefined); kgRef.current = null; }} />
         <div class="row">
-          <div class="grow" style={{ minWidth: 0 }}><NumInput label="체중" value={kg ?? existing} suffix="kg" onChange={(v) => setKg(v)} /></div>
+          <div class="grow" style={{ minWidth: 0 }}><NumInput label="체중" value={kg ?? existing} suffix="kg" onChange={(v) => { kgRef.current = v; setKg(v); }} /></div>
           <button class="primary" onClick={save}>{existing !== undefined ? '고치기' : '기록'}</button>
         </div>
         {err && <p role="alert" class="small" style={{ color: 'var(--bad)' }}>{err}</p>}

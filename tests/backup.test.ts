@@ -115,6 +115,8 @@ describe('깊은 검사: 깨진 백업이 기존 데이터를 지우지 않게 (
     ['같은 운동 기록 두 번', (f: any) => { f.data.workouts.push(f.data.workouts[0]); }, '두 번'],
     ['진행 중 운동 두 개', (f: any) => { f.data.workouts = [{ ...f.data.workouts[0], id: 'x', endedAt: undefined }, { ...f.data.workouts[0], id: 'y', endedAt: undefined }]; }, '진행 중'],
     ['백업 날짜 없음', (f: any) => { delete f.exportedAt; }, '백업 날짜'],
+    ['시작 시각이 년도만', (f: any) => { f.data.workouts[0].startedAt = '2026'; }, '운동 기록'],
+    ['없는 날짜 체중', (f: any) => { f.data.bodyweight[0].date = '2026-02-31'; }, '체중'],
   ])('%s → 거절', (_n, mut, msg) => {
     expect(bad(mut)).toMatchObject({ ok: false, error: expect.stringContaining(msg) });
   });
