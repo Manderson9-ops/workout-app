@@ -2,6 +2,8 @@ import type { AppState } from '../store';
 import { mutate, activeOf, historyOf } from '../store';
 import { catalog } from '../catalog';
 import { startRoutine } from '../actions';
+import { emptyRoutine } from '../../core/session';
+import { newId } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
 
@@ -19,7 +21,14 @@ export function Home({ s }: { s: AppState }) {
           <button class="primary big" onClick={() => go('#/workout')}>계속하기</button>
         </div>
       )}
-      <div class="row between"><h2>내 루틴</h2><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div>
+      {!s.settings.storageNoticeSeen && (
+        <div class="card" role="note" aria-label="저장 안내">
+          <h3>기록은 이 아이폰에만 저장돼요</h3>
+          <p class="small">사파리에서 공유 → "홈 화면에 추가"로 설치해서 쓰세요. 홈 화면 아이콘을 지우면 기록도 지워지니, 백업 파일을 가끔 저장해 주세요(설정).</p>
+          <button onClick={() => mutate((d) => d.settings.put({ ...s.settings, key: 'main', storageNoticeSeen: true }))}>알겠어요</button>
+        </div>
+      )}
+      <div class="row between"><h2>내 루틴</h2><div class="row"><button onClick={async () => { const r = emptyRoutine(newId('r'), '새 루틴', new Date().toISOString()); await mutate((d) => d.routines.put(r)); go(`#/routine/${encodeURIComponent(r.id)}`); }}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
       {!s.routines.length && (
         <div class="empty">
           <p>아직 루틴이 없어요.</p>

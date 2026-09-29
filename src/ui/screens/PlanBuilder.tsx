@@ -17,6 +17,8 @@ import { go } from '../nav';
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
 const NEXT: Record<string, Priority | undefined> = { none: 'high', high: 'normal', normal: 'low', low: undefined };
 const KEY = 'planBuilder.v1';
+const PLAN_KEY = 'planBuilder.plan';
+const LOCK_KEY = 'planBuilder.locks';
 
 interface Form { parts: Partial<Record<Part, Priority>>; order: Part[]; minGrade: Grade; minutes?: number; groupings: Grouping[]; prefer: boolean }
 const loadForm = (): Form => {
@@ -45,8 +47,11 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
   const [f, setF] = useState<Form>(loadForm);
-  const [plan, setPlan] = useState<Plan | null>(null);
-  const [locks, setLocks] = useState<Set<string>>(new Set());
+  // 만든 플랜은 다른 화면에 다녀와도 남도록 sessionStorage에 보관
+  const [plan, setPlanRaw] = useState<Plan | null>(() => { try { return JSON.parse(sessionStorage.getItem(PLAN_KEY) ?? 'null'); } catch { return null; } });
+  const setPlan = (p: Plan | null) => { setPlanRaw(p); if (p) sessionStorage.setItem(PLAN_KEY, JSON.stringify(p)); else sessionStorage.removeItem(PLAN_KEY); };
+  const [locks, setLocksRaw] = useState<Set<string>>(() => new Set(JSON.parse(sessionStorage.getItem(LOCK_KEY) ?? '[]') as string[]));
+  const setLocks = (l: Set<string>) => { setLocksRaw(l); sessionStorage.setItem(LOCK_KEY, JSON.stringify([...l])); };
   const [picker, setPicker] = useState<{ b: number; i: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
@@ -73,7 +78,10 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const generate = (keepLocks = false) => {
     const req = request();
     if (keepLocks && plan) {
-      req.locked = plan.blocks.flatMap((b) => b.items).filter((i) => locks.has(i.exerciseId)).map((i) => ({ exerciseId: i.exerciseId, part: i.part, sets: i.sets }));
+      const items = plan.blocks.flatMap((b) => b.items);
+      req.locked = items.filter((i) => locks.has(i.exerciseId)).map((i) => ({ exerciseId: i.exerciseId, part: i.part, sets: i.sets }));
+      // 모두 잠갔으면 잠근 운동만으로 다시 계산 (D-015)
+      req.lockedOnly = items.length > 0 && items.every((i) => locks.has(i.exerciseId));
     } else setLocks(new Set());
     const p = generatePlan(req, all);
     setPlan(p);
@@ -88,8 +96,13 @@ export function PlanBuilder({ s }: { s: AppState }) {
   };
   const editItem = (bi: number, ii: number, fn: (i: PlanItem) => PlanItem | null) => {
     if (!plan) return;
+    const old = plan.blocks[bi]!.items[ii]!;
     const blocks = plan.blocks.map((b, x) => x !== bi ? b : { ...b, items: b.items.map((it, y) => (y === ii ? fn(it) : it)).filter((it): it is PlanItem => !!it) });
-    setPlan(recompute({ ...plan, blocks }, all));
+    const next = recompute({ ...plan, blocks }, all);
+    setPlan(next);
+    // 지우거나 바꾼 운동의 잠금은 정리
+    const still = new Set(next.blocks.flatMap((b) => b.items.map((i) => i.exerciseId)));
+    if (locks.has(old.exerciseId) && !still.has(old.exerciseId)) { const n = new Set(locks); n.delete(old.exerciseId); setLocks(n); }
   };
   const nParts = f.order.filter((p) => f.parts[p]).length;
 
@@ -147,7 +160,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
           {plan.blocks.length > 0 && <p class="sub small">{plan.warmup.label} · 휴식 다관절 {plan.rest.compound}초 · 단관절 {plan.rest.isolation}초{plan.blocks.some((b) => b.kind !== 'single') ? ` · 묶음 라운드 후 ${plan.rest.round}초` : ''}</p>}
           {plan.blocks.map((b, bi) => (
             <div class="card" key={bi}>
-              {b.kind !== 'single' && <div class="row between"><span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span><span class="pill">{mmss(b.timeSec)}</span></div>}
+              {b.kind !== 'single' && <div class="row between"><span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span><span class="pill">라운드 후 휴식 {b.roundRestSec}초 · {mmss(b.timeSec)}</span></div>}
               {b.items.map((it, ii) => (
                 <div key={it.exerciseId} style={{ marginTop: ii ? '10px' : '4px' }}>
                   <div class="row between">
@@ -155,7 +168,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
                       <div class="row"><GradeBadge g={{ value: it.grade, source: it.gradeSource, estimated: it.estimated }} /><strong>{it.name}</strong></div>
                       <div class="pill">{it.why}</div>
                     </div>
-                    {b.kind === 'single' && <span class="pill">{mmss(b.timeSec)}</span>}
+                    {b.kind === 'single' && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}
                   </div>
                   <div class="row wrap" style={{ marginTop: '6px' }}>
                     <button aria-label={`${it.name} 세트 줄이기`} onClick={() => editItem(bi, ii, (x) => ({ ...x, sets: Math.max(1, x.sets - 1) }))}>−</button>
@@ -187,7 +200,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
             const g = resolveGrade(e, old.part, s.settings.level, undefined, s.meta.get(e.id)?.userGrade);
             editItem(picker.b, picker.i, () => ({ ...old, exerciseId: e.id, name: e.name_ko, reps: e.measure === 'time' ? 0 : targetReps(e), ...(e.measure === 'time' ? { seconds: e.default_seconds ?? 30 } : { seconds: undefined }),
               grade: g.value, gradeSource: g.source, estimated: g.estimated, substituted: false, why: `${old.part} ${g.value} (직접 교체)` }));
-            setLocks(new Set([...locks, e.id]));
+            const nl = new Set(locks); nl.delete(plan.blocks[picker.b]!.items[picker.i]!.exerciseId); nl.add(e.id); setLocks(nl);
             setPicker(null);
           }} />
       )}
@@ -196,8 +209,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
           <label>이름</label>
           <input value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} aria-label="루틴 이름" />
           <div class="row" style={{ marginTop: '12px' }}>
-            <button class="grow" onClick={async () => { await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec); go('#/'); }}>저장만</button>
-            <button class="primary grow" onClick={async () => { const r = await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec); await startRoutine(s, r); }}>저장하고 시작</button>
+            <button class="grow" onClick={async () => { await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec, plan.warmup.seconds); setPlan(null); go('#/'); }}>저장만</button>
+            <button class="primary grow" onClick={async () => { const r = await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec, plan.warmup.seconds); setPlan(null); await startRoutine(s, r); }}>저장하고 시작</button>
           </div>
         </Sheet>
       )}

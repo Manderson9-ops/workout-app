@@ -8,6 +8,7 @@ import { WorkoutScreen } from './screens/Workout';
 import { SettingsScreen } from './screens/Settings';
 import { RoutineEditor } from './screens/RoutineEditor';
 import { mmss } from './components';
+import { useAudioUnlock, useWakeLock } from './device';
 
 export function useHash(): string {
   const [h, set] = useState(location.hash || '#/');
@@ -24,6 +25,8 @@ export function App() {
   const hash = useHash();
   const [, tick] = useState(0);
   const active = activeOf(s);
+  useAudioUnlock();
+  useWakeLock(!!active && s.settings.keepAwake);
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
   if (!s.ready) return <main><p class="sub">불러오는 중…</p></main>;
 
@@ -34,7 +37,7 @@ export function App() {
   else if (path.startsWith('/exercises')) screen = <Exercises s={s} />;
   else if (path.startsWith('/workout')) screen = <WorkoutScreen s={s} />;
   else if (path.startsWith('/settings')) screen = <SettingsScreen s={s} />;
-  else if (path.startsWith('/routine/')) screen = <RoutineEditor s={s} id={decodeURIComponent(path.slice(9))} />;
+  else if (path.startsWith('/routine/')) screen = <RoutineEditor key={path} s={s} id={decodeURIComponent(path.slice(9))} />;
   else screen = <Home s={s} />;
 
   const tab = (h: string, ico: string, label: string, on: boolean) => (

@@ -56,7 +56,7 @@ label { display: block; font-size: 14px; color: var(--sub); margin: 12px 0 6px; 
 .stepper input { text-align: center; padding: 0 2px; min-width: 0; }
 .stepper button { padding: 0; }
 .check { width: 52px; height: 52px; border-radius: 14px; font-size: 22px; padding: 0; }
-.timer { position: fixed; left: 0; right: 0; bottom: calc(var(--nav-h) + var(--safe-b)); z-index: 25; background: #111827f5; border-top: 2px solid var(--acc); padding: 12px 14px; }
+.timer { position: fixed; left: 0; right: 0; bottom: calc(var(--nav-h) + var(--safe-b)); z-index: 25; background: #111827; border-top: 2px solid var(--acc); box-shadow: 0 -8px 20px #000a; padding: 12px 14px; }
 .timer.end { background: var(--ok); color: #06210f; border-top-color: var(--ok); }
 .timer .num { font-size: 44px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .flash { animation: flash 0.6s ease-in-out 3; }

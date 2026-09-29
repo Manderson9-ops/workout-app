@@ -1,7 +1,7 @@
 /**
  * 화면에서 쓰는 저장 동작 모음
  */
-import { mutate, activeOf, historyOf } from './store';
+import { mutate, activeOf, historyOf, db, setWorkoutLocal, askPersistOnce, flushPending } from './store';
 import type { AppState } from './store';
 import { newId } from '../db/db';
 import { startWorkout, planToRoutine } from '../core/session';
@@ -16,16 +16,27 @@ export async function saveWorkout(w: Workout) { await mutate((d) => d.workouts.p
  * 예: 무게 입력 직후 세트 완료를 눌러도 무게가 사라지지 않는다.
  */
 export async function updateWorkout(id: string, fn: (w: Workout) => Workout) {
-  await mutate((d) => d.transaction('rw', d.workouts, async () => {
-    const cur = await d.workouts.get(id);
-    if (cur) await d.workouts.put(fn(cur));
-  }));
+  const next = await db.transaction('rw', db.workouts, async () => {
+    const cur = await db.workouts.get(id);
+    if (!cur) return undefined;
+    const n = fn(cur);
+    await db.workouts.put(n);
+    return n;
+  });
+  if (next) setWorkoutLocal(next);
+}
+
+/** 입력 중인 값 먼저 저장한 뒤 변경 (세트 완료 등) */
+export async function updateWorkoutAfterInputs(id: string, fn: (w: Workout) => Workout) {
+  await flushPending();
+  await updateWorkout(id, fn);
 }
 
 export async function startRoutine(s: AppState, r: Routine) {
   const cur = activeOf(s);
   if (cur && !confirm(`진행 중인 운동 "${cur.name}"이 있어요. 그 운동을 끝내고 새로 시작할까요?`)) { go('#/workout'); return; }
-  const w = startWorkout(newId('w'), r, new Date().toISOString(), historyOf(s));
+  void askPersistOnce();
+  const w = startWorkout(newId('w'), r, new Date().toISOString(), historyOf(s), { betweenSec: s.settings.rest.between });
   await mutate(async (d) => {
     if (cur) await d.workouts.put({ ...cur, endedAt: new Date().toISOString(), timer: null });
     await d.workouts.put(w);
@@ -33,8 +44,9 @@ export async function startRoutine(s: AppState, r: Routine) {
   go('#/workout');
 }
 
-export async function savePlanAsRoutine(name: string, blocks: PlanBlock[], estimatedSec: number): Promise<Routine> {
-  const r = planToRoutine(newId('r'), name, new Date().toISOString(), blocks, estimatedSec);
+export async function savePlanAsRoutine(name: string, blocks: PlanBlock[], estimatedSec: number, warmupSec?: number): Promise<Routine> {
+  void askPersistOnce();
+  const r = planToRoutine(newId('r'), name, new Date().toISOString(), blocks, estimatedSec, warmupSec);
   await mutate((d) => d.routines.put(r));
   return r;
 }

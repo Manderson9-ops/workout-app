@@ -4,7 +4,7 @@ import { mutate, historyOf } from '../store';
 import { catalog, families, videoUrl, sourceVideos } from '../catalog';
 import { PARTS, EQUIPMENT, EQUIPMENT_LABEL, LEVELS } from '../../core/types';
 import type { Part, Equipment, Mechanics } from '../../core/types';
-import { resolveGrade, eligibleParts } from '../../core/exercises';
+import { resolveGrade, eligibleParts, patternFor } from '../../core/exercises';
 import { matchesQuery } from '../../core/search';
 import { lastSets, epley1RM } from '../../core/session';
 import { GRADES } from '../../core/version';
@@ -24,7 +24,9 @@ export function Exercises({ s }: { s: AppState }) {
   const [favOnly, setFavOnly] = useState<boolean>(!!saved.favOnly);
   const [videoOnly, setVideoOnly] = useState<boolean>(!!saved.videoOnly);
   const [adding, setAdding] = useState(false);
-  const remember = (p: object) => sessionStorage.setItem(KEY, JSON.stringify({ q, part, favOnly, videoOnly, ...p }));
+  const [equip, setEquip] = useState<Equipment | ''>(saved.equip ?? '');
+  const [minG, setMinG] = useState<Grade | ''>(saved.minG ?? '');
+  const remember = (p: object) => sessionStorage.setItem(KEY, JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, ...p }));
   const level = s.settings.level;
   const rows = all
     .filter((e) => (part ? eligibleParts(e).includes(part) : true))
@@ -32,6 +34,8 @@ export function Exercises({ s }: { s: AppState }) {
     .filter((e) => (favOnly ? s.meta.get(e.id)?.favorite : true))
     .map((e) => ({ e, g: resolveGrade(e, part ?? e.part, level, undefined, s.meta.get(e.id)?.userGrade) }))
     .filter((x) => (videoOnly ? !x.g.estimated : true))
+    .filter((x) => (equip ? x.e.equipment.includes(equip) : true))
+    .filter((x) => (minG ? GRADES.indexOf(x.g.value) <= GRADES.indexOf(minG) : true))
     .sort((a, b) => GRADES.indexOf(a.g.value) - GRADES.indexOf(b.g.value) || (a.g.estimated ? 1 : 0) - (b.g.estimated ? 1 : 0) || a.e.name_ko.localeCompare(b.e.name_ko));
   return (
     <main>
@@ -45,6 +49,14 @@ export function Exercises({ s }: { s: AppState }) {
         <button class={`chip ${favOnly ? 'on' : ''}`} aria-pressed={favOnly} onClick={() => { setFavOnly(!favOnly); remember({ favOnly: !favOnly }); }}>★ 즐겨찾기</button>
         <button class={`chip ${videoOnly ? 'on' : ''}`} aria-pressed={videoOnly} onClick={() => { setVideoOnly(!videoOnly); remember({ videoOnly: !videoOnly }); }}>영상 등급만</button>
         <span class="sub small">{rows.length}개</span>
+      </div>
+      <div class="grid2" style={{ marginTop: '8px' }}>
+        <select value={equip} aria-label="장비 필터" onChange={(e) => { const v = (e.target as HTMLSelectElement).value as Equipment | ''; setEquip(v); remember({ equip: v }); }}>
+          <option value="">장비 전체</option>{EQUIPMENT.map((x) => <option key={x} value={x}>{EQUIPMENT_LABEL[x]}</option>)}
+        </select>
+        <select value={minG} aria-label="등급 필터" onChange={(e) => { const v = (e.target as HTMLSelectElement).value as Grade | ''; setMinG(v); remember({ minG: v }); }}>
+          <option value="">등급 전체</option>{GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
+        </select>
       </div>
       <div class="card" style={{ padding: '0 10px' }}>
         {rows.map(({ e, g }) => {
@@ -86,7 +98,7 @@ function AddCustom({ s, onClose }: { s: AppState; onClose: () => void }) {
       <p class="sub small">직접 추가한 운동은 영상 등급이 없어 "B 추정"으로 시작해요. 상세 화면에서 내 등급을 바꿀 수 있어요.</p>
       <button class="primary big" disabled={!name.trim() || exists} onClick={async () => {
         const id = newId('custom').replace(/-/g, '_');
-        await mutate((d) => d.custom.put({ id, name_ko: name.trim(), family: id, part, muscles: [part], pattern: mech === 'compound' ? 'H_PUSH' : 'ISOLATION', mechanics: mech, equipment: [eq], unilateral: uni, custom: true, createdAt: new Date().toISOString() }));
+        await mutate((d) => d.custom.put({ id, name_ko: name.trim(), family: id, part, muscles: [part], pattern: patternFor(part, mech), mechanics: mech, equipment: [eq], unilateral: uni, custom: true, createdAt: new Date().toISOString() }));
         onClose();
       }}>추가</button>
     </Sheet>

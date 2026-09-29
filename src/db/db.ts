@@ -17,11 +17,16 @@ export interface Settings {
   defaultParts?: Part[];
   soundOn: boolean;
   keepAwake: boolean;
+  /** 앱 기본 휴식 (BLUEPRINT 4.4: 블록 설정 > 루틴 기본값 > 앱 기본값). 새로 추가하는 운동·블록 사이 휴식에 사용 */
+  rest: { compound: number; isolation: number; round: number; between: number; transition: number };
+  /** 저장공간 안내를 봤는지 */
+  storageNoticeSeen?: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   key: 'main', level: '중급', equipment: ['cable', 'machine', 'smith', 'dumbbell', 'bodyweight', 'band', 'barbell', 'other'],
   defaultMinutes: 60, soundOn: true, keepAwake: true,
+  rest: { compound: 150, isolation: 90, round: 120, between: 60, transition: 10 },
 };
 
 export class WorkoutDB extends Dexie {
@@ -45,7 +50,9 @@ export class WorkoutDB extends Dexie {
 export const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 export async function getSettings(db: WorkoutDB): Promise<Settings> {
-  return { ...DEFAULT_SETTINGS, ...(await db.settings.get('main')) };
+  const saved = await db.settings.get('main');
+  // 예전 설정에 없는 항목은 기본값으로 채움 (버전이 올라가도 설정 유지)
+  return { ...DEFAULT_SETTINGS, ...saved, rest: { ...DEFAULT_SETTINGS.rest, ...saved?.rest } };
 }
 
 /** 진행 중(끝나지 않은) 운동 하나 */

@@ -4,7 +4,10 @@ import { toChosung, matchesQuery } from '../src/core/search';
 import {
   planToRoutine, startWorkout, steps, currentStep, restAfter, completeSet, undoSet, addSet, removeSet, skipItem, replaceItem,
   appendExercise, adjustTimer, clearTimer, timerRemaining, finishWorkout, progress, lastSets, updateSet, epley1RM,
+  emptyRoutine, routineEstimate, mergeWithNext, splitBlock, applyRestToAll,
 } from '../src/core/session';
+import { patternFor } from '../src/core/exercises';
+import type { Exercise } from '../src/core/types';
 import type { Routine, Workout } from '../src/core/session';
 import { WorkoutDB, getSettings, activeWorkout, finishedWorkouts, newId, DEFAULT_SETTINGS, requestPersist } from '../src/db/db';
 
@@ -161,5 +164,78 @@ describe('저장소 (IndexedDB, 스키마 v1)', () => {
   });
   it('저장공간 유지 요청은 지원 안 되면 false', async () => {
     expect(typeof (await requestPersist())).toBe('boolean');
+  });
+});
+
+describe('P3 검토 반영', () => {
+  const past = (): Workout => {
+    const p: Workout = { ...startWorkout('w0', routine, '2026-09-29T10:00:00.000Z', []), endedAt: '2026-09-29T11:00:00.000Z' };
+    p.blocks[0]!.items[0]!.sets = [{ weight: 60, reps: 8, warmup: false, done: true }, { weight: 60, reps: 8, warmup: false, done: true }];
+    return p;
+  };
+  it('지난 기록이 있어도 앞 세트 무게를 바꾸면 뒤 자동 값이 따라감, 직접 고친 값은 유지', () => {
+    const w = startWorkout('w1', routine, now, [past()]);
+    expect(w.blocks[0]!.items[0]!.sets[1]).toMatchObject({ weight: 60, auto: true });
+    let x = updateSet(w, { block: 0, item: 0, set: 0 }, { weight: 65 });
+    expect(x.blocks[0]!.items[0]!.sets[0]!.auto).toBe(false);
+    x = completeSet(x, { block: 0, item: 0, set: 0 }, t0);
+    expect(x.blocks[0]!.items[0]!.sets[1]).toMatchObject({ weight: 65, auto: true });
+    let y = updateSet(w, { block: 0, item: 0, set: 1 }, { weight: 55 });
+    y = completeSet(updateSet(y, { block: 0, item: 0, set: 0 }, { weight: 70 }), { block: 0, item: 0, set: 0 }, t0);
+    expect(y.blocks[0]!.items[0]!.sets[1]!.weight).toBe(55);
+    expect(updateSet(w, { block: 0, item: 0, set: 0 }, { reps: 5 }).blocks[0]!.items[0]!.sets[0]!.auto).toBe(true);
+  });
+  it('교체 시 웜업 세트에는 작업 무게를 넣지 않고 작업 세트 순번으로 맞춤', () => {
+    const w = addSet(startWorkout('w1', routine, now, []), 1, 0, true); // B: [W, 1, 2]
+    const x = replaceItem(w, 1, 0, 'a', [past()]);
+    expect(x.blocks[1]!.items[0]!.sets.map((s) => [s.warmup, s.weight])).toEqual([[true, undefined], [false, 60], [false, 60]]);
+    expect(x.blocks[1]!.items[0]!.sets[0]!.reps).toBe(10);
+  });
+  it('휴식이 끝난 뒤 +15는 지금부터 15초', () => {
+    const w = completeSet(startWorkout('w1', routine, now, []), { block: 0, item: 0, set: 0 }, t0);
+    const later = t0 + 200000;
+    expect(timerRemaining(adjustTimer(w, 15, later).timer, later)).toBe(15);
+  });
+  it('블록 사이 휴식은 시작할 때 설정값, 예정 대비 차이', () => {
+    const w = startWorkout('w1', routine, now, [], { betweenSec: 45 });
+    expect(restAfter(w, { block: 0, item: 0, set: 1 })).toMatchObject({ sec: 45, kind: 'between' });
+    expect(w.plannedSec).toBe(1800);
+    const p = progress(w, t0 + 600000, () => 40);
+    expect(p.deltaSec).toBe(p.elapsedSec + p.remainingSec - 1800);
+    expect(progress({ ...w, plannedSec: undefined }, t0, () => 40).deltaSec).toBeUndefined();
+  });
+  it('루틴 편집: 빈 루틴, 묶기·풀기, 휴식 한 번에, 예상 시간', () => {
+    const ex = (id: string, mechanics: 'compound' | 'isolation', unilateral = false): Exercise => ({ id, name_ko: id, family: id, part: '등', muscles: ['m'], pattern: 'H_PULL', mechanics, equipment: ['cable'], unilateral });
+    const byId = new Map([['a', ex('a', 'compound')], ['b', ex('b', 'isolation')], ['c', ex('c', 'isolation')], ['p', { ...ex('p', 'isolation'), measure: 'time' as const, default_seconds: 45 }]]);
+    expect(emptyRoutine('r', '새 루틴', now)).toMatchObject({ blocks: [], name: '새 루틴' });
+    // a: 2×(20+8×3)=88 + 150 = 238 / 묶음 b(2세트×10회)+c(3세트×12회): 2×50 + 3×56 + 2×10 + 2×120 = 528 / p: 2×65 + 90 = 220 / 사이 2×90
+    expect(routineEstimate(routine, byId)).toBe(238 + 528 + 220 + 180);
+    expect(routineEstimate({ ...routine, blocks: [...routine.blocks, { kind: 'single', items: [{ exerciseId: 'ghost', sets: 3, reps: 8 }], restSec: 90, roundRestSec: 120, transitionSec: 10 }] }, byId)).toBe(238 + 528 + 220 + 180);
+    expect(routineEstimate(emptyRoutine('r', 'x', now), byId)).toBe(0);
+    const m = mergeWithNext(routine, 0, 'superset');
+    expect(m.blocks).toHaveLength(2);
+    expect(m.blocks[0]).toMatchObject({ kind: 'superset', roundRestSec: 120 });
+    expect(m.blocks[0]!.items.map((i) => i.exerciseId)).toEqual(['a', 'b', 'c']);
+    expect(mergeWithNext(routine, 2, 'superset')).toBe(routine);
+    expect(mergeWithNext(routine, 1, 'compound').blocks[1]!.roundRestSec).toBe(120);
+    const sp = splitBlock(routine, 1, (id) => (id === 'b' ? 90 : 60));
+    expect(sp.blocks.map((b) => [b.kind, b.restSec])).toEqual([['single', 150], ['single', 90], ['single', 60], ['single', 90]]);
+    expect(splitBlock(routine, 0, () => 1)).toBe(routine);
+    expect(applyRestToAll(routine, 75, 100).blocks.every((b) => b.restSec === 75 && b.roundRestSec === 100)).toBe(true);
+  });
+  it('직접 추가 운동의 동작 유형', () => {
+    expect(patternFor('가슴', 'compound')).toBe('H_PUSH');
+    expect(patternFor('하체', 'compound')).toBe('SQUAT');
+    expect(patternFor('등', 'compound')).toBe('H_PULL');
+    expect(patternFor('코어', 'isolation')).toBe('CORE');
+    expect(patternFor('이두', 'isolation')).toBe('ISOLATION');
+  });
+  it('저장된 예전 설정에 휴식 기본값이 없어도 채워짐', async () => {
+    const db = new WorkoutDB(`test-${Math.random()}`);
+    await db.settings.put({ key: 'main', level: '초보' } as never);
+    const st = await getSettings(db);
+    expect(st.level).toBe('초보');
+    expect(st.rest).toEqual(DEFAULT_SETTINGS.rest);
+    db.close();
   });
 });

@@ -10,40 +10,10 @@ import {
 import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, mmss } from '../components';
 import { resolveGrade } from '../../core/exercises';
-import { updateWorkout } from '../actions';
+import { updateWorkout, updateWorkoutAfterInputs } from '../actions';
 import { go } from '../nav';
 
-// ---------- 소리 (첫 탭에서 활성화, 무음 모드 대응 시도) ----------
-let ctx: AudioContext | undefined;
-function unlockAudio() {
-  try {
-    const nav = navigator as Navigator & { audioSession?: { type: string } };
-    if (nav.audioSession) nav.audioSession.type = 'playback';
-    ctx ??= new AudioContext();
-    if (ctx.state === 'suspended') void ctx.resume();
-  } catch { /* 소리 없음 */ }
-}
-function beep(freq: number, ms: number, when = 0) {
-  if (!ctx) return;
-  const o = ctx.createOscillator(); const g = ctx.createGain();
-  o.frequency.value = freq; o.connect(g); g.connect(ctx.destination);
-  const t = ctx.currentTime + when;
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
-  o.start(t); o.stop(t + ms / 1000 + 0.05);
-}
-
-// ---------- 화면 꺼짐 방지 ----------
-function useWakeLock(on: boolean) {
-  useEffect(() => {
-    if (!on || !('wakeLock' in navigator)) return;
-    let lock: WakeLockSentinel | undefined;
-    const req = async () => { try { lock = await navigator.wakeLock.request('screen'); } catch { /* 거부됨 */ } };
-    void req();
-    const vis = () => { if (document.visibilityState === 'visible') void req(); };
-    document.addEventListener('visibilitychange', vis);
-    return () => { document.removeEventListener('visibilitychange', vis); void lock?.release(); };
-  }, [on]);
-}
+import { unlockAudio, beep, wasAlerted, markAlerted } from '../device';
 
 export function WorkoutScreen({ s }: { s: AppState }) {
   const w = activeOf(s);
@@ -53,10 +23,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [open, setOpen] = useState<number | null>(null);
   const [picker, setPicker] = useState<{ mode: 'swap'; b: number; i: number } | { mode: 'add' } | null>(null);
   const [ended, setEnded] = useState(false);
-  const warned = useRef<number>(0); const rang = useRef<number>(0);
-  useWakeLock(!!w && s.settings.keepAwake);
+  const warned = useRef<number>(0);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
-  useEffect(() => { document.addEventListener('pointerdown', unlockAudio); return () => document.removeEventListener('pointerdown', unlockAudio); }, []);
 
   const rem = w ? timerRemaining(w.timer, now) : 0;
   const curKey = w ? JSON.stringify(currentStep(w) ?? null) : '';
@@ -69,8 +37,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     if (!w?.timer) { setEnded(false); return; }
     const key = w.timer.endsAt;
     if (rem <= 10 && rem > 0 && warned.current !== key) { warned.current = key; if (s.settings.soundOn) beep(660, 120); }
-    if (rem === 0 && rang.current !== key) {
-      rang.current = key; setEnded(true);
+    if (rem === 0 && !wasAlerted(key)) {
+      markAlerted(key); setEnded(true);
       if (s.settings.soundOn) { beep(880, 180); beep(880, 180, 0.3); beep(1175, 350, 0.6); }
     }
   }, [rem, w?.timer?.endsAt]);
@@ -126,23 +94,31 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           <div class="row small" style={{ margin: '4px 0 6px 42px' }}>
             <span class="sub">남은 횟수 여유(RIR)</span>
             {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
+            <button class="chip" aria-label={`${label} 메모`} onClick={() => { const m = prompt('세트 메모', x.memo ?? ''); if (m !== null) void upd((cw) => updateSet(cw, st, { memo: m || undefined })); }}>메모</button>
           </div>
         )}
+        {x.memo && <div class="pill" style={{ marginLeft: '36px' }}>📝 {x.memo}</div>}
       </div>
     );
   };
+
+  const finish = async () => {
+    const left = prog.totalSets - prog.doneSets;
+    if (!confirm(left ? `아직 ${left}세트 남았어요. 운동을 끝낼까요?` : '운동을 끝낼까요?')) return;
+    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/');
+  };
+  const delta = prog.deltaSec;
 
   return (
     <main style={{ paddingBottom: 'calc(var(--nav-h) + 260px)' }}>
       <div class="row between">
         <h1 class="grow" style={{ margin: '4px 0' }}>{w.name}</h1>
-        <button class="danger" onClick={async () => {
-          const left = prog.totalSets - prog.doneSets;
-          if (!confirm(left ? `아직 ${left}세트 남았어요. 운동을 끝낼까요?` : '운동을 끝낼까요?')) return;
-          await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/');
-        }}>종료</button>
+        <button aria-label="운동 메모" onClick={() => { const m = prompt('오늘 운동 메모', w.memo ?? ''); if (m !== null) void upd((cw) => ({ ...cw, memo: m || undefined })); }}>메모</button>
+        <button class="danger" onClick={finish}>종료</button>
       </div>
+      {w.memo && <p class="sub small">📝 {w.memo}</p>}
       <div class="row between sub small"><span>경과 {mmss(prog.elapsedSec)}</span><span>{prog.doneSets}/{prog.totalSets}세트</span><span>남은 예상 {mmss(prog.remainingSec)}</span></div>
+      {delta !== undefined && Math.abs(delta) >= 60 && <div class="pill" aria-label="예정 대비">{delta > 0 ? `예정보다 약 ${Math.round(delta / 60)}분 늦음` : `예정보다 약 ${Math.round(-delta / 60)}분 빠름`}</div>}
       <div class="progress" style={{ margin: '6px 0 10px' }}><div style={{ width: `${prog.totalSets ? (100 * prog.doneSets) / prog.totalSets : 0}%` }} /></div>
 
       {w.blocks.map((b, bi) => {
@@ -184,6 +160,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         );
       })}
       <button class="big" onClick={() => setPicker({ mode: 'add' })}>+ 운동 추가</button>
+      <button class="big danger" style={{ marginTop: '8px' }} onClick={finish}>운동 끝내기</button>
 
       {/* 휴식 타이머 / 다음 세트 */}
       <div class={`timer ${w.timer && rem === 0 ? 'end flash' : ''}`} role="timer" aria-live="polite">
@@ -217,7 +194,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           onClose={() => setPicker(null)}
           onPick={(e) => {
             if (picker.mode === 'swap') upd((cw) => replaceItem(cw, picker.b, picker.i, e.id, history));
-            else upd((cw) => appendExercise(cw, e.id, 3, e.measure === 'time' ? 0 : targetReps(e), e.mechanics === 'compound' ? 150 : 90, history, e.measure === 'time' ? e.default_seconds ?? 30 : undefined));
+            else upd((cw) => appendExercise(cw, e.id, 3, e.measure === 'time' ? 0 : targetReps(e), e.mechanics === 'compound' ? s.settings.rest.compound : s.settings.rest.isolation, history, e.measure === 'time' ? e.default_seconds ?? 30 : undefined));
             setPicker(null);
           }} />
       )}

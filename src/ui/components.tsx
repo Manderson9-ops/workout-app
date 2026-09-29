@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useState, useRef, useEffect } from 'preact/hooks';
+import { registerPending } from './store';
 import type { ComponentChildren } from 'preact';
 import type { BuiltExercise, Part } from '../core/types';
 import { PARTS, EQUIPMENT_LABEL } from '../core/types';
@@ -14,31 +15,46 @@ export function GradeBadge({ g }: { g: Pick<ResolvedGrade, 'value' | 'source' | 
   return <span class={`badge ${cls}`} title={title} aria-label={`등급 ${g.value} ${title}`}>{g.value}{g.estimated ? ' 추정' : ''}</span>;
 }
 
-export function Stepper({ value, step, min = 0, onChange, label, suffix }: { value: number | undefined; step: number; min?: number; onChange: (v: number) => void; label: string; suffix?: string }) {
+export function Stepper({ value, step, min = 0, onChange, label, suffix, integer }: { value: number | undefined; step: number; min?: number; onChange: (v: number) => void; label: string; suffix?: string; integer?: boolean }) {
   const v = value ?? 0;
   return (
     <div class="stepper" aria-label={label}>
       <button aria-label={`${label} 줄이기`} onClick={() => onChange(Math.max(min, Math.round((v - step) * 10) / 10))}>−</button>
-      <NumInput label={label} value={value} suffix={suffix ?? ''} onChange={(n) => onChange(Math.max(min, n ?? min))} />
+      <NumInput label={label} value={value} suffix={suffix ?? ''} integer={integer} onChange={(n) => onChange(Math.max(min, n ?? min))} />
       <button aria-label={`${label} 늘리기`} onClick={() => onChange(Math.round((v + step) * 10) / 10)}>+</button>
     </div>
   );
 }
 
-/** 숫자 입력 (탭하면 숫자 키패드). 입력하는 즉시 저장한다: 아이폰 사파리는 버튼을 눌러도 입력칸 포커스가 안 빠져 change 이벤트가 늦게 오기 때문 */
-export function NumInput({ value, onChange, label, suffix }: { value: number | undefined; onChange: (v: number | undefined) => void; label: string; suffix: string }) {
+/**
+ * 숫자 입력 (탭하면 숫자 키패드). 입력하는 대로 저장하되 0.3초 늦춰 모아서 저장한다(디바운스).
+ * 세트 완료를 누르면 늦춘 저장을 먼저 끝낸다(flushPending). 아이폰 사파리는 버튼을 눌러도 입력칸 포커스가 안 빠지기 때문.
+ */
+export function NumInput({ value, onChange, label, suffix, integer }: { value: number | undefined; onChange: (v: number | undefined) => void; label: string; suffix: string; integer?: boolean }) {
   const [text, setText] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const latest = useRef<number | undefined | null>(null);
+  const flush = async () => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = undefined; }
+    registerPending(label, null);
+    if (latest.current !== null) { const v = latest.current; latest.current = null; await Promise.resolve(onChange(v)); }
+  };
+  useEffect(() => () => { void flush(); }, []);
   const shown = text ?? (value === undefined ? '' : String(value));
   return (
     <div style={{ position: 'relative' }}>
-      <input inputMode="decimal" aria-label={label} value={shown} placeholder="-" style={{ textAlign: 'center', paddingRight: '26px' }}
-        onFocus={() => setText(shown)} onBlur={() => setText(null)}
+      <input inputMode={integer ? 'numeric' : 'decimal'} aria-label={label} value={shown} placeholder="-" style={{ textAlign: 'center', paddingRight: '26px' }}
+        onFocus={() => setText(shown)} onBlur={() => { setText(null); void flush(); }}
         onInput={(e) => {
           const t = (e.target as HTMLInputElement).value.replace(',', '.');
           setText(t);
-          if (t.trim() === '') { onChange(undefined); return; }
-          const n = parseFloat(t);
-          if (Number.isFinite(n) && n >= 0) onChange(n);
+          const n = integer ? parseInt(t, 10) : parseFloat(t);
+          if (t.trim() === '') latest.current = undefined;
+          else if (Number.isFinite(n) && n >= 0) latest.current = n;
+          else return;
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => { void flush(); }, 300);
+          registerPending(label, flush);
         }} />
       <span class="pill" style={{ position: 'absolute', right: '8px', top: '13px', pointerEvents: 'none' }}>{suffix}</span>
     </div>

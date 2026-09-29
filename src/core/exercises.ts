@@ -3,7 +3,7 @@
  * 데이터 검증(validateExerciseData)은 테스트와 빌드에서 함께 쓴다.
  */
 import { PARTS, EQUIPMENT, PATTERNS, LEVELS, DEFAULTS } from './types';
-import type { Exercise, BuiltExercise, GradeEntry, GuideItem, Part, Level, Equipment } from './types';
+import type { Exercise, BuiltExercise, GradeEntry, GuideItem, Part, Level, Equipment, Pattern } from './types';
 import { GRADES } from './version';
 import type { Grade } from './version';
 
@@ -131,4 +131,11 @@ export function validateStaples(all: BuiltExercise[], staples: Partial<Record<Pa
     }
   }
   return errs;
+}
+
+/** 직접 추가한 운동의 동작 유형: 부위와 다관절/단관절로 정함 */
+export function patternFor(part: Part, mech: 'compound' | 'isolation'): Pattern {
+  if (mech === 'isolation') return part === '코어' ? 'CORE' : 'ISOLATION';
+  const m: Record<Part, Pattern> = { 가슴: 'H_PUSH', 등: 'H_PULL', 어깨: 'V_PUSH', 이두: 'ISOLATION', 삼두: 'H_PUSH', '전완·악력': 'CARRY', 하체: 'SQUAT', 코어: 'CORE' };
+  return m[part];
 }
