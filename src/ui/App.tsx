@@ -7,6 +7,8 @@ import { Exercises, ExerciseDetail } from './screens/Exercises';
 import { WorkoutScreen } from './screens/Workout';
 import { SettingsScreen } from './screens/Settings';
 import { RoutineEditor } from './screens/RoutineEditor';
+import { Stats, WorkoutDetail } from './screens/Stats';
+import { ToolsScreen } from './screens/Tools';
 import { mmss } from './components';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
 import { useUpdateAvailable } from './update';
@@ -39,6 +41,9 @@ export function App() {
   else if (path.startsWith('/exercises')) screen = <Exercises s={s} />;
   else if (path.startsWith('/workout')) screen = <WorkoutScreen s={s} />;
   else if (path.startsWith('/settings')) screen = <SettingsScreen s={s} />;
+  else if (path.startsWith('/stats/w/')) screen = <WorkoutDetail s={s} id={decodeURIComponent(path.slice(9))} />;
+  else if (path.startsWith('/stats')) screen = <Stats s={s} />;
+  else if (path.startsWith('/tools')) screen = <ToolsScreen />;
   else if (path.startsWith('/routine/')) screen = <RoutineEditor key={path} s={s} id={decodeURIComponent(path.slice(9))} />;
   else screen = <Home s={s} />;
 
@@ -64,8 +69,9 @@ export function App() {
         {tab('#/', '🏠', '홈', path === '/' || path === '' || path.startsWith('/routine'))}
         {tab('#/plan', '🧩', '플랜', path.startsWith('/plan'))}
         {tab('#/workout', '⏱️', '운동', onWorkout)}
+        {tab('#/stats', '📈', '기록', path.startsWith('/stats'))}
         {tab('#/exercises', '📚', '종목', path.startsWith('/exercises'))}
-        {tab('#/settings', '⚙️', '설정', path.startsWith('/settings'))}
+        {tab('#/settings', '⚙️', '설정', path.startsWith('/settings') || path.startsWith('/tools'))}
       </nav>
     </>
   );

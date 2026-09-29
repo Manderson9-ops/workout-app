@@ -6,7 +6,9 @@ import type { Table } from 'dexie';
 import type { Routine, Workout } from '../core/session';
 import type { Exercise, Level, Part, Equipment } from '../core/types';
 import type { Grade } from '../core/version';
+import type { BackupData } from '../core/backup';
 
+export interface BodyweightRow { date: string; kg: number }
 export interface ExerciseMeta { exerciseId: string; favorite?: boolean; userGrade?: Grade; excluded?: boolean }
 export interface CustomExercise extends Exercise { custom: true; createdAt: string }
 export interface Settings {
@@ -21,6 +23,8 @@ export interface Settings {
   rest: { compound: number; isolation: number; round: number; between: number; transition: number };
   /** 저장공간 안내를 봤는지 */
   storageNoticeSeen?: boolean;
+  /** 마지막으로 백업 파일을 저장한 시각 (7일 알림용) */
+  lastBackupAt?: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,6 +39,7 @@ export class WorkoutDB extends Dexie {
   meta!: Table<ExerciseMeta, string>;
   custom!: Table<CustomExercise, string>;
   settings!: Table<Settings, string>;
+  bodyweight!: Table<BodyweightRow, string>;
   constructor(name = 'workout-app') {
     super(name);
     // 스키마(색인) 변경 시에만 버전을 올린다. 설정에 필드를 더하는 것은 색인이 아니라 버전 변경이 필요 없고,
@@ -46,6 +51,8 @@ export class WorkoutDB extends Dexie {
       custom: 'id',
       settings: 'key',
     });
+    // v2 (P4): 체중 기록 표 추가. 기존 표와 데이터는 그대로 (마이그레이션 테스트: tests/backup.test.ts)
+    this.version(2).stores({ bodyweight: 'date' });
   }
 }
 
@@ -70,4 +77,30 @@ export async function finishedWorkouts(db: WorkoutDB): Promise<Workout[]> {
 /** 브라우저에 저장공간 유지 요청 (사파리가 지우지 않도록, BLUEPRINT 2장) */
 export async function requestPersist(): Promise<boolean> {
   try { return (await navigator.storage?.persist?.()) ?? false; } catch { return false; }
+}
+
+// ---------- 백업 (BLUEPRINT 4.6) ----------
+
+/** 읽기 트랜잭션 하나로 읽어서, 읽는 도중 기록이 바뀌어도 서로 어긋나지 않게 */
+export async function exportAll(db: WorkoutDB): Promise<BackupData> {
+  return db.transaction('r', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight], async () => {
+    const [routines, workouts, meta, custom, settings, bodyweight] = await Promise.all([
+      db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.settings.toArray(), db.bodyweight.toArray(),
+    ]);
+    return { routines, workouts, meta, custom: custom as unknown as Record<string, unknown>[], settings: settings as unknown as Record<string, unknown>[], bodyweight };
+  });
+}
+/** 백업으로 전부 바꾸기. 한 트랜잭션이라 중간에 실패하면 아무것도 바뀌지 않음 */
+export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackupAt?: string } = {}): Promise<void> {
+  await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight], async () => {
+    await Promise.all([db.routines.clear(), db.workouts.clear(), db.meta.clear(), db.custom.clear(), db.settings.clear(), db.bodyweight.clear()]);
+    await db.routines.bulkPut(d.routines);
+    await db.workouts.bulkPut(d.workouts);
+    await db.meta.bulkPut(d.meta as ExerciseMeta[]);
+    await db.custom.bulkPut(d.custom as unknown as CustomExercise[]);
+    const st = (d.settings as unknown as Settings[]).map((x) => (opts.lastBackupAt ? { ...x, lastBackupAt: opts.lastBackupAt } : x));
+    if (!st.length && opts.lastBackupAt) st.push({ ...DEFAULT_SETTINGS, lastBackupAt: opts.lastBackupAt });
+    await db.settings.bulkPut(st);
+    await db.bodyweight.bulkPut(d.bodyweight);
+  });
 }

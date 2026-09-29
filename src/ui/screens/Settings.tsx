@@ -6,6 +6,8 @@ import type { Level, Equipment } from '../../core/types';
 import { APP_VERSION } from '../../core/version';
 import { setMeta } from '../actions';
 import type { Settings } from '../../db/db';
+import { BackupSection } from './BackupSection';
+import { go } from '../nav';
 
 export function SettingsScreen({ s }: { s: AppState }) {
   const st = s.settings;
@@ -45,8 +47,9 @@ export function SettingsScreen({ s }: { s: AppState }) {
           <button onClick={() => setMeta(m.exerciseId, { excluded: false })}>되돌리기</button>
         </div>
       ))}
-      <h2>데이터</h2>
-      <p class="sub small">운동 기록은 이 아이폰 안에만 저장돼요. 홈 화면 아이콘을 지우면 기록도 지워지니 주의하세요. 백업 파일 저장은 다음 단계(P4)에서 추가돼요.</p>
+      <BackupSection s={s} />
+      <h2>도구</h2>
+      <button onClick={() => go('#/tools')}>원판 계산기 · 1RM 계산기</button>
       <p class="sub small">앱 버전 {APP_VERSION}</p>
     </main>
   );

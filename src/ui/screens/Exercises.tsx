@@ -6,7 +6,9 @@ import { PARTS, EQUIPMENT, EQUIPMENT_LABEL, LEVELS } from '../../core/types';
 import type { Part, Equipment, Mechanics } from '../../core/types';
 import { resolveGrade, eligibleParts, patternFor } from '../../core/exercises';
 import { matchesQuery } from '../../core/search';
-import { lastSets, epley1RM } from '../../core/session';
+import { lastSets } from '../../core/session';
+import { exerciseHistory } from '../../core/stats';
+import { LineChart, BarChart } from '../charts';
 import { GRADES } from '../../core/version';
 import type { Grade } from '../../core/version';
 import { GradeBadge, Sheet } from '../components';
@@ -112,8 +114,8 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
   const m = s.meta.get(e.id);
   const g = resolveGrade(e, e.part, s.settings.level, undefined, m?.userGrade);
   const prev = lastSets(historyOf(s), e.id);
-  const best = historyOf(s).flatMap((w) => w.blocks.flatMap((b) => b.items.filter((i) => i.exerciseId === e.id).flatMap((i) => i.sets))).filter((x) => x.done && !x.warmup && x.weight && x.reps)
-    .reduce((mx, x) => Math.max(mx, epley1RM(x.weight!, x.reps!)), 0);
+  const hist = exerciseHistory(historyOf(s), e.id, e, s.bodyweight);
+  const best = hist.reduce((mx, h) => Math.max(mx, h.best1RM ?? 0), 0);
   const title = (vid: string) => sourceVideos.find((v) => v.video_id === vid)?.title ?? vid;
   return (
     <main>
@@ -151,8 +153,24 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
       ))}
       <h2>내 기록</h2>
       {prev.length ? <p>지난번: {prev.map((p) => `${p.weight ?? '-'}kg × ${p.reps ?? p.seconds ?? '-'}`).join(', ')}</p> : <p class="sub">아직 기록이 없어요</p>}
-      {best > 0 && <p>추정 1RM 최고: {best}kg <span class="sub small">(Epley 공식 추정)</span></p>}
-      {'custom' in e && <button class="danger" onClick={async () => { if (confirm('직접 추가한 운동을 지울까요? 운동 기록은 남아요.')) { await mutate((d) => d.custom.delete(e.id)); go('#/exercises'); } }}>이 운동 삭제</button>}
+      {hist.some((h) => h.best1RM) && (
+        <>
+          <p class="small">추정 1RM 최고 {best}kg <span class="sub">(Epley 공식 추정)</span></p>
+          <LineChart label="추정 1RM 추이" unit="kg" points={hist.filter((h) => h.best1RM).slice(-20).map((h) => ({ label: h.date.slice(5).replace('-', '/'), value: h.best1RM! }))} />
+          <BarChart label="볼륨 추이" unit="kg" points={hist.slice(-8).map((h) => ({ label: h.date.slice(5).replace('-', '/'), value: Math.round(h.volume) }))} />
+        </>
+      )}
+      {hist.length > 0 && (
+        <div class="card">
+          {[...hist].reverse().slice(0, 10).map((h) => (
+            <div class="row between small" key={h.workoutId} style={{ minHeight: '32px' }}>
+              <span>{h.date.slice(5).replace('-', '/')}</span>
+              <span>{h.sets}세트{h.bestSet ? ` · 최고 ${h.bestSet.weight}kg×${h.bestSet.reps}` : ''}{h.seconds ? ` · ${h.seconds}초` : ''}</span>
+              <span class="sub">{h.volume ? `${Math.round(h.volume).toLocaleString()}kg` : ''}</span>
+            </div>
+          ))}
+        </div>
+      )}      {'custom' in e && <button class="danger" onClick={async () => { if (confirm('직접 추가한 운동을 지울까요? 운동 기록은 남아요.')) { await mutate((d) => d.custom.delete(e.id)); go('#/exercises'); } }}>이 운동 삭제</button>}
     </main>
   );
 }

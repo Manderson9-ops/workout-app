@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 
 mkdirSync('reports/screens', { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `reports/screens/${test.info().project.name}-${name}.png` });
@@ -217,6 +217,7 @@ test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 �
   await page.getByLabel('해머 컬 1세트 무게', { exact: true }).pressSequentially('12.5');
   await page.getByRole('button', { name: '해머 컬 1세트 무게 조절 늘리기' }).dispatchEvent('click');
   await expect(page.getByLabel('해머 컬 1세트 무게', { exact: true })).toHaveValue('15');
+  await expect(page.getByRole('button', { name: '해머 컬 1세트 원판 계산' })).toHaveCount(0); // 덤벨 운동엔 원판 버튼 없음
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await expect(page.getByRole('timer')).toContainText('다음 운동으로 이동');
   const sec = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
@@ -224,4 +225,113 @@ test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 �
   expect(sec).toBeLessThanOrEqual(75);
 });
 
+test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원판·1RM, 백업 → 초기화 → 복원 100% 일치', async ({ page }) => {
+  // 공유 시트 대신 다운로드 경로로 고정 (테스트 브라우저에는 공유 시트가 없음)
+  await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
+  page.on('dialog', (d) => void d.accept());
+  // 운동 하나 끝내기: 바벨 컬 1세트 30kg × 10 (기본 목표 횟수)
+  await page.getByRole('button', { name: '+ 직접' }).click();
+  await page.getByLabel('루틴 이름').fill('팔 테스트');
+  await page.getByRole('button', { name: '+ 운동 추가' }).click();
+  await page.getByLabel('운동 검색').fill('바벨 컬');
+  await page.getByRole('dialog').getByRole('button').filter({ hasText: '바벨 컬' }).first().click();
+  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '세트 줄이기' }).first().click();
+  await page.getByRole('button', { name: '저장하고 시작' }).click();
+  await page.getByLabel('바벨 컬 1세트 무게', { exact: true }).fill('30');
+  // 운동 중 원판 계산 시트 (바벨·스미스 운동에만 버튼)
+  await page.getByRole('button', { name: '바벨 컬 1세트 원판 계산' }).click();
+  await expect(page.getByRole('dialog', { name: '원판 계산기' })).toBeVisible();
+  await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 5');
+  await touchTargets(page);
+  await page.getByRole('button', { name: '닫기' }).click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await expect(page.getByText('최근 운동')).toBeVisible();
+  // 홈 백업 알림 (백업한 적 없음)
+  await expect(page.getByRole('note', { name: '백업 알림' })).toContainText('아직 백업한 적이 없어요');
+
+  // 기록 탭: 이번 주 1회, 오늘 달력 표시 → 상세
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByText('1회', { exact: true })).toBeVisible();
+  const d = new Date();
+  const todayBtn = page.getByRole('button', { name: `${d.getMonth() + 1}월 ${d.getDate()}일 운동 1회` });
+  await expect(todayBtn).toBeEnabled();
+  await todayBtn.click();
+  await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+  await expect(page.getByRole('img', { name: /이번 주 부위별 작업 세트: .*이두 1세트/ })).toBeVisible();
+  await expect(page.getByRole('table', { name: '최근 4주 부위별 작업 세트' })).toContainText('이두');
+  await expect(page.getByRole('img', { name: /최근 8주 주간 볼륨: .*300kg/ })).toBeVisible();
+  // 체중: 범위 밖은 거절, 정상 값 기록
+  await page.getByLabel('체중', { exact: true }).fill('700');
+  await page.getByRole('button', { name: '기록', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('20~300kg');
+  await page.getByLabel('체중', { exact: true }).fill('72.5');
+  await page.getByRole('button', { name: '기록', exact: true }).click();
+  await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: '고치기' })).toBeVisible();
+  await checkScreen(page, '10-stats');
+  await page.getByRole('button', { name: /팔 테스트/ }).first().click();
+  await expect(page.getByRole('heading', { name: '팔 테스트' })).toBeVisible();
+  await expect(page.getByText(/30kg × 10회/)).toBeVisible();
+  await expect(page.getByRole('button', { name: '이 운동 다시 하기' })).toBeVisible();
+  await checkScreen(page, '11-workout-detail');
+
+  // 종목 상세: 내 기록 그래프
+  await page.getByRole('link', { name: '종목' }).click();
+  await page.getByLabel('운동 검색').fill('바벨 컬');
+  await page.getByRole('button', { name: '바벨 컬', exact: true }).click();
+  await expect(page.getByRole('img', { name: /추정 1RM 추이/ })).toBeVisible();
+  await expect(page.getByRole('img', { name: /볼륨 추이: .*300kg/ })).toBeVisible();
+  await checkScreen(page, '14-exercise-history');
+
+  // 도구: 원판 100kg (20kg 바) → 25 + 15, 원판 [15,10]만 → 60kg = 10 + 10, 1RM 100×5 → 116.7
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByRole('button', { name: '원판 계산기 · 1RM 계산기' }).click();
+  await page.getByLabel('원판 계산 목표 무게', { exact: true }).fill('100');
+  await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 25 + 15');
+  await page.getByLabel('1RM 계산 무게', { exact: true }).fill('100');
+  await page.getByLabel('1RM 계산 횟수', { exact: true }).fill('5');
+  await expect(page.getByLabel('1RM 계산 결과')).toContainText('추정 1RM 116.7kg');
+  await checkScreen(page, '12-tools');
+  await page.getByLabel('1RM 계산 횟수', { exact: true }).fill('20');
+  await expect(page.getByLabel('1RM 계산 결과')).toContainText('12회보다 많으면');
+  for (const p of ['25', '20', '5', '2.5', '1.25']) await page.getByRole('button', { name: p, exact: true }).click();
+  await page.getByLabel('원판 계산 목표 무게', { exact: true }).fill('60');
+  await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 10 + 10');
+  for (const p of ['25', '20', '5', '2.5', '1.25']) await page.getByRole('button', { name: p, exact: true }).click(); // 되돌림 (localStorage)
+
+  // 백업 저장 → 모든 데이터 지우기 → 불러오기 → 다시 백업: 내용 100% 일치 (7.1)
+  await page.getByRole('link', { name: '설정' }).click();
+  await expect(page.getByText('마지막 백업: 없음')).toBeVisible();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
+  expect(dl.suggestedFilename()).toMatch(/^workout-backup-\d{8}-\d{4}\.json$/);
+  const file = await dl.path();
+  await expect(page.getByText(/백업 파일을 내려받았어요/)).toBeVisible();
+  await expect(page.getByText('마지막 백업: 없음')).toHaveCount(0);
+  await checkScreen(page, '13-settings-backup');
+  await page.getByText('모든 데이터 지우기 (초기화)').click();
+  await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
+  await expect(page.getByText('모든 데이터를 지웠어요')).toBeVisible();
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByLabel('백업 파일 고르기').setInputFiles(file);
+  await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
+  await expect(page.getByText('마지막 백업: 없음')).toHaveCount(0); // 복원해도 백업 시각 유지
+  const [dl2] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
+  const strip = (t: string) => { const j = JSON.parse(t); for (const s of j.data.settings) delete s.lastBackupAt; return j.data; };
+  expect(strip(readFileSync(await dl2.path(), 'utf8'))).toEqual(strip(readFileSync(file, 'utf8')));
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+  await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
+  // 다른 앱 파일·깨진 파일은 거절, 기존 데이터 유지
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByLabel('백업 파일 고르기').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"app":"other"}') });
+  await expect(page.getByText(/불러오지 못했어요: 이 앱의 백업 파일이 아니에요/)).toBeVisible();
+  const broken = JSON.parse(readFileSync(file, 'utf8')); broken.data.workouts[0].blocks = [{}]; delete broken.counts;
+  await page.getByLabel('백업 파일 고르기').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(broken)) });
+  await expect(page.getByText(/불러오지 못했어요: 운동 기록 중 형식이 맞지 않는/)).toBeVisible();
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+});
 void makeRoutine;

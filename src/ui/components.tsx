@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
-import { registerPending, flushKey } from './store';
+import { registerPending, flushKey, trackInflight } from './store';
 import type { ComponentChildren } from 'preact';
 import type { BuiltExercise, Part } from '../core/types';
 import { PARTS, EQUIPMENT_LABEL } from '../core/types';
@@ -46,7 +46,7 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
   const flush = async () => {
     if (timer.current) { clearTimeout(timer.current); timer.current = undefined; }
     registerPending(key, null);
-    if (latest.current !== null) { const v = latest.current; latest.current = null; await Promise.resolve(onChange(v)); }
+    if (latest.current !== null) { const v = latest.current; latest.current = null; const p = Promise.resolve(onChange(v)); trackInflight(p); await p; }
   };
   useEffect(() => () => { void flush(); }, []);
   // 저장된 값이 다른 경로(−/+, 앞 세트 이어받기)로 바뀌면, 저장 대기 중인 입력이 없을 때 화면 글자도 맞춤
