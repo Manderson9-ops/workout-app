@@ -1,0 +1,8 @@
+{
+  "_note": "영상에서 추천한 운동 조합. 시간이 부족할 때 해당 부위 우선 조합으로 쓴다 (BLUEPRINT 3.1). wk_unrated = 영상의 미평가 항목 이름(가져오기 때 존재 확인)",
+  "combos": [
+    {"id": "tri_top2", "part": "삼두", "video_id": "i40LqeORuxA", "wk_unrated": "삼두 2개만 고른다면", "timestamp": "11:44",
+     "exercises": ["oh_cable_ext_single", "smith_jm_press"], "extra_if_three": "long_rope_pushdown",
+     "text": "2개면 오버헤드 케이블 익스텐션(장두) + JM프레스(내측두), 3개면 긴 로프(또는 로프 2개) 푸시다운 추가"}
+  ]
+}

@@ -9,7 +9,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "import:workout-k": "node tools/import_workout_k.ts",
+    "data:check": "vitest run tests/data.test.ts tests/wkImport.test.ts"
   },
   "dependencies": {
     "dexie": "^4.4.6",
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^26.6.3",
     "@vitest/coverage-v8": "^5.0.2",
     "fake-indexeddb": "^6.2.5",
     "typescript": "^7.0.2",

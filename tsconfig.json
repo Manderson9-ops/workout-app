@@ -11,6 +11,8 @@
     "noImplicitReturns": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "skipLibCheck": true,
     "types": ["vite/client"]
   },

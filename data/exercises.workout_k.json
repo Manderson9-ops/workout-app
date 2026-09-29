@@ -1,0 +1,1515 @@
+{
+ "_note": "tools/import_workout_k.ts 자동 생성. 직접 수정 금지",
+ "source_videos": [
+  {
+   "video_id": "6jfQD3PxIOg",
+   "title": "최고의 등 운동 티어 리스트 (2026년)",
+   "channel": "급진적 과부하",
+   "publish_date": "2026-06-30"
+  },
+  {
+   "video_id": "CxWZGilcUu4",
+   "title": "지금까지 가짜 운동 강도였다.",
+   "channel": "급진적 과부하",
+   "publish_date": "2026-09-18"
+  },
+  {
+   "video_id": "DtTX0QcwhRw",
+   "title": "최고의 분할 VS 최악의 분할",
+   "channel": "급진적 과부하",
+   "publish_date": "2026-07-22"
+  },
+  {
+   "video_id": "GclQVc4k4gU",
+   "title": "최고의 풀업 VS 최악의 풀업 (티어 리스트)",
+   "channel": "급진적 과부하",
+   "publish_date": "2026-08-05"
+  },
+  {
+   "video_id": "fRrg8JxnX6w",
+   "title": "스쿼트 자세, 딱 '3초'면 완벽해집니다. [무릎통증X 왕초보O]",
+   "channel": "모멘트핏 록코치",
+   "publish_date": "2026-01-13"
+  },
+  {
+   "video_id": "i40LqeORuxA",
+   "title": "최고의 삼두근 운동 VS 최악의 삼두근 운동 (티어 리스트)",
+   "channel": "급진적 과부하",
+   "publish_date": "2026-09-28"
+  }
+ ],
+ "grades": {
+  "one_arm_lat_pulldown": [
+   {
+    "value": "S",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "견갑골을 위로 올려 늘리고(2차 신장) 몸통을 옆으로 굽혀 최대로 늘림, 당길 때 몸통도 같이 굽혀 극한 수축. 광배의 최대 길이 변화를 이끌어냄.",
+    "target": "광배",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "10:47",
+    "primary_topic": true
+   }
+  ],
+  "kelso_shrug": [
+   {
+    "value": "S",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "팔 개입 없이 견갑골만 모아 중부 승모근을 실패 지점까지 몰아붙임. T바는 늘어난 하단에서 부하가 가장 커 스트레치 극대화.",
+    "target": "등 중상부 · 중부 승모근",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "12:37",
+    "primary_topic": true
+   }
+  ],
+  "chest_supported_tbar_row": [
+   {
+    "value": "A+",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "처음이 가장 무겁고 당길수록 가벼워져 스트렝스 커브와 일치. 영상 표현은 \"A~A+\".",
+    "target": "등 전반",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "07:03",
+    "primary_topic": true
+   }
+  ],
+  "lat_pulldown": [
+   {
+    "value": "A+",
+    "levels": [
+     "초보",
+     "중급"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "몸이 고정돼 안정적이고 궤적을 통제하기 쉬움.",
+    "target": "광배",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "08:49",
+    "primary_topic": true
+   },
+   {
+    "value": "A",
+    "levels": [
+     "상급"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "상급자에겐 풀업이 A+이고 랫풀다운은 A.",
+    "target": "광배",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "08:49",
+    "primary_topic": true
+   }
+  ],
+  "pull_up": [
+   {
+    "value": "A+",
+    "levels": [
+     "상급"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "체중 이상 중량(90~100kg 근처)에서는 랫풀다운이 몸이 딸려 올라가 불안정해지므로 풀업이 더 안정적.",
+    "target": "광배 · 대원근",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "08:49",
+    "primary_topic": true
+   },
+   {
+    "value": "A",
+    "levels": [
+     "초보",
+     "중급"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "수직 당기기로 광배·대원근에 효과적. 그립을 좁게 하면 광배, 넓게 하면 능형근·대원근 강조. 초보는 흔들림이 단점.",
+    "target": "광배 · 대원근",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "08:10",
+    "primary_topic": true
+   }
+  ],
+  "cam_supported_row_machine": [
+   {
+    "value": "A",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "동작 내내 비교적 일정한 부하. 레버 구조 머신보다 낫다.",
+    "target": "등 전반",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "07:03",
+    "primary_topic": true
+   }
+  ],
+  "chest_supported_db_row": [
+   {
+    "value": "A-",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "가슴 패드로 기립근 부담이 줄어 피로 비용이 적음. 다만 덤벨 세팅이 번거롭고 조금 불안정.",
+    "target": "등 전반",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "06:00",
+    "primary_topic": true
+   }
+  ],
+  "rack_pull": [
+   {
+    "value": "A-",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "데드리프트의 하체 구간을 건너뛰고 상단만 해서 승모근 자극이 좋음. 슈러그보다는 못함. 원판 과다·소음 등 실용성 기준으로는 B.",
+    "target": "승모근",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "05:35",
+    "primary_topic": true
+   }
+  ],
+  "lever_row_machine": [
+   {
+    "value": "B+",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "초반이 쉽고 마지막 수축 구간이 가장 어려운 저항 프로파일이라, 등이 가장 약한 구간을 더 어렵게 만들어 비효율적.",
+    "target": "등 전반",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "07:03",
+    "primary_topic": true
+   }
+  ],
+  "one_arm_cable_row": [
+   {
+    "value": "B+",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "원암 덤벨로우의 장점은 유지하고 흔들림을 없앰.",
+    "target": "광배",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "02:33",
+    "primary_topic": true
+   }
+  ],
+  "barbell_row": [
+   {
+    "value": "B-",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "전신 피로가 빨리 쌓이고, 기립근이 약하면 등이 남았는데 허리가 먼저 털려 등이 실패 지점까지 못 감. 진행자는 \"대체 불가능한 장점은 없다\"고 평가.",
+    "target": "등 + 기립근",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "00:38",
+    "primary_topic": true
+   }
+  ],
+  "one_arm_db_row": [
+   {
+    "value": "C+",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "몸통을 돌려 광배를 늘리고 쥐어짤 수 있지만 덤벨이 흔들려 불안정하고 기술적으로 어려움.",
+    "target": "광배",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "02:33",
+    "primary_topic": true
+   }
+  ],
+  "deadlift": [
+   {
+    "value": "D",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "주 동작은 힙힌지이고 광배는 바벨을 잡는 안정화 역할. 실패 지점에서 허리·하체가 먼저 털려 등이 못 감. 하체·기립근 운동으로는 A.",
+    "target": "등 운동 관점",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "03:39",
+    "primary_topic": true
+   }
+  ],
+  "pull_up_neutral": [
+   {
+    "value": "S",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "그립이 좁아 어깨 신전 위주로 광배 자극에 최적, 손목·팔꿈치 부담이 가장 적음. 이두 개입도 과하지 않음. 다른 등근육은 로우를 하나 추가해 채우라고 함. 완전 초보는 일반 풀업만으로도 충분.",
+    "target": "광배",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "08:01",
+    "primary_topic": true
+   }
+  ],
+  "assisted_pull_up_machine": [
+   {
+    "value": "S",
+    "levels": [
+     "초보"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "무릎 지지대로 안정적이라 타겟 근육에 집중하기 쉬움. 풀업을 못 하는 초보에게 특히 유용.",
+    "target": "입문 · 안정성",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "06:37",
+    "primary_topic": true
+   }
+  ],
+  "chin_up": [
+   {
+    "value": "A+",
+    "levels": [
+     "초보"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "초보는 성장 역치가 낮아 이두와 광배를 함께 자극 가능.",
+    "target": "이두 + 광배",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "00:21",
+    "primary_topic": true
+   },
+   {
+    "value": "B+",
+    "levels": [
+     "중급",
+     "상급"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "이두는 컬로 따로 할 텐데 풀업에서 미리 피로가 쌓이면 컬 퍼포먼스를 해칠 수 있음. 손목·팔꿈치 불편 가능. 진행자는 손목을 살짝 안쪽으로 돌린 그립을 선호.",
+    "target": "이두 + 광배",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "00:21",
+    "primary_topic": true
+   }
+  ],
+  "pull_up_overhand_mid": [
+   {
+    "value": "A+",
+    "levels": [
+     "초보",
+     "중급"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "광배·대원근·능형근을 골고루 자극하는 다재다능한 기본형. 성장 역치가 낮을 때 유리.",
+    "target": "올라운더",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "03:44",
+    "primary_topic": true
+   },
+   {
+    "value": "B+",
+    "levels": [
+     "상급"
+    ],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "상급자는 광배가 제한 요인이 되는 언더·뉴트럴 그립이 더 유리.",
+    "target": "올라운더",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "03:44",
+    "primary_topic": true
+   }
+  ],
+  "pull_up_wide": [
+   {
+    "value": "A",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "광배 자극은 가장 낮지만 대원근·능형근 자극이 뛰어남. 영상 표현은 \"높은 A\". 어깨(회전근개) 부담과 부상 위험에 주의.",
+    "target": "전반적 등 성장 (대원근·능형근)",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "01:31",
+    "primary_topic": true
+   },
+   {
+    "value": "D",
+    "levels": [],
+    "purpose_part": "등",
+    "purpose_note": "광배 집중",
+    "sub_goal_only": true,
+    "source": "VIDEO",
+    "why": "광배 자극이 모든 풀업 중 가장 낮음.",
+    "target": "광배만 목적",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "01:31",
+    "primary_topic": true
+   }
+  ],
+  "towel_pull_up": [
+   {
+    "value": "A",
+    "levels": [],
+    "purpose_part": "전완·악력",
+    "purpose_note": "악력",
+    "source": "VIDEO",
+    "why": "악력·전완 자극이 월등(유도 선수들이 악력 훈련에 사용).",
+    "target": "악력 목적",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "05:15",
+    "primary_topic": true
+   },
+   {
+    "value": "B-",
+    "levels": [],
+    "purpose_part": "전완·악력",
+    "purpose_note": "전완 근성장",
+    "source": "VIDEO",
+    "why": "악력·전완 자극은 좋지만 수축 상태에서 버티는 등척성 수축이라 근성장 자극은 그렇게까지 좋지 않을 수 있음. 전완은 리스트컬이 낫다고 함.",
+    "target": "전완 성장 목적",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "05:15",
+    "primary_topic": true
+   },
+   {
+    "value": "D",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "악력이 먼저 털려 등이 남아 있는 채로 세트가 끝날 수 있음.",
+    "target": "등 목적",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "05:15",
+    "primary_topic": true
+   }
+  ],
+  "band_assisted_pull_up": [
+   {
+    "value": "B",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "흔들리고 밴드는 늘어날수록 저항이 커져 스트레치 구간이 쉬워지고 수축 구간이 어려워짐. 머신 어시스트가 압도적으로 좋음.",
+    "target": "입문 (비추천)",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "07:26",
+    "primary_topic": true
+   }
+  ],
+  "archer_pull_up": [
+   {
+    "value": "D",
+    "levels": [],
+    "purpose_part": "등",
+    "source": "VIDEO",
+    "why": "한쪽씩 하면 매달리는 시간이 길어 그립이 먼저 털릴 수 있음. 한쪽씩 쉬는 방식이 최적이 아닐 수 있다는 \"몇 연구\"를 언급(연구 미특정).",
+    "target": "재미 외 이점 없음",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "03:00",
+    "primary_topic": true
+   }
+  ],
+  "smith_jm_press": [
+   {
+    "value": "S",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "클로즈그립 벤치보다 팔꿈치 신전 모멘트가 훨씬 커서 내측두 자극이 최상. 처음엔 팔꿈치가 불편할 수 있으니 저중량부터 적응. 프레스라 장두 자극은 낮음.",
+    "target": "내측두",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "05:22",
+    "primary_topic": true
+   }
+  ],
+  "oh_cable_ext_single": [
+   {
+    "value": "S",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "팔을 머리 위로 올려 장두를 크게 늘리는 거의 최고의 장두 운동. 팔꿈치가 약간 옆으로 빠져도 됨(장두는 위팔을 내리는 기능).",
+    "target": "장두",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "11:41",
+    "primary_topic": true
+   }
+  ],
+  "long_rope_pushdown": [
+   {
+    "value": "A+",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "팔이 옆·몸통 뒤로 가면서 장두가 극단적으로 수축. 오버헤드 익스텐션과 병행하면 장두 스트레치+수축을 모두 채움.",
+    "target": "장두 수축",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "03:13",
+    "primary_topic": true
+   }
+  ],
+  "oh_db_ext_single": [
+   {
+    "value": "A+",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "한 팔씩 하면 균형·중량 문제가 줄어듦.",
+    "target": "장두",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "11:35",
+    "primary_topic": true
+   }
+  ],
+  "rope_pushdown": [
+   {
+    "value": "A",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "초반 쉽고 중간이 가장 어렵고 끝에 다시 쉬운 수축 강조형. 관절 부담이 적고 로프라 손이 자유로워 장두도 더 수축.",
+    "target": "수축 · 관절 편함",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "02:19",
+    "primary_topic": true
+   }
+  ],
+  "triceps_push_up": [
+   {
+    "value": "A",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "내측두엔 아주 좋지만 장두엔 별로. 기술 난이도 때문에 A. 초보는 체중, 강해지면 중량 추가.",
+    "target": "내측두",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "06:59",
+    "primary_topic": true
+   }
+  ],
+  "lying_ext_behind_head": [
+   {
+    "value": "A",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "팔꿈치가 머리 뒤로 갈수록 장두 개입이 커지는 스펙트럼. 목적에 맞게 선택.",
+    "target": "장두",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "09:44",
+    "primary_topic": true
+   }
+  ],
+  "oh_barbell_ext": [
+   {
+    "value": "A-",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "양팔 동시라 균형 잡기 어렵고 중량이 제한되며 바벨을 머리 위로 떨어뜨릴 위험.",
+    "target": "장두",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "11:35",
+    "primary_topic": true
+   }
+  ],
+  "bar_pushdown": [
+   {
+    "value": "B+",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "로프보다 손·팔 움직임이 제한되어 장두 수축이 덜함.",
+    "target": "수축",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "03:26",
+    "primary_topic": true
+   }
+  ],
+  "dip": [
+   {
+    "value": "B",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "상체를 세우고 팔꿈치를 접으면 삼두, 숙이면 가슴. 장두 활성은 낮음. 삼두는 다른 고립 운동을 따로 하고 딥스는 가슴용으로 권장. 초보는 딥스 머신·어시스트 딥스가 안정적.",
+    "target": "내측두 · 가슴",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "06:07",
+    "primary_topic": true
+   }
+  ],
+  "cable_kickback": [
+   {
+    "value": "B",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "덤벨 킥백(D)을 케이블로 바꾸면 B까지 상승. 저항이 수평이라 후면 삼각근 부담과 과한 수축 강조가 줄어듦.",
+    "target": "장두 수축",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "01:58",
+    "primary_topic": true
+   }
+  ],
+  "close_grip_bench": [
+   {
+    "value": "B-",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "좋은 운동이지만 삼두보다 가슴이 먼저 한계에 도달해 삼두가 최대 효율을 못 받음. 팔꿈치를 앞으로 빼는 JM프레스로 바꾸면 개선.",
+    "target": "내측두",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "04:31",
+    "primary_topic": true
+   }
+  ],
+  "skull_crusher": [
+   {
+    "value": "B-",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "진행자 개인 의견: 이마에 부딪혀 가동 범위가 줄어 JM프레스의 하위 호환.",
+    "target": "내측두",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "09:44",
+    "primary_topic": true
+   }
+  ],
+  "db_kickback": [
+   {
+    "value": "D",
+    "levels": [],
+    "purpose_part": "삼두",
+    "source": "VIDEO",
+    "why": "수축 구간에서만 저항이 최대이고 늘어난 초반 1/3은 거의 저항이 없음. 후면 삼각근 부담이 커 불안정.",
+    "target": "장두 수축",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "01:03",
+    "primary_topic": true
+   }
+  ]
+ },
+ "guides": {
+  "barbell_row": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "바벨로우는 B-티어. 전신 피로가 빨리 쌓이고, 기립근이 등보다 약하면 등이 남았는데 허리가 먼저 털려 등이 실패 지점까지 못 간다고 지적. \"대체 불가능한 신비로운 장점은 없다\"는 진행자 견해이며 장비가 부족하던 시절의 필수 운동이었다고 말함.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "00:38"
+   }
+  ],
+  "one_arm_db_row": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "원암 덤벨로우 C+, 케이블로 바꾸면 B+. 팔꿈치를 몸통에 붙여 당기면 어깨 신전으로 광배가 강하게 자극되고 몸통 회전으로 광배를 더 늘리거나 수축할 수 있지만, 덤벨이 흔들려 불안정하고 기술적으로 어렵다. 케이블이면 장점은 유지하고 불안정성을 없앤다.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "02:33"
+   }
+  ],
+  "deadlift": [
+   {
+    "type": "PRINCIPLE",
+    "text": "데드리프트에서 광배는 바벨이 앞으로 나가지 않게 잡는 안정화 역할이고, 주된 움직임은 고관절을 펴는 힙힌지(둔근·기립근·햄스트링·내전근)라고 설명. 그래서 \"데드로 등을 넓힐 수 있다\"는 말은 잘못된 정보라고 주장하며, 등 운동 관점에서는 D티어(하체·기립근 운동으로는 A)로 평가.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "03:39"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "데드리프트 실패 지점에서는 허리·하체가 먼저 털리고 승모근이 먼저 털리지 않으므로 등근육이 실패 지점에 도달하는 경우가 거의 없다. 승모근을 키우려면 데드리프트가 아니라 슈러그를 하라고 권한다.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "04:52"
+   }
+  ],
+  "rack_pull": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "랙풀은 하체가 많이 쓰이는 하단을 건너뛰고 상단만 하므로 승모근 자극이 좋아 A-티어. 다만 슈러그보다는 못하다. 원판을 많이 쓰고 바벨이 망가질 수 있고 소음이 커서 실용성 면에서 B0로 내렸다.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "05:35"
+   }
+  ],
+  "chest_supported_db_row": [
+   {
+    "type": "PRINCIPLE",
+    "text": "가슴에 패드를 받치면 기립근 부담이 줄어 전신 피로가 훨씬 적다. 바벨로우 1세트는 매우 힘들지만 체스트 서포티드 로우는 5세트를 채워도 살 만해 \"동일한 등 자극에 피로 비용을 덜 지불한다\"고 설명. 덤벨 인클라인 로우는 셋업이 번거로워 A-.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "06:00"
+   }
+  ],
+  "chest_supported_tbar_row": [
+   {
+    "type": "PRINCIPLE",
+    "text": "가슴에 패드를 받치면 기립근 부담이 줄어 전신 피로가 훨씬 적다. 바벨로우 1세트는 매우 힘들지만 체스트 서포티드 로우는 5세트를 채워도 살 만해 \"동일한 등 자극에 피로 비용을 덜 지불한다\"고 설명. 덤벨 인클라인 로우는 셋업이 번거로워 A-.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "06:00"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "머신 저항 프로파일: 해머 스트렝스 같은 레버 구조는 동작 마지막 수축 구간이 가장 어려워 등이 가장 약한 구간을 더 어렵게 만드므로 비효율적(B+). 캠 구조는 일정한 부하(A0). 가장 이상적인 것은 T바처럼 처음이 가장 무겁고 당길수록 가벼워져 스트렝스 커브와 일치하는 형태(A0~A+).",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "07:03"
+   }
+  ],
+  "cam_supported_row_machine": [
+   {
+    "type": "PRINCIPLE",
+    "text": "가슴에 패드를 받치면 기립근 부담이 줄어 전신 피로가 훨씬 적다. 바벨로우 1세트는 매우 힘들지만 체스트 서포티드 로우는 5세트를 채워도 살 만해 \"동일한 등 자극에 피로 비용을 덜 지불한다\"고 설명. 덤벨 인클라인 로우는 셋업이 번거로워 A-.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "06:00"
+   }
+  ],
+  "lever_row_machine": [
+   {
+    "type": "PRINCIPLE",
+    "text": "가슴에 패드를 받치면 기립근 부담이 줄어 전신 피로가 훨씬 적다. 바벨로우 1세트는 매우 힘들지만 체스트 서포티드 로우는 5세트를 채워도 살 만해 \"동일한 등 자극에 피로 비용을 덜 지불한다\"고 설명. 덤벨 인클라인 로우는 셋업이 번거로워 A-.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "06:00"
+   }
+  ],
+  "seal_row": [
+   {
+    "type": "PRINCIPLE",
+    "text": "가슴에 패드를 받치면 기립근 부담이 줄어 전신 피로가 훨씬 적다. 바벨로우 1세트는 매우 힘들지만 체스트 서포티드 로우는 5세트를 채워도 살 만해 \"동일한 등 자극에 피로 비용을 덜 지불한다\"고 설명. 덤벨 인클라인 로우는 셋업이 번거로워 A-.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "06:00"
+   }
+  ],
+  "pull_up": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "풀업은 팔을 수직으로 당겨 광배·대원근 성장에 효과적이고, 몸통을 세우면 로우처럼 등 중상부도 함께 자극한다. 그립을 좁게 하면 광배, 넓게 하면 능형근·대원근 등 광배 외 근육이 더 강조된다. 초보자는 몸이 흔들려 불안정하다는 단점이 있다.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "08:10"
+   },
+   {
+    "type": "TIP",
+    "text": "중량 풀업은 추가 중량 때문에 무게 중심이 크게 바뀌어 당기는 테크닉을 중량마다 다시 익혀야 한다. 진행자는 체중 + 60kg가 최고 기록이라고 말함.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "09:40"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "견갑골(어깨)을 고정한 채 풀업·풀다운을 하라는 \"숄더 패킹\"은 매우 잘못된 주장이라고 단언하며, 견갑골이 위아래로 자연스럽게 움직일 때 광배가 함께 늘어나고 줄어든다고 주장. 근거 자료는 영상에서 제시되지 않음.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "11:40"
+   }
+  ],
+  "lat_pulldown": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "초보·중급자는 랫풀다운 A+, 풀업 A0. 상급자는 반대로 풀업 A+, 랫풀다운 A0. 이유: 랫풀다운은 몸이 고정돼 안정적이지만 중량이 90~100kg(체중 이상)에 가까워지면 몸이 딸려 올라가 불안정해지기 때문.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "08:49"
+   }
+  ],
+  "one_arm_lat_pulldown": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "광배 S티어 1위는 원암 랫풀다운. 근거: 광배를 최대 가동 범위로 늘리고 수축시킬 수 있기 때문. 팔을 올리면 1차 신장, 견갑골(어깨 전체)을 위로 올리면 2차 신장, 몸통을 옆으로 굽히면 3차로 최대 신장. 당길 때는 몸통을 당기는 쪽으로 같이 구부려 극한까지 수축.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "10:47"
+   }
+  ],
+  "kelso_shrug": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "등 중상부 S티어는 체스트 서포티드 T바로우 머신 켈소 슈러그. 팔의 개입 없이 견갑골만 모으므로 보조 근육이 먼저 지치지 않고 중부 승모근을 실패 지점까지 몰아붙일 수 있다. T바 머신은 하단(가장 늘어난 구간)에서 부하가 가장 커 스트레치를 극대화한다.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "12:37"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "중부 승모근은 팔을 움직이는 근육이 아니라 견갑골을 모으는 근육이며, 로우에서 견갑 움직임 없이 팔만 당기면 등 운동이 아니라 이두·후면 삼각근 운동이라고 주장. 진행자의 해부학적 해석이며 근거 자료는 영상에서 제시되지 않음.",
+    "video_id": "6jfQD3PxIOg",
+    "timestamp": "12:53"
+   }
+  ],
+  "bench_press": [
+   {
+    "type": "CLAIM_CHECK",
+    "text": "강도가 매우 높으면 협력근 활성이 크게 늘어나 운동 하나로 여러 근육을 키울 수 있다고 주장. 벤치프레스에서 실패 근처 마지막 몇 회는 전면 삼각근·삼두근 개입이 크게 증가한다고 예시. 주동근 자극이 줄지 않는다는 주장도 함께. 구체적 연구는 영상에서 특정되지 않음.",
+    "video_id": "CxWZGilcUu4",
+    "timestamp": "08:44"
+   }
+  ],
+  "chin_up": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "언더그립은 이두 개입이 가장 크고 그립이 좁아 광배 자극도 좋지만 손목·팔꿈치가 불편할 수 있다. 이두를 따로 컬로 할 거라면 피로만 쌓여 컬 퍼포먼스를 해칠 수 있어 중상급자 B+, 초보자 A+. 진행자는 완전 언더보다 손목을 살짝 안쪽으로 돌린 그립을 선호.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "00:21"
+   }
+  ],
+  "pull_up_wide": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "와이드 그립은 광배 자극이 가장 낮지만 대원근·능형근 자극이 뛰어나다. 광배만 목적이면 D, 전반적 등 성장이 목표면 높은 A. 대원근이 V테이퍼(역삼각형)에 광배보다 더 중요할 수 있다고 주장. 단점은 회전근개·어깨 관절 부담과 부상 위험.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "01:31"
+   },
+   {
+    "type": "SAFETY",
+    "text": "팔이 좌우로 넓게 벌어진 상태로 당기므로 회전근개와 어깨 관절에 더 무리가 갈 수 있고 자세에 익숙하지 않으면 부상 위험이 있다.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "02:35"
+   }
+  ],
+  "archer_pull_up": [
+   {
+    "type": "CLAIM_CHECK",
+    "text": "아처 풀업은 D티어. 한쪽씩 하면 매달리는 시간이 길어 그립이 먼저 털릴 수 있고, 한쪽 하는 동안 다른 쪽이 쉬는 것은 \"몇 연구\"에 따르면 근성장에 최적이 아닐 수 있다고 함. 연구는 특정되지 않음.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "03:00"
+   }
+  ],
+  "pull_up_overhand_mid": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "일반 오버그립 중간 너비는 광배·대원근·능형근을 골고루 자극하는 올라운더. 초보·중급자는 A+, 상급자는 광배 제한 요인이 되는 더 집중적인 언더·뉴트럴 그립이 낫기 때문에 B+.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "03:44"
+   }
+  ],
+  "towel_pull_up": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "타월 풀업은 악력·전완 자극이 월등하지만 악력이 먼저 털려 등이 남아 있을 수 있어 등 목적 D, 악력 목적 A, 전완 성장 목적 B-. 등척성 수축은 근육이 늘어난 상태에서 버티는 것이 수축한 상태에서 버티는 것보다 유리하다고 설명. 전완을 키우려면 리스트컬이 낫다고 권한다.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "05:15"
+   }
+  ],
+  "assisted_pull_up_machine": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "어시스트 풀업은 초보자용만이 아니다. 상급자도 마지막 세트를 어시스트로 해 등을 한계까지 털 수 있고, 몸이 흔들리지 않아 타겟 근육에 집중하기 쉽다. 초보자 S, 중상급자 B+.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "06:37"
+   }
+  ],
+  "band_assisted_pull_up": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "밴드 어시스트는 B티어. 흔들리고 불안정하며, 밴드는 늘어날수록 저항이 커져 하단(스트레치) 구간을 쉽게 하고 수축 구간을 어렵게 만들어 저항 프로파일이 바람직하지 않다. 머신 어시스트가 압도적으로 좋다고 함.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "07:26"
+   }
+  ],
+  "pull_up_neutral": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "뉴트럴 그립 풀업이 S티어이자 진행자의 개인 최고. 그립 너비가 좁아 어깨 신전 위주로 광배 자극에 최적이고, 손목·팔꿈치 부담이 가장 적으며 이두 개입도 과하지 않다. 다른 등근육은 로우를 하나 추가해 채우라고 한다. 완전 초보자는 일반 풀업만으로도 충분.",
+    "video_id": "GclQVc4k4gU",
+    "timestamp": "08:01"
+   }
+  ],
+  "back_squat": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "스쿼트 때 상체를 앞으로 숙이는 '인사' 동작을 하지 말라고 강조하며, 이 때문에 하체 운동 후 무릎이 시리고 통증이 생긴다고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:05"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "현장에서 만나는 고객의 90% 이상이 이렇게 하고 있어 잠재적 부상 가능성을 안고 있다고 주장한다. (코치 개인 경험에 따른 수치로 근거 제시 없음)",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:16"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "무게중심선은 발바닥 가운데를 지나는데, 스쿼트 시 무게가 뒤로 가면서 넘어질 것 같아 발의 무게중심이 앞으로 쏠리고, 그러면 허벅지 앞쪽 근육이 과도하게 활성화되어 무릎 압박이 커져 시큰거림·통증이 생긴다고 설명한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:38"
+   }
+  ],
+  "front_squat": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "스쿼트 때 상체를 앞으로 숙이는 '인사' 동작을 하지 말라고 강조하며, 이 때문에 하체 운동 후 무릎이 시리고 통증이 생긴다고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:05"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "현장에서 만나는 고객의 90% 이상이 이렇게 하고 있어 잠재적 부상 가능성을 안고 있다고 주장한다. (코치 개인 경험에 따른 수치로 근거 제시 없음)",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:16"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "무게중심선은 발바닥 가운데를 지나는데, 스쿼트 시 무게가 뒤로 가면서 넘어질 것 같아 발의 무게중심이 앞으로 쏠리고, 그러면 허벅지 앞쪽 근육이 과도하게 활성화되어 무릎 압박이 커져 시큰거림·통증이 생긴다고 설명한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:38"
+   }
+  ],
+  "bodyweight_squat": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "스쿼트 때 상체를 앞으로 숙이는 '인사' 동작을 하지 말라고 강조하며, 이 때문에 하체 운동 후 무릎이 시리고 통증이 생긴다고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:05"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "현장에서 만나는 고객의 90% 이상이 이렇게 하고 있어 잠재적 부상 가능성을 안고 있다고 주장한다. (코치 개인 경험에 따른 수치로 근거 제시 없음)",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:16"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "무게중심선은 발바닥 가운데를 지나는데, 스쿼트 시 무게가 뒤로 가면서 넘어질 것 같아 발의 무게중심이 앞으로 쏠리고, 그러면 허벅지 앞쪽 근육이 과도하게 활성화되어 무릎 압박이 커져 시큰거림·통증이 생긴다고 설명한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:38"
+   }
+  ],
+  "goblet_squat": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "스쿼트 때 상체를 앞으로 숙이는 '인사' 동작을 하지 말라고 강조하며, 이 때문에 하체 운동 후 무릎이 시리고 통증이 생긴다고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:05"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "현장에서 만나는 고객의 90% 이상이 이렇게 하고 있어 잠재적 부상 가능성을 안고 있다고 주장한다. (코치 개인 경험에 따른 수치로 근거 제시 없음)",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:16"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "무게중심선은 발바닥 가운데를 지나는데, 스쿼트 시 무게가 뒤로 가면서 넘어질 것 같아 발의 무게중심이 앞으로 쏠리고, 그러면 허벅지 앞쪽 근육이 과도하게 활성화되어 무릎 압박이 커져 시큰거림·통증이 생긴다고 설명한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:38"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "무거운 가방을 뒤로 메면 오히려 몸이 앞으로 쏠리지만 앞으로 메면 상체가 펴지는 것처럼, 덤벨을 앞쪽에 들면 뒤로 가는 무게중심과 균형이 맞아 안정적인 스쿼트가 된다고 비유한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "01:17"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "해결책으로 5kg 덤벨을 두 손바닥에 올려 몸 앞에 들고 스쿼트하는 방법(고블릿 스쿼트)을 제시한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "01:34"
+   },
+   {
+    "type": "FORM_CUE",
+    "text": "덤벨은 움켜쥐지 말고 손바닥을 펼친 '꽃받침' 모양으로 받치고, 손목과 팔꿈치는 최대한 수직, 높이는 인중 또는 입술 위치로 둔다. 너무 몸에 붙여도 안 된다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "01:52"
+   },
+   {
+    "type": "FORM_CUE",
+    "text": "입술을 오므리고 '후' 길게 내쉬면서 배꼽 중심으로 몸을 3차원적으로 수축하면 배가 단단해지고 즉각적인 안정감을 느낀다고 한다. 숨을 계속 밖으로 내보낸다는 상상을 할 때 깊은 코어가 쓰인다고 설명한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "02:10"
+   },
+   {
+    "type": "PROGRAMMING",
+    "text": "덤벨은 최소 5kg가 필요하며 3kg로는 무게중심이 맞지 않아 효과를 못 느낀다고 말한다. 따라하기는 1분씩 천천히, 총 3세트(약 3분)로 진행한다. (설명란: 하루 3분씩 2주 반복 권장)",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "02:43"
+   },
+   {
+    "type": "FORM_CUE",
+    "text": "천천히 내려가 바닥에서 잠깐 홀드하고, 발바닥 전체를 밀면서 올라오며 동시에 '후' 숨을 내쉰다. 발을 앞뒤로 꼼지락거리지 않는다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "02:57"
+   },
+   {
+    "type": "FORM_CUE",
+    "text": "무릎은 적극적으로 벌리고, 무릎이 앞으로 나가는 것은 신경 쓰지 않아도 된다고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "03:08"
+   },
+   {
+    "type": "FORM_CUE",
+    "text": "내려갈 때 허벅지 뒤쪽이 늘어나는 느낌을 느껴 보라고 안내한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "03:23"
+   },
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "하다 보면 자기도 모르게 다시 인사하거나 덤벨과 함께 몸이 '침몰'하는데, 오히려 덤벨을 든 손을 계속 위로 들어 올린다고 상상해야 한다. 덤벨이 턱 밑으로 내려가려는 것에 저항한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "03:30"
+   },
+   {
+    "type": "FORM_CUE",
+    "text": "명치에서 레이저가 나온다고 생각하고, 이 선이 아래로 꺼지지 않고 계속 앞쪽을 향하도록 가슴을 크게 연다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "03:56"
+   },
+   {
+    "type": "TIP",
+    "text": "하체 운동인지 상체 운동인지 헷갈릴 만큼 역설적으로 상체 힘이 많이 필요하지만 그게 더 안전한 방법이라고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "05:23"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "제목·설명의 '3초면 완벽', '2주면 자극과 안정성이 완벽히 달라짐', 영상 말미의 '무릎을 완전하게 안전하게 보호'는 홍보성 표현이며 근거 제시는 없다. 통증이 있다면 전문가 평가가 우선이다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "06:35"
+   }
+  ],
+  "smith_squat": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "스쿼트 때 상체를 앞으로 숙이는 '인사' 동작을 하지 말라고 강조하며, 이 때문에 하체 운동 후 무릎이 시리고 통증이 생긴다고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:05"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "현장에서 만나는 고객의 90% 이상이 이렇게 하고 있어 잠재적 부상 가능성을 안고 있다고 주장한다. (코치 개인 경험에 따른 수치로 근거 제시 없음)",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:16"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "무게중심선은 발바닥 가운데를 지나는데, 스쿼트 시 무게가 뒤로 가면서 넘어질 것 같아 발의 무게중심이 앞으로 쏠리고, 그러면 허벅지 앞쪽 근육이 과도하게 활성화되어 무릎 압박이 커져 시큰거림·통증이 생긴다고 설명한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:38"
+   }
+  ],
+  "hack_squat": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "스쿼트 때 상체를 앞으로 숙이는 '인사' 동작을 하지 말라고 강조하며, 이 때문에 하체 운동 후 무릎이 시리고 통증이 생긴다고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:05"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "현장에서 만나는 고객의 90% 이상이 이렇게 하고 있어 잠재적 부상 가능성을 안고 있다고 주장한다. (코치 개인 경험에 따른 수치로 근거 제시 없음)",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:16"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "무게중심선은 발바닥 가운데를 지나는데, 스쿼트 시 무게가 뒤로 가면서 넘어질 것 같아 발의 무게중심이 앞으로 쏠리고, 그러면 허벅지 앞쪽 근육이 과도하게 활성화되어 무릎 압박이 커져 시큰거림·통증이 생긴다고 설명한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:38"
+   }
+  ],
+  "pendulum_squat": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "스쿼트 때 상체를 앞으로 숙이는 '인사' 동작을 하지 말라고 강조하며, 이 때문에 하체 운동 후 무릎이 시리고 통증이 생긴다고 말한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:05"
+   },
+   {
+    "type": "CLAIM_CHECK",
+    "text": "현장에서 만나는 고객의 90% 이상이 이렇게 하고 있어 잠재적 부상 가능성을 안고 있다고 주장한다. (코치 개인 경험에 따른 수치로 근거 제시 없음)",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:16"
+   },
+   {
+    "type": "PRINCIPLE",
+    "text": "무게중심선은 발바닥 가운데를 지나는데, 스쿼트 시 무게가 뒤로 가면서 넘어질 것 같아 발의 무게중심이 앞으로 쏠리고, 그러면 허벅지 앞쪽 근육이 과도하게 활성화되어 무릎 압박이 커져 시큰거림·통증이 생긴다고 설명한다.",
+    "video_id": "fRrg8JxnX6w",
+    "timestamp": "00:38"
+   }
+  ],
+  "db_kickback": [
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "덤벨 킥백은 D티어. 팔꿈치를 완전히 펴는 수축 구간에서만 저항이 최대이고 늘어난 초반 1/3 정도는 거의 저항이 없어 스트레치 자극이 약하다. 또 후면 삼각근이 크게 일해야 해 팔을 몸통 뒤에 유지하기 어렵고 불안정하다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "01:03"
+   }
+  ],
+  "cable_kickback": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "킥백은 케이블로 바꾸면 D에서 B티어까지 올라갈 수 있다. 저항이 수평이라 후면 삼각근 부담과 과한 수축 강조가 줄어든다. 킥백은 장두를 끝까지 수축시키는 장점이 있어 케이블 사용을 권한다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "01:58"
+   }
+  ],
+  "rope_pushdown": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "로프 푸시다운은 A티어. 초반·후반이 쉽고 중간이 가장 어려운 수축 강조형이며 관절 부담이 적다. 로프는 손이 자유로워 팔꿈치 부담이 덜하고 팔이 옆·뒤로 이동해 장두가 더 수축한다. 바(bar) 사용 시 B+.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "02:19"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "아주 긴 로프나 로프 두 개를 묶어 팔의 움직임을 극대화하면 A+티어. 팔이 옆으로 벌어지고 몸통 뒤로 가면서 장두가 극단적으로 수축한다는 이유.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "03:13"
+   }
+  ],
+  "close_grip_bench": [
+   {
+    "type": "PRINCIPLE",
+    "text": "장두의 기능은 팔꿈치를 펴고 위팔을 몸통 쪽으로 내리는 것인데, 프레스류는 위팔이 앞·위로 올라가 기능과 반대라 장두 활성이 낮다고 설명. 그래서 프레스는 내측두 위주이며, 풀다운·로우 같은 당기는 운동에서 장두가 쓰인다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "03:44"
+   },
+   {
+    "type": "COMMON_MISTAKE",
+    "text": "클로즈그립 벤치프레스는 B-티어. 삼두가 아니라 가슴이 먼저 한계에 도달해 세트가 끝나는 경우가 많아 삼두가 최대 효율을 못 받는다는 지적.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "04:31"
+   }
+  ],
+  "smith_jm_press": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "팔꿈치를 앞으로 빼는 JM프레스는 클로즈그립보다 팔꿈치 신전 모멘트가 훨씬 커 내측두 자극이 좋다. 최적을 원하면 스미스머신 추천. 내측두 S티어. 다만 장두 자극은 프레스라서 좋지 않다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "04:47"
+   },
+   {
+    "type": "SAFETY",
+    "text": "JM프레스를 처음 하면 팔꿈치가 불편할 수 있지만 본질적으로 위험해 평생 못 하는 운동이라는 것은 과민 반응이라고 주장. 저중량으로 시작해 중량·강도·볼륨을 점진적으로 올려 관절이 적응하도록 권한다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "05:30"
+   }
+  ],
+  "dip": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "딥스는 B티어. 상체를 세우고 팔꿈치를 많이 접으면 삼두, 상체를 숙이고 팔꿈치가 곧게 서면 가슴 위주. 장두 활성은 낮다. 삼두는 딥스 대신 다른 고립 운동을 따로 하고 딥스는 상체를 숙여 가슴 타겟으로 하라고 권한다. 초보자는 딥스 머신이나 어시스트 딥스가 안정적.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "06:07"
+   }
+  ],
+  "triceps_push_up": [
+   {
+    "type": "EXERCISE_PICK",
+    "text": "팔꿈치가 뒤로 빠지는 프레스형 삼두 푸시업은 내측두에 아주 좋지만 장두에는 별로다. 진행자가 코로나 시기 집에서 많이 했더니 내측두는 유지되고 장두는 줄었다고 경험담을 말함. 기술 난이도 때문에 A0티어. 초보자는 체중, 강해지면 중량 추가.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "06:59"
+   }
+  ],
+  "lying_ext_behind_head": [
+   {
+    "type": "PRINCIPLE",
+    "text": "라잉 익스텐션은 정답이 없는 스펙트럼: 위팔·팔꿈치를 머리 뒤로 보낼수록 장두 개입이 늘고, 팔꿈치를 몸통 앞에 둘수록 내측두 위주다. 목적에 맞게 선택하면 된다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "08:37"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "진행자 개인 평가: 팔꿈치를 뒤로 보내 장두를 타겟하는 라잉 익스텐션은 A0, 바벨을 이마 쪽으로 내리는 방식은 B-. 이마에 부딪혀 가동 범위가 줄어 JM프레스의 하위 호환이라고 본다. 특수성 원칙상 내측두는 JM프레스, 장두는 팔꿈치를 뒤로 보내는 익스텐션.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "09:07"
+   }
+  ],
+  "skull_crusher": [
+   {
+    "type": "PRINCIPLE",
+    "text": "라잉 익스텐션은 정답이 없는 스펙트럼: 위팔·팔꿈치를 머리 뒤로 보낼수록 장두 개입이 늘고, 팔꿈치를 몸통 앞에 둘수록 내측두 위주다. 목적에 맞게 선택하면 된다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "08:37"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "진행자 개인 평가: 팔꿈치를 뒤로 보내 장두를 타겟하는 라잉 익스텐션은 A0, 바벨을 이마 쪽으로 내리는 방식은 B-. 이마에 부딪혀 가동 범위가 줄어 JM프레스의 하위 호환이라고 본다. 특수성 원칙상 내측두는 JM프레스, 장두는 팔꿈치를 뒤로 보내는 익스텐션.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "09:07"
+   }
+  ],
+  "db_skull_crusher": [
+   {
+    "type": "PRINCIPLE",
+    "text": "라잉 익스텐션은 정답이 없는 스펙트럼: 위팔·팔꿈치를 머리 뒤로 보낼수록 장두 개입이 늘고, 팔꿈치를 몸통 앞에 둘수록 내측두 위주다. 목적에 맞게 선택하면 된다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "08:37"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "진행자 개인 평가: 팔꿈치를 뒤로 보내 장두를 타겟하는 라잉 익스텐션은 A0, 바벨을 이마 쪽으로 내리는 방식은 B-. 이마에 부딪혀 가동 범위가 줄어 JM프레스의 하위 호환이라고 본다. 특수성 원칙상 내측두는 JM프레스, 장두는 팔꿈치를 뒤로 보내는 익스텐션.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "09:07"
+   }
+  ],
+  "oh_cable_ext_single": [
+   {
+    "type": "CLAIM_CHECK",
+    "text": "\"팔꿈치는 절대 옆으로 벌어지면 안 되고 무조건 앞으로 펴져야 한다\"는 SNS 주장은 완전히 틀렸다고 주장. 장두는 팔을 옆으로 보내고 어깨를 내회전하는 기능이 있어 팔을 앞에 고정하면 활성이 낮아진다고 설명. 근거로 \"연구\"를 언급하나 특정 연구는 제시되지 않음.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "10:12"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "오버헤드 익스텐션은 장두 운동 중 거의 최고. 양팔 바벨 A-, 한 팔씩 덤벨 A+, 한쪽씩 케이블 S티어. 긴 로프 푸시다운과 병행하면 장두 스트레치와 수축을 모두 채우는 완벽한 조합이 된다고 한다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "11:08"
+   }
+  ],
+  "oh_db_ext_single": [
+   {
+    "type": "CLAIM_CHECK",
+    "text": "\"팔꿈치는 절대 옆으로 벌어지면 안 되고 무조건 앞으로 펴져야 한다\"는 SNS 주장은 완전히 틀렸다고 주장. 장두는 팔을 옆으로 보내고 어깨를 내회전하는 기능이 있어 팔을 앞에 고정하면 활성이 낮아진다고 설명. 근거로 \"연구\"를 언급하나 특정 연구는 제시되지 않음.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "10:12"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "오버헤드 익스텐션은 장두 운동 중 거의 최고. 양팔 바벨 A-, 한 팔씩 덤벨 A+, 한쪽씩 케이블 S티어. 긴 로프 푸시다운과 병행하면 장두 스트레치와 수축을 모두 채우는 완벽한 조합이 된다고 한다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "11:08"
+   }
+  ],
+  "oh_barbell_ext": [
+   {
+    "type": "CLAIM_CHECK",
+    "text": "\"팔꿈치는 절대 옆으로 벌어지면 안 되고 무조건 앞으로 펴져야 한다\"는 SNS 주장은 완전히 틀렸다고 주장. 장두는 팔을 옆으로 보내고 어깨를 내회전하는 기능이 있어 팔을 앞에 고정하면 활성이 낮아진다고 설명. 근거로 \"연구\"를 언급하나 특정 연구는 제시되지 않음.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "10:12"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "오버헤드 익스텐션은 장두 운동 중 거의 최고. 양팔 바벨 A-, 한 팔씩 덤벨 A+, 한쪽씩 케이블 S티어. 긴 로프 푸시다운과 병행하면 장두 스트레치와 수축을 모두 채우는 완벽한 조합이 된다고 한다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "11:08"
+   }
+  ],
+  "oh_cable_ext_rope": [
+   {
+    "type": "CLAIM_CHECK",
+    "text": "\"팔꿈치는 절대 옆으로 벌어지면 안 되고 무조건 앞으로 펴져야 한다\"는 SNS 주장은 완전히 틀렸다고 주장. 장두는 팔을 옆으로 보내고 어깨를 내회전하는 기능이 있어 팔을 앞에 고정하면 활성이 낮아진다고 설명. 근거로 \"연구\"를 언급하나 특정 연구는 제시되지 않음.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "10:12"
+   },
+   {
+    "type": "EXERCISE_PICK",
+    "text": "오버헤드 익스텐션은 장두 운동 중 거의 최고. 양팔 바벨 A-, 한 팔씩 덤벨 A+, 한쪽씩 케이블 S티어. 긴 로프 푸시다운과 병행하면 장두 스트레치와 수축을 모두 채우는 완벽한 조합이 된다고 한다.",
+    "video_id": "i40LqeORuxA",
+    "timestamp": "11:08"
+   }
+  ]
+ },
+ "templates": [
+  {
+   "id": "full_body",
+   "name": "무분할 (전신)",
+   "wk_names": [
+    "무분할 (전신, 주 3~5회)",
+    "무분할 (전신)"
+   ],
+   "per_week": "3~5회",
+   "days": [
+    [
+     "하체",
+     "등",
+     "가슴",
+     "어깨",
+     "삼두",
+     "이두"
+    ]
+   ],
+   "generatable": true,
+   "grades": [
+    {
+     "value": "S",
+     "levels": [
+      "초보"
+     ],
+     "why": "운동 빈도가 높아 기술을 빨리 배움. 주 2~3회로도 시간이 부족한 사람에게 좋음.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "03:06",
+     "wk_name": "무분할 (전신, 주 3~5회)"
+    },
+    {
+     "value": "A",
+     "levels": [
+      "중급"
+     ],
+     "why": "단점: 다양한 부위를 하느라 웜업이 오래 걸림.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "03:06",
+     "wk_name": "무분할 (전신)"
+    },
+    {
+     "value": "B+",
+     "levels": [
+      "상급"
+     ],
+     "why": "상급자는 운동량이 많아 웜업 시간이 길고, 이미 기술을 익혀 빈도로 연습할 필요가 적음.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "03:06",
+     "wk_name": "무분할 (전신)"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "torso_limbs_legs",
+   "name": "몸통-말단-하체 3분할",
+   "wk_names": [
+    "몸통-말단-하체 3분할 (\"급진적 과부하 분할\")",
+    "몸통-말단-하체 3분할 (팔·어깨가 약한 거미형)"
+   ],
+   "per_week": "3일 + 휴식 반복",
+   "days": [
+    [
+     "가슴",
+     "등"
+    ],
+    [
+     "어깨",
+     "삼두",
+     "이두"
+    ],
+    [
+     "하체",
+     "코어"
+    ]
+   ],
+   "generatable": true,
+   "grades": [
+    {
+     "value": "S",
+     "levels": [],
+     "purpose_note": "팔·어깨가 약함",
+     "sub_goal_only": true,
+     "why": "가슴+등 / 어깨+팔 / 하체. 팔·어깨가 부족한 사람에게 특히 좋다고 평가.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "10:26",
+     "wk_name": "몸통-말단-하체 3분할 (팔·어깨가 약한 거미형)"
+    },
+    {
+     "value": "A+",
+     "levels": [],
+     "why": "몸통=가슴+등(반대 근육이라 슈퍼세트 가능, 피로 전이 없음), 말단=어깨+팔, 하체. 진행자가 2년 전부터 주장, 온라인 PT에서 가장 많이 짠 분할.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "10:26",
+     "wk_name": "몸통-말단-하체 3분할 (\"급진적 과부하 분할\")"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "pull_push_legs",
+   "name": "당기기-밀기-하체 3분할",
+   "wk_names": [
+    "당기기-밀기-하체 3분할"
+   ],
+   "per_week": "3일 + 휴식 반복",
+   "days": [
+    [
+     "등",
+     "이두"
+    ],
+    [
+     "가슴",
+     "어깨",
+     "삼두"
+    ],
+    [
+     "하체",
+     "코어"
+    ]
+   ],
+   "generatable": true,
+   "grades": [
+    {
+     "value": "A",
+     "levels": [],
+     "why": "등이 피로한 채로 하체를 하면 데드리프트·스쿼트 안정성에 지장. 당기기 → 밀기 → 하체 → 휴식 순서를 권장.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "11:32",
+     "wk_name": "당기기-밀기-하체 3분할"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "push_pull_legs",
+   "name": "밀기-당기기-하체 3분할",
+   "wk_names": [
+    "밀기-당기기-하체 3분할 (전형적)"
+   ],
+   "per_week": "3일 + 휴식 반복",
+   "days": [
+    [
+     "가슴",
+     "어깨",
+     "삼두"
+    ],
+    [
+     "등",
+     "이두"
+    ],
+    [
+     "하체",
+     "코어"
+    ]
+   ],
+   "generatable": true,
+   "grades": [
+    {
+     "value": "B+",
+     "levels": [],
+     "why": "비슷한 근육을 묶어 가슴 후 어깨·삼두가 이미 지친 상태로 운동하게 됨.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "09:47",
+     "wk_name": "밀기-당기기-하체 3분할 (전형적)"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "bro_split",
+   "name": "브로 스플릿 (부위별 하루 1개)",
+   "wk_names": [
+    "브로 스플릿 (부위별 하루 1개)"
+   ],
+   "per_week": "5일",
+   "days": [
+    [
+     "가슴"
+    ],
+    [
+     "등"
+    ],
+    [
+     "어깨"
+    ],
+    [
+     "삼두",
+     "이두"
+    ],
+    [
+     "하체"
+    ]
+   ],
+   "generatable": true,
+   "grades": [
+    {
+     "value": "D",
+     "levels": [],
+     "why": "대부분의 내추럴에게 비효율적이라는 주장(가슴은 수요일쯤 회복, 한 번에 11세트 초과 시 효과 감소). 약물 사용자나 초대형 근육 등 예외가 있다고 함. 회복 시점은 근거 미제시.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "03:57",
+     "wk_name": "브로 스플릿 (부위별 하루 1개)"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "upper_lower",
+   "name": "2분할 (상체-하체)",
+   "wk_names": [
+    "2분할 (상체-하체)"
+   ],
+   "per_week": "주 4회 (상하상하)",
+   "days": [
+    [
+     "가슴",
+     "등",
+     "어깨",
+     "삼두",
+     "이두"
+    ],
+    [
+     "하체",
+     "코어"
+    ]
+   ],
+   "generatable": true,
+   "grades": [],
+   "notes": [
+    {
+     "text": "티어 미평가. 주 4회(상하상하)가 현실적, 쉬는 날이 3일. 상하체가 50:50이라 하체 집중형이며, 균형을 원하면 팔 운동을 하체 날로 옮기라고 권함.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "05:34"
+    }
+   ]
+  },
+  {
+   "id": "upper_lower_full",
+   "name": "상체-하체-전신",
+   "wk_names": [
+    "상체-하체-전신 (주 3회) / 상-하-전-전 (주 4회)"
+   ],
+   "per_week": "주 3~4회",
+   "days": [
+    [
+     "가슴",
+     "등",
+     "어깨",
+     "삼두",
+     "이두"
+    ],
+    [
+     "하체",
+     "코어"
+    ],
+    [
+     "하체",
+     "등",
+     "가슴",
+     "어깨"
+    ]
+   ],
+   "generatable": true,
+   "grades": [],
+   "notes": [
+    {
+     "text": "티어 미평가. 2분할과 무분할의 혼합형으로 빈도가 주 2회 이상 확보됨. 프로그래밍이 까다로움.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "08:38"
+    }
+   ]
+  },
+  {
+   "id": "left_right",
+   "name": "좌우 분할",
+   "wk_names": [
+    "좌우 분할"
+   ],
+   "per_week": "-",
+   "days": [],
+   "generatable": false,
+   "grades": [],
+   "notes": [
+    {
+     "text": "티어 미평가. 반쯤 농담으로 소개했으나 진행자가 2개월 시도해 후기를 공유하겠다고 함. 운동 종류 제한이 큼.",
+     "video_id": "DtTX0QcwhRw",
+     "timestamp": "12:10"
+    }
+   ]
+  }
+ ],
+ "combos": [
+  {
+   "id": "tri_top2",
+   "part": "삼두",
+   "video_id": "i40LqeORuxA",
+   "wk_unrated": "삼두 2개만 고른다면",
+   "timestamp": "11:44",
+   "exercises": [
+    "oh_cable_ext_single",
+    "smith_jm_press"
+   ],
+   "extra_if_three": "long_rope_pushdown",
+   "text": "2개면 오버헤드 케이블 익스텐션(장두) + JM프레스(내측두), 3개면 긴 로프(또는 로프 2개) 푸시다운 추가"
+  }
+ ],
+ "unapplied": [
+  {
+   "video_id": "GclQVc4k4gU",
+   "exercise": "어시스트 풀업 (마지막 세트 피니셔)",
+   "grade": "B+",
+   "reason": "결정 M-01 대기/거절로 미적용"
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+{
+  "_note": "분할 템플릿. days = 요일별 부위(앞쪽이 우선순위 높음). wk_names = WORK_OUT_K 분할 영상의 항목 이름(등급을 가져옴). generatable=false는 소개만 하고 자동 생성하지 않음",
+  "templates": [
+    {"id": "full_body", "name": "무분할 (전신)", "wk_names": ["무분할 (전신, 주 3~5회)", "무분할 (전신)"], "per_week": "3~5회",
+     "days": [["하체", "등", "가슴", "어깨", "삼두", "이두"]], "generatable": true},
+    {"id": "torso_limbs_legs", "name": "몸통-말단-하체 3분할", "wk_names": ["몸통-말단-하체 3분할 (\"급진적 과부하 분할\")", "몸통-말단-하체 3분할 (팔·어깨가 약한 거미형)"], "per_week": "3일 + 휴식 반복",
+     "days": [["가슴", "등"], ["어깨", "삼두", "이두"], ["하체", "코어"]], "generatable": true},
+    {"id": "pull_push_legs", "name": "당기기-밀기-하체 3분할", "wk_names": ["당기기-밀기-하체 3분할"], "per_week": "3일 + 휴식 반복",
+     "days": [["등", "이두"], ["가슴", "어깨", "삼두"], ["하체", "코어"]], "generatable": true},
+    {"id": "push_pull_legs", "name": "밀기-당기기-하체 3분할", "wk_names": ["밀기-당기기-하체 3분할 (전형적)"], "per_week": "3일 + 휴식 반복",
+     "days": [["가슴", "어깨", "삼두"], ["등", "이두"], ["하체", "코어"]], "generatable": true},
+    {"id": "bro_split", "name": "브로 스플릿 (부위별 하루 1개)", "wk_names": ["브로 스플릿 (부위별 하루 1개)"], "per_week": "5일",
+     "days": [["가슴"], ["등"], ["어깨"], ["삼두", "이두"], ["하체"]], "generatable": true},
+    {"id": "upper_lower", "name": "2분할 (상체-하체)", "wk_names": ["2분할 (상체-하체)"], "per_week": "주 4회 (상하상하)",
+     "days": [["가슴", "등", "어깨", "삼두", "이두"], ["하체", "코어"]], "generatable": true},
+    {"id": "upper_lower_full", "name": "상체-하체-전신", "wk_names": ["상체-하체-전신 (주 3회) / 상-하-전-전 (주 4회)"], "per_week": "주 3~4회",
+     "days": [["가슴", "등", "어깨", "삼두", "이두"], ["하체", "코어"], ["하체", "등", "가슴", "어깨"]], "generatable": true},
+    {"id": "left_right", "name": "좌우 분할", "wk_names": ["좌우 분할"], "per_week": "-", "days": [], "generatable": false}
+  ],
+  "sub_goal_rules": [
+    {"template": "torso_limbs_legs", "wk_name": "몸통-말단-하체 3분할 (팔·어깨가 약한 거미형)", "purpose_note": "팔·어깨가 약함", "sub_goal_only": true, "decision": "M-07"}
+  ]
+}

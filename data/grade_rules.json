@@ -1,0 +1,15 @@
+{
+  "_note": "WORK_OUT_K 티어 항목별 예외 규칙. 기본값: purpose_part = 영상 주제 부위(tri→삼두, back·pull→등), primary_topic = true. 여기 적힌 항목만 덮어쓴다. 항목 키 = video_id + exercise(영상 원래 이름) + grade",
+  "topic_parts": {"tri": "삼두", "back": "등", "pull": "등"},
+  "rules": [
+    {"video_id": "GclQVc4k4gU", "exercise": "타월 풀업", "grade": "A", "purpose_part": "전완·악력", "purpose_note": "악력"},
+    {"video_id": "GclQVc4k4gU", "exercise": "타월 풀업", "grade": "B-", "purpose_part": "전완·악력", "purpose_note": "전완 근성장"},
+    {"video_id": "GclQVc4k4gU", "exercise": "타월 풀업", "grade": "D", "purpose_part": "등"},
+    {"video_id": "GclQVc4k4gU", "exercise": "와이드 그립 풀업", "grade": "D", "purpose_part": "등", "purpose_note": "광배 집중", "sub_goal_only": true, "decision": "M-03"},
+    {"video_id": "6jfQD3PxIOg", "exercise": "풀업", "grade": "A+", "primary_topic": false, "note": "풀업 계열은 풀업 영상이 주제 영상"},
+    {"video_id": "6jfQD3PxIOg", "exercise": "풀업", "grade": "A", "primary_topic": false, "note": "풀업 계열은 풀업 영상이 주제 영상"},
+    {"video_id": "6jfQD3PxIOg", "exercise": "데드리프트 (등 운동으로 볼 때)", "grade": "D", "purpose_part": "등", "decision": "M-04"},
+    {"video_id": "i40LqeORuxA", "exercise": "딥스", "grade": "B", "purpose_part": "삼두", "note": "딥스의 기본 부위는 가슴. 이 등급은 삼두 목적"},
+    {"video_id": "i40LqeORuxA", "exercise": "클로즈그립 벤치프레스", "grade": "B-", "purpose_part": "삼두"}
+  ]
+}
