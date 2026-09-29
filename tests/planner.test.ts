@@ -13,6 +13,8 @@ import { PARTS, LEVELS, EQUIPMENT } from '../src/core/types';
 import { GRADES } from '../src/core/version';
 import type { Grade } from '../src/core/version';
 
+/** 커버리지 계측 중이면 시간 관문 판정은 건너뜀 (npm run test:plans 에서 판정) */
+const timed = (ms: number) => (process.env.COVERAGE_RUN ? 0 : ms);
 const real = buildExercises(baseFile.exercises as Exercise[], wkFile as unknown as WorkoutKData, stapleFile.order as Partial<Record<Part, string[]>>);
 /** 5.7.1 예시 가정: 다관절 8회, 단관절 12회 */
 const ex571 = real.map((e) => ({ ...e, default_reps: (e.mechanics === 'compound' ? [8, 8] : [12, 12]) as [number, number] }));
@@ -230,12 +232,12 @@ describe('무작위 입력 500건 + 경계 사례: 검증 규칙 위반 0 (BLUEP
   });
   it('성능: 500건 중 95%가 200ms 이하, 부위 8개 모두 높음·부위 4개 모두 높음 사례 200ms 이하', () => {
     const times = reqs.map((q) => { const t = performance.now(); generatePlan(q, real); return performance.now() - t; }).sort((a, b) => a - b);
-    expect(times[Math.floor(times.length * 0.95)]!).toBeLessThan(200);
+    expect(timed(times[Math.floor(times.length * 0.95)]!)).toBeLessThan(200);
     const worst = edge[16]!;
     const t0 = performance.now(); generatePlan(worst, real); const worstMs = performance.now() - t0;
-    expect(worstMs).toBeLessThan(200);
+    expect(timed(worstMs)).toBeLessThan(200);
     const four: PlanRequest = { parts: (['가슴', '등', '어깨', '하체'] as Part[]).map((part) => ({ part, priority: 'high' as Priority })), level: '중급', targetMinutes: 120, groupings: ['superset'] };
-    const t1 = performance.now(); generatePlan(four, real); expect(performance.now() - t1).toBeLessThan(200);
+    const t1 = performance.now(); generatePlan(four, real); expect(timed(performance.now() - t1)).toBeLessThan(200);
     console.log(`성능: p50 ${times[250]!.toFixed(1)}ms, p95 ${times[475]!.toFixed(1)}ms, 최대 ${times[499]!.toFixed(1)}ms, 최악 사례 ${worstMs.toFixed(1)}ms`);
   }, 60000);
 });
@@ -397,7 +399,7 @@ describe('검토 지적 회귀 테스트', () => {
     const pr: Priority[] = ['high', 'normal', 'low'];
     const q: PlanRequest = { parts: PARTS.map((part, i) => ({ part, priority: pr[i % 3]! })), level: '중급', targetMinutes: 120, groupings: ['superset', 'compound'] };
     const t0 = performance.now(); const p = generatePlan(q, real); const ms = performance.now() - t0;
-    expect(ms).toBeLessThan(200);
+    expect(timed(ms)).toBeLessThan(200);
     expect(p.candidateCount).toBeGreaterThan(10000);
     expect(validatePlan(p, q, real)).toEqual([]);
   });
