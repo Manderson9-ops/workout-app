@@ -158,10 +158,15 @@ function buildPools(req: PlanRequest, all: BuiltExercise[], reasons: string[]): 
       const have = pool.filter((x) => x.ex.muscles[0] === m);
       if (have.length >= n) return true;
       return have.length === n - 1 && e.mechanics !== 'compound' && !have.some((x) => x.ex.mechanics === 'compound')
-        && remaining.some((c) => c.ex.id !== e.id && c.ex.muscles[0] === m && c.ex.mechanics === 'compound' && !families.has(c.ex.family));
+        && remaining.some((c) => c.ex.id !== e.id && c.ex.muscles[0] === m && c.ex.mechanics === 'compound' && !families.has(c.ex.family) && !(isHeavyHinge(c.ex) && heavyInPool));
     };
     // 이유 문구는 실제 플랜 개수(base) 안에서 걸렸을 때만
-    const fits = (e: BuiltExercise) => !families.has(e.family) && !(isHeavyHinge(e) && heavyInPool) && !(overCap(e) && (pool.length < base && (capped = true), true));
+    const fits = (e: BuiltExercise) => {
+      if (families.has(e.family) || (isHeavyHinge(e) && heavyInPool)) return false;
+      if (!overCap(e)) return true;
+      if (pool.length < base) capped = true;
+      return false;
+    };
     const remaining = [...ok];
     const limit = req.lockedOnly && lockedCount ? lockedCount : lockedCount + poolSize;
     while (pool.length < limit && remaining.length) {

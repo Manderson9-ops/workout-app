@@ -118,7 +118,8 @@ describe('앱 기본 추천 순서 (M-14)', () => {
     expect(validatePlan(fav, q, real)).toEqual([]);
     const combo = generatePlan({ parts: [{ part: '하체', priority: 'normal' }, { part: '코어', priority: 'high' }], level: '중급' }, real);
     const legIds = combo.blocks.flatMap((b) => b.items).filter((i) => i.part === '하체');
-    if (legIds.length <= 2) expect(combo.reasons.some((r) => r.includes('M-27'))).toBe(false);
+    expect(legIds.length).toBe(2);
+    expect(combo.reasons.some((r) => r.includes('M-27'))).toBe(false);
     const bad = generatePlan({ parts: [{ part: '하체', priority: 'high' }], level: '중급' }, real);
     const quad = bad.blocks.flatMap((b) => b.items).find((i) => i.exerciseId === 'leg_extension')!;
     const forged = { ...bad, blocks: [...bad.blocks, { ...bad.blocks[0]!, items: [{ ...quad, exerciseId: 'sissy_squat', name: '시시 스쿼트' }] }] };

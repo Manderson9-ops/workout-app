@@ -135,6 +135,10 @@ describe('새 티어 반영용 규칙 (M-15~M-26, 2026-10-01)', () => {
     expect(r.unapplied.map((u) => u.reason)).toEqual(['반영 안 함: 대안 설명', '반영 안 함: 격투기']);
     expect(r.grades.lat_pulldown).toHaveLength(1);
   });
+  it('쓰이지 않는 빼기 규칙은 알림(빌드 중단)', () => {
+    const r = runImport(input([rec([{ exercise: '랫풀다운', grade: 'S' }])], { skipItems: [{ video_id: 'v1', exercise: '없는 항목', reason: 'x' }], skipNames: [{ name: '없는 이름', reason: 'y' }] }));
+    expect(r.unresolved).toEqual(expect.arrayContaining(['[규칙 미사용] 빼기 v1 없는 항목', '[규칙 미사용] 빼기 이름 없는 이름']));
+  });
   it('별칭이 여러 운동을 가리키면 모두에 등급 (M-21 해머·리버스 컬), 없는 운동이면 실패', () => {
     const r = runImport(input([rec([{ exercise: '두 로우', grade: 'B' }])], { aliases: [{ name: '두 로우', exercises: ['row_a', 'row_b'], status: 'CONFIRMED' }] }));
     expect(Object.keys(r.grades).sort()).toEqual(['row_a', 'row_b']);
