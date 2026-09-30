@@ -18,6 +18,8 @@ import { softDelete } from '../../db/db';
 import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
 import { diagTimerEnd } from '../diag';
 import { sendNow } from '../autoSend';
+import { syncNow } from '../sync';
+import { remoteActiveOf } from '../store';
 
 export function WorkoutScreen({ s }: { s: AppState }) {
   const w = activeOf(s);
@@ -58,6 +60,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     return (
       <main>
         <h1>운동</h1>
+        {remoteActiveOf(s) && <p role="status" class="card small">📱 운동 「{remoteActiveOf(s)!.name}」은 다른 기기에서 진행 중이에요 (다른 기기로 넘어갔어요). 홈에서 볼 수 있어요.</p>}
         <div class="empty"><p>진행 중인 운동이 없어요.</p><p class="small">홈에서 루틴을 시작하거나 플랜을 만들어 보세요.</p></div>
         <button class="primary big" onClick={() => go('#/')}>루틴 고르기</button>
       </main>
@@ -118,7 +121,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const finish = async () => {
     const left = prog.totalSets - prog.doneSets;
     if (!confirm(left ? `아직 ${left}세트 남았어요. 운동을 끝낼까요?` : '운동을 끝낼까요?')) return;
-    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout');
+    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); void syncNow('finish');
   };
   const delta = prog.deltaSec;
 
@@ -196,7 +199,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             {nextRest ? <span class="small" style={{ fontWeight: 500 }}> → 휴식 {nextRest.sec}초</span> : null}
           </button>
         ) : (
-          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); }}>모든 세트 완료 · 운동 끝내기</button>
+          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); void syncNow('finish'); }}>모든 세트 완료 · 운동 끝내기</button>
         )}
       </div>
 

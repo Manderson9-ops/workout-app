@@ -6,6 +6,7 @@ import { emptyRoutine } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { BackupBanner } from './BackupSection';
 import { SendStatus } from './AutoSendSection';
+import { RemoteCards } from './RemoteCards';
 import { newId, softDelete } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
@@ -19,6 +20,7 @@ export function Home({ s }: { s: AppState }) {
     <main>
       <h1>운동 기록</h1>
       <SendStatus />
+      <RemoteCards s={s} />
       {active && (
         <div class="card active">
           <div class="row between"><h3>운동 중: {active.name}</h3><span class="sub">{mmss((Date.now() - Date.parse(active.startedAt)) / 1000)}</span></div>
