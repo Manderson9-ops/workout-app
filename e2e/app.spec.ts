@@ -758,6 +758,33 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
 });
 
+test('수정 화면: 입력 중 세트를 지워도 값이 옆 세트로 가지 않음, 시작을 옮겨도 운동 시간 그대로, 편집 중 메뉴 숨김', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  const w = page.locator('input[aria-label$="1세트 무게"]').first();
+  await w.fill('40'); await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  const w2 = page.locator('input[aria-label$="2세트 무게"]').first();
+  await w2.fill('50'); await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await page.locator('.card[aria-label^="최근 운동 "]').first().getByRole('button', { name: /수정$/ }).click();
+  await expect(page.locator('nav.nav')).toBeHidden();
+  const before = await page.getByLabel('운동 시간(분)').inputValue();
+  await page.getByLabel('시작 날짜와 시각').fill('2026-09-28T07:30');
+  await expect(page.getByLabel('운동 시간(분)')).toHaveValue(before);
+  // 1세트 무게에 입력하는 도중(포커스 유지) 1세트 지우기 → 남은 세트(원래 2세트)는 50 그대로
+  const f1 = page.locator('input[aria-label$=" 1세트 무게"]').first();
+  await f1.click(); await page.keyboard.type('9');
+  await page.locator('button[aria-label$=" 1세트 지우기"]').first().evaluate((b: HTMLButtonElement) => b.click());
+  await expect(page.locator('input[aria-label$=" 1세트 무게"]').first()).toHaveValue('50');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page).toHaveURL(/#\/stats\/w\/[^/]+$/);
+  await expect(page.getByText(/9월 28일/)).toBeVisible();
+  await expect(page.getByText(/50kg × \d+회/).first()).toBeVisible();
+  await expect(page.getByText(/409kg|409/)).toHaveCount(0);
+  await expect(page.locator('nav.nav')).toBeVisible();
+});
+
 test('수정 화면: 취소하면 기록 그대로', async ({ page }) => {
   page.on('dialog', (d) => void d.accept());
   await makeRoutine(page, ['등'], '30분');

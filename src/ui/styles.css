@@ -87,6 +87,9 @@ html.phone-view .fb-toast { max-width: 406px; margin: 0 auto; }
 
 /* 최근 운동 카드: 위쪽 전체가 상세로 가는 링크 */
 .card-link { display: block; color: inherit; text-decoration: none; min-height: 44px; }
+/* 끝낸 운동 수정 중에는 메뉴·운동 중 배너를 숨김 (고친 내용을 모르고 떠나지 않게, 취소/저장으로만) */
+html.editing .nav, html.editing .banner { display: none; }
+html.editing main { padding-bottom: 40px; }
 /* 끝낸 운동 수정 화면의 세트 줄 */
 .edit-set { display: grid; grid-template-columns: 44px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.8fr) 44px 44px; gap: 4px; align-items: center; margin-top: 6px; }
 .edit-set > button { min-width: 44px; padding: 0; }
@@ -101,6 +104,7 @@ html.phone-view .fb-toast { max-width: 406px; margin: 0 auto; }
   html:not(.phone-view) .nav .nav-fb { flex: 0 0 52px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0 12px; border-radius: 12px; font-size: 15px; margin-top: auto; }
   html:not(.phone-view) .nav a { flex: 0 0 52px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0 12px; border-radius: 12px; font-size: 15px; }
   html:not(.phone-view) .nav a.on { background: var(--card2); }
+  html.editing:not(.phone-view) main { margin-left: 24px; }
   html:not(.phone-view) main { max-width: 1040px; margin: 0 0 0 200px; padding: 24px 32px 120px; }
   html:not(.phone-view) .banner { left: 200px; right: 24px; bottom: 16px; }
   /* 운동 화면 아래 고정 바·시트: 메뉴를 덮지 않게 본문 영역에만 */

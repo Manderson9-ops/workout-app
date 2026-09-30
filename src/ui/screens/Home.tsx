@@ -77,7 +77,7 @@ export function Home({ s }: { s: AppState }) {
       {recent.map((w) => {
         const sets = w.blocks.flatMap((b) => b.items.flatMap((i) => i.sets)).filter((x) => x.done && !x.warmup).length;
         return (
-          <div class="card" key={w.id} aria-label={`최근 운동 ${w.name}`}>
+          <div class="card" key={w.id} role="group" aria-label={`최근 운동 ${w.name}`}>
             <a class="card-link" href={`#/stats/w/${encodeURIComponent(w.id)}`} aria-label={`${w.name} 자세히 보기`}>
               <div class="row between"><span>{w.name}</span><span class="sub small">{new Date(w.startedAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })}</span></div>
               <div class="sub small">작업 세트 {sets}개 · {minutes((Date.parse(w.endedAt!) - Date.parse(w.startedAt)) / 1000)}{w.editedAt ? ' · 고침' : ''}</div>

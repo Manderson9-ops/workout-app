@@ -299,6 +299,17 @@ describe('끝낸 운동 고치기 동기화 (D-035)', () => {
     expect(['A가 고침', 'B가 고침']).toContain(na);
     expect(await A.workouts.count()).toBe(1);
   });
+  it('다른 기기가 지운 걸 받은 뒤 "되살려 저장"하면 다시 생김 (실제 저장 경로: 지움 표시 있는 기기에서 put)', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);
+    const kept = (await B.workouts.get('w9'))!;
+    await softDelete(A, 'workouts', 'w9'); await sync(A, transport); await sync(B, transport);
+    expect(await B.workouts.get('w9')).toBeUndefined();
+    await B.workouts.put({ ...kept, name: '되살림' });
+    await sync(B, transport); await sync(A, transport);
+    expect((await A.workouts.get('w9'))?.name).toBe('되살림');
+    expect((await B.workouts.get('w9'))?.name).toBe('되살림');
+  });
   it('한 기기가 고치는 동안 다른 기기가 지우면 고친 쪽이 이김 (수정 대 지움)', async () => {
     const { transport } = server(); const A = dev('A'), B = dev('B');
     await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);

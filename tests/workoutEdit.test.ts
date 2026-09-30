@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { planToRoutine, startWorkout, finishWorkout } from '../src/core/session';
 import type { Workout } from '../src/core/session';
-import { toLocalInput, fromLocalInput, durationMin, setTimes, patchSet, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout } from '../src/core/workoutEdit';
+import { toLocalInput, fromLocalInput, durationMin, setTimes, patchSet, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, withKeys, keyOf, patchSetByKey, moveStart } from '../src/core/workoutEdit';
 import { makeBackup, parseBackup } from '../src/core/backup';
 import { summarize } from '../src/core/stats';
 
@@ -48,7 +48,7 @@ describe('끝낸 운동 고치기 (D-035)', () => {
     const w = done();
     expect(editProblem(w, NOW)).toBeNull();
     expect(editProblem({ ...w, name: '  ' }, NOW)).toMatch(/이름/);
-    expect(editProblem({ ...w, endedAt: w.startedAt }, NOW)).toMatch(/1분 이상/);
+    expect(editProblem({ ...w, endedAt: w.startedAt }, NOW)).toMatch(/1 이상/);
     expect(editProblem(setTimes(w, w.startedAt, 13 * 60), NOW)).toMatch(/12시간/);
     expect(editProblem(setTimes(w, '2026-10-02T10:00:00.000Z', 30), NOW)).toMatch(/미래/);
     expect(editProblem({ ...w, blocks: [] }, NOW)).toMatch(/삭제/);
@@ -84,5 +84,40 @@ describe('끝낸 운동 고치기 (D-035)', () => {
     const a = done();
     expect(sameWorkout(a, { ...a, _s: { h: 'x' } } as unknown as Workout)).toBe(true);
     expect(sameWorkout(a, patchSet(a, 0, 0, 0, { weight: 61 }))).toBe(false);
+  });
+  it('편집 열쇠: 세트를 지운 뒤 늦게 온 입력은 원래 세트로만 (다른 세트에 안 들어감), 저장·비교 때 열쇠는 사라짐', () => {
+    const w = withKeys(done());
+    const k0 = keyOf(w.blocks[0]!.items[0]!.sets[0]!), k1 = keyOf(w.blocks[0]!.items[0]!.sets[1]!);
+    expect(k0 && k1 && k0 !== k1).toBeTruthy();
+    const afterDel = deleteSet(w, 0, 0, 0);
+    const late = patchSetByKey(afterDel, k0, { weight: 409 });
+    expect(late.blocks[0]!.items[0]!.sets.map((s) => s.weight)).toEqual([60]);
+    expect(patchSetByKey(afterDel, k1, { weight: 65 }).blocks[0]!.items[0]!.sets[0]!.weight).toBe(65);
+    expect(sameWorkout(w, done())).toBe(true);
+    const out = finalizeEdit(appendDoneSet(w, 0, 0), '2026-09-30T12:00:00.000Z');
+    expect(JSON.stringify(out)).not.toContain('_k');
+  });
+  it('시작을 옮기면 세트의 끝낸 시각도 같은 만큼, 운동 시간은 그대로', () => {
+    const w = setTimes(done(), '2026-09-29T10:00:00.000Z', durationMin(done()));
+    expect(w.blocks[0]!.items[0]!.sets[0]!.doneAt).toBe('2026-09-29T10:05:00.000Z');
+    expect(durationMin(w)).toBe(40);
+  });
+  it('시작만 옮기면 길이가 초 단위까지 그대로 (20초 기록이 0분이 되지 않음)', () => {
+    const short = { ...done(), endedAt: '2026-09-30T10:00:20.000Z' };
+    const m = moveStart(short, '2026-09-29T08:00:00.000Z');
+    expect(m.endedAt).toBe('2026-09-29T08:00:20.000Z');
+  });
+  it('원래 1분 미만 기록은 시간을 안 건드리면 이름만 고쳐도 저장 가능', () => {
+    const short = { ...done(), endedAt: '2026-09-30T10:00:20.000Z' };
+    expect(editProblem({ ...short, name: '새 이름' }, NOW)).toMatch(/1 이상/);
+    expect(editProblem({ ...short, name: '새 이름' }, NOW, undefined, { allowShort: true })).toBeNull();
+  });
+  it('시간 운동의 세트 추가는 초로 이어받음', () => {
+    const w = done();
+    w.blocks[0]!.items[0]!.target = { sets: 2, reps: 0, seconds: 45 };
+    w.blocks[0]!.items[0]!.sets = [{ warmup: false, done: true, seconds: 50 }];
+    const s = appendDoneSet(w, 0, 0).blocks[0]!.items[0]!.sets[1]!;
+    expect(s).toMatchObject({ seconds: 50, done: true });
+    expect(s.reps).toBeUndefined();
   });
 });
