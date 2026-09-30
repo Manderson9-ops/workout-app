@@ -40,7 +40,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         <button onClick={() => setR(applyRestToAll(r, rest.compound, rest.round))}>길게 {rest.compound}초</button>
       </div>
       {!r.blocks.length && <div class="empty">운동을 추가해 주세요</div>}
-      <div class="wide-cards">
+      <div class="wide-cards-lg">
       {r.blocks.map((b, bi) => {
         const next = r.blocks[bi + 1];
         const canMerge = !!next && b.items.length + next.items.length <= 4;
@@ -48,7 +48,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         return (
           <div class="card" key={bi}>
             <div class="row between">
-              <span class="badge kind">{KIND_LABEL[b.kind]}</span>
+              <span><span class="sub small" aria-label={`${bi + 1}번 블록`}>{bi + 1} </span><span class="badge kind">{KIND_LABEL[b.kind]}</span></span>
               <div class="row"><button aria-label={`${bi + 1}번 블록 위로`} onClick={() => move(bi, -1)}>↑</button><button aria-label={`${bi + 1}번 블록 아래로`} onClick={() => move(bi, 1)}>↓</button></div>
             </div>
             {b.items.map((it, ii) => (

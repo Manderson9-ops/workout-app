@@ -94,6 +94,8 @@ input.date { min-height: 44px; border-radius: 12px; border: 1px solid var(--line
 }
 /* 플랜 만들기 2단은 본문이 충분히 넓을 때만 (900~1100px은 버튼이 접혀서 1단) */
 @media (min-width: 1100px) {
+  html:not(.phone-view) .wide-cards-lg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  html:not(.phone-view) .wide-cards-lg > .card { margin: 0; }
   html:not(.phone-view) .wide-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 }
 /* 폰 화면으로 보기: PC에서도 폰 폭으로 가운데 */
