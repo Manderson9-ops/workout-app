@@ -28,12 +28,13 @@ export interface BackupData {
 }
 export const BACKUP_KEYS: (keyof BackupData)[] = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight', 'diag', 'feedback'];
 /** device: 만든 기기 (진단의 기기 ID와 이름, 예: iPhone · Safari 26.0). 비밀 값은 절대 넣지 않음 (D-025) */
-export interface BackupFile { app: typeof BACKUP_APP; schema: number; appVersion: string; exportedAt: string; device?: { id: string; label: string }; counts: Record<keyof BackupData, number>; data: BackupData }
+/** preview: 미리 보기 판(workout-app-next)에서 만든 파일 (D-031). 본판에서 불러올 때 경고, PC 검사에 표시 */
+export interface BackupFile { app: typeof BACKUP_APP; schema: number; appVersion: string; exportedAt: string; preview?: true; device?: { id: string; label: string }; counts: Record<keyof BackupData, number>; data: BackupData }
 
 export const countsOf = (data: BackupData) => Object.fromEntries(BACKUP_KEYS.map((k) => [k, data[k].length])) as BackupFile['counts'];
 
-export function makeBackup(data: BackupData, appVersion: string, now: string, device?: { id: string; label: string }): BackupFile {
-  return { app: BACKUP_APP, schema: BACKUP_SCHEMA, appVersion, exportedAt: now, ...(device ? { device } : {}), counts: countsOf(data), data };
+export function makeBackup(data: BackupData, appVersion: string, now: string, device?: { id: string; label: string }, preview = false): BackupFile {
+  return { app: BACKUP_APP, schema: BACKUP_SCHEMA, appVersion, exportedAt: now, ...(preview ? { preview: true as const } : {}), ...(device ? { device } : {}), counts: countsOf(data), data };
 }
 
 export const backupFileName = (now: Date) =>
@@ -124,6 +125,7 @@ export function parseBackup(text: string): ParseResult {
   }
   if (data.settings.length > 1) return { ok: false, error: '설정이 두 개 들어 있어요' };
   if (data.diag.length > DIAG_MAX * 2) return { ok: false, error: '진단 기록이 너무 많아요' };
+  if (f.preview !== undefined && f.preview !== true) return { ok: false, error: '미리 보기 표시가 잘못됐어요' };
   if (f.device !== undefined && !(isObj(f.device) && str(f.device.id) && (f.device.id as string).length <= 12 && typeof f.device.label === 'string' && (f.device.label as string).length <= 80)) return { ok: false, error: '기기 정보가 잘못됐어요' };
   if (data.workouts.filter((w) => !w.endedAt).length > 1) return { ok: false, error: '진행 중인 운동이 두 개 들어 있어요' };
   return { ok: true, file: { ...f, counts: countsOf(data), data } };

@@ -107,7 +107,8 @@ let again: Promise<boolean> | null = null;
  * "보낼 것 있음"은 보내기 **시작 전에** 켜고 성공했을 때만 끈다: 보내는 도중 앱이 닫히거나 멈춰도 다음에 다시 보냄 (검토 1차)
  */
 export function sendNow(reason: 'workout' | 'manual' | 'retry'): Promise<boolean> {
-  if (IS_PREVIEW && reason !== 'manual') return Promise.resolve(false); // 미리 보기 판은 자동으로 보내지 않음 (D-031)
+  void reason;
+  if (IS_PREVIEW) return Promise.resolve(false); // 미리 보기 판은 드라이브로 보내지 않음 (D-031: 데이터는 본판 → 미리 보기 한 방향)
   const c = getSendConfig();
   if (!c) return Promise.resolve(false);
   lsSet(PENDING, '1');
@@ -122,7 +123,7 @@ export function sendNow(reason: 'workout' | 'manual' | 'retry'): Promise<boolean
       await flushPending();
       diag('send', { m: `자동 보내기 시작 (${reason})` });
       await flushDiag();
-      const file = makeBackup(await exportAll(db), APP_VERSION, new Date().toISOString(), deviceInfo());
+      const file = makeBackup(await exportAll(db), APP_VERSION, new Date().toISOString(), deviceInfo(), IS_PREVIEW);
       const r = await post(c.url, { key: c.key, file });
       if (r.ok) {
         const at = new Date().toISOString();

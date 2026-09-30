@@ -15,10 +15,11 @@ export function brandNext(dir: string): void {
   m.description = '미리 보기 판: 본판과 데이터가 분리돼 있고 동기화하지 않아요';
   writeFileSync(mf, JSON.stringify(m, null, 2), 'utf8');
   const ix = join(dir, 'index.html');
-  const h = readFileSync(ix, 'utf8')
+  const h0 = readFileSync(ix, 'utf8');
+  const h = h0
     .replace('<meta name="apple-mobile-web-app-title" content="운동 기록" />', `<meta name="apple-mobile-web-app-title" content="${NEXT_NAME}" />`)
     .replace('<title>운동 기록</title>', `<title>${NEXT_NAME} (미리 보기)</title>`);
-  if (!h.includes(NEXT_NAME)) throw new Error('index.html에서 이름을 바꾸지 못했어요');
+  if (!h.includes(`content="${NEXT_NAME}"`) || !h.includes(`<title>${NEXT_NAME} (미리 보기)</title>`)) throw new Error('index.html에서 이름(제목·홈 화면 이름)을 바꾸지 못했어요');
   writeFileSync(ix, h, 'utf8');
 }
 
