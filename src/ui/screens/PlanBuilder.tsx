@@ -15,6 +15,7 @@ import type { TimedBlock } from '../../core/time';
 import { GradeBadge, ExercisePicker, Sheet, mmss } from '../components';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
+import { stepSets, stepReps, moveBlock, addBlock, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
 const NEXT: Record<string, Priority | undefined> = { none: 'high', high: 'normal', normal: 'low', low: undefined };
@@ -55,6 +56,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const [locks, setLocksRaw] = useState<Set<string>>(() => new Set(JSON.parse(sessionStorage.getItem(scopedKey(LOCK_KEY)) ?? '[]') as string[]));
   const setLocks = (l: Set<string>) => { setLocksRaw(l); sessionStorage.setItem(scopedKey(LOCK_KEY), JSON.stringify([...l])); };
   const [picker, setPicker] = useState<{ b: number; i: number } | null>(null);
+  const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [showReasons, setShowReasons] = useState(true);
@@ -106,6 +108,22 @@ export function PlanBuilder({ s }: { s: AppState }) {
     const still = new Set(next.blocks.flatMap((b) => b.items.map((i) => i.exerciseId)));
     if (locks.has(old.exerciseId) && !still.has(old.exerciseId)) { const n = new Set(locks); n.delete(old.exerciseId); setLocks(n); }
   };
+  const move = (bi: number, d: -1 | 1) => { if (plan) setPlan(recompute(moveBlock(plan, bi, d), all)); };
+  const addExercise = (e: BuiltExercise) => {
+    if (!plan) return;
+    const g = resolveGrade(e, e.part, s.settings.level, undefined, s.meta.get(e.id)?.userGrade);
+    const item: PlanItem = { exerciseId: e.id, name: e.name_ko, part: e.part, sets: 3, reps: e.measure === 'time' ? 0 : targetReps(e),
+      ...(e.measure === 'time' ? { seconds: e.default_seconds ?? 30 } : {}),
+      grade: g.value, gradeSource: g.source, estimated: g.estimated, substituted: false, locked: false, why: `${e.part} ${g.value} (직접 추가)`, rank: 99 };
+    setPlan(recompute(addBlock(plan, item), all));
+  };
+  const moveBtns = (bi: number) => plan && plan.blocks.length > 1 && (
+    <span class="row" style={{ gap: '4px' }}>
+      <span class="sub small">{bi + 1}번째</span>
+      <button class="ghost" aria-label={`${bi + 1}번째 블록 위로`} disabled={bi === 0} onClick={() => move(bi, -1)}>↑</button>
+      <button class="ghost" aria-label={`${bi + 1}번째 블록 아래로`} disabled={bi === plan.blocks.length - 1} onClick={() => move(bi, 1)}>↓</button>
+    </span>
+  );
   const nParts = f.order.filter((p) => f.parts[p]).length;
 
   return (
@@ -159,12 +177,13 @@ export function PlanBuilder({ s }: { s: AppState }) {
       {plan && (
         <section aria-label="생성된 플랜">
           <div class="row between" style={{ marginTop: '16px' }}>
-            <h2>{plan.status === 'ok' ? '플랜' : plan.status === 'reduced' ? '플랜 (일부 부위만)' : '플랜을 만들 수 없어요'}</h2>
+            <h2>{plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : plan.status === 'reduced' ? '플랜 (일부 부위만)' : '플랜'}</h2>
             {plan.blocks.length > 0 && <span class="sub">예상 {mmss(plan.estimatedSec)}{plan.targetSec ? ` / ${Math.round(plan.targetSec / 60)}분` : ''}</span>}
           </div>
           {plan.blocks.length > 0 && <p class="sub small">{plan.warmup.label} · 휴식 다관절 {plan.rest.compound}초 · 단관절 {plan.rest.isolation}초{plan.blocks.some((b) => b.kind !== 'single') ? ` · 묶음 라운드 후 ${plan.rest.round}초` : ''}</p>}
           {plan.blocks.map((b, bi) => (
-            <div class="card" key={bi}>
+            <div class="card" key={b.items.map((i) => i.exerciseId).join('+')}>
+              {plan.blocks.length > 1 && <div class="row between">{moveBtns(bi)}{b.kind === 'single' && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}</div>}
               {b.kind !== 'single' && <div class="row between"><span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span><span class="pill">라운드 후 휴식 {b.roundRestSec}초 · {mmss(b.timeSec)}</span></div>}
               {b.items.map((it, ii) => (
                 <div key={it.exerciseId} style={{ marginTop: ii ? '10px' : '4px' }}>
@@ -173,12 +192,22 @@ export function PlanBuilder({ s }: { s: AppState }) {
                       <div class="row"><GradeBadge g={{ value: it.grade, source: it.gradeSource, estimated: it.estimated }} /><strong>{it.name}</strong></div>
                       <div class="pill">{it.why}</div>
                     </div>
-                    {b.kind === 'single' && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}
+                    {b.kind === 'single' && plan.blocks.length <= 1 && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}
+                  </div>
+                  <div class="row wrap plan-steps" style={{ marginTop: '6px' }}>
+                    <span class="mini-step" role="group" aria-label={`${it.name} 세트`}>
+                      <button aria-label={`${it.name} 세트 줄이기`} disabled={it.sets <= SETS_MIN} onClick={() => editItem(bi, ii, (x) => stepSets(x, -1))}>−</button>
+                      <span class="val">{it.sets}세트</span>
+                      <button aria-label={`${it.name} 세트 늘리기`} disabled={it.sets >= SETS_MAX} onClick={() => editItem(bi, ii, (x) => stepSets(x, 1))}>+</button>
+                    </span>
+                    <span class="sub">×</span>
+                    <span class="mini-step" role="group" aria-label={`${it.name} ${it.seconds !== undefined ? '시간' : '횟수'}`}>
+                      <button aria-label={`${it.name} ${it.seconds !== undefined ? '시간' : '횟수'} 줄이기`} disabled={it.seconds !== undefined ? it.seconds <= SECS_MIN : it.reps <= REPS_MIN} onClick={() => editItem(bi, ii, (x) => stepReps(x, -1))}>−</button>
+                      <span class="val">{it.seconds !== undefined ? `${it.seconds}초` : `${it.reps}회`}</span>
+                      <button aria-label={`${it.name} ${it.seconds !== undefined ? '시간' : '횟수'} 늘리기`} disabled={it.seconds !== undefined ? it.seconds >= SECS_MAX : it.reps >= REPS_MAX} onClick={() => editItem(bi, ii, (x) => stepReps(x, 1))}>+</button>
+                    </span>
                   </div>
                   <div class="row wrap" style={{ marginTop: '6px' }}>
-                    <button aria-label={`${it.name} 세트 줄이기`} onClick={() => editItem(bi, ii, (x) => ({ ...x, sets: Math.max(1, x.sets - 1) }))}>−</button>
-                    <span>{it.sets}세트 × {it.seconds ? `${it.seconds}초` : `${it.reps}회`}</span>
-                    <button aria-label={`${it.name} 세트 늘리기`} onClick={() => editItem(bi, ii, (x) => ({ ...x, sets: Math.min(8, x.sets + 1) }))}>+</button>
                     <button class={locks.has(it.exerciseId) ? 'chip on' : 'chip'} aria-pressed={locks.has(it.exerciseId)} onClick={() => { const n = new Set(locks); if (n.has(it.exerciseId)) n.delete(it.exerciseId); else n.add(it.exerciseId); setLocks(n); }}>{locks.has(it.exerciseId) ? '🔒 잠금' : '잠금'}</button>
                     <button onClick={() => setPicker({ b: bi, i: ii })}>교체</button>
                     <button class="danger" aria-label={`${it.name} 삭제`} onClick={() => editItem(bi, ii, () => null)}>삭제</button>
@@ -187,6 +216,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
               ))}
             </div>
           ))}
+          <button class="big" style={{ margin: '4px 0 10px' }} onClick={() => setAdding(true)}>+ 운동 추가</button>
           <button class="ghost" onClick={() => setShowReasons(!showReasons)}>{showReasons ? '▾' : '▸'} 이렇게 짠 이유</button>
           {showReasons && <ul class="reasons">{plan.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
           <div class="row" style={{ marginTop: '12px' }}>
@@ -208,6 +238,12 @@ export function PlanBuilder({ s }: { s: AppState }) {
             const nl = new Set(locks); nl.delete(plan.blocks[picker.b]!.items[picker.i]!.exerciseId); nl.add(e.id); setLocks(nl);
             setPicker(null);
           }} />
+      )}
+      {adding && plan && (
+        <ExercisePicker s={s} all={all} title="운동 추가"
+          exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
+          onClose={() => setAdding(false)}
+          onPick={(e) => { addExercise(e); setAdding(false); }} />
       )}
       {saving && plan && (
         <Sheet title="루틴으로 저장" onClose={() => setSaving(false)}>

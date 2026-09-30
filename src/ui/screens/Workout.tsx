@@ -10,6 +10,7 @@ import {
 import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, mmss } from '../components';
 import { resolveGrade } from '../../core/exercises';
+import { hasDbInfo } from '../../core/planEdit';
 import { updateWorkoutAfterInputs } from '../actions';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
@@ -166,7 +167,9 @@ export function WorkoutScreen({ s }: { s: AppState }) {
               return (
                 <div key={ii} style={{ marginTop: '10px', opacity: it.skipped ? 0.5 : 1 }}>
                   <div class="row">{g && <GradeBadge g={g} />}<strong class="grow">{b.kind !== 'single' ? `${String.fromCharCode(65 + ii)}. ` : ''}{nameOf(it.exerciseId)}</strong>
-                    <a class="btn ghost small" href={`#/exercises/${encodeURIComponent(it.exerciseId)}`}>정보</a></div>
+                    {hasDbInfo(ex)
+                      ? <a class="btn small info-db" href={`#/exercises/${encodeURIComponent(it.exerciseId)}`} aria-label={`${nameOf(it.exerciseId)} 정보 (내 운동 DB: 영상 등급·자세 포인트)`} title="내 운동 DB 있음 (영상 등급·자세 포인트)">📚 정보</a>
+                      : <a class="btn ghost small" href={`#/exercises/${encodeURIComponent(it.exerciseId)}`} aria-label={`${nameOf(it.exerciseId)} 정보 (DB 없음)`}>정보</a>}</div>
                   {prev.length > 0 && <div class="pill">지난번: {prev.map((p) => `${p.weight ?? '-'}kg×${p.reps ?? p.seconds ?? '-'}`).join(', ')}</div>}
                   {!it.skipped && it.sets.map((x, k) => setRow(bi, ii, k, x))}
                   <div class="row wrap" style={{ marginTop: '6px' }}>

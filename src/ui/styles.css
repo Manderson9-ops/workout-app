@@ -55,6 +55,13 @@ label { display: block; font-size: 14px; color: var(--sub); margin: 12px 0 6px; 
 .stepper { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 2px; }
 .stepper input { text-align: center; padding: 0 2px; min-width: 0; }
 .stepper button { padding: 0; }
+/* 플랜: 세트·횟수 따로 조절 (D-036) */
+.plan-steps { align-items: center; gap: 6px; }
+.mini-step { display: inline-grid; grid-template-columns: 44px auto 44px; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 12px; padding: 2px; }
+.mini-step button { padding: 0; }
+.mini-step .val { min-width: 52px; text-align: center; font-weight: 600; }
+/* 내 운동 DB(영상 등급·자세 포인트)가 있는 운동의 정보 버튼 */
+.btn.info-db { background: var(--video); border-color: var(--video); color: #1b1033; }
 .check { width: 52px; height: 52px; border-radius: 14px; font-size: 22px; padding: 0; }
 .timer { position: fixed; left: 0; right: 0; bottom: calc(var(--nav-h) + var(--safe-b)); z-index: 25; background: #111827; border-top: 2px solid var(--acc); box-shadow: 0 -8px 20px #000a; padding: 12px 14px; }
 .timer.end { background: var(--ok); color: #06210f; border-top-color: var(--ok); }
