@@ -1,3 +1,4 @@
+import { syncEnabled, disableSync, replaceServerWithLocal, pullFresh, syncErrorText } from '../sync';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { activeOf } from '../store';
@@ -28,7 +29,20 @@ export function BackupSection({ s }: { s: AppState }) {
     const c = r.file.counts;
     const warnActive = active ? `\n\n⚠ 진행 중인 운동("${active.name}")도 사라져요.` : '';
     if (!confirm(`${new Date(r.file.exportedAt).toLocaleString('ko-KR')} 백업으로 바꿀까요?\n운동 기록 ${c.workouts}개, 루틴 ${c.routines}개, 체중 ${c.bodyweight}개\n\n지금 이 폰의 데이터는 모두 이 백업으로 바뀌어요 (합치지 않음). 먼저 "백업 파일 저장"으로 지금 데이터를 저장해 두는 것을 권해요.${warnActive}`)) return;
-    try { await restoreBackup(r.file); setMsg({ text: '백업을 불러왔어요', ok: true }); }
+    // 동기화가 켜져 있으면 어디까지 바꿀지 고름 (D-032): 서버까지(다른 기기도 다시 받음) / 이 기기만(동기화 끔)
+    let scope: 'server' | 'local' = 'local';
+    if (syncEnabled()) {
+      if (confirm('동기화가 켜져 있어요.\n[확인] 서버와 다른 기기까지 이 백업으로 바꾸기 (서버는 바꾸기 전 상태를 따로 보관)\n[취소] 다른 방법 고르기')) scope = 'server';
+      else if (confirm('이 기기만 이 백업으로 바꾸고 동기화를 끌까요?')) { scope = 'local'; await disableSync(); }
+      else return;
+    }
+    try {
+      if (scope === 'server') {
+        // 동기화를 멈춘 상태에서 불러오고 곧바로 서버를 바꿈
+        const x = await replaceServerWithLocal(() => restoreBackup(r.file));
+        setMsg({ text: x.ok ? '백업을 불러오고 서버까지 바꿨어요' : `백업은 이 기기에 불러왔지만 서버는 못 바꿨어요: ${syncErrorText(x.error)}`, ok: x.ok });
+      } else { await restoreBackup(r.file); setMsg({ text: '백업을 불러왔어요', ok: true }); }
+    }
     catch { setMsg({ text: '불러오는 중 문제가 생겨 아무것도 바꾸지 않았어요', ok: false }); }
   };
 
@@ -49,6 +63,11 @@ export function BackupSection({ s }: { s: AppState }) {
         <button class="danger" onClick={async () => {
           if (!confirm('정말 모든 데이터를 지울까요? 되돌릴 수 없어요.')) return;
           if (!confirm('마지막 확인: 백업 파일을 저장해 두셨나요? 지우기를 계속할까요?')) return;
+          if (syncEnabled()) {
+            // 동기화 중에 지우면 다른 기기 기록까지 지워지지 않게: 이 기기만 비우고 서버에서 다시 받거나, 동기화를 끔
+            if (confirm('동기화가 켜져 있어요.\n[확인] 이 기기만 비우고 서버에서 다시 받기\n[취소] 이 기기만 비우고 동기화 끄기')) { await resetAll(); await pullFresh(); setMsg({ text: '이 기기를 비우고 서버에서 다시 받았어요', ok: true }); return; }
+            await disableSync();
+          }
           await resetAll(); setMsg({ text: '모든 데이터를 지웠어요', ok: true });
         }}>모든 데이터 지우기</button>
       </details>

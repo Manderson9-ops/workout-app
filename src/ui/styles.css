@@ -78,3 +78,28 @@ table.trend { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.trend th, table.trend td { padding: 4px 2px; text-align: center; border-bottom: 1px solid var(--line); }
 table.trend th:first-child, table.trend td:first-child { text-align: left; color: var(--sub); }
 input.date { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: var(--text); padding: 0 10px; font-size: 16px; }
+
+/* S1 (D-030): PC 넓은 화면. 900px 이상이면 왼쪽 세로 메뉴 + 넓은 본문, 카드 2열. "폰 화면으로 보기"(html.phone-view)면 폰과 똑같이 */
+@media (min-width: 900px) {
+  html:not(.phone-view) .nav { top: 0; bottom: 0; right: auto; width: 180px; height: auto; flex-direction: column; justify-content: flex-start; padding: 16px 8px; gap: 4px; border-top: 0; border-right: 1px solid var(--line); }
+  html:not(.phone-view) .nav a { flex: 0 0 52px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0 12px; border-radius: 12px; font-size: 15px; }
+  html:not(.phone-view) .nav a.on { background: var(--card2); }
+  html:not(.phone-view) main { max-width: 1040px; margin: 0 0 0 200px; padding: 24px 32px 120px; }
+  html:not(.phone-view) .banner { left: 200px; right: 24px; bottom: 16px; }
+  /* 운동 화면 아래 고정 바·시트: 메뉴를 덮지 않게 본문 영역에만 */
+  html:not(.phone-view) .timer { left: 200px; right: 0; bottom: 0; padding-bottom: 16px; }
+  html:not(.phone-view) .sheet { left: 200px; right: 0; max-width: 640px; margin: 0 auto; border-radius: 18px 18px 0 0; }
+  html:not(.phone-view) .wide-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  html:not(.phone-view) .wide-cards > .card { margin: 0; }
+}
+/* 플랜 만들기 2단은 본문이 충분히 넓을 때만 (900~1100px은 버튼이 접혀서 1단) */
+@media (min-width: 1100px) {
+  html:not(.phone-view) .wide-cards-lg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  html:not(.phone-view) .wide-cards-lg > .card { margin: 0; }
+  html:not(.phone-view) .wide-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+}
+/* 폰 화면으로 보기: PC에서도 폰 폭으로 가운데 */
+html.phone-view main { max-width: 430px; }
+html.phone-view .nav { max-width: 430px; margin: 0 auto; }
+html.phone-view .banner { max-width: 410px; margin: 0 auto; }
+html.phone-view .timer, html.phone-view .sheet { max-width: 430px; margin: 0 auto; }

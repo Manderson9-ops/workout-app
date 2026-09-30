@@ -8,6 +8,7 @@ import { WorkoutScreen } from './screens/Workout';
 import { SettingsScreen } from './screens/Settings';
 import { RoutineEditor } from './screens/RoutineEditor';
 import { Stats, WorkoutDetail } from './screens/Stats';
+import { SyncBadge } from './screens/SyncSection';
 import { ToolsScreen } from './screens/Tools';
 import { mmss } from './components';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
@@ -48,7 +49,7 @@ export function App() {
   else screen = <Home s={s} />;
 
   const tab = (h: string, ico: string, label: string, on: boolean) => (
-    <a href={h} class={on ? 'on' : ''} aria-label={label}><span class="ico">{ico}</span>{label}</a>
+    <a href={h} class={on ? 'on' : ''} aria-label={label} aria-current={on ? 'page' : undefined}><span class="ico">{ico}</span>{label}</a>
   );
   const onWorkout = path.startsWith('/workout');
   const [update, applyUpdate] = useUpdateAvailable();
@@ -59,6 +60,7 @@ export function App() {
           <div class="row between"><span>새 버전이 있어요</span><button class="primary" onClick={() => { if (!active || confirm('운동 중이에요. 기록은 저장돼 있어요. 새 버전으로 바꿀까요?')) applyUpdate(); }}>적용</button></div>
         </div>
       )}
+      <SyncBadge />
       {screen}
       {active && !onWorkout && (
         <a class="banner" href="#/workout" aria-label="운동 계속하기">

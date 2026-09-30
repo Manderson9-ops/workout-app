@@ -156,7 +156,7 @@ export async function exportAll(db: WorkoutDB): Promise<BackupData> {
 }
 /** 백업으로 전부 바꾸기. 한 트랜잭션이라 중간에 실패하면 아무것도 바뀌지 않음 */
 export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackupAt?: string } = {}): Promise<void> {
-  await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag, db.tombs], async () => {
+  await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag, db.tombs, db.kv], async () => {
     await Promise.all([db.routines.clear(), db.workouts.clear(), db.meta.clear(), db.custom.clear(), db.settings.clear(), db.bodyweight.clear(), db.diag.clear(), db.tombs.clear()]);
     // 파일 안의 _s(동기화 표시)는 믿지 않고 떼어 냄 → 새로 표시(아직 안 보냄). 진행 중 운동은 이 기기가 주인
     const clean = <T,>(xs: T[]) => xs.map((x) => withoutStamp(x as never) as unknown as T);
@@ -169,6 +169,9 @@ export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackup
     if (!st.length && opts.lastBackupAt) st.push({ ...DEFAULT_SETTINGS, lastBackupAt: opts.lastBackupAt });
     await db.settings.bulkPut(st);
     await db.bodyweight.bulkPut(clean(d.bodyweight));
+    // 불러온 뒤 동기화를 다시 켜면 처음 연결 절차(받기 → 비교 → 고르기 → 올리기)를 거치게 (보관본은 유지)
+    const kv = ((await db.kv.get('sync'))?.v ?? {}) as Record<string, unknown>;
+    await db.kv.put({ k: 'sync', v: { ...kv, epoch: 0, since: 0 } });
     await db.diag.bulkAdd((d.diag ?? []).map(({ id: _id, ...e }: DiagEntry & { id?: number }) => e));
   });
 }

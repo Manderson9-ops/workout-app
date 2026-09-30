@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, mkdtempSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkSyncDir } from '../tools/sync_check';
+import { emptyState, handleSync } from '../src/core/syncMerge';
 
 mkdirSync('reports/screens', { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `reports/screens/${test.info().project.name}-${name}.png` });
@@ -528,6 +529,157 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
     o.onsuccess = () => { const db = o.result; const g = db.transaction('tombs').objectStore('tombs').get('routines/r-old'); g.onsuccess = () => { res(!!g.result); db.close(); }; };
   }));
   expect(tomb).toBe(true);
+});
+
+test.describe('S2b 양방향 동기화 (두 브라우저 + 가짜 서버, 실제 합치기 코드)', () => {
+test.use({ serviceWorkers: 'block' });
+test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용, 끝낸 운동 → PC 기록, 지움 전파', async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  const URL_ = 'https://script.google.com/macros/s/AKfycbzSYNCTEST' + 'b'.repeat(30) + '/exec';
+  const KEY = 'S'.repeat(36) + 'Q1w2';
+  const state = emptyState();
+  let down = false;
+  const route = async (p: Page) => p.route(URL_, async (r) => {
+    if (down) return r.abort('internetdisconnected');
+    const body = JSON.parse(r.request().postData() ?? '{}');
+    let res: unknown = { ok: false, error: 'bad_key' };
+    if (body.key === KEY) res = body.op === 'sync' ? handleSync(state, JSON.parse(JSON.stringify(body)), Date.now()) : body.ping ? { ok: true, ping: true } : { ok: true };
+    await r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(res) });
+  });
+  page.on('dialog', (d) => void d.accept());
+  const connect = async (p: Page) => {
+    await p.evaluate(([u, k]) => localStorage.setItem('send.cfg', `${u}#${k}`), [URL_, KEY]);
+    await p.reload();
+    await p.getByRole('link', { name: '설정' }).click();
+    await p.getByRole('button', { name: '동기화 연결하기' }).click();
+    await p.getByRole('button', { name: '이미 저장했어요' }).click();
+    await p.getByRole('button', { name: '연결 시작' }).click();
+    await expect(p.getByLabel('PC와 폰 동기화')).toContainText('동기화됨');
+  };
+  const syncNowOn = async (p: Page) => { await p.getByRole('link', { name: '설정' }).click(); await p.getByRole('button', { name: '지금 동기화' }).click(); await expect(p.getByLabel('PC와 폰 동기화')).toContainText('동기화됨'); };
+  // 폰 = 기본 page (아이폰 크기), PC = 새 창 (넓은 화면)
+  const pcCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
+  const pc = await pcCtx.newPage();
+  pc.on('dialog', (d) => void d.accept());
+  await route(page); await route(pc);
+  await pc.goto('./#/');
+  await pc.getByRole('button', { name: '알겠어요' }).click();
+  await connect(page);
+  await connect(pc);
+  // PC에서 루틴 만들기
+  await pc.getByRole('link', { name: '홈' }).click();
+  await pc.getByRole('button', { name: '+ 직접' }).click();
+  await pc.getByLabel('루틴 이름').fill('PC에서 짠 루틴');
+  await pc.getByRole('button', { name: '+ 운동 추가' }).click();
+  await pc.getByLabel('운동 검색').fill('해머 컬');
+  await pc.getByRole('dialog').getByRole('button').filter({ hasText: '해머 컬' }).first().click();
+  await pc.getByRole('button', { name: '저장', exact: true }).click();
+  await syncNowOn(pc);
+  await syncNowOn(page);
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(page.getByRole('heading', { name: 'PC에서 짠 루틴' })).toBeVisible();
+  // 폰에서 시작 → 세트 완료 → PC에서는 "다른 기기에서 진행 중"
+  await page.getByRole('button', { name: /PC에서 짠 루틴 시작/ }).click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await syncNowOn(page);
+  await syncNowOn(pc);
+  await pc.getByRole('link', { name: '홈' }).click();
+  await expect(pc.getByLabel('다른 기기에서 진행 중')).toContainText('PC에서 짠 루틴');
+  await expect(pc.getByRole('link', { name: '운동 계속하기' })).toHaveCount(0);
+  await checkScreen(pc, '17-pc-remote-workout');
+  // PC가 가져오기 → PC가 주인, 폰은 "다른 기기로 넘어갔어요" (세트는 그대로)
+  await pc.getByRole('button', { name: '이 기기로 가져오기' }).click();
+  await expect(pc).toHaveURL(/#\/workout/);
+  await expect(pc.getByText(/1\/\d+세트/)).toBeVisible();
+  await syncNowOn(pc); await syncNowOn(page);
+  await page.getByRole('link', { name: '운동', exact: true }).click();
+  await expect(page.getByText(/다른 기기로 넘어갔어요/)).toBeVisible();
+  // PC에서 끝냄 → 폰 기록
+  await pc.getByRole('link', { name: '운동', exact: true }).click();
+  await pc.getByRole('button', { name: '종료' }).click();
+  await syncNowOn(pc); await syncNowOn(page);
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByRole('button', { name: /PC에서 짠 루틴/ }).first()).toBeVisible();
+  await pc.getByRole('link', { name: '기록' }).click();
+  await expect(pc.getByRole('button', { name: /PC에서 짠 루틴/ }).first()).toBeVisible();
+  await pc.getByRole('link', { name: '홈' }).click();
+  await expect(pc.getByLabel('다른 기기에서 진행 중')).toHaveCount(0);
+  // 폰이 인터넷 없이 루틴 이름을 고침 → 동기화 실패 표시 → 다시 연결되면 PC에 반영
+  down = true;
+  await page.getByRole('link', { name: '홈' }).click();
+  await page.getByRole('button', { name: '편집' }).first().click();
+  await page.getByLabel('루틴 이름').fill('PC에서 짠 루틴');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByRole('button', { name: '지금 동기화' }).click();
+  await expect(page.getByLabel('PC와 폰 동기화')).toContainText('인터넷에 연결되지 않았어요');
+  down = false;
+  await syncNowOn(page); await syncNowOn(pc);
+  // PC에서 루틴 지움 → 폰에서도 사라짐
+  await pc.getByRole('link', { name: '홈' }).click();
+  await pc.getByRole('button', { name: 'PC에서 짠 루틴 삭제' }).click();
+  await syncNowOn(pc); await syncNowOn(page);
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(page.getByRole('heading', { name: 'PC에서 짠 루틴' })).toHaveCount(0);
+  await checkScreen(page, '18-phone-after-sync');
+  await pcCtx.close();
+});
+});
+
+test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 화면으로 보기', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const pc = await ctx.newPage();
+  pc.on('dialog', (d) => void d.accept());
+  await pc.goto('./#/');
+  await pc.getByRole('button', { name: '알겠어요' }).click();
+  const nav = await pc.locator('nav.nav').boundingBox();
+  expect(nav!.x).toBe(0);
+  expect(nav!.width).toBeLessThan(200);
+  expect(nav!.height).toBeGreaterThan(nav!.width);
+  // 플랜: 왼쪽 조건, 오른쪽 결과
+  await pc.getByRole('link', { name: '플랜' }).click();
+  await pc.getByRole('button', { name: '등 선택 안 함' }).click();
+  await pc.getByRole('button', { name: '45분' }).click();
+  await pc.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const form = await pc.getByRole('button', { name: '플랜 만들기', exact: true }).boundingBox();
+  const res = await pc.getByRole('region', { name: '생성된 플랜' }).boundingBox();
+  expect(res!.x).toBeGreaterThan(form!.x + form!.width - 5);
+  await checkScreen(pc, '19-pc-plan');
+  // 저장하고 시작 → 무게 입력 후 Enter = 다음 칸(횟수), Ctrl+Enter = 현재 세트 완료
+  await pc.getByRole('button', { name: '저장', exact: true }).click();
+  await pc.getByRole('button', { name: '저장하고 시작' }).click();
+  const w = pc.locator('input[aria-label$="1세트 무게"]').first();
+  await w.click(); await w.fill('40'); await w.press('Enter');
+  expect(await pc.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toMatch(/1세트 횟수$/);
+  await pc.keyboard.press('Control+Enter');
+  await expect(pc.getByText('1/9세트')).toBeVisible();
+  await expect(pc.getByRole('timer')).toBeVisible();
+  // 아래 고정 바는 메뉴를 덮지 않고 바닥에 붙음
+  const tb = await pc.locator('.timer').boundingBox();
+  expect(tb!.x).toBeGreaterThanOrEqual(199);
+  expect(Math.round(tb!.y + tb!.height)).toBe(900);
+  // Ctrl+Enter를 누르고 있어도(반복) 세트가 연달아 끝나지 않음
+  const doneBefore = await pc.locator('[aria-label$="완료됨"], .set.done').count();
+  await pc.keyboard.down('Control'); await pc.keyboard.down('Enter');
+  await pc.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, repeat: true })));
+  await pc.keyboard.up('Enter'); await pc.keyboard.up('Control');
+  expect(await pc.locator('[aria-label$="완료됨"], .set.done').count()).toBeLessThanOrEqual(doneBefore + 1);
+  await expect(pc.getByText(/^[12]\/9세트$/)).toBeVisible();
+  await checkScreen(pc, '20-pc-workout');
+  // 폰 화면으로 보기
+  await pc.getByRole('link', { name: '설정' }).click();
+  await pc.getByLabel('폰 화면으로 보기').check();
+  const main = await pc.locator('main').boundingBox();
+  expect(main!.width).toBeLessThanOrEqual(430);
+  const nav2 = await pc.locator('nav.nav').boundingBox();
+  expect(nav2!.width).toBeLessThanOrEqual(430);
+  // 운동 화면 고정 바도 폰 폭
+  await pc.getByRole('link', { name: '운동', exact: true }).click();
+  const tb2 = await pc.locator('.timer').boundingBox();
+  expect(tb2!.width).toBeLessThanOrEqual(430);
+  await pc.getByRole('link', { name: '설정' }).click();
+  await pc.getByLabel('폰 화면으로 보기').uncheck();
+  await ctx.close();
 });
 
 void makeRoutine;

@@ -18,6 +18,8 @@ import { softDelete } from '../../db/db';
 import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
 import { diagTimerEnd } from '../diag';
 import { sendNow } from '../autoSend';
+import { syncNow } from '../sync';
+import { remoteActiveOf } from '../store';
 
 export function WorkoutScreen({ s }: { s: AppState }) {
   const w = activeOf(s);
@@ -30,6 +32,15 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [plate, setPlate] = useState<number | null>(null);
   /** 운동 화면이 뜬 시각 (휴식이 끝날 때 이 화면에 있었는지 판정용, 진단) */
   const shownAt = useRef(Date.now());
+  // PC 키보드: Ctrl+Enter(맥 ⌘+Enter) = 현재 세트 완료 (D-030)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      // 누르고 있기(반복)·한글 조합 중·시트(메모·교체 등)가 열려 있을 때는 무시
+      if (e.repeat || e.isComposing || document.querySelector('.sheet')) return;
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.querySelector<HTMLButtonElement>('[aria-label="현재 세트 완료"]')?.click(); } };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
@@ -58,6 +69,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     return (
       <main>
         <h1>운동</h1>
+        {remoteActiveOf(s) && <p role="status" class="card small">📱 운동 「{remoteActiveOf(s)!.name}」은 다른 기기에서 진행 중이에요 (다른 기기로 넘어갔어요). 홈에서 볼 수 있어요.</p>}
         <div class="empty"><p>진행 중인 운동이 없어요.</p><p class="small">홈에서 루틴을 시작하거나 플랜을 만들어 보세요.</p></div>
         <button class="primary big" onClick={() => go('#/')}>루틴 고르기</button>
       </main>
@@ -118,7 +130,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const finish = async () => {
     const left = prog.totalSets - prog.doneSets;
     if (!confirm(left ? `아직 ${left}세트 남았어요. 운동을 끝낼까요?` : '운동을 끝낼까요?')) return;
-    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout');
+    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); void syncNow('finish');
   };
   const delta = prog.deltaSec;
 
@@ -196,7 +208,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             {nextRest ? <span class="small" style={{ fontWeight: 500 }}> → 휴식 {nextRest.sec}초</span> : null}
           </button>
         ) : (
-          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); }}>모든 세트 완료 · 운동 끝내기</button>
+          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); void syncNow('finish'); }}>모든 세트 완료 · 운동 끝내기</button>
         )}
       </div>
 

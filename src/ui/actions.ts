@@ -21,6 +21,8 @@ export async function updateWorkout(id: string, fn: (w: Workout) => Workout) {
   const next = await db.transaction('rw', db.workouts, async () => {
     const cur = await db.workouts.get(id);
     if (!cur) return undefined;
+    // 다른 기기로 넘어간 운동은 이 기기에서 고치지 않음 (늦은 저장이 새 주인 기록과 부딪히지 않게)
+    if (cur.ownerDeviceId && cur.ownerDeviceId !== deviceId()) return undefined;
     const n = fn(cur);
     await db.workouts.put(n);
     return n;
@@ -39,7 +41,7 @@ export async function startRoutine(s: AppState, r: Routine) {
   const cur = activeOf(s);
   if (cur && !confirm(`진행 중인 운동 "${cur.name}"이 있어요. 그 운동을 끝내고 새로 시작할까요?`)) { go('#/workout'); return; }
   void askPersistOnce();
-  const w = { ...startWorkout(newId('w'), r, new Date().toISOString(), historyOf(s), { betweenSec: s.settings.rest.between }), ownerDeviceId: deviceId(), ownerAt: new Date().toISOString() };
+  const w = { ...startWorkout(newId('w'), r, new Date().toISOString(), historyOf(s), { betweenSec: s.settings.rest.between }), ownerDeviceId: deviceId(), ownerAt: new Date().toISOString(), ownerSeq: 1 };
   await mutate(async (d) => {
     if (cur) await d.workouts.put({ ...cur, endedAt: new Date().toISOString(), timer: null });
     await d.workouts.put(w);

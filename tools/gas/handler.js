@@ -26,6 +26,7 @@ function doPost(e) {
     if (body.length > MAX_CHARS) return out_({ ok: false, error: 'too_big' });
     return out_(inbox_(j));
   } catch (err) {
+    console.error('doPost 오류: ' + (err && err.stack || err)); // 편집기 → 실행 기록에서 원인 확인
     return out_({ ok: false, error: 'server' });
   }
 }
@@ -55,15 +56,26 @@ function dbFolder_() {
   var it = sync.getFoldersByName('db');
   return it.hasNext() ? it.next() : sync.createFolder('db');
 }
+/** 기록 파일은 ID로 찾음 (같은 이름 사본·휴지통 파일이 섞이지 않게). ID가 없으면 이름으로 한 번 찾아 저장 */
 function load_(folder) {
-  var it = folder.getFilesByName('records.json');
-  if (!it.hasNext()) return { file: null, state: SyncMerge.emptyState() };
-  var file = it.next();
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('DB_FILE');
+  var file = null;
+  if (id) { try { file = DriveApp.getFileById(id); if (file.isTrashed()) file = null; } catch (x) { file = null; } }
+  if (!file) {
+    var it = folder.getFilesByName('records.json');
+    while (it.hasNext()) { var f = it.next(); if (!f.isTrashed()) { file = f; break; } }
+    if (file) props.setProperty('DB_FILE', file.getId());
+  }
+  if (!file) return { file: null, state: SyncMerge.emptyState() };
   return { file: file, state: JSON.parse(file.getBlob().getDataAsString()) };
 }
+var WARN_BYTES = 8 * 1024 * 1024;
 function save_(folder, file, state) {
   var s = JSON.stringify(state);
-  if (file) file.setContent(s); else folder.createFile('records.json', s, 'application/json');
+  if (s.length > WARN_BYTES) console.warn('기록 파일이 커요: ' + s.length + '자 (한도 전에 오래된 진단·지움 표시 정리 필요)');
+  if (file) file.setContent(s);
+  else { var nf = folder.createFile('records.json', s, 'application/json'); PropertiesService.getScriptProperties().setProperty('DB_FILE', nf.getId()); }
 }
 /** 하루 한 번 스냅숏, 최근 SNAPSHOTS개만 (D-032) */
 function snapshot_(folder, file) {
@@ -111,7 +123,14 @@ function replace_(req) {
   try {
     var folder = dbFolder_();
     var loaded = load_(folder);
-    if (loaded.file) loaded.file.makeCopy('records-before-replace-' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd-HHmmss') + '.json', folder);
+    if (loaded.file) {
+      loaded.file.makeCopy('records-before-replace-' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd-HHmmss') + '.json', folder);
+      // 바꾸기 전 사본은 최근 3개만
+      var list = [], it2 = folder.getFiles();
+      while (it2.hasNext()) { var f2 = it2.next(); if (/^records-before-replace-/.test(f2.getName())) list.push(f2); }
+      list.sort(function (a, b) { return a.getName() < b.getName() ? 1 : -1; });
+      for (var i = 3; i < list.length; i++) list[i].setTrashed(true);
+    }
     var state = SyncMerge.replaceState(loaded.state, req.recs);
     setHint_('pending');
     save_(folder, loaded.file, state);

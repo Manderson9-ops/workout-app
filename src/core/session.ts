@@ -25,6 +25,8 @@ export interface Workout {
   ownerDeviceId?: string;
   /** 주인이 된 시각 (가져오기 때 새로. 더 오래된 주인의 늦은 기록을 가려냄) */
   ownerAt?: string;
+  /** 주인이 바뀐 횟수 (가져올 때마다 +1). 서버가 이 번호로 새 주인·옛 주인을 가림 (기기 시계와 무관, D-029) */
+  ownerSeq?: number;
   /** 다른 기기에서 늦게 온 기록 사본: 원래 운동 ID (통계에서 빼고 합치기/지우기) */
   pendingMerge?: string;
   startedAt: string; endedAt?: string;

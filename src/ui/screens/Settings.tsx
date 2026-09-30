@@ -1,3 +1,5 @@
+import { useState } from 'preact/hooks';
+import { phoneView, setPhoneView } from '../view';
 import type { AppState } from '../store';
 import { mutate } from '../store';
 import { catalog } from '../catalog';
@@ -15,6 +17,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
   const put = (p: Partial<Settings>) => mutate((d) => d.settings.put({ ...st, ...p, key: 'main' }));
   const all = catalog(s.custom);
   const excluded = [...s.meta.values()].filter((m) => m.excluded);
+  const [pv, setPv] = useState(phoneView());
   return (
     <main>
       <h1>설정</h1>
@@ -50,6 +53,12 @@ export function SettingsScreen({ s }: { s: AppState }) {
       ))}
       <BackupSection s={s} />
       <DiagSection s={s} />
+      <h2>화면</h2>
+      <label class="row small" style={{ minHeight: '44px' }}>
+        <input type="checkbox" aria-label="폰 화면으로 보기" checked={pv} style={{ width: '24px', height: '24px' }} onChange={(e) => { const v = (e.target as HTMLInputElement).checked; setPhoneView(v); setPv(v); }} />
+        폰 화면으로 보기 (PC에서 폰과 똑같은 모양으로 확인)
+      </label>
+      <p class="sub small">PC 키보드: 숫자 입력 뒤 Enter = 다음 칸, 운동 중 Ctrl+Enter = 현재 세트 완료</p>
       <h2>도구</h2>
       <button onClick={() => go('#/tools')}>원판 계산기 · 1RM 계산기</button>
       <p class="sub small">앱 버전 {APP_VERSION}</p>
