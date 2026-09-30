@@ -27,10 +27,14 @@ export interface AppState {
 let state: AppState = { ready: false, settings: DEFAULT_SETTINGS, routines: [], workouts: [], meta: new Map(), custom: [], bodyweight: [] };
 const listeners = new Set<(s: AppState) => void>();
 
+/** 이 기기에서 진행 중 운동을 바꾼 횟수: load가 읽는 도중 바뀌면 옛 값으로 덮지 않도록 다시 읽음 (S2b 검토) */
+let localVer = 0;
 export async function load(): Promise<void> {
+  const startVer = localVer;
   const [settings, routines, workouts, meta, custom, bodyweight] = await Promise.all([
     getSettings(db), db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.bodyweight.toArray(),
   ]);
+  if (startVer !== localVer) return load();
   state = {
     ready: true, settings,
     routines: routines.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
@@ -55,6 +59,7 @@ export async function mutate(fn: (d: WorkoutDB) => Promise<unknown>): Promise<vo
 /** 진행 중 운동 하나만 메모리에서 바꿔 알림 (전체 다시 읽기 없이) */
 export function setWorkoutLocal(w: Workout): void {
   const workouts = state.workouts.some((x) => x.id === w.id) ? state.workouts.map((x) => (x.id === w.id ? w : x)) : [w, ...state.workouts];
+  localVer++;
   state = { ...state, workouts };
   listeners.forEach((l) => l(state));
   notifyWrite();

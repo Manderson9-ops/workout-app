@@ -4,6 +4,18 @@ import { useSyncStatus, syncEnabled, enableSync, disableSync, syncNow, answerCon
 import { getSendConfig } from '../autoSend';
 import { saveBackupFile, SAVE_MESSAGE } from '../backupActions';
 import { tombKey } from '../../core/syncStamp';
+import type { Conflict } from '../../db/sync';
+
+/** 충돌 비교 정보: 이 기기 / 서버 */
+function compare(c: Conflict): string {
+  const d = (x: Record<string, unknown>) => {
+    if (c.table === 'routines') { const b = (x.blocks as { items: unknown[] }[] | undefined) ?? []; return `운동 ${b.reduce((n, y) => n + y.items.length, 0)}개${x.updatedAt ? ` · ${new Date(String(x.updatedAt)).toLocaleDateString('ko-KR')}` : ''}`; }
+    if (c.table === 'workouts') { const b = (x.blocks as { items: { sets: { done?: boolean }[] }[] }[] | undefined) ?? []; return `세트 ${b.flatMap((y) => y.items.flatMap((i) => i.sets)).filter((s) => s.done).length}개`; }
+    if (c.table === 'bodyweight') return `${x.kg}kg`;
+    return Object.keys(x).filter((k) => JSON.stringify(x[k]) !== JSON.stringify((c.table === 'settings' ? c.server : c.local)[k])).slice(0, 3).join(', ') || '내용 다름';
+  };
+  return `이 기기: ${d(c.local)} / 서버: ${d(c.server)}`;
+}
 
 const ago = (t?: string) => {
   if (!t) return '아직 없음';
@@ -66,7 +78,7 @@ export function SyncSection({ s }: { s: AppState }) {
             const p = picks[k] ?? 'local';
             return (
               <div key={k} class="row between small" style={{ minHeight: '44px' }}>
-                <span>{c.table === 'settings' ? '설정' : c.table === 'routines' ? `루틴 「${c.label}」` : c.table === 'workouts' ? `운동 「${c.label}」` : `${c.label}`}</span>
+                <span>{c.table === 'settings' ? '설정' : c.table === 'routines' ? `루틴 「${c.label}」` : c.table === 'workouts' ? `운동 「${c.label}」` : `${c.label}`}<br /><span class="sub">{compare(c)}</span></span>
                 <span class="row">
                   <button class={`chip ${p === 'local' ? 'on' : ''}`} aria-pressed={p === 'local'} onClick={() => setPicks({ ...picks, [k]: 'local' })}>이 기기</button>
                   <button class={`chip ${p === 'server' ? 'on' : ''}`} aria-pressed={p === 'server'} onClick={() => setPicks({ ...picks, [k]: 'server' })}>서버</button>
@@ -74,7 +86,10 @@ export function SyncSection({ s }: { s: AppState }) {
               </div>
             );
           })}
-          <button class="primary" onClick={() => answerConflicts(Object.fromEntries(st.conflicts!.map((c) => [tombKey(c.table, c.id), picks[tombKey(c.table, c.id)] ?? 'local'])))}>이대로 합치기</button>
+          <div class="row wrap">
+            <button class="primary" onClick={() => answerConflicts(Object.fromEntries(st.conflicts!.map((c) => [tombKey(c.table, c.id), picks[tombKey(c.table, c.id)] ?? 'local'])))}>이대로 합치기</button>
+            <button onClick={() => { answerConflicts(null); setOn(false); }}>취소 (연결 안 함)</button>
+          </div>
         </div>
       )}
       {on && (

@@ -9,9 +9,9 @@
 
 export const SYNC_SCHEMA = 1;
 export const FIELD_TABLES_M = ['settings', 'meta'];
-export const MUT_KEEP = 5000;
+export const MUT_KEEP = 2000;
 /** 서버 시각보다 이만큼 넘게 미래인 HLC는 서버 시각으로 다시 찍음 */
-export const FUTURE_MS = 10 * 60_000;
+export const FUTURE_MS = 600000; // 10분 (숫자 구분자 없이: Apps Script 호환)
 
 export interface ServerRec {
   table: string; id: string;
@@ -54,18 +54,44 @@ function clampFuture(h: string, nowMs: number, dev: string): string {
   return parse(h).ms > nowMs + FUTURE_MS ? fmt(nowMs, 0, dev) : h;
 }
 
-/** 늦게 온 세트 사본: 서버본에서 아직 안 끝낸(또는 없는) 세트 가운데 기기가 끝낸 것만 */
+type SetL = { done?: boolean; warmup?: boolean };
+type ItemL = { exerciseId: string; sets: SetL[] };
+type BlockL = { items: ItemL[] };
+const setKey = (s: SetL) => JSON.stringify(s, Object.keys(s).sort());
+const blocksOf = (w: Record<string, unknown>) => (w.blocks as BlockL[] | undefined) ?? [];
+/** 같은 자리(블록 순번·운동)의 운동 항목 */
+const itemAt = (w: Record<string, unknown>, bi: number, it: ItemL) => blocksOf(w)[bi]?.items.find((x) => x.exerciseId === it.exerciseId);
+
+/**
+ * a에 b의 완료 세트 가운데 a에 없는 것(내용 기준)을 채움: 가져오기가 최신 화면이 아닐 때 서버 세트를 잃지 않게.
+ * 자리(순번)가 아니라 내용으로 비교 → 두 기기가 같은 자리에 세트를 적어도 둘 다 남음
+ */
+function fillDone(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
+  const blocks = blocksOf(a).map((blk, bi) => ({ ...blk, items: blk.items.map((it) => {
+    const o = itemAt(b, bi, it);
+    if (!o) return it;
+    const have = new Set(it.sets.filter((s) => s.done).map(setKey));
+    const sets = [...it.sets];
+    for (const s of o.sets) {
+      if (!s.done || have.has(setKey(s))) continue;
+      const k = sets.findIndex((x) => !x.done && !!x.warmup === !!s.warmup);
+      if (k >= 0) sets[k] = s; else sets.push(s);
+      have.add(setKey(s));
+    }
+    return { ...it, sets };
+  }) }));
+  return { ...a, blocks };
+}
+
+/** 늦게 온 세트 사본: 기기가 끝낸 세트 가운데 서버본에 (내용이 같은 것이) 없는 것만 */
 function lateSets(server: Record<string, unknown>, mine: Record<string, unknown>): Record<string, unknown> | undefined {
-  type S = { done?: boolean; warmup?: boolean };
-  type It = { exerciseId: string; sets: S[] };
-  type B = { items: It[] };
-  const sb = (server.blocks as B[] | undefined) ?? [], mb = (mine.blocks as B[] | undefined) ?? [];
   let any = false;
-  const blocks = mb.map((b, bi) => ({
+  const blocks = blocksOf(mine).map((b, bi) => ({
     ...b,
-    items: b.items.map((it, ii) => {
-      const sItem = sb[bi]?.items?.[ii];
-      const sets = it.sets.filter((s, k) => s.done && !(sItem && sItem.exerciseId === it.exerciseId && sItem.sets?.[k]?.done));
+    items: b.items.map((it) => {
+      const sItem = itemAt(server, bi, it);
+      const onServer = new Set((sItem?.sets ?? []).filter((s) => s.done).map(setKey));
+      const sets = it.sets.filter((s) => s.done && !onServer.has(setKey(s)));
       if (sets.length) any = true;
       return { ...it, sets };
     }).filter((it) => it.sets.length),
@@ -124,11 +150,14 @@ export function applyMutations(state: ServerState, muts: Mutation[], nowMs: numb
       const exOwner = ex?.data?.ownerDeviceId as string | undefined;
       const newOwner = data.ownerDeviceId as string | undefined;
       const ownerChanged = isWorkout && !!ex && !ex.deleted && !!exOwner && !!newOwner && exOwner !== newOwner;
-      // 주인 바뀜: ownerAt(주인이 된 시각)이 더 새로운 쪽이 주인. 더 오래된 주인의 수정 = 가져간 뒤 늦게 온 옛 주인 기록
-      const staleOwner = ownerChanged && String(data.ownerAt ?? '') < String(ex!.data!.ownerAt ?? '');
+      // 주인 바뀜은 ownerSeq(가져올 때마다 +1)로 판단 (기기 시계와 무관). 더 작은 번호 = 가져간 뒤 늦게 온 옛 주인 기록
+      const seqIn = Number(data.ownerSeq ?? 0), seqEx = Number(ex?.data?.ownerSeq ?? 0);
+      const staleOwner = ownerChanged && (seqIn < seqEx || (seqIn === seqEx && m.hlc <= ex!.hlc));
       const takeover = ownerChanged && !staleOwner;
       if (takeover) {
-        rec = bump({ table: m.table, id: m.id, data, hlc: m.hlc > ex!.hlc ? m.hlc : after(ex!.hlc, nowMs, m.dev), dev: m.dev, rev: 0 });
+        // 가져온 기기가 최신 화면이 아니었으면(서버가 그 사이 바뀜) 서버에만 있던 완료 세트를 합쳐 잃지 않음
+        const merged = (m.baseRev ?? 0) < ex!.rev ? fillDone(data, ex!.data!) : data;
+        rec = bump({ table: m.table, id: m.id, data: merged, hlc: m.hlc > ex!.hlc ? m.hlc : after(ex!.hlc, nowMs, m.dev), dev: m.dev, rev: 0 });
       } else if (staleOwner) {
         // 주인이 넘어간 뒤 옛 주인이 보낸 기록: 버리지 않고 서버본에 없는 세트만 사본으로 (통계 제외, 합치기/지우기 고르게)
         const late = lateSets(ex!.data!, data);

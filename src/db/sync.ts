@@ -10,6 +10,7 @@ import type { SyncStamp, SyncTable, Tomb } from '../core/syncStamp';
 import { SYNC_SCHEMA } from '../core/syncMerge';
 import type { Mutation, ServerRec, SyncRequest, SyncResponse } from '../core/syncMerge';
 
+export const CHUNK = 300;
 export type Transport = (req: SyncRequest) => Promise<SyncResponse | { ok: false; error: string }>;
 export interface SyncKv { since: number; epoch: number; stash?: Mutation[]; connected?: boolean; lastOkAt?: string }
 
@@ -62,7 +63,7 @@ async function writeRemote(db: WorkoutDB, rec: ServerRec, localQ: number): Promi
   }
   let data: Record<string, unknown> = { ...(rec.data ?? {}), [PK[t]]: t === 'bodyweight' || t === 'settings' || t === 'meta' ? rec.id : (rec.data?.[PK[t]] ?? rec.id) };
   if (t === 'settings') {
-    const cur = (await db.settings.get(rec.id)) as Row | undefined;
+    const cur = (await db.table('settings').get(rec.id)) as Row | undefined;
     const local = Object.fromEntries(LOCAL_SETTINGS_FIELDS.filter((k) => cur && cur[k] !== undefined).map((k) => [k, cur![k]]));
     data = { ...data, ...local, key: rec.id };
   }
@@ -76,7 +77,7 @@ async function localStamp(db: WorkoutDB, table: string, id: string): Promise<Syn
   return (await db.tombs.get(tombKey(table, id)))?._s;
 }
 
-export interface ApplyResult { confirmed: number; received: number; stashed?: number; full?: boolean }
+export interface ApplyResult { confirmed: number; received: number; stashed?: number; full?: boolean; dedup?: number }
 
 /** 응답 반영 (한 트랜잭션). 보낸 수정은 localSeq가 그대로일 때만 확정 (보내는 동안 또 고쳤으면 dirty 유지) */
 export async function applyResponse(db: WorkoutDB, resp: SyncResponse, sent: Mutation[]): Promise<ApplyResult> {
@@ -84,13 +85,36 @@ export async function applyResponse(db: WorkoutDB, resp: SyncResponse, sent: Mut
   let confirmed = 0, received = 0, stashed: number | undefined;
   await db.transaction('rw', tables, async () => {
     if (resp.full) {
-      // 서버가 되돌려짐(epoch 바뀜): 안 보낸 수정은 따로 보관 → 전체 다시 받기
-      const dirty = await collectMutations(db);
+      // 서버가 되돌려짐(epoch 바뀜): 안 보낸 수정은 따로 보관 → 전체 다시 받기 (S2b 검토 반영)
+      //  - 기기별 설정(소리·화면 켜 두기·마지막 백업 등)은 비우기 전에 읽어 두었다가 다시 넣음
+      //  - 이 기기가 주인인 진행 중 운동은 보관하지 않고 그대로 남겨 다시 올림 (운동 화면에서 사라지지 않게)
+      //  - 보관본은 덮어쓰지 않고 합침 (되돌리기가 두 번 일어나도 처음 보관한 수정이 남게)
+      const me = db.dev();
+      const keepSettings = (await db.table('settings').get('main')) as Row | undefined;
+      const mine = ((await db.table('workouts').toArray()) as Row[]).filter((w) => !w.endedAt && w.ownerDeviceId === me);
+      const mineKeys = new Set(mine.map((w) => String(w.id)));
+      const dirty = (await collectMutations(db)).filter((m) => !(m.table === 'workouts' && mineKeys.has(m.id)));
+      const prev = (await getKv(db)).stash ?? [];
+      const byMid = new Map([...prev, ...dirty].map((m) => [m.mid, m]));
+      const stash = [...byMid.values()];
       stashed = dirty.length;
       for (const t of SYNC_TABLES) await db.table(t).clear();
       await db.tombs.clear();
-      for (const c of resp.changes) { await writeRemote(db, c, 0); received++; }
-      await setKv(db, { since: resp.rev, epoch: resp.epoch, ...(dirty.length ? { stash: dirty } : {}), lastOkAt: new Date().toISOString() });
+      let maxH = '';
+      for (const c of resp.changes) { await writeRemote(db, c, 0); received++; if (c.hlc > maxH) maxH = c.hlc; }
+      if (maxH) db.clock.observe(maxH);
+      if (keepSettings) {
+        const cur = (await db.table('settings').get('main')) as Row | undefined;
+        const local = Object.fromEntries(LOCAL_SETTINGS_FIELDS.filter((k) => keepSettings[k] !== undefined).map((k) => [k, keepSettings[k]]));
+        if (cur) await db.table('settings').put({ ...cur, ...local, _s: { ...cur._s!, remote: true } });
+        else await db.table('settings').put({ ...keepSettings, _s: { ...keepSettings._s!, y: 1, remote: true } });
+      }
+      for (const w of mine) {
+        const { _s: s0, ...rest } = w;
+        const cur = (await db.table('workouts').get(String(w.id))) as Row | undefined;
+        await db.table('workouts').put({ ...rest, _s: { h: db.clock.tick(me), d: me, q: (s0?.q ?? 0) + 1, y: 1, ...(cur?._s?.r !== undefined ? { b: cur._s.r, r: cur._s.r } : {}), remote: true } });
+      }
+      await setKv(db, { since: resp.rev, epoch: resp.epoch, stash: stash.length ? stash : undefined, lastOkAt: new Date().toISOString() });
       return;
     }
     const sentByMid = new Map(sent.map((m) => [m.mid, m]));
@@ -128,7 +152,8 @@ export async function applyResponse(db: WorkoutDB, resp: SyncResponse, sent: Mut
 }
 
 export interface Conflict { table: string; id: string; label: string; local: Record<string, unknown>; server: Record<string, unknown>; rev: number }
-export type ChooseFn = (conflicts: Conflict[]) => Promise<Record<string, 'local' | 'server'>>;
+/** null = 취소 (연결하지 않음, 아무것도 안 바꿈) */
+export type ChooseFn = (conflicts: Conflict[]) => Promise<Record<string, 'local' | 'server'> | null>;
 const keepLocal: ChooseFn = async (cs) => Object.fromEntries(cs.map((c) => [tombKey(c.table, c.id), 'local' as const]));
 
 const same = (a: unknown, b: unknown) => JSON.stringify(sortObj(a)) === JSON.stringify(sortObj(b));
@@ -155,6 +180,12 @@ export async function firstConnect(db: WorkoutDB, transport: Transport, choose: 
     if (!same(mine, theirs)) conflicts.push({ table: c.table, id: c.id, label: String(mine.name ?? theirs.name ?? c.id), local: mine, server: theirs, rev: c.rev });
   }
   const picks = conflicts.length ? await choose(conflicts) : {};
+  if (picks === null) return { confirmed: 0, received: 0, conflicts: conflicts.length, error: 'cancelled' };
+  // 이 기기에만 있는 루틴 가운데 서버 루틴과 이름·내용이 같은 것은 중복이라 이 기기 것을 지움 (한 번도 올린 적 없어 지움 표시 불필요)
+  const strip = (r: Record<string, unknown> | undefined) => { if (!r) return ''; const { id: _i, createdAt: _c, updatedAt: _u, _s: _x, ...rest } = r; return JSON.stringify(sortObj(rest)); };
+  const serverRoutines = new Set(pull.changes.filter((c) => c.table === 'routines' && !c.deleted).map((c) => strip(c.data)));
+  const serverIds = new Set(pull.changes.map((c) => tombKey(c.table, c.id)));
+  const dupIds = ((await db.table('routines').toArray()) as Row[]).filter((r) => !serverIds.has(tombKey('routines', String(r.id))) && r._s?.r === undefined && serverRoutines.has(strip(r))).map((r) => String(r.id));
   let received = 0;
   await db.transaction('rw', [...SYNC_TABLES.map((t) => db.table(t)), db.tombs, db.kv], async () => {
     for (const c of pull.changes) {
@@ -174,20 +205,34 @@ export async function firstConnect(db: WorkoutDB, transport: Transport, choose: 
       if (cur?.y === 1 && c.deleted) continue; // 이 기기에 살아 있는 건은 올림 (서버가 판정)
       await writeRemote(db, c, cur?.q ?? 0); received++;
     }
+    for (const id of dupIds) await db.table('routines').delete(id);
+    let maxH = '';
+    for (const c of pull.changes) if (c.hlc > maxH) maxH = c.hlc;
+    if (maxH) db.clock.observe(maxH);
     await setKv(db, { since: pull.rev, epoch: pull.epoch, connected: true });
   });
   const push = await syncOnce(db, transport);
-  return { ...push, received: push.received + received, conflicts: conflicts.length };
+  return { ...push, received: push.received + received, conflicts: conflicts.length, ...(dupIds.length ? { dedup: dupIds.length } : {}) };
 }
 
 /** 한 번 동기화: 보낼 것 보내고 받은 것 반영. 처음이면 firstConnect */
 export async function syncOnce(db: WorkoutDB, transport: Transport, choose?: ChooseFn): Promise<ApplyResult & { error?: string; conflicts?: number }> {
-  const kv = await getKv(db);
-  if (!kv.epoch) return firstConnect(db, transport, choose);
-  const muts = await collectMutations(db);
-  const resp = await transport({ op: 'sync', schema: SYNC_SCHEMA, epoch: kv.epoch, since: kv.since, muts });
-  if (!resp.ok) return { confirmed: 0, received: 0, error: resp.error };
-  return applyResponse(db, resp, muts);
+  const kv0 = await getKv(db);
+  if (!kv0.epoch) return firstConnect(db, transport, choose);
+  // 한 번에 CHUNK건씩 나눠 보냄 (처음 올릴 때 요청이 너무 커지거나 서버 실행 시간을 넘지 않게)
+  const total: ApplyResult = { confirmed: 0, received: 0 };
+  for (let round = 0; round < 50; round++) {
+    const kv = await getKv(db);
+    const all = await collectMutations(db);
+    const muts = all.slice(0, CHUNK);
+    const resp = await transport({ op: 'sync', schema: SYNC_SCHEMA, epoch: kv.epoch, since: kv.since, muts });
+    if (!resp.ok) return { ...total, error: resp.error };
+    const r = await applyResponse(db, resp, muts);
+    total.confirmed += r.confirmed; total.received += r.received;
+    if (r.full) return { ...total, full: true, stashed: r.stashed };
+    if (all.length <= CHUNK || r.confirmed === 0) break;
+  }
+  return total;
 }
 
 /** 되돌리기 뒤 보관한 수정 다시 올리기: 새 epoch의 serverRev를 baseRev로 다시 잡고 dirty로 되돌림 */

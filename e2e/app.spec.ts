@@ -534,10 +534,13 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
 test.describe('S2b 양방향 동기화 (두 브라우저 + 가짜 서버, 실제 합치기 코드)', () => {
 test.use({ serviceWorkers: 'block' });
 test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용, 끝낸 운동 → PC 기록, 지움 전파', async ({ page, browser }) => {
+  test.setTimeout(120_000);
   const URL_ = 'https://script.google.com/macros/s/AKfycbzSYNCTEST' + 'b'.repeat(30) + '/exec';
   const KEY = 'S'.repeat(36) + 'Q1w2';
   const state = emptyState();
+  let down = false;
   const route = async (p: Page) => p.route(URL_, async (r) => {
+    if (down) return r.abort('internetdisconnected');
     const body = JSON.parse(r.request().postData() ?? '{}');
     let res: unknown = { ok: false, error: 'bad_key' };
     if (body.key === KEY) res = body.op === 'sync' ? handleSync(state, JSON.parse(JSON.stringify(body)), Date.now()) : body.ping ? { ok: true, ping: true } : { ok: true };
@@ -584,15 +587,36 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await expect(pc.getByLabel('다른 기기에서 진행 중')).toContainText('PC에서 짠 루틴');
   await expect(pc.getByRole('link', { name: '운동 계속하기' })).toHaveCount(0);
   await checkScreen(pc, '17-pc-remote-workout');
-  // 폰에서 끝냄 → PC 기록
+  // PC가 가져오기 → PC가 주인, 폰은 "다른 기기로 넘어갔어요" (세트는 그대로)
+  await pc.getByRole('button', { name: '이 기기로 가져오기' }).click();
+  await expect(pc).toHaveURL(/#\/workout/);
+  await expect(pc.getByText(/1\/\d+세트/)).toBeVisible();
+  await syncNowOn(pc); await syncNowOn(page);
   await page.getByRole('link', { name: '운동', exact: true }).click();
-  await page.getByRole('button', { name: '종료' }).click();
-  await syncNowOn(page); await syncNowOn(pc);
+  await expect(page.getByText(/다른 기기로 넘어갔어요/)).toBeVisible();
+  // PC에서 끝냄 → 폰 기록
+  await pc.getByRole('link', { name: '운동', exact: true }).click();
+  await pc.getByRole('button', { name: '종료' }).click();
+  await syncNowOn(pc); await syncNowOn(page);
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByRole('button', { name: /PC에서 짠 루틴/ }).first()).toBeVisible();
   await pc.getByRole('link', { name: '기록' }).click();
   await expect(pc.getByRole('button', { name: /PC에서 짠 루틴/ }).first()).toBeVisible();
   await pc.getByRole('link', { name: '홈' }).click();
   await expect(pc.getByLabel('다른 기기에서 진행 중')).toHaveCount(0);
+  // 폰이 인터넷 없이 루틴 이름을 고침 → 동기화 실패 표시 → 다시 연결되면 PC에 반영
+  down = true;
+  await page.getByRole('link', { name: '홈' }).click();
+  await page.getByRole('button', { name: '편집' }).first().click();
+  await page.getByLabel('루틴 이름').fill('PC에서 짠 루틴');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByRole('button', { name: '지금 동기화' }).click();
+  await expect(page.getByLabel('PC와 폰 동기화')).toContainText('인터넷에 연결되지 않았어요');
+  down = false;
+  await syncNowOn(page); await syncNowOn(pc);
   // PC에서 루틴 지움 → 폰에서도 사라짐
+  await pc.getByRole('link', { name: '홈' }).click();
   await pc.getByRole('button', { name: 'PC에서 짠 루틴 삭제' }).click();
   await syncNowOn(pc); await syncNowOn(page);
   await page.getByRole('link', { name: '홈' }).click();

@@ -12,7 +12,9 @@ function gas() {
   let today = '20261001';
   const props = new Map<string, string>();
   let reads = 0;
-  type F = { name: string; content: string; parent: D; trashed?: boolean };
+  type F = { name: string; content: string; parent: D; trashed?: boolean; id: string };
+  const byId = new Map<string, F>(); let nid = 0;
+  const mk = (name: string, content: string, parent: D): F => { const f = { name, content, parent, id: `f${++nid}` }; byId.set(f.id, f); return f; };
   type D = { name: string; files: F[]; folders: D[]; parent?: D; id?: string };
   const root: D = { name: 'WORK_OUT_APP', files: [], folders: [] };
   const sync: D = { name: 'sync', files: [], folders: [], parent: root };
@@ -23,8 +25,10 @@ function gas() {
     getName: () => f.name,
     getBlob: () => ({ getDataAsString: () => { reads++; return f.content; } }),
     setContent: (s: string) => { f.content = s; },
-    makeCopy: (name: string, d: ReturnType<typeof folderApi>) => { const nf = { name, content: f.content, parent: (d as { _d: D })._d }; (d as { _d: D })._d.files.push(nf); return fileApi(nf); },
-    setTrashed: () => { f.parent.files = f.parent.files.filter((x) => x !== f); },
+    makeCopy: (name: string, d: ReturnType<typeof folderApi>) => { const nf = mk(name, f.content, (d as { _d: D })._d); (d as { _d: D })._d.files.push(nf); return fileApi(nf); },
+    setTrashed: () => { f.trashed = true; f.parent.files = f.parent.files.filter((x) => x !== f); },
+    isTrashed: () => !!f.trashed,
+    getId: () => f.id,
   });
   const folderApi = (d: D): Record<string, unknown> & { _d: D } => ({
     _d: d,
@@ -33,14 +37,15 @@ function gas() {
     createFolder: (n: string) => { const nd: D = { name: n, files: [], folders: [], parent: d }; d.folders.push(nd); return folderApi(nd); },
     getFilesByName: (n: string) => iter(d.files.filter((x) => x.name === n).map(fileApi)),
     getFiles: () => iter(d.files.map(fileApi)),
-    createFile: (name: string, content: string) => { const f = { name, content, parent: d }; d.files.push(f); return fileApi(f); },
+    createFile: (name: string, content: string) => { const f = mk(name, content, d); d.files.push(f); return fileApi(f); },
   });
   const env = {
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k: string) => props.get(k) ?? null, setProperty: (k: string, v: string) => void props.set(k, v) }) },
     LockService: { getScriptLock: () => ({ waitLock: () => undefined, tryLock: () => true, releaseLock: () => undefined }) },
     ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (s: string) => ({ text: s, setMimeType() { return this; } }) },
     Utilities: { formatDate: (_d: Date, _tz: string, f: string) => (f === 'yyyyMMdd' ? today : today + '-120000'), getUuid: () => Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2) },
-    DriveApp: { getFolderById: (id: string) => { if (id !== '__INBOX_ID__') throw new Error('no folder'); return folderApi(inbox); } },
+    DriveApp: { getFolderById: (id: string) => { if (id !== '__INBOX_ID__') throw new Error('no folder'); return folderApi(inbox); }, getFileById: (id: string) => { const f = byId.get(id); if (!f) throw new Error('no file'); return fileApi(f); } },
+    console: { error: () => undefined, warn: () => undefined, log: () => undefined },
   };
   const code = buildGas();
   const api = new Function(...Object.keys(env), code + '\nreturn { doPost, setup, restoreSnapshot };')(...Object.values(env)) as { doPost: (e: unknown) => { text: string }; setup: () => void; restoreSnapshot: (d: string) => unknown };

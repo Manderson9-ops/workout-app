@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
-import { WorkoutDB, softDelete, DEFAULT_SETTINGS } from '../src/db/db';
+import { WorkoutDB, softDelete, DEFAULT_SETTINGS, importAll, exportAll } from '../src/db/db';
 import { Clock, memoryClockStore } from '../src/core/hlc';
 import { emptyState, handleSync, replaceState, changesSince } from '../src/core/syncMerge';
 import type { ServerState, SyncRequest } from '../src/core/syncMerge';
-import { syncOnce, getKv, restoreStash, collectMutations } from '../src/db/sync';
+import { syncOnce, getKv, restoreStash, collectMutations, CHUNK } from '../src/db/sync';
 import type { Transport } from '../src/db/sync';
 import { SYNC_TABLES, syncedFields, withoutStamp } from '../src/core/syncStamp';
 import { planToRoutine, startWorkout } from '../src/core/session';
@@ -135,11 +135,11 @@ describe('충돌 규칙 (D-029)', () => {
   });
   it('진행 중 운동: 가져간 뒤 옛 주인이 늦게 보낸 세트는 사본(합치기 대기)으로, 원본은 새 주인 것', async () => {
     const { transport } = server(); const A = dev('A'), B = dev('B');
-    const w: Workout = { ...startWorkout('w1', R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'A', ownerAt: '2026-09-30T10:00:00.000Z' };
+    const w: Workout = { ...startWorkout('w1', R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'A', ownerAt: '2026-09-30T10:00:00.000Z', ownerSeq: 1 };
     await A.workouts.put(w); await sync(A, transport); await sync(B, transport);
     const bw = (await B.workouts.get('w1'))!;
     bw.blocks[0]!.items[0]!.sets[0] = { weight: 60, reps: 8, warmup: false, done: true };
-    await B.workouts.put({ ...bw, ownerDeviceId: 'B', ownerAt: '2026-09-30T10:05:00.000Z' }); await sync(B, transport);
+    await B.workouts.put({ ...bw, ownerDeviceId: 'B', ownerAt: '2026-09-30T10:05:00.000Z', ownerSeq: 2 }); await sync(B, transport);
     const aw = (await A.workouts.get('w1'))!;
     aw.blocks[0]!.items[0]!.sets[0] = { weight: 60, reps: 8, warmup: false, done: true };
     aw.blocks[0]!.items[0]!.sets[1] = { weight: 62.5, reps: 8, warmup: false, done: true };
@@ -164,6 +164,82 @@ describe('충돌 규칙 (D-029)', () => {
     await sync(B, transport); await sync(A, transport);
     expect(await names(A)).toEqual(['B 새것', 'v1']);
     expect((await getKv(A)).epoch).toBe(s.state.epoch);
+  });
+});
+
+
+describe('S2b 검토 반영', () => {
+  const W = (id: string, owner: string, seq = 1): Workout => ({ ...startWorkout(id, R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: owner, ownerAt: '2026-09-30T10:00:00.000Z', ownerSeq: seq });
+  const setDone = (w: Workout, k: number, kg: number) => { w.blocks[0]!.items[0]!.sets[k] = { weight: kg, reps: 8, warmup: false, done: true }; };
+  it('최신이 아닌 화면에서 가져와도 서버에만 있던 세트를 잃지 않음', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(W('w1', 'A')); await sync(A, transport); await sync(B, transport);
+    const a = (await A.workouts.get('w1'))!; setDone(a, 0, 50); setDone(a, 1, 51); setDone(a, 2, 52); await A.workouts.put(a); await sync(A, transport);
+    const b = (await B.workouts.get('w1'))!; // B는 세트 0개인 옛 화면
+    await B.workouts.put({ ...b, ownerDeviceId: 'B', ownerSeq: 2 }); await sync(B, transport); await sync(A, transport);
+    const done = (await B.workouts.get('w1'))!.blocks[0]!.items[0]!.sets.filter((x) => x.done).map((x) => x.weight);
+    expect(done).toEqual([50, 51, 52]);
+    expect((await B.workouts.get('w1'))!.ownerDeviceId).toBe('B');
+    expect(await view(A)).toEqual(await view(B));
+  });
+  it('시계가 늦은 기기가 가져와도 되돌려지지 않음 (ownerSeq)', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B', -3_600_000);
+    await A.workouts.put(W('w1', 'A')); await sync(A, transport); await sync(B, transport);
+    const b = (await B.workouts.get('w1'))!;
+    await B.workouts.put({ ...b, ownerDeviceId: 'B', ownerAt: '2020-01-01T00:00:00.000Z', ownerSeq: 2 }); await sync(B, transport); await sync(A, transport);
+    expect((await A.workouts.get('w1'))!.ownerDeviceId).toBe('B');
+  });
+  it('전체 다시 받기: 기기별 설정·이 기기가 주인인 진행 중 운동은 남고, 보관본은 두 번 되돌려도 합쳐짐', async () => {
+    const { s, transport } = server(); const A = dev('A');
+    await A.settings.put({ ...DEFAULT_SETTINGS, soundOn: false, lastBackupAt: '2026-09-29T00:00:00.000Z' });
+    await A.workouts.put(W('w1', 'A')); await sync(A, transport);
+    const snap = changesSince(s.state, 0);
+    await A.routines.put(R('r1', '보관1'));
+    s.state = replaceState(s.state, snap); await sync(A, transport);
+    await A.routines.put(R('r2', '보관2'));
+    s.state = replaceState(s.state, snap); await sync(A, transport);
+    const st = (await A.settings.get('main'))!;
+    expect(st.soundOn).toBe(false); expect(st.lastBackupAt).toBe('2026-09-29T00:00:00.000Z');
+    expect(await A.workouts.get('w1')).toBeDefined();
+    expect((await getKv(A)).stash!.map((m) => m.id).sort()).toEqual(['r1', 'r2']);
+  });
+  it('백업 불러오기 뒤에는 처음 연결 절차 (다른 내용은 고르게, 서버 기록 다시 받기)', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.routines.put(R('r1', '서버 것')); await A.routines.put(R('r2', 'A만')); await sync(A, transport); await sync(B, transport);
+    const backup = await exportAll(B);
+    backup.routines = backup.routines.filter((r) => r.id === 'r1').map((r) => ({ ...r, name: '백업 것' }));
+    await importAll(B, backup);
+    expect((await getKv(B)).epoch).toBe(0);
+    let asked = 0;
+    await syncOnce(B, transport, async (cs) => { asked = cs.length; return Object.fromEntries(cs.map((c) => [`${c.table}/${c.id}`, 'server' as const])); });
+    expect(asked).toBe(1);
+    expect(await names(B)).toEqual(['A만', '서버 것']);
+  });
+  it('처음 연결 취소: 아무것도 안 바꾸고 다음에 다시 처음 연결', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.routines.put(R('r1', '서버 것')); await sync(A, transport);
+    await B.routines.put(R('r1', 'B 것'));
+    const r = await syncOnce(B, transport, async () => null);
+    expect(r.error).toBe('cancelled');
+    expect(await names(B)).toEqual(['B 것']);
+    expect((await getKv(B)).epoch).toBe(0);
+  });
+  it('처음 연결: 이름·내용이 같은 루틴은 중복으로 보고 하나만', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.routines.put(R('rA', '같은 루틴')); await sync(A, transport);
+    await B.routines.put(R('rB', '같은 루틴'));
+    await sync(B, transport); await sync(A, transport);
+    expect(await names(B)).toEqual(['같은 루틴']);
+    expect(await names(A)).toEqual(['같은 루틴']);
+  });
+  it(`${CHUNK}건 넘게 올릴 때 나눠 보냄`, async () => {
+    const { transport } = server(); const A = dev('A');
+    const sizes: number[] = [];
+    const spy: Transport = async (req) => { sizes.push(req.muts.length); return transport(req); };
+    await A.bodyweight.bulkPut(Array.from({ length: 650 }, (_, i) => ({ date: `2026-01-${String(i).padStart(3, '0')}`, kg: 70 })));
+    await syncOnce(A, spy);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(CHUNK);
+    expect((await collectMutations(A)).length).toBe(0);
   });
 });
 
@@ -193,4 +269,42 @@ describe('수렴 검사: 기기 3대 무작위 500가지', () => {
       for (const d of devs) d.close();
     }
   }, 240_000);
+});
+
+describe('수렴 + 세트 손실 0: 운동·가져오기·늦은 기록 포함 무작위 300가지', () => {
+  it('끝나면 모든 기기가 같고, 누가 기록한 완료 세트든 서버에 남음(원본 또는 늦은 기록 사본)', async () => {
+    let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed / 2 ** 31; };
+    const pick = <X,>(xs: X[]) => xs[Math.floor(rnd() * xs.length)]!;
+    let weight = 1;
+    for (let sc = 0; sc < 300; sc++) {
+      const { s, transport } = server();
+      const devs = [dev('A'), dev('B', 45_000), dev('C', -30_000)];
+      const recorded: number[] = [];
+      for (let step = 0; step < 14; step++) {
+        const i = Math.floor(rnd() * 3); const d = devs[i]!; const me = ['A', 'B', 'C'][i]!; T += Math.floor(rnd() * 4000);
+        const op = rnd();
+        const w = await d.workouts.get('w1');
+        // 실제 앱은 운동 ID가 기기마다 달라 겹치지 않음 → 시작은 한 기기만
+        if (op < 0.12 && !w && me === 'A') { await d.workouts.put({ ...startWorkout('w1', R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: me, ownerSeq: 1 }); }
+        else if (op < 0.45 && w && !w.endedAt && w.ownerDeviceId === me && !w.pendingMerge) {
+          const sets = w.blocks[0]!.items[0]!.sets; const k = sets.findIndex((x) => !x.done);
+          const kg = weight++; recorded.push(kg);
+          if (k >= 0) sets[k] = { weight: kg, reps: 8, warmup: false, done: true }; else sets.push({ weight: kg, reps: 8, warmup: false, done: true });
+          await d.workouts.put(w);
+        }
+        else if (op < 0.55 && w && !w.endedAt && w.ownerDeviceId !== me) { await d.workouts.put({ ...w, ownerDeviceId: me, ownerSeq: (w.ownerSeq ?? 1) + 1 }); }
+        else if (op < 0.6 && w && !w.endedAt && w.ownerDeviceId === me) { await d.workouts.put({ ...w, endedAt: new Date(T).toISOString(), timer: null }); }
+        else if (op < 0.7) { const ex = await d.routines.get('r9'); await d.routines.put(ex ? { ...ex, name: `x${step}` } : R('r9', 'n')); }
+        else { s.fail = rnd() < 0.15 ? 'afterApply' : rnd() < 0.1 ? 'before' : ''; await sync(d, transport); s.fail = ''; }
+      }
+      for (let k = 0; k < 3; k++) for (const d of devs) await sync(d, transport);
+      const v0 = await view(devs[0]!);
+      for (const d of devs.slice(1)) expect(await view(d), `시나리오 ${sc}`).toEqual(v0);
+      const onServer = new Set(Object.values(s.state.recs).filter((r) => r.table === 'workouts' && !r.deleted)
+        .flatMap((r) => ((r.data!.blocks as { items: { sets: { weight?: number; done?: boolean }[] }[] }[])).flatMap((b) => b.items.flatMap((it) => it.sets.filter((x) => x.done).map((x) => x.weight)))));
+      const lost = recorded.filter((kg) => !onServer.has(kg));
+      expect(lost, `시나리오 ${sc} 잃은 세트`).toEqual([]);
+      for (const d of devs) d.close();
+    }
+  }, 300_000);
 });

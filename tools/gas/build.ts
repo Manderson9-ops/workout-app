@@ -15,9 +15,9 @@ export function buildGas(local?: { INBOX_ID: string; EXEC_URL: string }): string
   const ts = readFileSync(join(ROOT, 'src', 'core', 'syncMerge.ts'), 'utf8');
   if (/^\s*import\s/m.test(ts)) throw new Error('syncMerge.ts는 다른 모듈을 가져오면 안 됩니다 (Apps Script)');
   // 형식을 지운 자리에 들어가는 특수 공백(U+2002 등)은 Apps Script 편집기가 못 읽어 저장이 안 됨 → 보통 공백으로
-  let js = stripTypeScriptTypes(ts, { mode: 'strip' }).replace(/[\u00a0\u2000-\u200b\u3000]/g, ' ')
-    // 숫자 구분자(60_000)는 Apps Script가 못 읽음
-    .replace(/(\d)_(?=\d)/g, '$1');
+  let js = stripTypeScriptTypes(ts, { mode: 'strip' }).replace(/[\u00a0\u2000-\u200b\u3000]/g, ' ');
+  // 숫자 구분자(60_000)는 Apps Script가 못 읽음 → syncMerge.ts에는 쓰지 않음 (문자열을 건드리지 않게 치환 대신 검사)
+  if (/\d_\d/.test(js.replace(/(['"`])(?:\\.|(?!\1).)*\1/g, ''))) throw new Error('syncMerge.ts에 숫자 구분자(예: 60_000)가 있어요');
   const names = [...js.matchAll(/^export (?:const|function) (\w+)/gm)].map((m) => m[1]);
   js = js.replace(/^export (const|function) /gm, '$1 ');
   const lib = `// ---- 자동 생성: src/core/syncMerge.ts (고치지 말 것) ----\nvar SyncMerge = (function () {\n${js}\nreturn { ${names.join(', ')} };\n})();\n`;
