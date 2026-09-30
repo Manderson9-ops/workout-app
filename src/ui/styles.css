@@ -59,6 +59,8 @@ label { display: block; font-size: 14px; color: var(--sub); margin: 12px 0 6px; 
 .plan-steps { align-items: center; gap: 6px; }
 .mini-step { display: inline-grid; grid-template-columns: 44px auto 44px; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 12px; padding: 2px; }
 .mini-step button { padding: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.warn-text { color: var(--warn); }
 .mini-step .val { min-width: 52px; text-align: center; font-weight: 600; }
 /* 내 운동 DB(영상 등급·자세 포인트)가 있는 운동의 정보 버튼 */
 .btn.info-db { background: var(--video); border-color: var(--video); color: #1b1033; }

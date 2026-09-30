@@ -34,15 +34,15 @@ export function targetReps(e: Exercise): number {
   return Math.floor((a + b) / 2);
 }
 
-/** 한 세트 시간. reps는 한쪽 기준 */
-export function setTime(e: Exercise, reps: number, p: TimeParams = DEFAULT_TIME): number {
+/** 한 세트 시간. reps는 한쪽 기준. seconds는 시간 운동의 세트당 초 (없으면 운동 기본값, D-036) */
+export function setTime(e: Exercise, reps: number, p: TimeParams = DEFAULT_TIME, seconds?: number): number {
   const spr = e.sec_per_rep ?? p.secPerRep;
   const setup = e.setup_sec ?? p.setupSec;
-  const work = e.measure === 'time' ? (e.default_seconds ?? 30) : reps * spr;
+  const work = e.measure === 'time' ? (seconds ?? e.default_seconds ?? 30) : reps * spr;
   return e.unilateral ? setup + 2 * work + p.sideSwitchSec : setup + work;
 }
 
-export interface TimedItem { exercise: Exercise; sets: number; reps: number; drops?: number; dropReps?: number }
+export interface TimedItem { exercise: Exercise; sets: number; reps: number; seconds?: number; drops?: number; dropReps?: number }
 export interface TimedBlock {
   kind: 'single' | 'group';
   items: TimedItem[];
@@ -53,7 +53,7 @@ export interface TimedBlock {
 }
 
 function itemSetTime(it: TimedItem, setIndex: number, p: TimeParams): number {
-  let t = setTime(it.exercise, it.reps, p);
+  let t = setTime(it.exercise, it.reps, p, it.seconds);
   if (it.drops && setIndex === it.sets - 1) {
     const spr = it.exercise.sec_per_rep ?? p.secPerRep;
     t += it.drops * ((it.dropReps ?? Math.max(1, Math.floor(it.reps / 2))) * spr + p.dropChangeSec);

@@ -832,8 +832,11 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   expect(await planSec.getByText(/예상 \d+:\d{2}/).textContent(), '횟수를 바꾸면 예상 시간도 다시 계산').not.toBe(est0);
 
   // 순서: 1번째 블록을 아래로 → 2번째 블록이 맨 위
-  await expect(planSec.getByRole('button', { name: '1번째 블록 위로' })).toBeDisabled();
-  await planSec.getByRole('button', { name: '1번째 블록 아래로' }).click();
+  const firstBlock = (await cards.nth(0).locator('strong').allTextContents()).join(' + ');
+  await expect(planSec.getByRole('button', { name: `${firstBlock} 위로 (지금 1번째)` })).toBeDisabled();
+  await planSec.getByRole('button', { name: `${firstBlock} 아래로 (지금 1번째)` }).click();
+  // 누른 ↓가 아직 켜져 있으면 그대로, 끝에 닿아 꺼졌으면 같은 블록의 ↑로 초점
+  await expect(planSec.getByRole('button', { name: `${firstBlock} ${(await cards.count()) > 2 ? '아래로' : '위로'} (지금 2번째)` })).toBeFocused();
   expect(await cards.nth(0).locator('strong').allTextContents()).toEqual(second);
   expect((await cards.nth(1).locator('strong').allTextContents())[0]).toBe(first);
   await expect(repsBox).toContainText(`${reps0 + 1}회`); // 옮겨도 값 유지
@@ -851,7 +854,8 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   await expect(cards.nth(n0)).toContainText('스미스머신 JM프레스');
   await expect(cards.nth(n0)).toContainText('직접 추가');
   // 추가한 운동을 맨 위로
-  for (let k = n0; k > 0; k--) await planSec.getByRole('button', { name: `${k + 1}번째 블록 위로` }).click();
+  for (let k = n0; k > 0; k--) await planSec.getByRole('button', { name: `스미스머신 JM프레스 위로 (지금 ${k + 1}번째)` }).click();
+  await expect(planSec.getByRole('button', { name: '스미스머신 JM프레스 아래로 (지금 1번째)' })).toBeFocused(); // 맨 위에 닿아 ↑가 꺼지면 ↓로 초점
   await expect(cards.nth(0)).toContainText('스미스머신 JM프레스');
   await checkScreen(page, '20-plan-edit');
 
@@ -859,12 +863,57 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await expect(page).toHaveURL(/#\/workout/);
   // 첫 블록 = 추가한 JM프레스: 내 운동 DB 정보 버튼(강조)
-  await expect(page.getByRole('link', { name: '스미스머신 JM프레스 정보 (내 운동 DB: 영상 등급·자세 포인트)' })).toBeVisible();
-  await expect(page.getByRole('link', { name: '스미스머신 JM프레스 정보 (내 운동 DB: 영상 등급·자세 포인트)' })).toHaveClass(/info-db/);
+  const dbLink = page.getByRole('link', { name: '스미스머신 JM프레스 정보 (내 운동 DB: 영상 등급·자세 포인트)' });
+  await expect(dbLink).toBeVisible();
+  await expect(dbLink).toHaveClass(/info-db/);
+  await dbLink.locator('xpath=..').screenshot({ path: `reports/screens/${test.info().project.name}-22-info-db.png` });
   // 바꾼 세트·횟수가 루틴으로 이어짐
   await page.getByRole('button', { name: new RegExp(`^${first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).first().click();
   await expect(page.getByLabel(`${first} 1세트 횟수`, { exact: true })).toHaveValue(String(reps0 + 1));
   await expect(page.getByLabel(`${first} ${sets0 + 1}세트 횟수`, { exact: true })).toBeVisible();
   await expect(page.getByLabel(`${first} ${sets0 + 2}세트 횟수`, { exact: true })).toHaveCount(0);
+  // 이두 운동은 내 운동 DB가 없음 → 흐린 기본 "정보"
+  const plain = page.getByRole('link', { name: `${first} 정보 (DB 없음)` });
+  await expect(plain).toBeVisible();
+  await expect(plain).not.toHaveClass(/info-db/);
+  await plain.locator('xpath=..').screenshot({ path: `reports/screens/${test.info().project.name}-23-info-plain.png` });
   await checkScreen(page, '21-workout-info');
+});
+
+test('플랜 바로 고치기 (D-036): 시간 운동 초 −/+ 가 예상 시간에 반영, 잠금 다시 생성해도 바꾼 횟수·다른 부위 추가 운동 유지', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const est = async () => { const t = (await planSec.getByText(/예상 \d+:\d{2}/).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
+
+  // 다른 부위(코어)의 시간 운동 추가 → 초 조절
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  await page.getByRole('dialog', { name: '운동 추가' }).getByLabel('운동 검색').fill('플랭크');
+  await page.getByRole('dialog', { name: '운동 추가' }).getByRole('button', { name: '플랭크', exact: true }).click();
+  const secBox = planSec.getByRole('group', { name: '플랭크 시간' });
+  await expect(secBox).toContainText('45초');
+  const e0 = await est();
+  for (let k = 0; k < 3; k++) await planSec.getByRole('button', { name: '플랭크 시간 늘리기' }).click();
+  await expect(secBox).toContainText('60초');
+  expect(await est(), '3세트 × 15초 늘림 → 예상 +45초').toBe(e0 + 45);
+
+  // 첫 이두 운동 횟수 바꾸고 잠금, 플랭크도 잠금 → 다시 생성
+  const first = (await planSec.locator('.card').nth(0).locator('strong').allTextContents())[0]!;
+  const repsBox = planSec.getByRole('group', { name: `${first} 횟수` });
+  const r0 = Number((await repsBox.textContent())!.match(/(\d+)회/)![1]);
+  await planSec.getByRole('button', { name: `${first} 횟수 늘리기` }).click();
+  await planSec.getByRole('button', { name: `${first} 횟수 늘리기` }).click();
+  const lockBtn = (n: string) => planSec.locator('.card').filter({ hasText: n }).getByRole('button', { name: '잠금', exact: true });
+  await lockBtn(first).first().click();
+  await lockBtn('플랭크').click();
+  await planSec.getByRole('button', { name: '다시 생성 (잠금 2개 유지)' }).click();
+  await expect(planSec.getByRole('group', { name: '플랭크 시간' })).toContainText('60초');
+  await expect(planSec.getByRole('group', { name: `${first} 횟수` })).toContainText(`${r0 + 2}회`);
+  await expect(planSec.getByRole('button', { name: '다시 생성 (잠금 2개 유지)' })).toBeVisible();
+
+  // 플랭크를 지우면 잠금 수도 줄어듦
+  await planSec.getByRole('button', { name: '플랭크 삭제' }).click();
+  await expect(planSec.getByRole('button', { name: '다시 생성 (잠금 1개 유지)' })).toBeVisible();
 });
