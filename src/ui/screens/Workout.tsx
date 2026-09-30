@@ -14,7 +14,8 @@ import { updateWorkoutAfterInputs } from '../actions';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
 
-import { unlockAudio, beep, wasAlerted, markAlerted } from '../device';
+import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
+import { diagTimerEnd } from '../diag';
 
 export function WorkoutScreen({ s }: { s: AppState }) {
   const w = activeOf(s);
@@ -44,6 +45,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     if (rem <= 10 && rem > 0 && warned.current !== key) { warned.current = key; if (s.settings.soundOn) beep(660, 120); }
     if (rem === 0 && !wasAlerted(key)) {
       markAlerted(key); setEnded(true);
+      diagTimerEnd(key, s.settings.soundOn, audioState());
       if (s.settings.soundOn) { beep(880, 180); beep(880, 180, 0.3); beep(1175, 350, 0.6); }
     }
   }, [rem, w?.timer?.endsAt]);

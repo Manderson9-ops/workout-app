@@ -3,6 +3,7 @@
  */
 import { useEffect } from 'preact/hooks';
 import { flushPending } from './store';
+import { diag } from './diag';
 
 let ctx: AudioContext | undefined;
 
@@ -15,6 +16,9 @@ export function unlockAudio(): void {
     if (ctx.state !== 'running') void ctx.resume();
   } catch { /* 소리 불가 */ }
 }
+
+/** 소리 장치 상태 (running이 아니면 소리가 안 남). 진단용 대리 지표 */
+export const audioState = () => (ctx ? ctx.state : 'none');
 
 export function beep(freq: number, ms: number, when = 0): void {
   if (!ctx || ctx.state !== 'running') return;
@@ -39,6 +43,7 @@ export function useAudioUnlock(): void {
 /** 운동 중이면 어느 화면에 있든 화면을 켜 둠. 앱으로 돌아오면 다시 요청 (iOS 18.4+ 홈 화면 앱) */
 export function useWakeLock(on: boolean): void {
   useEffect(() => {
+    if (on && !('wakeLock' in navigator)) diag('wake', { m: '이 브라우저는 화면 꺼짐 방지를 지원하지 않음', ok: false });
     if (!on || !('wakeLock' in navigator)) return;
     let lock: WakeLockSentinel | undefined;
     let alive = true;
@@ -48,7 +53,9 @@ export function useWakeLock(on: boolean): void {
         const l = await navigator.wakeLock.request('screen');
         if (!alive) { void l.release(); return; }
         lock = l;
-      } catch { /* 배터리 부족 등으로 거부 */ }
+        diag('wake', { m: 'request', ok: true });
+        l.addEventListener('release', () => { if (alive) diag('wake', { m: 'released' }); });
+      } catch (e) { diag('wake', { m: `request 실패: ${(e as Error).name}`, ok: false }); /* 배터리 부족 등으로 거부 */ }
     };
     void req();
     const vis = () => { if (document.visibilityState === 'visible') void req(); };

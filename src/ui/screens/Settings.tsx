@@ -7,6 +7,7 @@ import { APP_VERSION } from '../../core/version';
 import { setMeta } from '../actions';
 import type { Settings } from '../../db/db';
 import { BackupSection } from './BackupSection';
+import { DiagSection } from './DiagSection';
 import { go } from '../nav';
 
 export function SettingsScreen({ s }: { s: AppState }) {
@@ -48,6 +49,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
         </div>
       ))}
       <BackupSection s={s} />
+      <DiagSection s={s} />
       <h2>도구</h2>
       <button onClick={() => go('#/tools')}>원판 계산기 · 1RM 계산기</button>
       <p class="sub small">앱 버전 {APP_VERSION}</p>

@@ -4,10 +4,13 @@
  * 불러오기는 전체 교체라서, 깨진 파일이 기존 데이터를 지우지 않도록 **항목 하나하나까지** 검사한다.
  */
 import type { Routine, Workout } from './session';
-import { PARTS, EQUIPMENT, PATTERNS } from './types';
+import { PARTS, EQUIPMENT, PATTERNS } from './types.ts';
+import { diagEntryOk, DIAG_MAX } from './diag.ts';
+import type { DiagEntry } from './diag.ts';
 
 export const BACKUP_APP = 'workout-app';
-export const BACKUP_SCHEMA = 1;
+/** 1: P4 첫 형식. 2: 진단 기록(diag) 추가 (D-026) */
+export const BACKUP_SCHEMA = 2;
 
 export interface BackupData {
   routines: Routine[];
@@ -16,14 +19,17 @@ export interface BackupData {
   custom: Record<string, unknown>[];
   settings: Record<string, unknown>[];
   bodyweight: { date: string; kg: number }[];
+  /** 진단 기록 (schema 2, D-024). 운동 내용·입력값 없음 */
+  diag: DiagEntry[];
 }
-export const BACKUP_KEYS: (keyof BackupData)[] = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight'];
-export interface BackupFile { app: typeof BACKUP_APP; schema: number; appVersion: string; exportedAt: string; counts: Record<keyof BackupData, number>; data: BackupData }
+export const BACKUP_KEYS: (keyof BackupData)[] = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight', 'diag'];
+/** device: 만든 기기 (진단의 기기 ID와 이름, 예: iPhone · Safari 26.0). 비밀 값은 절대 넣지 않음 (D-025) */
+export interface BackupFile { app: typeof BACKUP_APP; schema: number; appVersion: string; exportedAt: string; device?: { id: string; label: string }; counts: Record<keyof BackupData, number>; data: BackupData }
 
 export const countsOf = (data: BackupData) => Object.fromEntries(BACKUP_KEYS.map((k) => [k, data[k].length])) as BackupFile['counts'];
 
-export function makeBackup(data: BackupData, appVersion: string, now: string): BackupFile {
-  return { app: BACKUP_APP, schema: BACKUP_SCHEMA, appVersion, exportedAt: now, counts: countsOf(data), data };
+export function makeBackup(data: BackupData, appVersion: string, now: string, device?: { id: string; label: string }): BackupFile {
+  return { app: BACKUP_APP, schema: BACKUP_SCHEMA, appVersion, exportedAt: now, ...(device ? { device } : {}), counts: countsOf(data), data };
 }
 
 export const backupFileName = (now: Date) =>
@@ -105,7 +111,7 @@ export function parseBackup(text: string): ParseResult {
   if (isObj(f.counts) && BACKUP_KEYS.some((k) => f.counts[k] !== undefined && f.counts[k] !== data[k].length)) return { ok: false, error: '백업 파일이 중간에 잘렸거나 바뀌었어요 (개수가 맞지 않음)' };
   const checks: [keyof BackupData, (x: unknown) => boolean, string, string | null][] = [
     ['workouts', workoutOk, '운동 기록', 'id'], ['routines', routineOk, '루틴', 'id'], ['meta', metaOk, '운동 표시(즐겨찾기 등)', 'exerciseId'],
-    ['custom', customOk, '직접 추가한 운동', 'id'], ['settings', settingsOk, '설정', 'key'], ['bodyweight', bwOk, '체중 기록', 'date'],
+    ['custom', customOk, '직접 추가한 운동', 'id'], ['settings', settingsOk, '설정', 'key'], ['bodyweight', bwOk, '체중 기록', 'date'], ['diag', diagEntryOk, '진단 기록', null],
   ];
   for (const [k, ok, label, key] of checks) {
     const bad = data[k].findIndex((x) => !ok(x));
@@ -113,13 +119,17 @@ export function parseBackup(text: string): ParseResult {
     if (key && !unique(data[k], key)) return { ok: false, error: `${label} 중 같은 항목이 두 번 들어 있어요` };
   }
   if (data.settings.length > 1) return { ok: false, error: '설정이 두 개 들어 있어요' };
+  if (data.diag.length > DIAG_MAX * 2) return { ok: false, error: '진단 기록이 너무 많아요' };
+  if (f.device !== undefined && !(isObj(f.device) && str(f.device.id) && (f.device.id as string).length <= 12 && typeof f.device.label === 'string' && (f.device.label as string).length <= 80)) return { ok: false, error: '기기 정보가 잘못됐어요' };
   if (data.workouts.filter((w) => !w.endedAt).length > 1) return { ok: false, error: '진행 중인 운동이 두 개 들어 있어요' };
   return { ok: true, file: { ...f, counts: countsOf(data), data } };
 }
 
-/** 예전 형식 → 현재 형식 (지금은 1뿐) */
+/** 예전 형식 → 현재 형식. 1 → 2: 진단 기록 빈 목록 */
 export function migrateBackup(f: BackupFile): BackupFile {
-  return f;
+  let out = f;
+  if (out.schema < 2 && isObj(out.data)) out = { ...out, schema: 2, data: { ...out.data, diag: Array.isArray((out.data as Partial<BackupData>).diag) ? out.data.diag : [] } };
+  return out;
 }
 
 /** 불러오기 뒤 마지막 백업 시각: 지금 기기 값, 파일 안 값, 파일을 만든 시각 중 가장 최근 (복원했다고 7일 알림이 다시 뜨지 않게) */

@@ -58,10 +58,11 @@ export async function flushKey(key: string): Promise<void> {
 const inflight = new Set<Promise<unknown>>();
 export function trackInflight(p: Promise<unknown>): void { inflight.add(p); void p.finally(() => inflight.delete(p)); }
 let flushDepth = 0;
-export async function flushPending(): Promise<void> {
+/** 돌려주는 값: 이번에 먼저 저장한 입력 수 (진단용) */
+export async function flushPending(): Promise<number> {
   // 대기 입력을 저장하는 도중 그 저장이 다시 flushPending을 부르면(세트 변경 경로), 바깥 호출이 이미 처리 중이므로 바로 돌아감.
   // 입력칸 두 개가 서로를 기다리는 멈춤을 막음 (검토 3차)
-  if (flushDepth > 0) return;
+  if (flushDepth > 0) return 0;
   flushDepth++;
   try {
   // 버튼을 누르면 입력칸 포커스가 먼저 빠지며 저장이 시작되므로, 그 저장이 끝날 때까지 기다린다.
@@ -70,6 +71,7 @@ export async function flushPending(): Promise<void> {
   const fns = [...pending.values()]; pending.clear();
   for (const fn of fns) await fn();
   await Promise.allSettled(before);
+  return fns.length + before.length;
   } finally { flushDepth--; }
 }
 

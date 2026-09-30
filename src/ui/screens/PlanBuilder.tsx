@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { catalog, templates } from '../catalog';
 import { generatePlan } from '../../core/planner';
+import { diag } from '../diag';
 import type { Plan, PlanBlock, PlanItem, PlanRequest, Priority, Grouping } from '../../core/planner';
 import { PARTS } from '../../core/types';
 import type { Part, BuiltExercise } from '../../core/types';
@@ -83,7 +84,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
       // 모두 잠갔으면 잠근 운동만으로 다시 계산 (D-015)
       req.lockedOnly = items.length > 0 && items.every((i) => locks.has(i.exerciseId));
     } else setLocks(new Set());
-    const p = generatePlan(req, all);
+    const t0 = performance.now(); const p = generatePlan(req, all); diag('plan', { v: performance.now() - t0 });
     setPlan(p);
     setName(defaultName(req));
   };

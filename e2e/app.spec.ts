@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, mkdtempSync, copyFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { checkSyncDir } from '../tools/sync_check';
 
 mkdirSync('reports/screens', { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `reports/screens/${test.info().project.name}-${name}.png` });
@@ -334,4 +337,40 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
 });
+test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, 끄기', async ({ page }) => {
+  await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
+  page.on('dialog', (d) => void d.accept());
+  // 비밀 값 흉내: 자동 보내기 키는 localStorage에만. 어떤 파일에도 나가면 안 됨 (D-025)
+  await page.evaluate(() => localStorage.setItem('send.key', 'SECRET-KEY-123'));
+  await makeRoutine(page, ['등'], '30분'); // 플랜 생성 → 진단 'plan'
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await page.getByRole('link', { name: '설정' }).click();
+  const box = page.getByLabel('진단 요약');
+  await expect(box).toContainText('11 플랜 속도');
+  await expect(box).toContainText('오류 없음');
+  await checkScreen(page, '15-settings-diag');
+  await page.getByText('최근 기록 50건 보기').click();
+  await expect(page.getByText(/앱 시작 · .*브라우저 탭/).first()).toBeVisible();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PC로 보내기 (파일)' }).click()]);
+  await expect(page.getByText(/PC로 보낼 파일을 내려받았어요/)).toBeVisible();
+  const text = readFileSync(await dl.path(), 'utf8');
+  expect(text).not.toContain('SECRET-KEY-123');
+  const j = JSON.parse(text);
+  expect(j.schema).toBe(2);
+  expect(j.device.label).toMatch(/Safari|Chrome/);
+  expect(j.data.diag.map((x: { k: string }) => x.k)).toEqual(expect.arrayContaining(['start', 'plan']));
+  // PC 쪽 검사 도구로 왕복
+  const dir = mkdtempSync(join(tmpdir(), 'e2e-sync-'));
+  checkSyncDir(dir);
+  copyFileSync(await dl.path(), join(dir, 'inbox', dl.suggestedFilename()));
+  const { results } = checkSyncDir(dir);
+  expect(results).toEqual([{ file: dl.suggestedFilename(), ok: true }]);
+  expect(readFileSync(join(dir, 'checked', dl.suggestedFilename().replace('.json', '.summary.md')), 'utf8')).toContain('11 플랜 속도');
+  // 끄면 더 이상 쌓이지 않음
+  await page.getByLabel('진단 기록 남기기').uncheck();
+  expect(await page.evaluate(() => localStorage.getItem('diag.off'))).toBe('1');
+});
+
 void makeRoutine;
