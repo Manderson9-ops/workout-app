@@ -15,7 +15,7 @@ import type { TimedBlock } from '../../core/time';
 import { GradeBadge, ExercisePicker, Sheet, mmss } from '../components';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
-import { stepSets, stepReps, moveBlock, addBlock, regenerateWithLocks, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
+import { stepSets, stepReps, moveBlock, addBlock, regenerateWithLocks, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
 const NEXT: Record<string, Priority | undefined> = { none: 'high', high: 'normal', normal: 'low', low: undefined };
@@ -91,8 +91,10 @@ export function PlanBuilder({ s }: { s: AppState }) {
       if ([...locks].some((id) => !ids.has(id))) setLocks(new Set([...locks].filter((id) => ids.has(id))));
     } else { setLocks(new Set()); p = generatePlan(req, all); }
     diag('plan', { v: performance.now() - t0 });
+    const noop = !!plan && p.reasons[0] === KEEP_ALL;
     setPlan(p);
-    setName(defaultName(req));
+    if (noop) setShowReasons(true); // 그대로 둔 이유가 보이게
+    else setName(defaultName(req));
   };
   const defaultName = (req: PlanRequest) => `${req.parts.map((p) => p.part).join('+')}${req.targetMinutes ? ` ${req.targetMinutes}분` : ''}`;
   const applyTemplate = (id: string, day: number) => {
