@@ -110,6 +110,20 @@ describe('앱 기본 추천 순서 (M-14)', () => {
     expect(ids).not.toContain('sissy_squat');
     expect(legs.reasons.some((r) => r.includes('M-27'))).toBe(true);
   });
+  it('M-27: 시시 스쿼트를 즐겨찾기해도 다관절 스쿼트가 빠지지 않음, 개수 안에서 안 걸리면 이유 문구 없음, 검증 함수가 초과를 잡음', () => {
+    const q: PlanRequest = { parts: [{ part: '하체', priority: 'high' }], level: '중급', favorites: ['sissy_squat'] };
+    const fav = generatePlan(q, real);
+    const ids = fav.blocks.flatMap((b) => b.items.map((i) => i.exerciseId));
+    expect(ids).toContain('smith_squat');
+    expect(validatePlan(fav, q, real)).toEqual([]);
+    const combo = generatePlan({ parts: [{ part: '하체', priority: 'normal' }, { part: '코어', priority: 'high' }], level: '중급' }, real);
+    const legIds = combo.blocks.flatMap((b) => b.items).filter((i) => i.part === '하체');
+    if (legIds.length <= 2) expect(combo.reasons.some((r) => r.includes('M-27'))).toBe(false);
+    const bad = generatePlan({ parts: [{ part: '하체', priority: 'high' }], level: '중급' }, real);
+    const quad = bad.blocks.flatMap((b) => b.items).find((i) => i.exerciseId === 'leg_extension')!;
+    const forged = { ...bad, blocks: [...bad.blocks, { ...bad.blocks[0]!, items: [{ ...quad, exerciseId: 'sissy_squat', name: '시시 스쿼트' }] }] };
+    expect(validatePlan(forged as never, { parts: [{ part: '하체', priority: 'high' }], level: '중급' }, real)).toContain('하체 대퇴사두 운동 2개 초과 (M-27)');
+  });
   it('M-28: 전완은 굽히기·펴기 묶음이 달라 둘 다 들어감', () => {
     const fa = generatePlan({ parts: [{ part: '전완·악력', priority: 'high' }], level: '중급' }, real);
     expect(fa.blocks.flatMap((b) => b.items.map((i) => i.exerciseId)).slice(0, 2)).toEqual(['seated_barbell_wrist_curl', 'seated_barbell_wrist_ext']);

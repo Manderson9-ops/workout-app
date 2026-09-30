@@ -150,8 +150,18 @@ function buildPools(req: PlanRequest, all: BuiltExercise[], reasons: string[]): 
     // M-27: 부위 안에서 같은 주 근육 운동 개수 상한 (하체: 대퇴사두 2개. 영상이 대퇴사두만 다뤄 S가 몰려도 햄스트링·둔근이 빠지지 않게)
     const cap = MUSCLE_CAP[p.part] ?? {};
     let capped = false;
-    const overCap = (e: BuiltExercise) => { const m = e.muscles[0]!; const n = cap[m]; return n !== undefined && pool.filter((x) => x.ex.muscles[0] === m).length >= n; };
-    const fits = (e: BuiltExercise) => !families.has(e.family) && !(isHeavyHinge(e) && heavyInPool) && !(overCap(e) && (capped = true));
+    const base = parts.length >= 5 ? 2 : p.priority === 'high' ? 3 : 2;
+    // 상한의 마지막 자리는 다관절(예: 스쿼트)이 하나도 없으면 다관절 몫으로 남김 (시시 스쿼트를 즐겨찾기해도 스쿼트가 빠지지 않게)
+    const overCap = (e: BuiltExercise) => {
+      const m = e.muscles[0]!; const n = cap[m];
+      if (n === undefined) return false;
+      const have = pool.filter((x) => x.ex.muscles[0] === m);
+      if (have.length >= n) return true;
+      return have.length === n - 1 && e.mechanics !== 'compound' && !have.some((x) => x.ex.mechanics === 'compound')
+        && remaining.some((c) => c.ex.id !== e.id && c.ex.muscles[0] === m && c.ex.mechanics === 'compound' && !families.has(c.ex.family));
+    };
+    // 이유 문구는 실제 플랜 개수(base) 안에서 걸렸을 때만
+    const fits = (e: BuiltExercise) => !families.has(e.family) && !(isHeavyHinge(e) && heavyInPool) && !(overCap(e) && (pool.length < base && (capped = true), true));
     const remaining = [...ok];
     const limit = req.lockedOnly && lockedCount ? lockedCount : lockedCount + poolSize;
     while (pool.length < limit && remaining.length) {
@@ -163,7 +173,6 @@ function buildPools(req: PlanRequest, all: BuiltExercise[], reasons: string[]): 
       take(remaining.splice(idx, 1)[0]!, substituted);
     }
     if (capped) reasons.push(`${p.part}: ${Object.entries(cap).map(([m, n]) => `${m} 운동은 ${n}개까지`).join(', ')} (M-27)`);
-    const base = parts.length >= 5 ? 2 : p.priority === 'high' ? 3 : 2;
     states.push({ part: p.part, priority: p.priority, order: p.order, pool, baseCount: Math.max(lockedCount, Math.min(base, pool.length)), lockedCount, lockedSets });
   }
   return states;

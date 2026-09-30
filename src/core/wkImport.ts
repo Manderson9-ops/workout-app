@@ -74,10 +74,11 @@ export function runImport(inp: ImportInput): ImportResult {
   }
   const aliasByName = new Map(inp.aliases.map((a) => [normalizeName(a.name), a]));
 
+  const usedSkips = new Set<SkipItem>(), usedSkipNames = new Set<SkipName>();
   const skipNames = new Map((inp.skipNames ?? []).map((s) => [normalizeName(s.name), s]));
   const resolve = (name: string): { ids: string[]; via: string } | { ids: null; failed: boolean; reason: string } => {
     const sk = skipNames.get(normalizeName(name));
-    if (sk && allows(sk.decision, false)) return { ids: null, failed: false, reason: `반영 안 함: ${sk.reason}` };
+    if (sk && allows(sk.decision, false)) { usedSkipNames.add(sk); return { ids: null, failed: false, reason: `반영 안 함: ${sk.reason}` }; }
     const a = aliasByName.get(normalizeName(name));
     if (a) {
       if (!allows(a.decision, a.status === 'PENDING_MERGE')) return { ids: null, failed: false, reason: `결정 ${a.decision} 대기/거절로 미적용` };
@@ -128,7 +129,7 @@ export function runImport(inp: ImportInput): ImportResult {
       for (const it of part && !ignored ? tl.items : []) {
         tierItemCount++;
         const skip = (inp.skipItems ?? []).find((s) => s.video_id === r.video_id && s.exercise === it.exercise && (!s.grade || s.grade === it.grade));
-        if (skip && allows(skip.decision, false)) { unapplied.push({ video_id: r.video_id, exercise: it.exercise, grade: it.grade, reason: `반영 안 함: ${skip.reason}` }); continue; }
+        if (skip && allows(skip.decision, false)) { usedSkips.add(skip); unapplied.push({ video_id: r.video_id, exercise: it.exercise, grade: it.grade, reason: `반영 안 함: ${skip.reason}` }); continue; }
         const res = resolve(it.exercise);
         if (res.ids === null) {
           if (res.failed) unresolved.push(`[${tl.topic}] ${it.exercise}: ${res.reason}`);
@@ -176,6 +177,8 @@ export function runImport(inp: ImportInput): ImportResult {
     return ok;
   });
   for (const x of inp.rules) if (!usedRules.has(x)) unresolved.push(`[규칙 미사용] ${x.video_id} ${x.exercise} ${x.grade}`);
+  for (const x of inp.skipItems ?? []) if (!usedSkips.has(x)) unresolved.push(`[규칙 미사용] 빼기 ${x.video_id} ${x.exercise} ${x.grade ?? ''}`.trim());
+  for (const x of inp.skipNames ?? []) if (!usedSkipNames.has(x)) unresolved.push(`[규칙 미사용] 빼기 이름 ${x.name}`);
   for (const f of new Set(inp.base.map((e) => e.family))) if (!inp.families[f]) unresolved.push(`[family 이름 없음] ${f}`);
 
   return { grades, guides, templates, combos, unapplied, unresolved, mapped, tierItemCount };
