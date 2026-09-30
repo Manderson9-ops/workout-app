@@ -79,9 +79,13 @@ table.trend th, table.trend td { padding: 4px 2px; text-align: center; border-bo
 table.trend th:first-child, table.trend td:first-child { text-align: left; color: var(--sub); }
 input.date { min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--card2); color: var(--text); padding: 0 10px; font-size: 16px; }
 
+/* S3: 메뉴의 개선 메모 버튼 (메뉴 칸과 같은 모양) */
+.nav .nav-fb { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--sub); font-size: 12px; }
+
 /* S1 (D-030): PC 넓은 화면. 900px 이상이면 왼쪽 세로 메뉴 + 넓은 본문, 카드 2열. "폰 화면으로 보기"(html.phone-view)면 폰과 똑같이 */
 @media (min-width: 900px) {
   html:not(.phone-view) .nav { top: 0; bottom: 0; right: auto; width: 180px; height: auto; flex-direction: column; justify-content: flex-start; padding: 16px 8px; gap: 4px; border-top: 0; border-right: 1px solid var(--line); }
+  html:not(.phone-view) .nav .nav-fb { flex: 0 0 52px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0 12px; border-radius: 12px; font-size: 15px; margin-top: auto; }
   html:not(.phone-view) .nav a { flex: 0 0 52px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0 12px; border-radius: 12px; font-size: 15px; }
   html:not(.phone-view) .nav a.on { background: var(--card2); }
   html:not(.phone-view) main { max-width: 1040px; margin: 0 0 0 200px; padding: 24px 32px 120px; }

@@ -132,15 +132,29 @@ describe('DB 층: 모든 저장에 자동 표시, 지우기는 지움 표시 (S2
     expect(s._s.f.level).toBe(hlcZero('devM'));
     expect(s._s.f).not.toHaveProperty('soundOn');
     expect(((await db.bodyweight.get('2026-09-30')) as unknown as { _s?: unknown })._s).toBeDefined();
-    expect(db.verno).toBe(4);
+    expect(db.verno).toBe(5);
     // 옛 진행 중 운동은 이 기기가 주인
     expect(await db.workouts.get('w-open')).toMatchObject({ ownerDeviceId: 'devM', ownerAt: '2026-09-30T09:00:00.000Z' });
+    db.close();
+  });
+  it('v4 → v5 옮김 (S3): 개선 메모 표 추가, 기록은 그대로, 받은 위치(since)만 0으로 (연결·보관본 유지)', async () => {
+    const name2 = `mig5b-${Math.random()}`;
+    const old = new Dexie(name2);
+    old.version(4).stores({ routines: 'id, updatedAt', workouts: 'id, startedAt, endedAt', meta: 'exerciseId', custom: 'id', settings: 'key', bodyweight: 'date', diag: '++id, t', tombs: 'k, table', kv: 'k' });
+    await old.table('routines').put({ ...routine, _s: { h: hlcZero('devM'), d: 'devM', y: 0, q: 1, r: 7 } });
+    await old.table('kv').put({ k: 'sync', v: { epoch: 3, since: 42, stash: { muts: [] } } });
+    old.close();
+    const db = new WorkoutDB(name2, { clock: new Clock(memoryClockStore(), () => 5_000), deviceId: () => 'devM' });
+    expect(db.verno).toBe(5);
+    expect(await db.feedback.count()).toBe(0);
+    expect((await db.routines.get('r1'))?.name).toBe('등');
+    expect((await db.kv.get('sync'))?.v).toEqual({ epoch: 3, since: 0, stash: { muts: [] } });
     db.close();
   });
   it('백업 불러오기: 파일 안 _s는 떼고 새로 표시, 진행 중 운동은 이 기기가 주인', async () => {
     const db = mkDb('devI');
     const w = { ...startWorkout('w9', routine, '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'other', _s: { h: 'x', d: 'o', q: 1, y: 0, r: 5 } };
-    await importAll(db, { routines: [], workouts: [w as never], meta: [], custom: [], settings: [], bodyweight: [], diag: [] });
+    await importAll(db, { routines: [], workouts: [w as never], meta: [], custom: [], settings: [], bodyweight: [], diag: [], feedback: [] });
     const got = (await db.workouts.get('w9')) as unknown as { ownerDeviceId: string; _s: { y: number; d: string } };
     expect(got.ownerDeviceId).toBe('devI');
     expect(got._s).toMatchObject({ y: 1, d: 'devI' });

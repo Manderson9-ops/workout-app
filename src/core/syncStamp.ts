@@ -11,14 +11,14 @@ import { hlcZero } from './hlc.ts';
 export interface SyncStamp { h: string; d: string; q: number; y: 0 | 1; b?: number; r?: number; f?: Record<string, string> }
 
 /** 동기화하는 표. diag(진단)는 보내기만, tombs(지움 표시)는 따로 */
-export const SYNC_TABLES = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight'] as const;
+export const SYNC_TABLES = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight', 'feedback'] as const;
 export type SyncTable = (typeof SYNC_TABLES)[number];
 /** 항목 단위로 합치는 표 */
 export const FIELD_TABLES: readonly string[] = ['settings', 'meta'];
 /** 기기마다 다른 설정 (동기화하지 않음, D-029) */
 export const LOCAL_SETTINGS_FIELDS: readonly string[] = ['key', 'lastBackupAt', 'storageNoticeSeen', 'soundOn', 'keepAwake'];
 /** 표마다 기본 키 이름 (지움 표시·동기화 단위) */
-export const PK: Record<SyncTable, string> = { routines: 'id', workouts: 'id', meta: 'exerciseId', custom: 'id', settings: 'key', bodyweight: 'date' };
+export const PK: Record<SyncTable, string> = { routines: 'id', workouts: 'id', meta: 'exerciseId', custom: 'id', settings: 'key', bodyweight: 'date', feedback: 'id' };
 
 type Rec = Record<string, unknown> & { _s?: SyncStamp & { remote?: boolean } };
 

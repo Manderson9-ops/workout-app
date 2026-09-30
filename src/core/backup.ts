@@ -7,10 +7,12 @@ import type { Routine, Workout } from './session';
 import { PARTS, EQUIPMENT, PATTERNS } from './types.ts';
 import { diagEntryOk, DIAG_MAX } from './diag.ts';
 import type { DiagEntry } from './diag.ts';
+import { feedbackOk } from './feedback.ts';
+import type { Feedback } from './feedback.ts';
 
 export const BACKUP_APP = 'workout-app';
-/** 1: P4 첫 형식. 2: 진단 기록(diag) 추가 (D-026) */
-export const BACKUP_SCHEMA = 2;
+/** 1: P4 첫 형식. 2: 진단 기록(diag) 추가 (D-026). 3: 개선 메모(feedback) 추가 (S3) */
+export const BACKUP_SCHEMA = 3;
 
 export interface BackupData {
   routines: Routine[];
@@ -21,8 +23,10 @@ export interface BackupData {
   bodyweight: { date: string; kg: number }[];
   /** 진단 기록 (schema 2, D-024). 운동 내용·입력값 없음 */
   diag: DiagEntry[];
+  /** 개선 메모 (schema 3, S3) */
+  feedback: Feedback[];
 }
-export const BACKUP_KEYS: (keyof BackupData)[] = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight', 'diag'];
+export const BACKUP_KEYS: (keyof BackupData)[] = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight', 'diag', 'feedback'];
 /** device: 만든 기기 (진단의 기기 ID와 이름, 예: iPhone · Safari 26.0). 비밀 값은 절대 넣지 않음 (D-025) */
 export interface BackupFile { app: typeof BACKUP_APP; schema: number; appVersion: string; exportedAt: string; device?: { id: string; label: string }; counts: Record<keyof BackupData, number>; data: BackupData }
 
@@ -111,7 +115,7 @@ export function parseBackup(text: string): ParseResult {
   if (isObj(f.counts) && BACKUP_KEYS.some((k) => f.counts[k] !== undefined && f.counts[k] !== data[k].length)) return { ok: false, error: '백업 파일이 중간에 잘렸거나 바뀌었어요 (개수가 맞지 않음)' };
   const checks: [keyof BackupData, (x: unknown) => boolean, string, string | null][] = [
     ['workouts', workoutOk, '운동 기록', 'id'], ['routines', routineOk, '루틴', 'id'], ['meta', metaOk, '운동 표시(즐겨찾기 등)', 'exerciseId'],
-    ['custom', customOk, '직접 추가한 운동', 'id'], ['settings', settingsOk, '설정', 'key'], ['bodyweight', bwOk, '체중 기록', 'date'], ['diag', diagEntryOk, '진단 기록', null],
+    ['custom', customOk, '직접 추가한 운동', 'id'], ['settings', settingsOk, '설정', 'key'], ['bodyweight', bwOk, '체중 기록', 'date'], ['diag', diagEntryOk, '진단 기록', null], ['feedback', feedbackOk, '개선 메모', 'id'],
   ];
   for (const [k, ok, label, key] of checks) {
     const bad = data[k].findIndex((x) => !ok(x));
@@ -125,10 +129,11 @@ export function parseBackup(text: string): ParseResult {
   return { ok: true, file: { ...f, counts: countsOf(data), data } };
 }
 
-/** 예전 형식 → 현재 형식. 1 → 2: 진단 기록 빈 목록 */
+/** 예전 형식 → 현재 형식. 1 → 2: 진단 기록 빈 목록. 2 → 3: 개선 메모 빈 목록 */
 export function migrateBackup(f: BackupFile): BackupFile {
   let out = f;
   if (out.schema < 2 && isObj(out.data)) out = { ...out, schema: 2, data: { ...out.data, diag: Array.isArray((out.data as Partial<BackupData>).diag) ? out.data.diag : [] } };
+  if (out.schema < 3 && isObj(out.data)) out = { ...out, schema: 3, data: { ...out.data, feedback: Array.isArray((out.data as Partial<BackupData>).feedback) ? out.data.feedback : [] } };
   return out;
 }
 
