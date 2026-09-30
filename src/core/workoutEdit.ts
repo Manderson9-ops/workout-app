@@ -45,7 +45,7 @@ type Keyed = SetLog & { _k?: string };
 let keySeq = 0;
 const newKey = () => `k${++keySeq}`;
 export function withKeys(w: Workout): Workout {
-  return { ...w, blocks: w.blocks.map((b) => ({ ...b, items: b.items.map((it) => ({ ...it, sets: it.sets.map((s) => ({ ...s, _k: newKey() }) as SetLog) })) })) };
+  return { ...w, blocks: w.blocks.map((b) => ({ ...b, items: b.items.map((it) => ({ ...it, sets: it.sets.map((s) => ({ ...s, _k: (s as Keyed)._k ?? newKey() }) as SetLog) })) })) };
 }
 export const keyOf = (s: SetLog) => (s as Keyed)._k ?? '';
 const stripKey = (s: SetLog): SetLog => { const { _k: _x, ...rest } = s as Keyed; return rest; };
