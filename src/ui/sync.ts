@@ -14,6 +14,7 @@ import type { SyncStamp } from '../core/syncStamp';
 import { getSendConfig } from './autoSend';
 import { lsGet, lsSet, APP } from './appName';
 import { diag } from './diag';
+import { applyFeedbackStatus } from './feedbackStatus';
 
 export type SyncPhase = 'off' | 'idle' | 'syncing' | 'error';
 export interface SyncStatus { phase: SyncPhase; lastOkAt?: string; pending: number; error?: string; stash: number; conflicts?: Conflict[]; received?: number }
@@ -88,7 +89,7 @@ export function syncNow(reason: string): Promise<void> {
         else {
           set({ phase: 'idle', received: r.received });
           // 받은 것이 있을 때만 화면 다시 읽기 (확정만 된 경우는 화면이 바뀌지 않음)
-          if (r.received || r.full || r.dedup) await load();
+          if (r.received || r.full || r.dedup) { await load(); void applyFeedbackStatus().catch(() => {}); }
           diag('send', { m: `동기화 (${reason}) 받음 ${r.received} 확정 ${r.confirmed}${r.full ? ' 전체' : ''}`, ok: true });
         }
       } catch (e) { set({ phase: 'error', error: (e as Error).message }); }
@@ -166,7 +167,7 @@ export async function replaceServerWithLocal(before?: () => Promise<void>): Prom
   try {
     // 불러오기에서 오류가 나도 finally가 멈춤을 풀도록 try 안에서
     if (before) await before();
-    const r = await fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: c.key, op: 'replace', recs: await localRecs() }), signal: ctl.signal });
+    const r = await fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: c.key, op: 'replace', recs: await localRecs(), tables: [...SYNC_TABLES] }), signal: ctl.signal });
     let j: { ok: boolean; error?: string };
     try { j = (await r.json()) as { ok: boolean; error?: string }; } catch { j = { ok: false, error: 'bad_response' }; }
     if (!j.ok) { replacing = false; await disableSync(); return j; }

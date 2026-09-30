@@ -44,6 +44,9 @@ export function feedbackOk(x: unknown): boolean {
 
 interface ChangelogVersion { version: string; feedback_ids?: string[]; deferred?: { id: string; reason: string }[] }
 
+/** 지운 메모의 ID도 넘겨야 번호가 다시 쓰이지 않음 (지운 02를 새 메모가 다시 쓰면 PC 가져오기·CHANGELOG 상태가 섞임) */
+export const usedFeedbackIds = (live: string[], tombIds: string[]) => [...live, ...tombIds];
+
 /**
  * 배포된 CHANGELOG로 상태 갱신: 반영된 메모 → "반영됨 (버전)", 보류 → "보류 (이유)".
  * 바뀌는 메모만 돌려줌 (그대로인 것은 저장하지 않게)
@@ -57,7 +60,8 @@ export function applyChangelog(items: Feedback[], versions: ChangelogVersion[]):
   const out: Feedback[] = [];
   for (const f of items) {
     if (done.has(f.id)) { const note = `${done.get(f.id)} 에 반영`; if (f.status !== '반영됨' || f.note !== note) out.push({ ...f, status: '반영됨', note }); }
-    else if (deferred.has(f.id)) { const note = deferred.get(f.id)!; if (f.status !== '보류' || f.note !== note) out.push({ ...f, status: '보류', note }); }
+    // 더 새 버전 기기가 반영됨으로 바꾼 것을 옛 버전이 보류로 되돌리지 않게
+    else if (deferred.has(f.id) && f.status !== '반영됨') { const note = deferred.get(f.id)!; if (f.status !== '보류' || f.note !== note) out.push({ ...f, status: '보류', note }); }
   }
   return out;
 }

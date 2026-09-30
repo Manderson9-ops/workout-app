@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { newFeedbackId, feedbackOk, applyChangelog } from '../src/core/feedback';
+import { newFeedbackId, feedbackOk, applyChangelog, usedFeedbackIds } from '../src/core/feedback';
+import { replaceState, emptyState } from '../src/core/syncMerge';
 import type { Feedback } from '../src/core/feedback';
 import { pullFeedback } from '../tools/feedback_pull';
 import { parseBackup, makeBackup } from '../src/core/backup';
@@ -57,5 +58,34 @@ describe('개선 메모 (S3)', () => {
     expect(readdirSync(join(dir, 'feedback', 'inbox'))).toEqual(['FB-20260930-ab12-01.json']);
     expect(JSON.parse(readFileSync(join(dir, 'feedback', 'inbox', 'FB-20260930-ab12-01.json'), 'utf8')).text).toBe('휴식 끝 소리가 작아요');
     expect(pullFeedback(dir).written).toEqual([]);
+  });
+  it('지운 메모의 번호는 다시 쓰지 않음 (지움 표시 ID까지 봄)', () => {
+    const d = new Date(2026, 8, 30, 10);
+    expect(newFeedbackId(d, 'ab12', usedFeedbackIds(['FB-20260930-ab12-01'], ['FB-20260930-ab12-02']))).toBe('FB-20260930-ab12-03');
+  });
+  it('반영됨은 옛 버전의 보류로 되돌리지 않음 (버전이 섞인 기기끼리 번갈아 바꾸지 않게)', () => {
+    const out = applyChangelog([fb('FB-20260930-ab12-01', { status: '반영됨', note: '0.7.0 에 반영' })], [{ version: '0.6.0', deferred: [{ id: 'FB-20260930-ab12-01', reason: '나중에' }] }]);
+    expect(out).toEqual([]);
+  });
+  it('서버 바꾸기: 보낸 기기가 모르는 표(예: 0.5.0의 feedback)는 남김, 아는 표는 교체', () => {
+    const st = emptyState();
+    st.recs['feedback/FB-1'] = { table: 'feedback', id: 'FB-1', data: { id: 'FB-1' }, hlc: 'h', dev: 'A', rev: 1 };
+    st.recs['routines/r1'] = { table: 'routines', id: 'r1', data: { id: 'r1' }, hlc: 'h', dev: 'A', rev: 2 };
+    st.rev = 2;
+    const old = replaceState(st, [{ table: 'routines', id: 'r2', data: { id: 'r2' }, hlc: 'h', dev: 'B', rev: 0 }]);
+    expect(Object.keys(old.recs).sort()).toEqual(['feedback/FB-1', 'routines/r2']);
+    const neu = replaceState(st, [], ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight', 'feedback']);
+    expect(Object.keys(neu.recs)).toEqual([]);
+    expect(old.rev).toBeGreaterThan(st.rev);
+  });
+  it('feedback:pull: 정해진 칸만 옮기고, records.json이 깨졌으면 안내 오류', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fbpull2-'));
+    mkdirSync(join(dir, 'sync', 'db'), { recursive: true });
+    writeFileSync(join(dir, 'sync', 'db', 'records.json'), JSON.stringify({ recs: { a: { table: 'feedback', id: 'FB-20260930-ab12-01', data: { ...fb('FB-20260930-ab12-01'), _s: { h: 'x' }, extra: 'secret' } } } }));
+    pullFeedback(dir);
+    const out = JSON.parse(readFileSync(join(dir, 'feedback', 'inbox', 'FB-20260930-ab12-01.json'), 'utf8'));
+    expect(Object.keys(out).sort()).toEqual(['createdAt', 'id', 'screen', 'status', 'text']);
+    writeFileSync(join(dir, 'sync', 'db', 'records.json'), '{"recs": {');
+    expect(() => pullFeedback(dir)).toThrow(/records.json을 읽지 못했어요/);
   });
 });

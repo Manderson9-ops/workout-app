@@ -131,7 +131,7 @@ function replace_(req) {
       list.sort(function (a, b) { return a.getName() < b.getName() ? 1 : -1; });
       for (var i = 3; i < list.length; i++) list[i].setTrashed(true);
     }
-    var state = SyncMerge.replaceState(loaded.state, req.recs);
+    var state = SyncMerge.replaceState(loaded.state, req.recs, Array.isArray(req.tables) ? req.tables.map(String) : undefined);
     setHint_('pending');
     save_(folder, loaded.file, state);
     setHint_(state.epoch + ':' + state.rev);

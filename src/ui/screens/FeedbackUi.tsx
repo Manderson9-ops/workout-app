@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, activeOf } from '../store';
 import { Sheet } from '../components';
-import { newFeedbackId, FB_TEXT_MAX } from '../../core/feedback';
+import { newFeedbackId, FB_TEXT_MAX, usedFeedbackIds } from '../../core/feedback';
+import { db } from '../store';
+import { lsGet, lsRemove } from '../appName';
+import { FB_NOTICE_KEY } from '../feedbackStatus';
 import type { Feedback } from '../../core/feedback';
 import { deviceId } from '../deviceId';
 import { APP_VERSION } from '../../core/version';
@@ -17,9 +20,17 @@ export function FeedbackNavItem() {
 /** 어느 화면에서든 개선 메모 (S3). 화면·진행 중 운동·앱 버전이 자동으로 붙고, 동기화로 PC에 감 */
 export function FeedbackButton({ s }: { s: AppState }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => { const f = () => { setDone(''); setOpen(true); }; openers.add(f); return () => { openers.delete(f); }; }, []);
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (open) setTimeout(() => box.current?.focus(), 50); }, [open]);
   const [text, setText] = useState('');
   const [done, setDone] = useState('');
+  useEffect(() => { const f = () => { setDone(''); setOpen(true); }; openers.add(f); return () => { openers.delete(f); }; }, []);
+  // 반영됨·보류 알림 (CHANGELOG 반영 뒤 한 번)
+  useEffect(() => {
+    const show = () => { const n = lsGet(FB_NOTICE_KEY); if (n) { lsRemove(FB_NOTICE_KEY); setDone(n); } };
+    show(); window.addEventListener('fb-notice', show); return () => window.removeEventListener('fb-notice', show);
+  }, []);
+  useEffect(() => { if (!done) return; const t = setTimeout(() => setDone(''), 6000); return () => clearTimeout(t); }, [done]);
   const screen = location.hash || '#/';
   const active = activeOf(s);
   return (
@@ -27,10 +38,10 @@ export function FeedbackButton({ s }: { s: AppState }) {
       {open && (
         <Sheet title="개선 메모" onClose={() => setOpen(false)}>
           <p class="sub small">지금 화면({screen}){active ? ` · 운동 「${active.name}」` : ''}에서 불편한 점·바라는 점을 적어 주세요. PC로 전달돼 다음 개선에 반영돼요.</p>
-          <textarea aria-label="개선 메모 내용" rows={5} maxLength={FB_TEXT_MAX} value={text} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)} style={{ width: '100%', boxSizing: 'border-box', fontSize: '16px' }} />
+          <textarea ref={box} aria-label="개선 메모 내용" rows={5} maxLength={FB_TEXT_MAX} value={text} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)} style={{ width: '100%', boxSizing: 'border-box', fontSize: '16px' }} />
           <button class="primary" style={{ marginTop: '8px' }} disabled={!text.trim()} onClick={async () => {
             const fb: Feedback = {
-              id: newFeedbackId(new Date(), deviceId(), s.feedback.map((f) => f.id)),
+              id: newFeedbackId(new Date(), deviceId(), usedFeedbackIds(s.feedback.map((f) => f.id), (await db.tombs.where('table').equals('feedback').toArray()).map((t) => t.id))),
               createdAt: new Date().toISOString(), screen: screen.slice(0, 200),
               context: `${APP_VERSION}${active ? ` · 운동 ${active.name}` : ''}`.slice(0, 300),
               text: text.trim().slice(0, FB_TEXT_MAX), status: '접수',
@@ -38,9 +49,9 @@ export function FeedbackButton({ s }: { s: AppState }) {
             await mutate((d) => d.feedback.put(fb));
             setText(''); setDone(`저장했어요 (${fb.id})`); setOpen(false);
           }}>저장</button>
-          {done && <p role="status" class="small">{done}</p>}
         </Sheet>
       )}
+      {done && <div role="status" class="fb-toast" onClick={() => setDone('')}>{done}</div>}
     </>
   );
 }

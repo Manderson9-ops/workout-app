@@ -225,10 +225,16 @@ export function handleSync(state: ServerState, req: SyncRequest, nowMs: number):
   return { ok: true, epoch: state.epoch, rev: state.rev, results, changes: changesSince(state, req.since) };
 }
 
-/** 서버를 백업(또는 스냅숏)으로 바꿈: epoch를 올리고 rev는 줄지 않게, mutationId 기록은 비움 */
-export function replaceState(state: ServerState, recs: ServerRec[]): ServerState {
+/** 0.5.0까지 앱이 아는 표. 바꾸기 요청에 tables가 없으면(옛 앱) 이 표들만 바꾸고 나머지(예: feedback)는 남김 */
+export const LEGACY_TABLES = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight'];
+/**
+ * 서버를 백업(또는 스냅숏)으로 바꿈: epoch를 올리고 rev는 줄지 않게, mutationId 기록은 비움.
+ * tables: 보낸 기기가 아는 표. 그 밖의 표 기록은 그대로 둠 (옛 앱이 서버를 바꿔도 새 표 기록이 사라지지 않게)
+ */
+export function replaceState(state: ServerState, recs: ServerRec[], tables: string[] = LEGACY_TABLES): ServerState {
   let rev = Math.max(state.rev, ...recs.map((r) => r.rev), 0);
   const map: Record<string, ServerRec> = {};
+  for (const r of Object.values(state.recs)) if (!tables.includes(r.table)) map[recKey(r.table, r.id)] = { ...r, rev: ++rev };
   for (const r of recs) map[recKey(r.table, r.id)] = { ...r, rev: ++rev };
   return { epoch: state.epoch + 1, rev, recs: map, muts: {}, mutOrder: [] };
 }

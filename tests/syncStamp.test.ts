@@ -151,6 +151,16 @@ describe('DB 층: 모든 저장에 자동 표시, 지우기는 지움 표시 (S2
     expect((await db.kv.get('sync'))?.v).toEqual({ epoch: 3, since: 0, stash: { muts: [] } });
     db.close();
   });
+  it('되돌리기(0.6 → 0.5): Dexie 4는 더 높은 버전 DB도 열어서 기존 표를 그대로 읽음 (feedback 표는 무시)', async () => {
+    const name = `rb5-${Math.random()}`;
+    const db = new WorkoutDB(name, { clock: new Clock(memoryClockStore(), () => 5_000), deviceId: () => 'devM' });
+    await db.routines.put(routine); db.close();
+    const old = new Dexie(name);
+    old.version(4).stores({ routines: 'id, updatedAt', workouts: 'id, startedAt, endedAt', meta: 'exerciseId', custom: 'id', settings: 'key', bodyweight: 'date', diag: '++id, t', tombs: 'k, table', kv: 'k' });
+    await old.open();
+    expect((await old.table('routines').get('r1'))?.name).toBe('등');
+    old.close();
+  });
   it('백업 불러오기: 파일 안 _s는 떼고 새로 표시, 진행 중 운동은 이 기기가 주인', async () => {
     const db = mkDb('devI');
     const w = { ...startWorkout('w9', routine, '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'other', _s: { h: 'x', d: 'o', q: 1, y: 0, r: 5 } };

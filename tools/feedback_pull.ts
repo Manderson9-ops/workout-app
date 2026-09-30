@@ -17,7 +17,9 @@ export function pullFeedback(appDir: string): PullResult {
   const processed = join(appDir, 'feedback', 'processed');
   mkdirSync(inbox, { recursive: true });
   if (!existsSync(db)) return { written: [], skipped: 0, invalid: 0, total: 0 };
-  const state = JSON.parse(readFileSync(db, 'utf8')) as { recs: Record<string, { table: string; id: string; data?: Record<string, unknown>; deleted?: boolean }> };
+  let raw: unknown;
+  try { raw = JSON.parse(readFileSync(db, 'utf8')); } catch (e) { throw new Error(`records.json을 읽지 못했어요 (드라이브가 아직 내려받는 중일 수 있어요, 잠시 뒤 다시): ${(e as Error).message}`); }
+  const state = raw as { recs: Record<string, { table: string; id: string; data?: Record<string, unknown>; deleted?: boolean }> };
   const res: PullResult = { written: [], skipped: 0, invalid: 0, total: 0 };
   for (const r of Object.values(state.recs ?? {})) {
     if (r.table !== 'feedback' || r.deleted || !r.data) continue;
@@ -27,7 +29,9 @@ export function pullFeedback(appDir: string): PullResult {
     if (f.status !== '접수') { res.skipped++; continue; }
     const name = `${f.id}.json`;
     if (existsSync(join(inbox, name)) || existsSync(join(processed, name))) { res.skipped++; continue; }
-    writeFileSync(join(inbox, name), JSON.stringify(f, null, 2), 'utf8');
+    // 정해진 항목만 (서버 기록의 다른 칸은 옮기지 않음)
+    const out: Feedback = { id: f.id, createdAt: f.createdAt, screen: f.screen, ...(f.context !== undefined ? { context: f.context } : {}), text: f.text, status: f.status };
+    writeFileSync(join(inbox, name), JSON.stringify(out, null, 2), 'utf8');
     res.written.push(f.id);
   }
   return res;
@@ -35,7 +39,8 @@ export function pullFeedback(appDir: string): PullResult {
 
 if (process.argv[1]?.replace(/\\/g, '/').endsWith('tools/feedback_pull.ts')) {
   const dir = process.env.APP_DIR ?? 'G:\\내 드라이브\\WORK_OUT_APP';
-  const r = pullFeedback(dir);
+  let r: PullResult;
+  try { r = pullFeedback(dir); } catch (e) { console.error((e as Error).message); process.exit(1); }
   console.log(`메모 ${r.total}개 중 새로 꺼냄 ${r.written.length}개 (이미 있음·처리 중 ${r.skipped}, 형식 이상 ${r.invalid}) → ${join(dir, 'feedback', 'inbox')}`);
   for (const id of r.written) console.log(`  + ${id}`);
 }

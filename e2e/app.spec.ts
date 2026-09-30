@@ -701,6 +701,13 @@ test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙
   await checkScreen(page, '22-feedback-list');
   await card.getByRole('button', { name: /지우기/ }).click();
   await expect(card).toHaveCount(0);
+  // 지운 뒤 새로 쓰면 번호가 겹치지 않음 (02), 저장 알림은 시트 밖에 보임
+  await page.getByRole('button', { name: '개선 메모 쓰기' }).click();
+  await expect(page.getByLabel('개선 메모 내용')).toBeFocused();
+  await page.getByLabel('개선 메모 내용').fill('두 번째');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: /저장했어요 \(FB-\d{8}-[a-z0-9]+-02\)/i })).toBeVisible();
+  await expect(page.getByLabel(/^개선 메모 FB-\d{8}-[a-z0-9]+-02$/i)).toContainText('두 번째');
 });
 
 void makeRoutine;
