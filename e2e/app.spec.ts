@@ -602,4 +602,43 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
 });
 });
 
+test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 화면으로 보기', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const pc = await ctx.newPage();
+  pc.on('dialog', (d) => void d.accept());
+  await pc.goto('./#/');
+  await pc.getByRole('button', { name: '알겠어요' }).click();
+  const nav = await pc.locator('nav.nav').boundingBox();
+  expect(nav!.x).toBe(0);
+  expect(nav!.width).toBeLessThan(200);
+  expect(nav!.height).toBeGreaterThan(nav!.width);
+  // 플랜: 왼쪽 조건, 오른쪽 결과
+  await pc.getByRole('link', { name: '플랜' }).click();
+  await pc.getByRole('button', { name: '등 선택 안 함' }).click();
+  await pc.getByRole('button', { name: '45분' }).click();
+  await pc.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const form = await pc.getByRole('button', { name: '플랜 만들기', exact: true }).boundingBox();
+  const res = await pc.getByRole('region', { name: '생성된 플랜' }).boundingBox();
+  expect(res!.x).toBeGreaterThan(form!.x + form!.width - 5);
+  await checkScreen(pc, '19-pc-plan');
+  // 저장하고 시작 → 무게 입력 후 Enter = 다음 칸(횟수), Ctrl+Enter = 현재 세트 완료
+  await pc.getByRole('button', { name: '저장', exact: true }).click();
+  await pc.getByRole('button', { name: '저장하고 시작' }).click();
+  const w = pc.locator('input[aria-label$="1세트 무게"]').first();
+  await w.click(); await w.fill('40'); await w.press('Enter');
+  expect(await pc.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toMatch(/1세트 횟수$/);
+  await pc.keyboard.press('Control+Enter');
+  await expect(pc.getByRole('timer')).toBeVisible();
+  await checkScreen(pc, '20-pc-workout');
+  // 폰 화면으로 보기
+  await pc.getByRole('link', { name: '설정' }).click();
+  await pc.getByLabel('폰 화면으로 보기').check();
+  const main = await pc.locator('main').boundingBox();
+  expect(main!.width).toBeLessThanOrEqual(430);
+  const nav2 = await pc.locator('nav.nav').boundingBox();
+  expect(nav2!.width).toBeLessThanOrEqual(430);
+  await pc.getByLabel('폰 화면으로 보기').uncheck();
+  await ctx.close();
+});
+
 void makeRoutine;

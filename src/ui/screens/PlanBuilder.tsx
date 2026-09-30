@@ -111,6 +111,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
   return (
     <main>
       <h1>플랜 만들기</h1>
+      {/* PC 넓은 화면: 왼쪽 조건, 오른쪽 결과 (D-030) */}
+      <div class="wide-2"><div>
       <label>부위 (누를 때마다 우선순위 높음 → 보통 → 낮음 → 빼기)</label>
       <div class="row wrap">
         {PARTS.map((p) => {
@@ -153,6 +155,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
         <button class="primary big" disabled={!nParts} onClick={() => generate(false)}>{nParts ? '플랜 만들기' : '부위를 먼저 고르세요'}</button>
       </div>
 
+      </div><div>
       {plan && (
         <section aria-label="생성된 플랜">
           <div class="row between" style={{ marginTop: '16px' }}>
@@ -217,6 +220,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
         </Sheet>
       )}
       {!plan && <p class="sub small" style={{ marginTop: '14px' }}>{byId.size}개 운동 중에서 등급·수준·장비·시간에 맞게 고릅니다. 영상 등급이 없는 운동은 "추정"으로 표시돼요.</p>}
+      </div></div>
     </main>
   );
 }

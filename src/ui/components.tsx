@@ -56,6 +56,15 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
     <div style={{ position: 'relative' }}>
       <input inputMode={integer ? 'numeric' : 'decimal'} aria-label={label} value={shown} placeholder="-" style={{ textAlign: 'center', paddingRight: '26px' }}
         onFocus={() => setText(shown)} onBlur={() => { setText(null); void flush(); }}
+        onKeyDown={(e) => {
+          // PC 키보드: Enter로 다음 입력칸 (D-030)
+          if (e.key !== 'Enter' || e.isComposing) return;
+          e.preventDefault();
+          const all = [...document.querySelectorAll<HTMLInputElement>('input:not([type=checkbox]):not([type=file]):not([disabled])')].filter((x) => x.offsetParent !== null);
+          const i = all.indexOf(e.currentTarget as HTMLInputElement);
+          (all[i + 1] ?? (e.currentTarget as HTMLInputElement)).focus();
+          if (!all[i + 1]) (e.currentTarget as HTMLInputElement).blur();
+        }}
         onInput={(e) => {
           const t = (e.target as HTMLInputElement).value.replace(',', '.');
           setText(t);

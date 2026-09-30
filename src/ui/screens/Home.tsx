@@ -44,6 +44,7 @@ export function Home({ s }: { s: AppState }) {
           <p class="small">플랜 만들기에서 부위·등급·시간을 고르면 자동으로 짜 드려요.</p>
         </div>
       )}
+      <div class="wide-cards">
       {s.routines.map((r) => (
         <div class="card" key={r.id}>
           <div class="row between">
@@ -60,7 +61,9 @@ export function Home({ s }: { s: AppState }) {
           </div>
         </div>
       ))}
+      </div>
       {recent.length > 0 && <h2>최근 운동</h2>}
+      <div class="wide-cards">
       {recent.map((w) => {
         const sets = w.blocks.flatMap((b) => b.items.flatMap((i) => i.sets)).filter((x) => x.done && !x.warmup).length;
         return (
@@ -70,6 +73,7 @@ export function Home({ s }: { s: AppState }) {
           </div>
         );
       })}
+      </div>
     </main>
   );
 }

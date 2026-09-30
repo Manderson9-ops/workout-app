@@ -32,6 +32,12 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [plate, setPlate] = useState<number | null>(null);
   /** 운동 화면이 뜬 시각 (휴식이 끝날 때 이 화면에 있었는지 판정용, 진단) */
   const shownAt = useRef(Date.now());
+  // PC 키보드: Ctrl+Enter(맥 ⌘+Enter) = 현재 세트 완료 (D-030)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.querySelector<HTMLButtonElement>('[aria-label="현재 세트 완료"]')?.click(); } };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
