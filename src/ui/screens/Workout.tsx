@@ -14,7 +14,9 @@ import { updateWorkoutAfterInputs } from '../actions';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
 
-import { unlockAudio, beep, wasAlerted, markAlerted } from '../device';
+import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
+import { diagTimerEnd } from '../diag';
+import { sendNow } from '../autoSend';
 
 export function WorkoutScreen({ s }: { s: AppState }) {
   const w = activeOf(s);
@@ -25,6 +27,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [picker, setPicker] = useState<{ mode: 'swap'; b: number; i: number } | { mode: 'add' } | null>(null);
   const [ended, setEnded] = useState(false);
   const [plate, setPlate] = useState<number | null>(null);
+  /** 운동 화면이 뜬 시각 (휴식이 끝날 때 이 화면에 있었는지 판정용, 진단) */
+  const shownAt = useRef(Date.now());
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
@@ -44,6 +48,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     if (rem <= 10 && rem > 0 && warned.current !== key) { warned.current = key; if (s.settings.soundOn) beep(660, 120); }
     if (rem === 0 && !wasAlerted(key)) {
       markAlerted(key); setEnded(true);
+      diagTimerEnd(key, s.settings.soundOn, audioState(), shownAt.current);
       if (s.settings.soundOn) { beep(880, 180); beep(880, 180, 0.3); beep(1175, 350, 0.6); }
     }
   }, [rem, w?.timer?.endsAt]);
@@ -112,7 +117,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const finish = async () => {
     const left = prog.totalSets - prog.doneSets;
     if (!confirm(left ? `아직 ${left}세트 남았어요. 운동을 끝낼까요?` : '운동을 끝낼까요?')) return;
-    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/');
+    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout');
   };
   const delta = prog.deltaSec;
 
@@ -190,7 +195,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             {nextRest ? <span class="small" style={{ fontWeight: 500 }}> → 휴식 {nextRest.sec}초</span> : null}
           </button>
         ) : (
-          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); }}>모든 세트 완료 · 운동 끝내기</button>
+          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); }}>모든 세트 완료 · 운동 끝내기</button>
         )}
       </div>
 

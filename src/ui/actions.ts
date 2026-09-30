@@ -2,6 +2,7 @@
  * 화면에서 쓰는 저장 동작 모음
  */
 import { mutate, activeOf, historyOf, db, setWorkoutLocal, askPersistOnce, flushPending } from './store';
+import { diag } from './diag';
 import type { AppState } from './store';
 import { newId } from '../db/db';
 import { startWorkout, planToRoutine } from '../core/session';
@@ -28,7 +29,8 @@ export async function updateWorkout(id: string, fn: (w: Workout) => Workout) {
 
 /** 입력 중인 값 먼저 저장한 뒤 변경 (세트 완료 등) */
 export async function updateWorkoutAfterInputs(id: string, fn: (w: Workout) => Workout) {
-  await flushPending();
+  const n = await flushPending();
+  if (n) diag('input', { v: n, m: '버튼 전에 입력 먼저 저장' });
   await updateWorkout(id, fn);
 }
 

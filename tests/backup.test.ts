@@ -17,6 +17,7 @@ async function seed(db: WorkoutDB) {
   await db.custom.put({ id: 'custom_1', name_ko: '내 운동', family: 'custom_1', part: '가슴', muscles: ['가슴'], pattern: 'H_PUSH', mechanics: 'compound', equipment: ['machine'], custom: true, createdAt: now });
   await db.settings.put({ ...DEFAULT_SETTINGS, level: '상급' });
   await db.bodyweight.put({ date: '2026-09-30', kg: 72.5 });
+  await db.diag.add({ t: now, k: 'timer', d: 'ab12', v: 120 });
 }
 
 describe('백업 파일', () => {
@@ -25,7 +26,7 @@ describe('백업 파일', () => {
     await seed(db);
     const before = await exportAll(db);
     const file = makeBackup(before, '0.1.0', now);
-    expect(file.counts).toEqual({ routines: 1, workouts: 1, meta: 1, custom: 1, settings: 1, bodyweight: 1 });
+    expect(file.counts).toEqual({ routines: 1, workouts: 1, meta: 1, custom: 1, settings: 1, bodyweight: 1, diag: 1 });
     const text = JSON.stringify(file);
     await Promise.all(db.tables.map((t) => t.clear()));
     expect(await db.workouts.count()).toBe(0);
@@ -52,7 +53,7 @@ describe('백업 파일', () => {
     expect(parseBackup('{"app":"other"}')).toEqual({ ok: false, error: '이 앱의 백업 파일이 아니에요' });
     expect(parseBackup('{"app":"workout-app"}')).toEqual({ ok: false, error: '백업 형식 버전이 없어요' });
     expect(parseBackup(JSON.stringify({ app: 'workout-app', schema: BACKUP_SCHEMA + 1 }))).toMatchObject({ ok: false, error: expect.stringContaining('더 새 버전') });
-    const base = makeBackup({ routines: [], workouts: [], meta: [], custom: [], settings: [], bodyweight: [] }, '0.1.0', now);
+    const base = makeBackup({ routines: [], workouts: [], meta: [], custom: [], settings: [], bodyweight: [], diag: [] }, '0.1.0', now);
     expect(parseBackup(JSON.stringify({ ...base, data: { ...base.data, workouts: undefined } }))).toMatchObject({ ok: false, error: expect.stringContaining('깨졌') });
     expect(parseBackup(JSON.stringify({ ...base, data: { ...base.data, workouts: [{ id: 1 }] }, counts: undefined }))).toMatchObject({ ok: false, error: expect.stringContaining('운동 기록') });
     expect(parseBackup(JSON.stringify({ ...base, data: { ...base.data, routines: [{ id: 'r' }] }, counts: undefined }))).toMatchObject({ ok: false, error: expect.stringContaining('루틴') });
@@ -86,18 +87,18 @@ describe('저장소 버전 올리기 (v1 → v2): 기존 기록 유지 (AGENTS �
     expect((await v2.settings.get('main'))?.level).toBe('초보');
     await v2.bodyweight.put({ date: '2026-09-30', kg: 70 });
     expect(await v2.bodyweight.count()).toBe(1);
-    expect(v2.verno).toBe(2);
+    expect(v2.verno).toBe(3);
     v2.close();
   });
 });
 
 describe('깊은 검사: 깨진 백업이 기존 데이터를 지우지 않게 (검토 M1)', () => {
-  const good = () => makeBackup({ routines: [routine], workouts: [w], meta: [{ exerciseId: 'a', favorite: true }], custom: [], settings: [{ ...DEFAULT_SETTINGS }], bodyweight: [{ date: '2026-09-30', kg: 72 }] }, '0.2.0', now);
+  const good = () => makeBackup({ routines: [routine], workouts: [w], meta: [{ exerciseId: 'a', favorite: true }], custom: [], settings: [{ ...DEFAULT_SETTINGS }], bodyweight: [{ date: '2026-09-30', kg: 72 }], diag: [] }, '0.2.0', now);
   const bad = (mut: (f: ReturnType<typeof good>) => void) => { const f = JSON.parse(JSON.stringify(good())); mut(f); f.counts = undefined; return parseBackup(JSON.stringify(f)); };
   it('정상 파일은 통과, 개수는 실제 길이로 다시 셈', () => {
     const r = parseBackup(JSON.stringify(good()));
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.file.counts).toEqual({ routines: 1, workouts: 1, meta: 1, custom: 0, settings: 1, bodyweight: 1 });
+    if (r.ok) expect(r.file.counts).toEqual({ routines: 1, workouts: 1, meta: 1, custom: 0, settings: 1, bodyweight: 1, diag: 0 });
   });
   it.each([
     ['블록이 빈 객체', (f: any) => { f.data.workouts[0].blocks = [{}]; }, '운동 기록'],
@@ -128,7 +129,7 @@ describe('깊은 검사: 깨진 백업이 기존 데이터를 지우지 않게 (
 
 describe('불러오기 뒤 마지막 백업 시각 (검토 M2)', () => {
   it('지금 값·파일 값·파일 만든 시각 중 가장 최근', () => {
-    const f = makeBackup({ routines: [], workouts: [], meta: [], custom: [], settings: [{ ...DEFAULT_SETTINGS, lastBackupAt: '2026-09-01T00:00:00.000Z' }], bodyweight: [] }, '0.2.0', '2026-09-20T00:00:00.000Z');
+    const f = makeBackup({ routines: [], workouts: [], meta: [], custom: [], settings: [{ ...DEFAULT_SETTINGS, lastBackupAt: '2026-09-01T00:00:00.000Z' }], bodyweight: [], diag: [] }, '0.2.0', '2026-09-20T00:00:00.000Z');
     expect(mergedLastBackupAt('2026-09-25T00:00:00.000Z', f)).toBe('2026-09-25T00:00:00.000Z');
     expect(mergedLastBackupAt(undefined, f)).toBe('2026-09-20T00:00:00.000Z');
   });

@@ -12,6 +12,7 @@ import { exportAll, importAll, getSettings } from '../db/db';
 import { makeBackup, backupFileName, parseBackup, mergedLastBackupAt } from '../core/backup';
 import type { BackupFile } from '../core/backup';
 import { APP_VERSION } from '../core/version';
+import { diag, flushDiag, deviceInfo } from './diag';
 
 export type SaveResult = 'shared' | 'downloaded' | 'cancelled' | 'retry';
 
@@ -22,7 +23,8 @@ async function build(): Promise<{ file: File; state: AppState }> {
   await flushPending();
   const state = getState();
   const now = new Date();
-  const data = makeBackup(await exportAll(db), APP_VERSION, now.toISOString());
+  await flushDiag();
+  const data = makeBackup(await exportAll(db), APP_VERSION, now.toISOString(), deviceInfo());
   return { file: new File([JSON.stringify(data)], backupFileName(now), { type: 'application/json' }), state };
 }
 
@@ -55,17 +57,17 @@ export async function saveBackupFile(): Promise<SaveResult> {
   if (nav.canShare?.({ files: [f] })) {
     try {
       await navigator.share({ files: [f] }); // title을 넣으면 아이폰이 텍스트 파일을 하나 더 만드는 경우가 있어 파일만
-      await markBackedUp();
+      await markBackedUp(); diag('backup', { m: 'shared', ok: true });
       return 'shared';
     } catch (e) {
       const name = (e as Error).name;
       if (name === 'AbortError') return 'cancelled';
-      if (name === 'NotAllowedError') { prepared = { file: f, state: getState() }; return 'retry'; }
+      if (name === 'NotAllowedError') { prepared = { file: f, state: getState() }; diag('backup', { m: 'NotAllowedError → 한 번 더', ok: false }); return 'retry'; }
       // 그 밖의 오류는 다운로드로
     }
   }
   download(f);
-  await markBackedUp();
+  await markBackedUp(); diag('backup', { m: 'downloaded', ok: true });
   return 'downloaded';
 }
 
@@ -84,6 +86,7 @@ export async function readBackupFile(file: File): Promise<{ ok: true; file: Back
 export async function restoreBackup(file: BackupFile): Promise<void> {
   await flushPending();
   const current = (await getSettings(db)).lastBackupAt;
+  await flushDiag();
   await importAll(db, file.data, { lastBackupAt: mergedLastBackupAt(current, file) });
   prepared = null;
   await load();

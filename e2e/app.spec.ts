@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Locator } from '@playwright/test';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, mkdtempSync, copyFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { checkSyncDir } from '../tools/sync_check';
 
 mkdirSync('reports/screens', { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `reports/screens/${test.info().project.name}-${name}.png` });
@@ -334,4 +337,150 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
 });
+test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, 끄기', async ({ page }) => {
+  await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
+  page.on('dialog', (d) => void d.accept());
+  // 비밀 값 흉내: 자동 보내기 키는 localStorage에만. 어떤 파일에도 나가면 안 됨 (D-025)
+  await page.evaluate(() => localStorage.setItem('send.cfg', 'https://script.google.com/macros/s/AKfycbzTESTaaaaaaaaaaaaaaaaaaaa/exec#SECRETKEY1234567890ABCDEFGH'));
+  await makeRoutine(page, ['등'], '30분'); // 플랜 생성 → 진단 'plan'
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await page.getByRole('link', { name: '설정' }).click();
+  const box = page.getByLabel('진단 요약');
+  await expect(box).toContainText('11 플랜 속도');
+  await expect(box).toContainText('오류 없음');
+  await checkScreen(page, '15-settings-diag');
+  await page.getByText('최근 기록 50건 보기').click();
+  await expect(page.getByText(/앱 시작 · .*브라우저 탭/).first()).toBeVisible();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PC로 보내기 (파일)' }).click()]);
+  await expect(page.getByText(/PC로 보낼 파일을 내려받았어요/)).toBeVisible();
+  const text = readFileSync(await dl.path(), 'utf8');
+  expect(text).not.toContain('SECRETKEY1234567890ABCDEFGH');
+  const j = JSON.parse(text);
+  expect(j.schema).toBe(2);
+  expect(j.device.label).toMatch(/Safari|Chrome/);
+  expect(j.data.diag.map((x: { k: string }) => x.k)).toEqual(expect.arrayContaining(['start', 'plan']));
+  // PC 쪽 검사 도구로 왕복
+  const dir = mkdtempSync(join(tmpdir(), 'e2e-sync-'));
+  checkSyncDir(dir);
+  copyFileSync(await dl.path(), join(dir, 'inbox', dl.suggestedFilename()));
+  const { results } = checkSyncDir(dir, { settleMs: 0 });
+  expect(results).toEqual([{ file: dl.suggestedFilename(), ok: true, savedAs: dl.suggestedFilename() }]);
+  expect(readFileSync(join(dir, 'checked', dl.suggestedFilename().replace('.json', '.summary.md')), 'utf8')).toContain('11 플랜 속도');
+  // 끄면 더 이상 쌓이지 않음
+  await page.getByLabel('진단 기록 남기기').uncheck();
+  expect(await page.evaluate(() => localStorage.getItem('diag.off'))).toBe('1');
+});
+
+test.describe('서비스 워커 없이 (Playwright WebKit은 서비스 워커가 있으면 다른 주소 요청을 가짜 서버로 못 돌림)', () => {
+test.use({ serviceWorkers: 'block' });
+test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, 실패하면 다음에 열 때 다시, 키는 어디에도 안 보임', async ({ page }) => {
+  await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
+  page.on('dialog', (d) => void d.accept());
+  const KEY = 'K'.repeat(36) + 'Z9x8';
+  const URL_ = 'https://script.google.com/macros/s/AKfycbzTEST' + 'a'.repeat(30) + '/exec';
+  const got: { key: string; ping?: boolean; file?: { app: string; schema: number; data: { workouts: unknown[]; diag: { k: string }[] } } }[] = [];
+  let fail = false, hang = false, badKey = false;
+  let gate: Promise<void> | null = null;
+  const ctypes: string[] = [];
+  await page.route(URL_, async (route) => {
+    if (fail) return route.abort('internetdisconnected');
+    if (hang) return; // 응답 없이 멈춤 (보내는 도중 앱이 닫히는 상황)
+    let body: typeof got[number];
+    try { body = JSON.parse(route.request().postData() ?? '{}'); } catch (e) { console.log('PARSE', String(e)); body = { key: '' }; }
+    got.push(body);
+    ctypes.push(route.request().headers()['content-type'] ?? '');
+    if (gate) await gate; // 응답을 늦춤 (보내는 중에 또 보내기)
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body.key === KEY && !badKey ? (body.ping ? { ok: true, ping: true } : { ok: true, name: 'auto-x.json' }) : { ok: false, error: 'bad_key' }) });
+  });
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByLabel('자동 보내기 설정 붙여넣기').fill(`https://evil.example.com/x/exec#${KEY}`);
+  await page.getByRole('button', { name: '저장하고 연결 확인' }).click();
+  await expect(page.getByText('구글 Apps Script 주소(/exec)가 아니에요')).toBeVisible();
+  await page.getByLabel('자동 보내기 설정 붙여넣기').fill(`workout-app 자동 보내기 설정\n${URL_}#${KEY}`);
+  await page.getByRole('button', { name: '저장하고 연결 확인' }).click();
+  await expect(page.getByText('연결됐어요. 이제 설정.txt를 지워 주세요')).toBeVisible();
+  await expect(page.getByLabel('자동 보내기')).toContainText('키 ••••Z9x8');
+  await checkScreen(page, '16-settings-autosend');
+  expect(got[0]).toEqual({ key: KEY, ping: true });
+  expect(ctypes.every((t) => t.toLowerCase().startsWith('text/plain'))).toBe(true);
+  // 운동 끝 → 자동으로 보냄
+  await makeRoutine(page, ['이두'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await expect(page.getByLabel('PC로 보내기 상태')).toContainText('PC로 보냄 ✓');
+  const sent = got[got.length - 1]!;
+  expect(sent.file!.app).toBe('workout-app');
+  expect(sent.file!.schema).toBe(2);
+  expect(sent.file!.data.workouts).toHaveLength(1);
+  expect(sent.file!.data.diag.map((x) => x.k)).toContain('send');
+  // 키는 보낸 파일 안에도, 화면에도, 백업 파일에도 없음 (D-025)
+  expect(JSON.stringify(sent.file)).not.toContain(KEY);
+  expect(await page.content()).not.toContain(KEY);
+  await page.getByRole('link', { name: '설정' }).click();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
+  expect(readFileSync(await dl.path(), 'utf8')).not.toContain(KEY);
+  // 실패 → 안내, 다음에 앱을 열 때 다시 보냄
+  fail = true;
+  const n = got.length;
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await expect(page.getByText('보내지 못했어요')).toBeVisible();
+  await expect(page.getByLabel('자동 보내기')).toContainText('보낼 것 있음');
+  fail = false;
+  await page.reload();
+  await expect.poll(() => got.length).toBe(n + 1);
+  await page.getByRole('link', { name: '설정' }).click();
+  await expect(page.getByLabel('자동 보내기')).not.toContainText('보낼 것 있음');
+  // 보내는 도중 앱이 닫혀도(새로고침) 다음에 열 때 다시 보냄 (검토 1차 막는 문제 1)
+  hang = true;
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => localStorage.getItem('send.pending'))).toBe('1');
+  hang = false;
+  const n2 = got.length;
+  await page.reload();
+  await expect.poll(() => got.length).toBe(n2 + 1);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('send.pending'))).toBeNull();
+  // 인터넷이 끊겼다가 다시 연결되면 자동으로 다시 보냄 (막는 문제 2)
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.context().setOffline(true); fail = true; // Chromium은 가짜 서버가 오프라인에도 응답하므로 함께 끊음
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await expect(page.getByText(/보내지 못했어요: 인터넷에 연결되지 않았어요/)).toBeVisible();
+  const n3 = got.length;
+  fail = false; await page.context().setOffline(false);
+  await expect.poll(() => got.length).toBe(n3 + 1);
+  // 보내는 중에 운동을 끝내면, 지금 보내기가 끝난 뒤 한 번 더 보냄 (검토 2차 막는 문제)
+  let release!: () => void;
+  gate = new Promise<void>((r) => { release = r; });
+  const n4 = got.length;
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await expect.poll(() => got.length).toBe(n4 + 1); // 첫 요청 도착 (응답은 멈춤)
+  await page.getByRole('link', { name: '홈' }).click();
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  gate = null; release();
+  await expect.poll(() => got.length).toBe(n4 + 2);
+  expect(got[got.length - 1]!.file!.data.workouts).toHaveLength(2); // 방금 끝낸 운동까지 들어감
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('send.pending'))).toBeNull();
+  // 다시 해도 안 되는 오류(키 틀림)는 자동 재시도를 멈춤 (데이터 낭비 방지)
+  await page.getByRole('link', { name: '설정' }).click();
+  badKey = true;
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await expect(page.getByText(/보내지 못했어요: 키가 맞지 않아요/)).toBeVisible();
+  await expect(page.getByLabel('자동 보내기')).toContainText('자동 재시도 멈춤');
+  const n5 = got.length;
+  await page.reload();
+  await page.waitForTimeout(1500);
+  expect(got.length).toBe(n5);
+  badKey = false;
+  // 끄기
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByRole('button', { name: '끄기' }).click();
+  expect(await page.evaluate(() => localStorage.getItem('send.cfg'))).toBeNull();
+});
+});
+
 void makeRoutine;
