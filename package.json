@@ -1,6 +1,6 @@
 {
   "name": "workout-app",
-  "version": "0.5.0-preview",
+  "version": "0.6.0-preview",
   "private": true,
   "type": "module",
   "description": "iPhone PWA workout logger with rule-based plan generator. Rules: G:\\내 드라이브\\WORK_OUT_APP\\AGENTS.md",
@@ -16,6 +16,7 @@
     "decisions:check": "node tools/check_decisions.ts",
     "sync:check": "node tools/sync_check.ts",
     "gas:build": "node tools/gas/build.ts",
+    "feedback:pull": "node tools/feedback_pull.ts",
     "test:plans": "vitest run tests/planner.test.ts",
     "samples": "vitest run tools/sample_plans.gen.ts",
     "test:e2e": "playwright test"

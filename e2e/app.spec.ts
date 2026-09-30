@@ -359,7 +359,7 @@ test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, �
   const text = readFileSync(await dl.path(), 'utf8');
   expect(text).not.toContain('SECRETKEY1234567890ABCDEFGH');
   const j = JSON.parse(text);
-  expect(j.schema).toBe(2);
+  expect(j.schema).toBe(3);
   expect(j.device.label).toMatch(/Safari|Chrome/);
   expect(j.data.diag.map((x: { k: string }) => x.k)).toEqual(expect.arrayContaining(['start', 'plan']));
   // PC 쪽 검사 도구로 왕복
@@ -414,7 +414,7 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   await expect(page.getByLabel('PC로 보내기 상태')).toContainText('PC로 보냄 ✓');
   const sent = got[got.length - 1]!;
   expect(sent.file!.app).toBe('workout-app');
-  expect(sent.file!.schema).toBe(2);
+  expect(sent.file!.schema).toBe(3);
   expect(sent.file!.data.workouts).toHaveLength(1);
   expect(sent.file!.data.diag.map((x) => x.k)).toContain('send');
   // 키는 보낸 파일 안에도, 화면에도, 백업 파일에도 없음 (D-025)
@@ -519,7 +519,7 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
     const o = indexedDB.open('workout-app');
     o.onsuccess = () => { const db = o.result; const g = db.transaction('routines').objectStore('routines').get('r-old'); g.onsuccess = () => { res({ ver: db.version, stamped: !!g.result?._s && g.result._s.y === 1 }); db.close(); }; };
   }));
-  expect(info).toEqual({ ver: 40, stamped: true });
+  expect(info).toEqual({ ver: 50, stamped: true });
   // 지우면 기록은 없어지고 지움 표시가 남음
   await page.getByRole('link', { name: '홈' }).click();
   await page.getByRole('button', { name: '예전 루틴 삭제' }).click();
@@ -680,6 +680,34 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   await pc.getByRole('link', { name: '설정' }).click();
   await pc.getByLabel('폰 화면으로 보기').uncheck();
   await ctx.close();
+});
+
+
+test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙음 → 설정에서 상태 보기·지우기', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await expect(page).toHaveURL(/#\/workout/);
+  await page.getByRole('button', { name: '개선 메모 쓰기' }).click();
+  await expect(page.getByText(/#\/workout/)).toBeVisible();
+  await page.getByLabel('개선 메모 내용').fill('휴식 끝 소리가 작아요');
+  await checkScreen(page, '21-feedback-sheet');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('link', { name: '설정' }).click();
+  const card = page.getByLabel(/^개선 메모 FB-\d{8}-[a-z0-9]+-\d{8}$/i).filter({ hasText: '휴식 끝 소리가 작아요' });
+  await expect(card).toContainText('휴식 끝 소리가 작아요');
+  await expect(card).toContainText('접수');
+  await expect(card).toContainText('#/workout');
+  await checkScreen(page, '22-feedback-list');
+  await card.getByRole('button', { name: /지우기/ }).click();
+  await expect(card).toHaveCount(0);
+  // 저장 알림은 시트 밖에 보임, 새 메모도 목록에
+  await page.getByRole('button', { name: '개선 메모 쓰기' }).click();
+  await expect(page.getByLabel('개선 메모 내용')).toBeFocused();
+  await page.getByLabel('개선 메모 내용').fill('두 번째');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: /저장했어요 \(FB-\d{8}-[a-z0-9]+-\d{8}\)/i })).toBeVisible();
+  await expect(page.getByLabel(/^개선 메모 FB-/).filter({ hasText: '두 번째' })).toHaveCount(1);
 });
 
 void makeRoutine;

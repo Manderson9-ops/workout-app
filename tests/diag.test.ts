@@ -11,7 +11,7 @@ import { makeBackup, parseBackup, BACKUP_SCHEMA } from '../src/core/backup';
 import { checkSyncDir, quote } from '../tools/sync_check';
 
 const e = (k: DiagEntry['k'], f: Partial<DiagEntry> = {}): DiagEntry => ({ t: '2026-09-30T10:00:00.000Z', k, d: 'ab12', ...f });
-const empty = { routines: [], workouts: [], meta: [], custom: [], settings: [], bodyweight: [], diag: [] as DiagEntry[] };
+const empty = { routines: [], workouts: [], meta: [], custom: [], settings: [], bodyweight: [], diag: [] as DiagEntry[], feedback: [] };
 
 describe('진단 기록 (D-024)', () => {
   it('오류 메시지에서 주소·경로·따옴표 값·긴 숫자를 지우고 200자로', () => {
@@ -85,7 +85,7 @@ describe('진단 기록 (D-024)', () => {
 describe('백업 schema 2 (D-026)', () => {
   it('현재 형식은 2, 진단이 들어감, 기기 정보', () => {
     const f = makeBackup({ ...empty, diag: [e('timer', { v: 1 })] }, '0.3.0', '2026-09-30T10:00:00.000Z', { id: 'ab12', label: 'iPhone · Safari 26.0' });
-    expect(BACKUP_SCHEMA).toBe(2);
+    expect(BACKUP_SCHEMA).toBe(3);
     const r = parseBackup(JSON.stringify(f));
     expect(r.ok && r.file.data.diag).toHaveLength(1);
     expect(r.ok && r.file.device).toEqual({ id: 'ab12', label: 'iPhone · Safari 26.0' });
@@ -94,7 +94,7 @@ describe('백업 schema 2 (D-026)', () => {
     const old = { app: 'workout-app', schema: 1, appVersion: '0.2.0-preview', exportedAt: '2026-09-30T10:00:00.000Z', counts: { routines: 0, workouts: 0, meta: 0, custom: 0, settings: 0, bodyweight: 0 }, data: { routines: [], workouts: [], meta: [], custom: [], settings: [], bodyweight: [] } };
     const r = parseBackup(JSON.stringify(old));
     expect(r.ok).toBe(true);
-    if (r.ok) { expect(r.file.schema).toBe(2); expect(r.file.data.diag).toEqual([]); }
+    if (r.ok) { expect(r.file.schema).toBe(3); expect(r.file.data.diag).toEqual([]); expect(r.file.data.feedback).toEqual([]); }
   });
   it('깨진 진단·기기 정보·너무 많은 진단은 거절', () => {
     const f = makeBackup({ ...empty, diag: [{ ...e('timer'), k: 'x' } as never] }, '0.3.0', '2026-09-30T10:00:00.000Z');

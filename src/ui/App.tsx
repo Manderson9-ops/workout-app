@@ -9,6 +9,7 @@ import { SettingsScreen } from './screens/Settings';
 import { RoutineEditor } from './screens/RoutineEditor';
 import { Stats, WorkoutDetail } from './screens/Stats';
 import { SyncBadge } from './screens/SyncSection';
+import { FeedbackButton, FeedbackNavItem } from './screens/FeedbackUi';
 import { ToolsScreen } from './screens/Tools';
 import { mmss } from './components';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
@@ -61,6 +62,7 @@ export function App() {
         </div>
       )}
       <SyncBadge />
+      <FeedbackButton s={s} />
       {screen}
       {active && !onWorkout && (
         <a class="banner" href="#/workout" aria-label="운동 계속하기">
@@ -74,6 +76,7 @@ export function App() {
         {tab('#/stats', '📈', '기록', path.startsWith('/stats'))}
         {tab('#/exercises', '📚', '종목', path.startsWith('/exercises'))}
         {tab('#/settings', '⚙️', '설정', path.startsWith('/settings') || path.startsWith('/tools'))}
+        <FeedbackNavItem />
       </nav>
     </>
   );

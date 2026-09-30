@@ -245,6 +245,36 @@ describe('S2b 검토 반영', () => {
   });
 });
 
+describe('개선 메모 동기화 (S3)', () => {
+  it('폰에서 적은 메모가 PC로, PC가 상태를 바꾸면 폰에도', async () => {
+    const { s, transport } = server(); const A = dev('A'), B = dev('B');
+    await A.feedback.put({ id: 'FB-20260930-A-01', createdAt: '2026-09-30T10:00:00.000Z', screen: '#/workout', text: '소리', status: '접수' });
+    await sync(A, transport); await sync(B, transport);
+    expect((await B.feedback.get('FB-20260930-A-01'))?.text).toBe('소리');
+    expect(Object.values(s.state.recs).some((r) => r.table === 'feedback')).toBe(true);
+    await B.feedback.put({ ...(await B.feedback.get('FB-20260930-A-01'))!, status: '반영됨', note: '0.6.0 에 반영' });
+    await sync(B, transport); await sync(A, transport);
+    expect((await A.feedback.get('FB-20260930-A-01'))?.status).toBe('반영됨');
+  });
+});
+
+describe('0.5.0 → 0.6.0 (DB v5)', () => {
+  it('예전 기기는 모르는 표(feedback)를 건너뛰고, v5가 되면 받은 위치를 되돌려 놓친 메모를 받음', async () => {
+    const { s: srv, transport } = server(); const A = dev('A'), B = dev('B');
+    await A.routines.put(R('r1', 'v1')); await sync(A, transport); await sync(B, transport);
+    await A.feedback.put({ id: 'FB-20260930-A-01', createdAt: '2026-09-30T10:00:00.000Z', screen: '#/', text: '메모', status: '접수' });
+    await sync(A, transport);
+    // B가 0.5.0이었다고 치고: 메모를 건너뛴 채 since만 서버 끝까지 감
+    const kv = { ...(await getKv(B)), since: srv.state.rev }; await B.kv.put({ k: 'sync', v: kv });
+    await sync(B, transport);
+    expect(await B.feedback.count()).toBe(0);
+    await B.kv.put({ k: 'sync', v: { ...kv, since: 0 } }); // v5 업그레이드가 하는 일
+    await sync(B, transport);
+    expect((await B.feedback.get('FB-20260930-A-01'))?.text).toBe('메모');
+    expect(await names(B)).toEqual(['v1']);
+  });
+});
+
 describe('S2b 2차 검토 반영', () => {
   const W = (id: string, owner: string, seq = 1): Workout => ({ ...startWorkout(id, R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: owner, ownerSeq: seq });
   it('끄고 → 다른 기기가 고침 → 다시 켜기: 고치지 않은 옛 사본은 충돌로 묻지 않고 서버 값을 받음', async () => {

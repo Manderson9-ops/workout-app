@@ -9,6 +9,7 @@ import { APP_VERSION } from '../../core/version';
 import { setMeta } from '../actions';
 import type { Settings } from '../../db/db';
 import { BackupSection } from './BackupSection';
+import { FeedbackList } from './FeedbackUi';
 import { DiagSection } from './DiagSection';
 import { go } from '../nav';
 
@@ -52,6 +53,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
         </div>
       ))}
       <BackupSection s={s} />
+      <FeedbackList s={s} />
       <DiagSection s={s} />
       <h2>화면</h2>
       <label class="row small" style={{ minHeight: '44px' }}>
