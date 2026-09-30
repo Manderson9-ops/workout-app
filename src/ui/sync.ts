@@ -161,10 +161,11 @@ export async function replaceServerWithLocal(before?: () => Promise<void>): Prom
   replacing = true;
   again = false;
   if (running) await running;
-  if (before) await before();
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 60000);
   try {
+    // 불러오기에서 오류가 나도 finally가 멈춤을 풀도록 try 안에서
+    if (before) await before();
     const r = await fetch(c.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: c.key, op: 'replace', recs: await localRecs() }), signal: ctl.signal });
     let j: { ok: boolean; error?: string };
     try { j = (await r.json()) as { ok: boolean; error?: string }; } catch { j = { ok: false, error: 'bad_response' }; }
