@@ -5,6 +5,7 @@ import type { PlanBlock } from './planner';
 import type { Exercise } from './types';
 import { blockTime, DEFAULT_TIME } from './time';
 import type { TimedBlock } from './time';
+import { moveItem } from './reorder';
 
 export interface RoutineItem { exerciseId: string; sets: number; reps: number; seconds?: number }
 export interface RoutineBlock { kind: 'single' | 'superset' | 'compound'; items: RoutineItem[]; restSec: number; roundRestSec: number; transitionSec: number }
@@ -285,6 +286,21 @@ export function mergeWithNext(r: Routine, bi: number, kind: 'superset' | 'compou
   if (!a || !b) return r;
   const merged: RoutineBlock = { kind, items: [...a.items, ...b.items], restSec: a.restSec, roundRestSec: a.kind === 'single' ? 120 : a.roundRestSec, transitionSec: a.transitionSec || 10 };
   return { ...r, blocks: [...r.blocks.slice(0, bi), merged, ...r.blocks.slice(bi + 2)] };
+}
+
+/** 루틴 블록 순서 바꾸기 (끌어서 놓기·↑↓, D-037). 범위 밖·같은 자리면 그대로 */
+export function moveRoutineBlock(r: Routine, from: number, to: number): Routine {
+  const blocks = moveItem(r.blocks, from, to);
+  return blocks === r.blocks ? r : { ...r, blocks: blocks as RoutineBlock[] };
+}
+
+/**
+ * 운동 중 블록 순서 바꾸기 (D-037). 세트 기록·완료 여부는 블록과 함께 옮겨지고,
+ * 현재 세트는 새 순서에서 "아직 안 끝낸 첫 세트"로 다시 정해진다 (currentStep). 휴식 타이머는 그대로.
+ */
+export function moveWorkoutBlock(w: Workout, from: number, to: number): Workout {
+  const blocks = moveItem(w.blocks, from, to);
+  return blocks === w.blocks ? w : { ...w, blocks: blocks as WorkoutBlock[] };
 }
 
 /** 묶음을 풀어 운동마다 일반 블록으로 */

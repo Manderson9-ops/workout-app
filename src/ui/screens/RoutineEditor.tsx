@@ -3,7 +3,8 @@ import type { AppState } from '../store';
 import { mutate } from '../store';
 import { catalog } from '../catalog';
 import type { Routine, RoutineBlock, RoutineItem } from '../../core/session';
-import { routineEstimate, mergeWithNext, splitBlock, applyRestToAll } from '../../core/session';
+import { routineEstimate, mergeWithNext, splitBlock, applyRestToAll, moveRoutineBlock } from '../../core/session';
+import { useDragSort } from '../dragSort';
 import { targetReps } from '../../core/time';
 import { ExercisePicker, mmss } from '../components';
 import { startRoutine } from '../actions';
@@ -18,6 +19,9 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
   const rest = s.settings.rest;
+  // 블록 끌어서 순서 바꾸기 (D-037)
+  const dnd = useDragSort(r?.blocks.length ?? 0, (from, to) => setR((cur) => (cur ? moveRoutineBlock(cur, from, to) : cur)),
+    (i) => r?.blocks[i]?.items.map((it) => byId.get(it.exerciseId)?.name_ko ?? it.exerciseId).join(' + ') ?? '');
   if (!r) return <main><p>루틴을 찾을 수 없어요.</p><button onClick={() => go('#/')}>홈으로</button></main>;
   const restFor = (exId: string) => (byId.get(exId)?.mechanics === 'compound' ? rest.compound : rest.isolation);
   const setBlock = (bi: number, fn: (b: RoutineBlock) => RoutineBlock | null) =>
@@ -26,7 +30,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
   const est = routineEstimate(r, byId, rest.between) + (r.warmupSec ?? 0);
   const saved = (): Routine => ({ ...r, estimatedSec: est, updatedAt: new Date().toISOString() });
   const save = async () => { await mutate((d) => d.routines.put(saved())); };
-  const move = (bi: number, dir: -1 | 1) => { const j = bi + dir; if (j < 0 || j >= r.blocks.length) return; const b = [...r.blocks]; [b[bi], b[j]] = [b[j]!, b[bi]!]; setR({ ...r, blocks: b }); };
+  const move = (bi: number, dir: -1 | 1) => setR(moveRoutineBlock(r, bi, bi + dir));
   const partOf = (b: RoutineBlock) => new Set(b.items.map((i) => byId.get(i.exerciseId)?.part));
   return (
     <main>
@@ -39,6 +43,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         <button onClick={() => setR(applyRestToAll(r, rest.isolation, rest.round))}>짧게 {rest.isolation}초</button>
         <button onClick={() => setR(applyRestToAll(r, rest.compound, rest.round))}>길게 {rest.compound}초</button>
       </div>
+      <p class="sr-only" aria-live="polite">{dnd.msg}</p>
       {!r.blocks.length && <div class="empty">운동을 추가해 주세요</div>}
       <div class="wide-cards-lg">
       {r.blocks.map((b, bi) => {
@@ -46,9 +51,9 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         const canMerge = !!next && b.items.length + next.items.length <= 4;
         const samePart = next ? [...partOf(b)].every((p) => partOf(next).has(p)) && partOf(b).size === 1 : false;
         return (
-          <div class="card" key={bi}>
+          <div class="card" key={bi} {...dnd.itemAttrs(bi)}>
             <div class="row between">
-              <span><span class="sub small" aria-label={`${bi + 1}번 블록`}>{bi + 1} </span><span class="badge kind">{KIND_LABEL[b.kind]}</span></span>
+              <span class="row" style={{ gap: '4px' }}>{r.blocks.length > 1 && <button {...dnd.handleProps(bi)}>≡</button>}<span class="sub small" aria-label={`${bi + 1}번 블록`}>{bi + 1} </span><span class="badge kind">{KIND_LABEL[b.kind]}</span></span>
               <div class="row"><button aria-label={`${bi + 1}번 블록 위로`} onClick={() => move(bi, -1)}>↑</button><button aria-label={`${bi + 1}번 블록 아래로`} onClick={() => move(bi, 1)}>↓</button></div>
             </div>
             {b.items.map((it, ii) => (

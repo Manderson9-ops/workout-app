@@ -15,7 +15,8 @@ import type { TimedBlock } from '../../core/time';
 import { GradeBadge, ExercisePicker, Sheet, mmss } from '../components';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
-import { stepSets, stepReps, moveBlock, addBlock, regenerateWithLocks, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
+import { useDragSort } from '../dragSort';
+import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
 const NEXT: Record<string, Priority | undefined> = { none: 'high', high: 'normal', normal: 'low', low: undefined };
@@ -59,6 +60,12 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const [adding, setAdding] = useState(false);
   const [moved, setMoved] = useState<{ key: string; d: -1 | 1; msg: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  // 블록 끌어서 순서 바꾸기 (D-037). ↑↓ 버튼과 같은 결과
+  const dnd = useDragSort(plan?.blocks.length ?? 0, (from, to) => {
+    if (!plan) return;
+    const next = moveBlockTo(plan, from, to);
+    if (next !== plan) { setMoved(null); setPlan(recompute(next, all)); }
+  }, (i) => plan?.blocks[i]?.items.map((it) => it.name).join(' + ') ?? '');
   const [name, setName] = useState('');
   const [showReasons, setShowReasons] = useState(true);
   const [tpl, setTpl] = useState('');
@@ -148,6 +155,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
     const b = plan.blocks[bi]!; const key = blockKey(b); const nm = blockName(b);
     return (
       <span class="row" style={{ gap: '4px' }}>
+        <button {...dnd.handleProps(bi)}>≡</button>
         <span class="sub small" aria-hidden="true">{bi + 1}번째</span>
         <button class="ghost" data-move={key} data-dir="-1" aria-label={`${nm} 위로 (지금 ${bi + 1}번째)`} disabled={bi === 0} onClick={() => move(bi, -1)}>↑</button>
         <button class="ghost" data-move={key} data-dir="1" aria-label={`${nm} 아래로 (지금 ${bi + 1}번째)`} disabled={bi === plan.blocks.length - 1} onClick={() => move(bi, 1)}>↓</button>
@@ -210,11 +218,11 @@ export function PlanBuilder({ s }: { s: AppState }) {
             <h2>{plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : plan.status === 'reduced' ? '플랜 (일부 부위만)' : '플랜'}</h2>
             {plan.blocks.length > 0 && <span class="sub">예상 {mmss(plan.estimatedSec)}{plan.targetSec ? ` / ${Math.round(plan.targetSec / 60)}분` : ''}</span>}
           </div>
-          <p class="sr-only" aria-live="polite">{moved?.msg ?? ''}</p>
+          <p class="sr-only" aria-live="polite">{moved?.msg ?? dnd.msg}</p>
           {plan.blocks.length > 0 && plan.targetSec !== undefined && plan.estimatedSec > plan.targetSec && <p class="pill warn-text" role="status">목표 시간보다 약 {Math.ceil((plan.estimatedSec - plan.targetSec) / 60)}분 길어요 (직접 바꾼 내용은 그대로 둠)</p>}
           {plan.blocks.length > 0 && <p class="sub small">{plan.warmup.label ? `${plan.warmup.label} · ` : ''}휴식 다관절 {plan.rest.compound}초 · 단관절 {plan.rest.isolation}초{plan.blocks.some((b) => b.kind !== 'single') ? ` · 묶음 라운드 후 ${plan.rest.round}초` : ''}</p>}
           {plan.blocks.map((b, bi) => (
-            <div class="card" key={blockKey(b)}>
+            <div class="card" key={blockKey(b)} {...dnd.itemAttrs(bi)}>
               {plan.blocks.length > 1 && <div class="row between">{moveBtns(bi)}{b.kind === 'single' && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}</div>}
               {b.kind !== 'single' && <div class="row between"><span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span><span class="pill">라운드 후 휴식 {b.roundRestSec}초 · {mmss(b.timeSec)}</span></div>}
               {b.items.map((it, ii) => (

@@ -7,7 +7,7 @@ import type { ServerState, SyncRequest } from '../src/core/syncMerge';
 import { syncOnce, getKv, restoreStash, collectMutations, CHUNK } from '../src/db/sync';
 import type { Transport } from '../src/db/sync';
 import { SYNC_TABLES, syncedFields, withoutStamp } from '../src/core/syncStamp';
-import { planToRoutine, startWorkout } from '../src/core/session';
+import { planToRoutine, startWorkout, moveWorkoutBlock } from '../src/core/session';
 import type { Routine, Workout } from '../src/core/session';
 
 let T = 1_750_000_000_000;
@@ -182,6 +182,21 @@ describe('S2b 검토 반영', () => {
     const done = (await B.workouts.get('w1'))!.blocks[0]!.items[0]!.sets.filter((x) => x.done).map((x) => x.weight);
     expect(done).toEqual([50, 51, 52]);
     expect((await B.workouts.get('w1'))!.ownerDeviceId).toBe('B');
+    expect(await view(A)).toEqual(await view(B));
+  });
+  it('D-037: 순서를 바꾼 옛 화면에서 가져와도 서버에만 있던 세트는 옮겨진 블록에 남음', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    const r0 = R('r1', '등');
+    const r: Routine = { ...r0, blocks: [r0.blocks[0]!, { ...r0.blocks[0]!, items: [{ ...r0.blocks[0]!.items[0]!, exerciseId: 'b' }] }] };
+    await A.workouts.put({ ...startWorkout('w1', r, '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'A', ownerAt: '2026-09-30T10:00:00.000Z', ownerSeq: 1 });
+    await sync(A, transport); await sync(B, transport);
+    const a = (await A.workouts.get('w1'))!; setDone(a, 0, 50); setDone(a, 1, 51); await A.workouts.put(a); await sync(A, transport);
+    const b = (await B.workouts.get('w1'))!; // 세트 0개인 옛 화면에서 b를 맨 앞으로 옮기고 가져옴
+    await B.workouts.put({ ...moveWorkoutBlock(b, 1, 0), ownerDeviceId: 'B', ownerSeq: 2 }); await sync(B, transport); await sync(A, transport);
+    const got = (await B.workouts.get('w1'))!;
+    expect(got.blocks.map((x) => x.items[0]!.exerciseId)).toEqual(['b', 'a']);
+    expect(got.blocks[1]!.items[0]!.sets.filter((x) => x.done).map((x) => x.weight)).toEqual([50, 51]);
+    expect(got.blocks[0]!.items[0]!.sets.some((x) => x.done)).toBe(false);
     expect(await view(A)).toEqual(await view(B));
   });
   it('시계가 늦은 기기가 가져와도 되돌려지지 않음 (ownerSeq)', async () => {

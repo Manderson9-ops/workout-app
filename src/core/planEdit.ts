@@ -4,6 +4,7 @@
  */
 import type { Plan, PlanBlock, PlanItem, PlanRequest } from './planner';
 import type { BuiltExercise } from './types';
+import { moveItem } from './reorder';
 
 export const SETS_MIN = 1, SETS_MAX = 8;
 export const REPS_MIN = 1, REPS_MAX = 50;
@@ -23,11 +24,13 @@ export function stepReps(it: PlanItem, d: number): PlanItem {
 
 /** 블록(묶음은 통째로) 한 칸 위/아래로. 범위 밖이면 그대로 */
 export function moveBlock(plan: Plan, bi: number, d: -1 | 1): Plan {
-  const to = bi + d;
-  if (bi < 0 || bi >= plan.blocks.length || to < 0 || to >= plan.blocks.length) return plan;
-  const blocks = [...plan.blocks];
-  [blocks[bi], blocks[to]] = [blocks[to]!, blocks[bi]!];
-  return { ...plan, blocks };
+  return moveBlockTo(plan, bi, bi + d);
+}
+
+/** 블록을 from 자리에서 to 자리로 (끌어서 놓기, D-037). 사이 블록은 한 칸씩 밀림. 범위 밖·같은 자리면 그대로 */
+export function moveBlockTo(plan: Plan, from: number, to: number): Plan {
+  const blocks = moveItem(plan.blocks, from, to);
+  return blocks === plan.blocks ? plan : { ...plan, blocks: blocks as PlanBlock[] };
 }
 
 /** 운동 하나를 단일 블록으로 맨 뒤에 추가. 이미 있는 운동이면 그대로 */

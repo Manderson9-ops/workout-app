@@ -134,3 +134,11 @@ html.phone-view main { max-width: 430px; }
 html.phone-view .nav { max-width: 430px; margin: 0 auto; }
 html.phone-view .banner { max-width: 410px; margin: 0 auto; }
 html.phone-view .timer, html.phone-view .sheet { max-width: 430px; margin: 0 auto; }
+
+/* 끌어서 순서 바꾸기 (D-037): 손잡이만 스크롤을 막고, 끄는 카드는 떠 보이게, 놓을 자리는 파란 선 */
+.drag-handle { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; font-size: 22px; line-height: 1; color: var(--sub); padding: 0 8px; min-width: 44px; flex: none; }
+.drag-handle:hover, .drag-handle:focus-visible { color: var(--text); }
+html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+.card.dragging { position: relative; z-index: 30; opacity: .92; box-shadow: 0 12px 28px #000c; border-color: var(--acc); }
+.card[data-drop="before"] { box-shadow: 0 -4px 0 0 var(--acc); }
+.card[data-drop="after"] { box-shadow: 0 4px 0 0 var(--acc); }
