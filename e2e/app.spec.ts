@@ -381,7 +381,8 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   const KEY = 'K'.repeat(36) + 'Z9x8';
   const URL_ = 'https://script.google.com/macros/s/AKfycbzTEST' + 'a'.repeat(30) + '/exec';
   const got: { key: string; ping?: boolean; file?: { app: string; schema: number; data: { workouts: unknown[]; diag: { k: string }[] } } }[] = [];
-  let fail = false, hang = false;
+  let fail = false, hang = false, badKey = false;
+  let gate: Promise<void> | null = null;
   const ctypes: string[] = [];
   await page.route(URL_, async (route) => {
     if (fail) return route.abort('internetdisconnected');
@@ -390,7 +391,8 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
     try { body = JSON.parse(route.request().postData() ?? '{}'); } catch (e) { console.log('PARSE', String(e)); body = { key: '' }; }
     got.push(body);
     ctypes.push(route.request().headers()['content-type'] ?? '');
-    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body.key === KEY ? (body.ping ? { ok: true, ping: true } : { ok: true, name: 'auto-x.json' }) : { ok: false, error: 'bad_key' }) });
+    if (gate) await gate; // 응답을 늦춤 (보내는 중에 또 보내기)
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body.key === KEY && !badKey ? (body.ping ? { ok: true, ping: true } : { ok: true, name: 'auto-x.json' }) : { ok: false, error: 'bad_key' }) });
   });
   await page.getByRole('link', { name: '설정' }).click();
   await page.getByLabel('자동 보내기 설정 붙여넣기').fill(`https://evil.example.com/x/exec#${KEY}`);
@@ -449,7 +451,33 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   const n3 = got.length;
   fail = false; await page.context().setOffline(false);
   await expect.poll(() => got.length).toBe(n3 + 1);
+  // 보내는 중에 운동을 끝내면, 지금 보내기가 끝난 뒤 한 번 더 보냄 (검토 2차 막는 문제)
+  let release!: () => void;
+  gate = new Promise<void>((r) => { release = r; });
+  const n4 = got.length;
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await expect.poll(() => got.length).toBe(n4 + 1); // 첫 요청 도착 (응답은 멈춤)
+  await page.getByRole('link', { name: '홈' }).click();
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  gate = null; release();
+  await expect.poll(() => got.length).toBe(n4 + 2);
+  expect(got[got.length - 1]!.file!.data.workouts).toHaveLength(2); // 방금 끝낸 운동까지 들어감
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('send.pending'))).toBeNull();
+  // 다시 해도 안 되는 오류(키 틀림)는 자동 재시도를 멈춤 (데이터 낭비 방지)
+  await page.getByRole('link', { name: '설정' }).click();
+  badKey = true;
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await expect(page.getByText(/보내지 못했어요: 키가 맞지 않아요/)).toBeVisible();
+  await expect(page.getByLabel('자동 보내기')).toContainText('자동 재시도 멈춤');
+  const n5 = got.length;
+  await page.reload();
+  await page.waitForTimeout(1500);
+  expect(got.length).toBe(n5);
+  badKey = false;
   // 끄기
+  await page.getByRole('link', { name: '설정' }).click();
   await page.getByRole('button', { name: '끄기' }).click();
   expect(await page.evaluate(() => localStorage.getItem('send.cfg'))).toBeNull();
 });

@@ -67,7 +67,8 @@ export function checkSyncDir(dir: string, opts: { now?: number; settleMs?: numbe
   const now = opts.now ?? Date.now(), settle = opts.settleMs ?? SETTLE_MS, giveUp = opts.giveUpMs ?? GIVE_UP_MS;
   const inbox = join(dir, 'inbox'), checked = join(dir, 'checked'), rejected = join(dir, 'rejected');
   for (const p of [inbox, checked, rejected]) mkdirSync(p, { recursive: true });
-  // 이미 받은 파일의 내용 해시 (같은 파일이 두 번 와도 한 번만 처리: 시간 초과 뒤 재전송 등)
+  // 이미 받은 파일의 내용 해시: 완전히 같은 파일이 두 번 오면(같은 파일을 두 번 저장 등) 한 번만 처리.
+  // 시간 초과 뒤 재전송은 새로 만든 파일(더 최신 내용)이라 따로 저장됨 (해가 없음, 최신 파일을 보면 됨)
   const hashFile = join(checked, '.hashes.txt');
   const seen = new Set(existsSync(hashFile) ? readFileSync(hashFile, 'utf8').split(/\r?\n/).filter(Boolean) : []);
   const results: CheckResult[] = [];
@@ -83,14 +84,15 @@ export function checkSyncDir(dir: string, opts: { now?: number; settleMs?: numbe
       const st = statSync(p);
       if (!st.isFile() || name.startsWith('.') || name.endsWith('.tmp') || name.startsWith('~')) continue;
       if (name === SECRET_FILE) { results.push({ file: name, ok: false, reason: '비밀 설정 파일이 inbox에 있어요. 옮기지 않았어요. 지워 주세요', waiting: true }); continue; }
-      if (settle > 0 && now - st.mtimeMs < settle) { results.push({ file: name, ok: false, reason: '방금 들어온 파일이라 드라이브가 다 받을 때까지 기다려요', waiting: true }); continue; }
+      // 드라이브는 클라우드 수정 시각을 유지할 수 있어 PC에 생긴 시각도 봄
+      if (settle > 0 && now - Math.max(st.mtimeMs, st.birthtimeMs) < settle) { results.push({ file: name, ok: false, reason: '방금 들어온 파일이라 드라이브가 다 받을 때까지 기다려요', waiting: true }); continue; }
       if (extname(name).toLowerCase() !== '.json') { reject(p, name, 'JSON 파일이 아님'); continue; }
       if (st.size > MAX_BYTES) { reject(p, name, `너무 큼 (${Math.round(st.size / 1024)}KB > ${MAX_BYTES / 1024}KB)`); continue; }
       const text = readFileSync(p, 'utf8');
       const r = parseBackup(text);
       if (!r.ok) {
         // 읽을 수 없는 파일(잘림)은 드라이브가 덜 받았을 수 있어 한동안 inbox에 둠
-        if (r.error.startsWith('파일을 읽을 수 없어요') && now - st.mtimeMs < giveUp) { results.push({ file: name, ok: false, reason: '파일이 아직 다 안 받아졌을 수 있어 다음에 다시 볼게요', waiting: true }); continue; }
+        if (r.error.startsWith('파일을 읽을 수 없어요') && now - Math.max(st.mtimeMs, st.birthtimeMs) < giveUp) { results.push({ file: name, ok: false, reason: '파일이 아직 다 안 받아졌을 수 있어 다음에 다시 볼게요', waiting: true }); continue; }
         reject(p, name, r.error); continue;
       }
       const h = createHash('sha256').update(text).digest('hex');

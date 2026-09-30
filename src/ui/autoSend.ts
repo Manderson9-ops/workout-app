@@ -5,14 +5,17 @@
  * - 설정(주소#키)은 이 기기 localStorage 'send.cfg' 에만. 백업·진단·화면에 넣지 않음 (D-025, 테스트로 확인)
  */
 import { useEffect, useState } from 'preact/hooks';
-import { db, flushPending } from './store';
+import { db, flushPending, getState, activeOf } from './store';
 import { exportAll } from '../db/db';
 import { makeBackup } from '../core/backup';
 import { APP_VERSION } from '../core/version';
 import { parseSendConfig } from '../core/autoSendConfig';
 import { diag, flushDiag, deviceInfo } from './diag';
 
-const CFG = 'send.cfg', PENDING = 'send.pending', LAST = 'send.lastAt';
+const CFG = 'send.cfg', PENDING = 'send.pending', LAST = 'send.lastAt', BLOCKED = 'send.blocked';
+/** 다시 해도 안 되는 오류: 자동 재시도를 멈추고 직접 보내기·새 설정 때만 다시 (데이터 낭비 방지) */
+const PERMANENT = ['bad_key', 'too_big', 'not_backup', 'bad_response', 'not_json'];
+const today = () => new Date().toDateString();
 
 export type SendState = { phase: 'idle' | 'sending' | 'sent' | 'failed'; at?: string; error?: string };
 let state: SendState = { phase: 'idle' };
@@ -36,9 +39,18 @@ export function saveSendConfig(text: string): { ok: true } | { ok: false; error:
   const r = parseSendConfig(text);
   if (!r.ok) return r;
   localStorage.setItem(CFG, `${r.url}#${r.key}`);
+  localStorage.removeItem(BLOCKED);
   return { ok: true };
 }
-export function clearSendConfig() { localStorage.removeItem(CFG); localStorage.removeItem(PENDING); set({ phase: 'idle' }); }
+export function clearSendConfig() { localStorage.removeItem(CFG); localStorage.removeItem(PENDING); localStorage.removeItem(BLOCKED); set({ phase: 'idle' }); }
+/** 자동 재시도를 멈춘 이유 (없으면 undefined). 하루 한도는 다음 날 풀림 */
+export function retryBlocked(): string | undefined {
+  const b = localStorage.getItem(BLOCKED);
+  if (!b) return undefined;
+  const [code, day] = b.split('|');
+  if (code === 'daily_limit' && day !== today()) { localStorage.removeItem(BLOCKED); return undefined; }
+  return code;
+}
 export const lastSentAt = () => localStorage.getItem(LAST) ?? undefined;
 export const hasPending = () => localStorage.getItem(PENDING) === '1';
 
@@ -85,6 +97,8 @@ export async function pingSend(): Promise<{ ok: boolean; message: string }> {
 }
 
 let sending: Promise<boolean> | null = null;
+/** 보내는 중에 또 보내 달라는 요청(예: 재시도 중 운동 종료)이 오면, 지금 보내기가 끝난 뒤 한 번 더 보냄 (검토 2차) */
+let again: Promise<boolean> | null = null;
 /**
  * 지금 보내기. 설정이 없으면 아무것도 안 함. 동시에 하나만.
  * "보낼 것 있음"은 보내기 **시작 전에** 켜고 성공했을 때만 끈다: 보내는 도중 앱이 닫히거나 멈춰도 다음에 다시 보냄 (검토 1차)
@@ -92,8 +106,12 @@ let sending: Promise<boolean> | null = null;
 export function sendNow(reason: 'workout' | 'manual' | 'retry'): Promise<boolean> {
   const c = getSendConfig();
   if (!c) return Promise.resolve(false);
-  if (sending) return sending;
   localStorage.setItem(PENDING, '1');
+  if (sending) {
+    again ??= sending.then(() => { again = null; return sendNow(reason); });
+    return again;
+  }
+  if (reason !== 'retry') localStorage.removeItem(BLOCKED);
   sending = (async () => {
     set({ phase: 'sending' });
     try {
@@ -104,12 +122,15 @@ export function sendNow(reason: 'workout' | 'manual' | 'retry'): Promise<boolean
       const r = await post(c.url, { key: c.key, file });
       if (r.ok) {
         const at = new Date().toISOString();
-        localStorage.setItem(LAST, at); localStorage.removeItem(PENDING);
+        localStorage.setItem(LAST, at);
+        if (!again) localStorage.removeItem(PENDING); // 한 번 더 보낼 예정이면 표시를 남겨 둠 (그 사이 앱이 닫혀도 다시 보냄)
         diag('send', { m: `자동 (${reason})`, ok: true });
         set({ phase: 'sent', at });
         return true;
       }
       diag('send', { m: `자동 실패 (${reason}): ${r.error}`, ok: false });
+      if (r.error && PERMANENT.includes(r.error)) localStorage.setItem(BLOCKED, r.error);
+      if (r.error === 'daily_limit') localStorage.setItem(BLOCKED, `daily_limit|${today()}`);
       set({ phase: 'failed', error: ERR[r.error ?? 'server'] ?? '보내지 못했어요' });
       return false;
     } catch {
@@ -123,7 +144,9 @@ export function sendNow(reason: 'workout' | 'manual' | 'retry'): Promise<boolean
 let lastRetry = 0;
 /** 못 보낸 것이 있으면 다시 보냄. 앱을 열 때·다시 보일 때·인터넷이 다시 연결될 때. 30초에 한 번까지 */
 export function retryPending(): void {
-  if (!hasPending() || !getSendConfig() || sending) return;
+  if (!hasPending() || !getSendConfig() || sending || retryBlocked()) return;
+  // 운동 중에는 다시 보내지 않음 (전체 내보내기로 입력이 잠깐 느려질 수 있음). 운동이 끝나면 어차피 보냄
+  if (activeOf(getState())) return;
   if (Date.now() - lastRetry < 30000) return;
   lastRetry = Date.now();
   void sendNow('retry');

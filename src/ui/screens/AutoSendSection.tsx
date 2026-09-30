@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { getSendConfig, saveSendConfig, clearSendConfig, pingSend, sendNow, lastSentAt, hasPending, useSendState, getSendState } from '../autoSend';
+import { getSendConfig, saveSendConfig, clearSendConfig, pingSend, sendNow, lastSentAt, hasPending, useSendState, getSendState, retryBlocked } from '../autoSend';
 import { maskKey } from '../../core/autoSendConfig';
 
 const when = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '없음');
@@ -26,7 +26,7 @@ export function AutoSendSection() {
       <p class="sub small">PC 브라우저에서는 확인했고, 아이폰 홈 화면 앱에서 실제로 되는지는 아직 확인 전이에요. 연결 후 운동을 한 번 끝내 보고 알려 주세요.</p>
       {cfg ? (
         <>
-          <p class="small">연결됨 · 키 {maskKey(cfg.key)} · 마지막 보냄 {when(lastSentAt())}{hasPending() ? ' · 보낼 것 있음' : ''}</p>
+          <p class="small">연결됨 · 키 {maskKey(cfg.key)} · 마지막 보냄 {when(lastSentAt())}{hasPending() ? ' · 보낼 것 있음' : ''}{retryBlocked() ? ' · 자동 재시도 멈춤 ("지금 보내기"로 다시)' : ''}</p>
           <div class="row wrap">
             <button onClick={async () => { const r = await pingSend(); setMsg({ t: r.message, ok: r.ok }); }}>연결 확인</button>
             <button class="primary" disabled={st.phase === 'sending'} onClick={async () => { const ok = await sendNow('manual'); setMsg({ t: ok ? 'PC로 보냈어요' : `보내지 못했어요: ${getSendState().error ?? ''}`, ok }); }}>지금 보내기</button>
