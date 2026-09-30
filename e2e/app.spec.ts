@@ -341,7 +341,7 @@ test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, �
   await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
   page.on('dialog', (d) => void d.accept());
   // 비밀 값 흉내: 자동 보내기 키는 localStorage에만. 어떤 파일에도 나가면 안 됨 (D-025)
-  await page.evaluate(() => localStorage.setItem('send.key', 'SECRET-KEY-123'));
+  await page.evaluate(() => localStorage.setItem('send.cfg', 'https://script.google.com/macros/s/AKfycbzTESTaaaaaaaaaaaaaaaaaaaa/exec#SECRETKEY1234567890ABCDEFGH'));
   await makeRoutine(page, ['등'], '30분'); // 플랜 생성 → 진단 'plan'
   await page.getByRole('button', { name: /시작/ }).first().click();
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
@@ -356,7 +356,7 @@ test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, �
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'PC로 보내기 (파일)' }).click()]);
   await expect(page.getByText(/PC로 보낼 파일을 내려받았어요/)).toBeVisible();
   const text = readFileSync(await dl.path(), 'utf8');
-  expect(text).not.toContain('SECRET-KEY-123');
+  expect(text).not.toContain('SECRETKEY1234567890ABCDEFGH');
   const j = JSON.parse(text);
   expect(j.schema).toBe(2);
   expect(j.device.label).toMatch(/Safari|Chrome/);
@@ -365,8 +365,8 @@ test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, �
   const dir = mkdtempSync(join(tmpdir(), 'e2e-sync-'));
   checkSyncDir(dir);
   copyFileSync(await dl.path(), join(dir, 'inbox', dl.suggestedFilename()));
-  const { results } = checkSyncDir(dir);
-  expect(results).toEqual([{ file: dl.suggestedFilename(), ok: true }]);
+  const { results } = checkSyncDir(dir, { settleMs: 0 });
+  expect(results).toEqual([{ file: dl.suggestedFilename(), ok: true, savedAs: dl.suggestedFilename() }]);
   expect(readFileSync(join(dir, 'checked', dl.suggestedFilename().replace('.json', '.summary.md')), 'utf8')).toContain('11 플랜 속도');
   // 끄면 더 이상 쌓이지 않음
   await page.getByLabel('진단 기록 남기기').uncheck();
@@ -381,10 +381,11 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   const KEY = 'K'.repeat(36) + 'Z9x8';
   const URL_ = 'https://script.google.com/macros/s/AKfycbzTEST' + 'a'.repeat(30) + '/exec';
   const got: { key: string; ping?: boolean; file?: { app: string; schema: number; data: { workouts: unknown[]; diag: { k: string }[] } } }[] = [];
-  let fail = false;
+  let fail = false, hang = false;
   const ctypes: string[] = [];
   await page.route(URL_, async (route) => {
     if (fail) return route.abort('internetdisconnected');
+    if (hang) return; // 응답 없이 멈춤 (보내는 도중 앱이 닫히는 상황)
     let body: typeof got[number];
     try { body = JSON.parse(route.request().postData() ?? '{}'); } catch (e) { console.log('PARSE', String(e)); body = { key: '' }; }
     got.push(body);
@@ -430,6 +431,24 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   await expect.poll(() => got.length).toBe(n + 1);
   await page.getByRole('link', { name: '설정' }).click();
   await expect(page.getByLabel('자동 보내기')).not.toContainText('보낼 것 있음');
+  // 보내는 도중 앱이 닫혀도(새로고침) 다음에 열 때 다시 보냄 (검토 1차 막는 문제 1)
+  hang = true;
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => localStorage.getItem('send.pending'))).toBe('1');
+  hang = false;
+  const n2 = got.length;
+  await page.reload();
+  await expect.poll(() => got.length).toBe(n2 + 1);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('send.pending'))).toBeNull();
+  // 인터넷이 끊겼다가 다시 연결되면 자동으로 다시 보냄 (막는 문제 2)
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.context().setOffline(true); fail = true; // Chromium은 가짜 서버가 오프라인에도 응답하므로 함께 끊음
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await expect(page.getByText(/보내지 못했어요: 인터넷에 연결되지 않았어요/)).toBeVisible();
+  const n3 = got.length;
+  fail = false; await page.context().setOffline(false);
+  await expect.poll(() => got.length).toBe(n3 + 1);
   // 끄기
   await page.getByRole('button', { name: '끄기' }).click();
   expect(await page.evaluate(() => localStorage.getItem('send.cfg'))).toBeNull();

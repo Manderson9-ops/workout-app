@@ -27,6 +27,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [picker, setPicker] = useState<{ mode: 'swap'; b: number; i: number } | { mode: 'add' } | null>(null);
   const [ended, setEnded] = useState(false);
   const [plate, setPlate] = useState<number | null>(null);
+  /** 운동 화면이 뜬 시각 (휴식이 끝날 때 이 화면에 있었는지 판정용, 진단) */
+  const shownAt = useRef(Date.now());
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
@@ -46,7 +48,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     if (rem <= 10 && rem > 0 && warned.current !== key) { warned.current = key; if (s.settings.soundOn) beep(660, 120); }
     if (rem === 0 && !wasAlerted(key)) {
       markAlerted(key); setEnded(true);
-      diagTimerEnd(key, s.settings.soundOn, audioState());
+      diagTimerEnd(key, s.settings.soundOn, audioState(), shownAt.current);
       if (s.settings.soundOn) { beep(880, 180); beep(880, 180, 0.3); beep(1175, 350, 0.6); }
     }
   }, [rem, w?.timer?.endsAt]);

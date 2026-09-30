@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { getSendConfig, saveSendConfig, clearSendConfig, pingSend, sendNow, lastSentAt, hasPending, useSendState } from '../autoSend';
+import { getSendConfig, saveSendConfig, clearSendConfig, pingSend, sendNow, lastSentAt, hasPending, useSendState, getSendState } from '../autoSend';
 import { maskKey } from '../../core/autoSendConfig';
 
 const when = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '없음');
@@ -22,20 +22,21 @@ export function AutoSendSection() {
   const st = useSendState();
   return (
     <div class="card" aria-label="자동 보내기">
-      <strong>자동 보내기 (운동 끝나면 PC로)</strong>
+      <strong>자동 보내기 (운동 끝나면 PC로) · 실험</strong>
+      <p class="sub small">PC 브라우저에서는 확인했고, 아이폰 홈 화면 앱에서 실제로 되는지는 아직 확인 전이에요. 연결 후 운동을 한 번 끝내 보고 알려 주세요.</p>
       {cfg ? (
         <>
           <p class="small">연결됨 · 키 {maskKey(cfg.key)} · 마지막 보냄 {when(lastSentAt())}{hasPending() ? ' · 보낼 것 있음' : ''}</p>
           <div class="row wrap">
             <button onClick={async () => { const r = await pingSend(); setMsg({ t: r.message, ok: r.ok }); }}>연결 확인</button>
-            <button class="primary" disabled={st.phase === 'sending'} onClick={async () => { const ok = await sendNow('manual'); setMsg({ t: ok ? 'PC로 보냈어요' : '보내지 못했어요', ok }); }}>지금 보내기</button>
+            <button class="primary" disabled={st.phase === 'sending'} onClick={async () => { const ok = await sendNow('manual'); setMsg({ t: ok ? 'PC로 보냈어요' : `보내지 못했어요: ${getSendState().error ?? ''}`, ok }); }}>지금 보내기</button>
             <button class="danger" onClick={() => { if (confirm('자동 보내기를 끌까요? 이 기기에서 설정이 지워져요.')) { clearSendConfig(); setCfg(undefined); setMsg({ t: '자동 보내기를 껐어요', ok: true }); } }}>끄기</button>
           </div>
         </>
       ) : (
         <>
           <p class="sub small">PC의 <strong>WORK_OUT_APP\sync\설정.txt</strong> 두 번째 줄(https://…#…)을 아이폰 파일 앱(구글 드라이브)에서 복사해 붙여넣으세요. 연결되면 그 파일은 지워 주세요.</p>
-          <input aria-label="자동 보내기 설정 붙여넣기" type="password" autoComplete="off" placeholder="https://script.google.com/…#…" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} />
+          <input aria-label="자동 보내기 설정 붙여넣기" type="text" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellcheck={false} style={{ WebkitTextSecurity: 'disc' } as Record<string, string>} placeholder="https://script.google.com/…#…" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} />
           <button class="primary" style={{ marginTop: '6px' }} disabled={!text.trim()} onClick={async () => {
             const r = saveSendConfig(text);
             if (!r.ok) { setMsg({ t: r.error, ok: false }); return; }

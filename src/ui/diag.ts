@@ -4,7 +4,7 @@
  * 설정에서 끌 수 있음 (localStorage 'diag.off' = '1').
  */
 import { db } from './store';
-import { DIAG_MAX, sanitize, browserLabel } from '../core/diag';
+import { DIAG_MAX, sanitize, browserLabel, classifyTimerEnd } from '../core/diag';
 import type { DiagEntry, DiagKind } from '../core/diag';
 import { APP_VERSION } from '../core/version';
 
@@ -25,7 +25,7 @@ export function setDiagEnabled(on: boolean) { if (on) localStorage.removeItem('d
 export function diag(k: DiagKind, f: { m?: string; v?: number; ok?: boolean } = {}): void {
   if (!diagEnabled()) return;
   const e: DiagEntry = { t: new Date().toISOString(), k, d: deviceId() };
-  if (f.m !== undefined) e.m = sanitize(f.m);
+  if (f.m !== undefined) e.m = sanitize(f.m, { numbers: k === 'error' });
   if (f.v !== undefined && Number.isFinite(f.v)) e.v = Math.round(f.v);
   if (f.ok !== undefined) e.ok = f.ok;
   buf.push(e);
@@ -39,16 +39,19 @@ export async function flushDiag(): Promise<void> {
   if (timer) { clearTimeout(timer); timer = undefined; }
   if (!buf.length) return;
   const items = buf.splice(0, buf.length);
-  try {
-    await db.transaction('rw', db.diag, async () => {
-      await db.diag.bulkAdd(items);
-      const n = await db.diag.count();
-      if (n > DIAG_MAX) {
-        const old = await db.diag.orderBy('id').limit(n - DIAG_MAX).primaryKeys();
-        await db.diag.bulkDelete(old);
-      }
-    });
-  } catch { /* 저장 실패는 조용히 버림 (진단 때문에 앱이 멈추면 안 됨) */ }
+  try { await writeDiag(items); } catch { /* 저장 실패는 조용히 버림 (진단 때문에 앱이 멈추면 안 됨) */ }
+}
+
+/** 저장하고 최근 max건만 남김 (오래된 것부터 지움). 테스트에서 직접 부름 */
+export async function writeDiag(items: DiagEntry[], max = DIAG_MAX): Promise<void> {
+  await db.transaction('rw', db.diag, async () => {
+    await db.diag.bulkAdd(items);
+    const n = await db.diag.count();
+    if (n > max) {
+      const old = await db.diag.orderBy('id').limit(n - max).primaryKeys();
+      await db.diag.bulkDelete(old);
+    }
+  });
 }
 
 export async function recentDiag(n = 50): Promise<DiagEntry[]> {
@@ -89,10 +92,10 @@ export function startDiag(): void {
 export let lastHiddenAt = 0;
 export let lastVisibleAt = 0;
 
-/** 휴식 끝을 알린 순간: 예정 시각보다 얼마나 늦었나. 그 사이 앱이 숨겨졌다면 "돌아와서 안 것"으로 따로 셈 */
-export function diagTimerEnd(endsAt: number, soundOn: boolean, audio: string): void {
+/** 휴식 끝을 알린 순간: 예정 시각보다 얼마나 늦었나. 운동 화면 밖이었거나 앱이 숨겨졌던 경우는 측정에서 뺌 (classifyTimerEnd) */
+export function diagTimerEnd(endsAt: number, soundOn: boolean, audio: string, screenShownAt: number): void {
   const now = Date.now();
-  const returned = lastHiddenAt > 0 && lastVisibleAt >= lastHiddenAt && lastVisibleAt > endsAt - 1000 && lastHiddenAt < endsAt;
-  diag('timer', { v: now - endsAt, ...(returned ? { m: 'returned' } : {}) });
+  const kind = classifyTimerEnd({ endsAt, now, screenShownAt, lastHiddenAt, lastVisibleAt, hiddenNow: document.visibilityState === 'hidden' });
+  diag('timer', { v: now - endsAt, m: kind });
   if (soundOn) diag('audio', { m: audio, ok: audio === 'running' });
 }
