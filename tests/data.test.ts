@@ -21,10 +21,12 @@ describe('운동 데이터 검증', () => {
     expect(base.length).toBeLessThanOrEqual(200);
     expect(new Set(base.map((e) => e.part)).size).toBe(8);
   });
-  it('WORK_OUT_K 영상 등급 43개(티어 항목 전부)가 35개 운동에 연결, 미적용 0', () => {
-    expect(Object.keys(wk.grades).length).toBe(35);
-    expect(Object.values(wk.grades).flat().length).toBe(43);
-    expect((wkFile as { unapplied: unknown[] }).unapplied).toEqual([]);
+  it('WORK_OUT_K 영상 등급 87개가 78개 운동에 연결, 미적용은 결정으로 뺀 것만 (M-15·16·22·24·26)', () => {
+    expect(Object.keys(wk.grades).length).toBe(78);
+    expect(Object.values(wk.grades).flat().length).toBe(87);
+    const un = (wkFile as { unapplied: { reason: string }[] }).unapplied;
+    expect(un.length).toBe(40);
+    expect(un.every((u) => u.reason.startsWith('반영 안 함'))).toBe(true);
   });
   it('분할 템플릿 8개, 추천 조합 1개', () => {
     expect(wk.templates.length).toBe(8);
@@ -119,8 +121,8 @@ describe('등급 고르기 (BLUEPRINT 3.3)', () => {
   });
   it('자세 포인트 연결: 고블릿 스쿼트, 스쿼트 계열(M-05), 체스트 서포티드 로우 계열(M-06)', () => {
     expect(get('goblet_squat').guide.length).toBeGreaterThan(10);
-    expect(get('back_squat').guide.length).toBe(3);
-    expect(get('lever_row_machine').guide.length).toBe(1);
+    expect(get('back_squat').guide.length).toBe(16); // 초보 스쿼트 3 + 새 영상의 스쿼트·하프·풀 스쿼트 자세 포인트
+    expect(get('lever_row_machine').guide.length).toBe(7); // 등 영상 1 + 새 영상의 로우 공통·서포티드 로우 자세 포인트
   });
   it('무거운 운동·한쪽씩 표시 (묶음 제외, 시간 계산에 사용)', () => {
     for (const id of ['bench_press', 'back_squat', 'deadlift', 'romanian_deadlift', 'barbell_row', 'close_grip_bench', 'good_morning', 'rack_pull', 'trap_bar_deadlift']) expect(get(id).heavy).toBe(true);

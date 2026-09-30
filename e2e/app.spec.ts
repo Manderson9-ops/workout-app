@@ -873,10 +873,10 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   await expect(page.getByLabel(`${first} 1세트 횟수`, { exact: true })).toHaveValue(String(reps0 + 1));
   await expect(page.getByLabel(`${first} ${sets0 + 1}세트 횟수`, { exact: true })).toBeVisible();
   await expect(page.getByLabel(`${first} ${sets0 + 2}세트 횟수`, { exact: true })).toHaveCount(0);
-  // 이두 운동은 내 운동 DB가 없음 → 흐린 기본 "정보"
-  const plain = page.getByRole('link', { name: `${first} 정보 (DB 없음)` });
+  // 이두도 이제 내 운동 DB(이두 티어 2026)가 있음 → 강조된 정보 버튼
+  const plain = page.getByRole('link', { name: `${first} 정보 (내 운동 DB: 영상 등급·자세 포인트)` });
   await expect(plain).toBeVisible();
-  await expect(plain).not.toHaveClass(/info-db/);
+  await expect(plain).toHaveClass(/info-db/);
   await plain.locator('xpath=..').screenshot({ path: `reports/screens/${test.info().project.name}-23-info-plain.png` });
   await checkScreen(page, '21-workout-info');
 });

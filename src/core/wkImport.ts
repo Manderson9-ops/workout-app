@@ -4,8 +4,11 @@
  */
 import type { Exercise, GradeEntry, GuideItem, Part, Level } from './types';
 
-export interface AliasEntry { name: string; exercise?: string; families?: string[]; status: 'CONFIRMED' | 'PROPOSED' | 'PENDING_MERGE'; decision?: string; note?: string }
+export interface AliasEntry { name: string; exercise?: string; exercises?: string[]; families?: string[]; status: 'CONFIRMED' | 'PROPOSED' | 'PENDING_MERGE'; decision?: string; note?: string }
 export interface GradeRule { video_id: string; exercise: string; grade: string; purpose_part?: Part; purpose_note?: string; sub_goal_only?: boolean; primary_topic?: boolean; decision?: string; note?: string }
+/** 반영하지 않는 티어 항목(영상+이름+등급)·이름. 실패가 아니라 '미적용'으로 기록 (M-15·16·22·24·26) */
+export interface SkipItem { video_id: string; exercise: string; grade?: string; reason: string; decision?: string }
+export interface SkipName { name: string; reason: string; decision?: string }
 export interface Decision { id: string; status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CUSTOM'; title: string; proposal: string; while_pending: string; resolution?: string }
 export interface Template { id: string; name: string; wk_names: string[]; per_week: string; days: Part[][]; generatable: boolean }
 export interface SubGoalRule { template: string; wk_name: string; purpose_note: string; sub_goal_only: boolean; decision?: string }
@@ -21,6 +24,10 @@ export interface ImportInput {
   families: Record<string, string>;
   aliases: AliasEntry[];
   topicParts: Record<string, Part>;
+  /** 운동이 아닌 티어 주제 (유전자·근육 난이도 등): 등급으로 쓰지 않음. 자세 포인트는 그대로 봄 (M-25) */
+  ignoreTopics?: string[];
+  skipItems?: SkipItem[];
+  skipNames?: SkipName[];
   rules: GradeRule[];
   decisions: Decision[];
   templates: Template[];
@@ -67,13 +74,18 @@ export function runImport(inp: ImportInput): ImportResult {
   }
   const aliasByName = new Map(inp.aliases.map((a) => [normalizeName(a.name), a]));
 
+  const skipNames = new Map((inp.skipNames ?? []).map((s) => [normalizeName(s.name), s]));
   const resolve = (name: string): { ids: string[]; via: string } | { ids: null; failed: boolean; reason: string } => {
+    const sk = skipNames.get(normalizeName(name));
+    if (sk && allows(sk.decision, false)) return { ids: null, failed: false, reason: `반영 안 함: ${sk.reason}` };
     const a = aliasByName.get(normalizeName(name));
     if (a) {
       if (!allows(a.decision, a.status === 'PENDING_MERGE')) return { ids: null, failed: false, reason: `결정 ${a.decision} 대기/거절로 미적용` };
-      if (a.exercise) {
-        if (!byId.has(a.exercise)) return { ids: null, failed: true, reason: `별칭 대상 운동 없음: ${a.exercise}` };
-        return { ids: [a.exercise], via: `별칭(${a.status})` };
+      if (a.exercise || a.exercises) {
+        const ids = a.exercises ?? [a.exercise!];
+        const missing = ids.filter((x) => !byId.has(x));
+        if (missing.length) return { ids: null, failed: true, reason: `별칭 대상 운동 없음: ${missing.join(', ')}` };
+        return { ids, via: `별칭(${a.status})` };
       }
       const ids = inp.base.filter((e) => a.families!.includes(e.family)).map((e) => e.id);
       if (!ids.length) return { ids: null, failed: true, reason: `별칭 대상 묶음 비어 있음` };
@@ -111,9 +123,12 @@ export function runImport(inp: ImportInput): ImportResult {
       }
     } else if (tl) {
       const part = inp.topicParts[tl.key];
-      if (!part) { unresolved.push(`[주제] ${tl.key} (topic_parts에 부위 매핑 없음)`); continue; }
-      for (const it of tl.items) {
+      const ignored = (inp.ignoreTopics ?? []).includes(tl.key);
+      if (!part && !ignored) unresolved.push(`[주제] ${tl.key} (topic_parts에 부위 매핑 없음)`);
+      for (const it of part && !ignored ? tl.items : []) {
         tierItemCount++;
+        const skip = (inp.skipItems ?? []).find((s) => s.video_id === r.video_id && s.exercise === it.exercise && (!s.grade || s.grade === it.grade));
+        if (skip && allows(skip.decision, false)) { unapplied.push({ video_id: r.video_id, exercise: it.exercise, grade: it.grade, reason: `반영 안 함: ${skip.reason}` }); continue; }
         const res = resolve(it.exercise);
         if (res.ids === null) {
           if (res.failed) unresolved.push(`[${tl.topic}] ${it.exercise}: ${res.reason}`);
@@ -126,7 +141,7 @@ export function runImport(inp: ImportInput): ImportResult {
         for (const id of res.ids) {
           const g: GradeEntry = {
             value: it.grade as GradeEntry['value'], levels: it.levels ?? [],
-            purpose_part: (ok && rule?.purpose_part) || part,
+            purpose_part: (ok && rule?.purpose_part) || part!,
             ...(ok && rule?.purpose_note ? { purpose_note: rule.purpose_note } : {}),
             ...(ok && rule?.sub_goal_only ? { sub_goal_only: true } : {}),
             source: 'VIDEO', why: it.why, target: it.target, video_id: r.video_id, timestamp: it.timestamp,

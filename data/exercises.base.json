@@ -94,7 +94,7 @@
     {"id":"seated_dip_machine","name_ko":"딥스 머신 (시티드)","family":"dip_triceps","part":"삼두","muscles":["삼두"],"pattern":"V_PUSH","mechanics":"compound","equipment":["machine"],"default_reps":[8,12]},
 
     {"id":"wrist_curl","name_ko":"리스트 컬","family":"wrist_curl","part":"전완·악력","muscles":["전완 굴곡근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["dumbbell"],"default_reps":[12,20]},
-    {"id":"reverse_wrist_curl","name_ko":"리버스 리스트 컬","family":"wrist_curl","part":"전완·악력","muscles":["전완 신전근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["dumbbell"],"default_reps":[12,20]},
+    {"id":"reverse_wrist_curl","name_ko":"리버스 리스트 컬","family":"wrist_ext","part":"전완·악력","muscles":["전완 신전근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["dumbbell"],"default_reps":[12,20]},
     {"id":"reverse_curl","name_ko":"리버스 컬","family":"reverse_curl","part":"전완·악력","muscles":["상완요골근","전완 신전근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["barbell"]},
     {"id":"farmers_walk","name_ko":"파머스 워크","family":"carry","part":"전완·악력","muscles":["악력","승모근","코어"],"pattern":"CARRY","mechanics":"compound","equipment":["dumbbell"],"measure":"time","default_seconds":40},
     {"id":"dead_hang","name_ko":"데드 행","aliases":["매달리기"],"family":"hang","part":"전완·악력","muscles":["악력"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["bodyweight"],"measure":"time","default_seconds":40},
@@ -157,6 +157,22 @@
     {"id":"cable_pull_through","name_ko":"케이블 풀스루","family":"rdl","part":"하체","muscles":["둔근","햄스트링"],"pattern":"HINGE","mechanics":"compound","equipment":["cable"],"default_reps":[10,15]},
     {"id":"hanging_knee_raise","name_ko":"행잉 니 레이즈","family":"leg_raise","part":"코어","muscles":["복직근 하부"],"pattern":"CORE","mechanics":"isolation","equipment":["bodyweight"],"default_reps":[8,15]},
     {"id":"reverse_crunch","name_ko":"리버스 크런치","family":"crunch","part":"코어","muscles":["복직근 하부"],"pattern":"CORE","mechanics":"isolation","equipment":["bodyweight"],"default_reps":[10,20]},
-    {"id":"cable_woodchop","name_ko":"케이블 우드촙","family":"rotation","part":"코어","muscles":["복사근"],"pattern":"CORE","mechanics":"isolation","equipment":["cable"],"unilateral":true,"default_reps":[10,15]}
+    {"id":"cable_woodchop","name_ko":"케이블 우드촙","family":"rotation","part":"코어","muscles":["복사근"],"pattern":"CORE","mechanics":"isolation","equipment":["cable"],"unilateral":true,"default_reps":[10,15]},
+    {"id":"lying_lever_chest_press","name_ko":"레버 체스트 프레스 머신 (누워서)","aliases":["해머 스트렝스 라잉 체스트 프레스"],"family":"chest_press_flat","part":"가슴","muscles":["대흉근","전면 삼각근","삼두"],"pattern":"H_PUSH","mechanics":"compound","equipment":["machine"],"default_reps":[8,12],"note":"해머 스트렝스류 레버 구조, 누워서 (M-17)"},
+    {"id":"seated_lever_chest_press","name_ko":"레버 체스트 프레스 머신 (앉아서)","aliases":["해머 스트렝스 체스트 프레스 머신 (앉아서)","해머 스트렝스 머신 체스트 프레스"],"family":"chest_press_flat","part":"가슴","muscles":["대흉근","전면 삼각근","삼두"],"pattern":"H_PUSH","mechanics":"compound","equipment":["machine"],"default_reps":[8,12],"note":"해머 스트렝스류 레버 구조, 앉아서 (M-17)"},
+    {"id":"pinch_press","name_ko":"핀치 프레스","aliases":["플레이트 핀치 프레스","스미스 머신 핀치 프레스"],"family":"pinch_press","part":"가슴","muscles":["대흉근"],"pattern":"H_PUSH","mechanics":"isolation","equipment":["other"],"default_reps":[10,15]},
+    {"id":"rotary_torso_machine","name_ko":"로터리 토르소 머신","aliases":["로터리 머신","로터리 코어 머신"],"family":"rotation","part":"코어","muscles":["복사근"],"pattern":"CORE","mechanics":"isolation","equipment":["machine"],"default_reps":[10,15]},
+    {"id":"captains_chair_leg_raise","name_ko":"딥스바 레그 레이즈 (캡틴스 체어)","aliases":["딥스바 레그레이즈","캡틴스 체어 레그 레이즈"],"family":"leg_raise","part":"코어","muscles":["복직근 하부","고관절 굴곡근"],"pattern":"CORE","mechanics":"isolation","equipment":["bodyweight"],"default_reps":[10,15]},
+    {"id":"weighted_sit_up","name_ko":"싯업 (중량)","aliases":["중량 싯업","싯업"],"family":"crunch","part":"코어","muscles":["복직근"],"pattern":"CORE","mechanics":"isolation","equipment":["other"],"default_reps":[8,15]},
+    {"id":"weighted_plank","name_ko":"중량 플랭크","family":"plank","part":"코어","muscles":["복직근","복횡근"],"pattern":"CORE","mechanics":"isolation","equipment":["other"],"measure":"time","default_seconds":40,"note":"등에 원판을 올린 플랭크 (M-18)"},
+    {"id":"flutter_kick","name_ko":"플러터 킥","aliases":["누워서 발차기"],"family":"leg_raise","part":"코어","muscles":["복직근 하부","고관절 굴곡근"],"pattern":"CORE","mechanics":"isolation","equipment":["bodyweight"],"measure":"time","default_seconds":30},
+    {"id":"elbow_supported_incline_curl","name_ko":"팔꿈치 서포티드 인클라인 컬","family":"curl_stretch","part":"이두","muscles":["이두근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["dumbbell"],"default_reps":[8,12],"note":"인클라인 벤치에 팔꿈치를 받치고 하는 컬"},
+    {"id":"seated_barbell_wrist_curl","name_ko":"시티드 바벨 리스트 컬","family":"wrist_curl","part":"전완·악력","muscles":["전완 굴곡근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["barbell"],"default_reps":[12,20]},
+    {"id":"seated_barbell_wrist_ext","name_ko":"시티드 바벨 리스트 익스텐션","family":"wrist_ext","part":"전완·악력","muscles":["전완 신전근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["barbell"],"default_reps":[12,20]},
+    {"id":"standing_barbell_wrist_curl","name_ko":"스탠딩 바벨 리스트 컬","aliases":["비하인드 백 리스트 컬"],"family":"wrist_curl","part":"전완·악력","muscles":["전완 굴곡근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["barbell"],"default_reps":[12,20]},
+    {"id":"wrist_roller","name_ko":"리스트 롤러","family":"wrist_roller","part":"전완·악력","muscles":["전완 굴곡근","전완 신전근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["other"],"default_reps":[3,5]},
+    {"id":"hand_gripper","name_ko":"악력기","family":"grip","part":"전완·악력","muscles":["손가락 굴곡근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["other"],"default_reps":[10,20]},
+    {"id":"sissy_squat","name_ko":"시시 스쿼트","family":"sissy_squat","part":"하체","muscles":["대퇴사두","대퇴직근"],"pattern":"ISOLATION","mechanics":"isolation","equipment":["bodyweight"],"default_reps":[8,15]},
+    {"id":"dual_cable_pulldown","name_ko":"양옆 케이블 풀다운","aliases":["케이블 풀다운 (양옆 케이블)","케이블 풀다운(양옆 케이블)"],"family":"lat_pulldown","part":"등","muscles":["대원근","능형근","광배근"],"pattern":"V_PULL","mechanics":"compound","equipment":["cable"],"default_reps":[10,15],"note":"양쪽 높은 케이블을 하나씩 잡고 옆에서 당기는 풀다운"}
   ]
 }

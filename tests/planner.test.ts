@@ -97,11 +97,22 @@ describe('BLUEPRINT 5.7.1 계산 예시 (고정 사례)', () => {
 });
 
 describe('앱 기본 추천 순서 (M-14)', () => {
-  it('영상 등급 없는 부위는 대표 운동부터: 가슴 벤치프레스, 하체 백스쿼트', () => {
+  it('영상 등급 없는 부위는 대표 운동부터 (어깨), 영상 등급이 있으면 영상 먼저·빈 자리는 대표 운동 (가슴: 스미스 벤치 S, 펙덱 A+, 인클라인은 추천 순서)', () => {
+    const sh = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, real);
+    expect(sh.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(expect.arrayContaining(['db_shoulder_press', 'db_lateral_raise', 'reverse_pec_deck']));
     const chest = generatePlan({ parts: [{ part: '가슴', priority: 'high' }], level: '중급' }, real);
-    expect(chest.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(expect.arrayContaining(['bench_press', 'incline_db_press', 'cable_fly']));
+    expect(chest.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(expect.arrayContaining(['smith_bench_press', 'pec_deck', 'incline_db_press']));
+  });
+  it('M-27: 하체 플랜의 대퇴사두 운동은 2개까지 (대퇴사두 영상 S 3개가 몰려도 힌지가 들어감)', () => {
     const legs = generatePlan({ parts: [{ part: '하체', priority: 'high' }], level: '중급' }, real);
-    expect(legs.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(expect.arrayContaining(['back_squat', 'romanian_deadlift', 'leg_press']));
+    const ids = legs.blocks.flatMap((b) => b.items.map((i) => i.exerciseId));
+    expect(ids).toEqual(expect.arrayContaining(['smith_squat', 'leg_extension', 'romanian_deadlift']));
+    expect(ids).not.toContain('sissy_squat');
+    expect(legs.reasons.some((r) => r.includes('M-27'))).toBe(true);
+  });
+  it('M-28: 전완은 굽히기·펴기 묶음이 달라 둘 다 들어감', () => {
+    const fa = generatePlan({ parts: [{ part: '전완·악력', priority: 'high' }], level: '중급' }, real);
+    expect(fa.blocks.flatMap((b) => b.items.map((i) => i.exerciseId)).slice(0, 2)).toEqual(['seated_barbell_wrist_curl', 'seated_barbell_wrist_ext']);
   });
   it('영상 등급 운동의 순서에는 영향 없음 (5.7.1 기본안 동일)', () => {
     const withStaples = buildExercises(baseFile.exercises as Exercise[], wkFile as unknown as WorkoutKData, { 등: ['kelso_shrug'] });
@@ -116,11 +127,12 @@ describe('앱 기본 추천 순서 (M-14)', () => {
 
 describe('특수 상황', () => {
   const base: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }], level: '중급' };
-  it('등급 미달 대체: 가슴은 영상 등급이 없어 S 이상이 없음 → 최고 등급 1개로 대체', () => {
-    const p = generatePlan({ ...base, minGrade: 'S' }, real);
+  const shoulder: PlanRequest = { parts: [{ part: '어깨', priority: 'high' }], level: '중급' };
+  it('등급 미달 대체: 어깨는 영상 등급이 없어 S 이상이 없음 → 최고 등급 1개로 대체', () => {
+    const p = generatePlan({ ...shoulder, minGrade: 'S' }, real);
     expect(p.blocks.flatMap((b) => b.items).every((i) => i.substituted)).toBe(true);
     expect(p.reasons.some((r) => r.includes('등급 미달 대체'))).toBe(true);
-    expect(validatePlan(p, { ...base, minGrade: 'S' }, real)).toEqual([]);
+    expect(validatePlan(p, { ...shoulder, minGrade: 'S' }, real)).toEqual([]);
   });
   it('장비가 없으면 부위가 빠지고 이유 표시', () => {
     const r: PlanRequest = { ...base, parts: [{ part: '가슴', priority: 'high' }, { part: '등', priority: 'normal' }], equipment: ['band'] };
@@ -169,7 +181,7 @@ describe('특수 상황', () => {
     if (p.rest.compound < 150) expect(p.rest.isolation).toBe(60);
   });
   it('사용자 등급과 세부 목표 반영', () => {
-    const r: PlanRequest = { parts: [{ part: '전완·악력', priority: 'high' }], level: '중급', minGrade: 'A', subGoals: { '전완·악력': '악력' }, userGrades: { farmers_walk: 'S' } };
+    const r: PlanRequest = { parts: [{ part: '전완·악력', priority: 'high' }], level: '중급', minGrade: 'A', subGoals: { '전완·악력': '악력' }, userGrades: { farmers_walk: 'S' }, excluded: ['seated_barbell_wrist_curl', 'seated_barbell_wrist_ext'] }; // 새 전완 영상 S·A+ 운동은 빼고 원래 의도(사용자 등급·세부 목표)만 확인
     const ids = generatePlan(r, real).blocks.flatMap((b) => b.items.map((i) => i.exerciseId));
     expect(ids).toEqual(expect.arrayContaining(['farmers_walk', 'towel_pull_up']));
   });
@@ -353,16 +365,16 @@ describe('잠금 (5.10)', () => {
 });
 
 describe('검토 지적 회귀 테스트', () => {
-  it('다른 부위 풀에만 있는 운동이 이 부위를 막지 않음: 등+하체 최소 D에서 하체에 루마니안 데드리프트', () => {
+  it('다른 부위 풀에만 있는 운동이 이 부위를 막지 않음: 등+하체 최소 D에서 하체에 스쿼트와 힌지 1개', () => {
     const q: PlanRequest = { parts: [{ part: '등', priority: 'high' }, { part: '하체', priority: 'high' }], level: '중급', minGrade: 'D' };
     const p = generatePlan(q, real);
     const ids = p.blocks.flatMap((b) => b.items.map((i) => i.exerciseId));
-    expect(ids).toContain('back_squat');
+    expect(ids).toContain('smith_squat');
     expect(ids.filter((i) => ['deadlift', 'romanian_deadlift', 'rack_pull', 'good_morning', 'sumo_deadlift', 'trap_bar_deadlift'].includes(i)).length).toBe(1);
     expect(validatePlan(p, q, real)).toEqual([]);
   });
   it('시간 운동은 횟수 대신 초', () => {
-    const p = generatePlan({ parts: [{ part: '코어', priority: 'high' }], level: '중급', favorites: ['plank'], minGrade: 'B' }, real);
+    const p = generatePlan({ parts: [{ part: '코어', priority: 'high' }], level: '중급', locked: [{ part: '코어', exerciseId: 'plank', sets: 3 }] }, real);
     const plank = p.blocks.flatMap((b) => b.items).find((i) => i.exerciseId === 'plank')!;
     expect(plank).toMatchObject({ reps: 0, seconds: 45 });
   });
@@ -388,8 +400,8 @@ describe('검토 지적 회귀 테스트', () => {
     expect(r60.reasons.some((x) => x.includes('남는 시간에') && x.includes('긴 로프'))).toBe(true);
     const r45 = generatePlan(req571(45), ex571);
     expect(r45.reasons.some((x) => /약 \d+분 절약/.test(x))).toBe(true);
-    const chest = generatePlan({ parts: [{ part: '가슴', priority: 'high' }], level: '중급' }, real);
-    expect(chest.reasons.some((x) => x.includes('추정 등급 운동 3개') && x.includes('M-14'))).toBe(true);
+    const sh = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, real);
+    expect(sh.reasons.some((x) => x.includes('추정 등급 운동 3개') && x.includes('M-14'))).toBe(true);
     const legs = generatePlan({ parts: [{ part: '하체', priority: 'high' }], level: '중급' }, real);
     expect(legs.reasons.some((x) => x.includes('M-12'))).toBe(true);
     // 여유가 없으면 상한 문구 없음

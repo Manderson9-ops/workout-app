@@ -11,6 +11,9 @@ import type { ResolvedGrade } from './exercises';
 import { DEFAULT_TIME, targetReps, setTime, blockTime, warmupFor } from './time';
 import type { TimeParams, TimedBlock, TimedItem, Warmup } from './time';
 
+/** M-27: 부위별 같은 주 근육(muscles[0]) 운동 상한 */
+export const MUSCLE_CAP: Partial<Record<Part, Record<string, number>>> = { 하체: { 대퇴사두: 2 } };
+
 export type Priority = 'high' | 'normal' | 'low';
 export type Grouping = 'superset' | 'compound';
 
@@ -144,7 +147,11 @@ function buildPools(req: PlanRequest, all: BuiltExercise[], reasons: string[]): 
       substituted = true;
       reasons.push(`${p.part}: 최소 등급 ${minGrade} 이상 운동이 없어 가장 높은 등급(${ok[0]!.grade.value}) 운동으로 대체 (등급 미달 대체)`);
     }
-    const fits = (e: BuiltExercise) => !families.has(e.family) && !(isHeavyHinge(e) && heavyInPool);
+    // M-27: 부위 안에서 같은 주 근육 운동 개수 상한 (하체: 대퇴사두 2개. 영상이 대퇴사두만 다뤄 S가 몰려도 햄스트링·둔근이 빠지지 않게)
+    const cap = MUSCLE_CAP[p.part] ?? {};
+    let capped = false;
+    const overCap = (e: BuiltExercise) => { const m = e.muscles[0]!; const n = cap[m]; return n !== undefined && pool.filter((x) => x.ex.muscles[0] === m).length >= n; };
+    const fits = (e: BuiltExercise) => !families.has(e.family) && !(isHeavyHinge(e) && heavyInPool) && !(overCap(e) && (capped = true));
     const remaining = [...ok];
     const limit = req.lockedOnly && lockedCount ? lockedCount : lockedCount + poolSize;
     while (pool.length < limit && remaining.length) {
@@ -155,6 +162,7 @@ function buildPools(req: PlanRequest, all: BuiltExercise[], reasons: string[]): 
       if (idx < 0) break;
       take(remaining.splice(idx, 1)[0]!, substituted);
     }
+    if (capped) reasons.push(`${p.part}: ${Object.entries(cap).map(([m, n]) => `${m} 운동은 ${n}개까지`).join(', ')} (M-27)`);
     const base = parts.length >= 5 ? 2 : p.priority === 'high' ? 3 : 2;
     states.push({ part: p.part, priority: p.priority, order: p.order, pool, baseCount: Math.max(lockedCount, Math.min(base, pool.length)), lockedCount, lockedSets });
   }
