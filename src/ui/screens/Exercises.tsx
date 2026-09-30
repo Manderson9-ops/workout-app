@@ -1,3 +1,4 @@
+import { scopedKey } from '../appName';
 import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf } from '../store';
@@ -20,7 +21,7 @@ const KEY = 'exerciseFilter.v1';
 
 export function Exercises({ s }: { s: AppState }) {
   const all = catalog(s.custom);
-  const saved = (() => { try { return JSON.parse(sessionStorage.getItem(KEY) ?? '{}'); } catch { return {}; } })();
+  const saved = (() => { try { return JSON.parse(sessionStorage.getItem(scopedKey(KEY)) ?? '{}'); } catch { return {}; } })();
   const [q, setQ] = useState<string>(saved.q ?? '');
   const [part, setPart] = useState<Part | undefined>(saved.part);
   const [favOnly, setFavOnly] = useState<boolean>(!!saved.favOnly);
@@ -28,7 +29,7 @@ export function Exercises({ s }: { s: AppState }) {
   const [adding, setAdding] = useState(false);
   const [equip, setEquip] = useState<Equipment | ''>(saved.equip ?? '');
   const [minG, setMinG] = useState<Grade | ''>(saved.minG ?? '');
-  const remember = (p: object) => sessionStorage.setItem(KEY, JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, ...p }));
+  const remember = (p: object) => sessionStorage.setItem(scopedKey(KEY), JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, ...p }));
   const level = s.settings.level;
   const rows = all
     .filter((e) => (part ? eligibleParts(e).includes(part) : true))

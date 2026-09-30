@@ -1,4 +1,4 @@
-import { lsGet, lsSet, lsRemove } from '../appName';
+import { lsGet, lsSet, lsRemove, scopedKey } from '../appName';
 import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { catalog, templates } from '../catalog';
@@ -50,10 +50,10 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const byId = new Map(all.map((e) => [e.id, e]));
   const [f, setF] = useState<Form>(loadForm);
   // 만든 플랜은 다른 화면에 다녀와도 남도록 sessionStorage에 보관
-  const [plan, setPlanRaw] = useState<Plan | null>(() => { try { return JSON.parse(sessionStorage.getItem(PLAN_KEY) ?? 'null'); } catch { return null; } });
-  const setPlan = (p: Plan | null) => { setPlanRaw(p); if (p) sessionStorage.setItem(PLAN_KEY, JSON.stringify(p)); else sessionStorage.removeItem(PLAN_KEY); };
-  const [locks, setLocksRaw] = useState<Set<string>>(() => new Set(JSON.parse(sessionStorage.getItem(LOCK_KEY) ?? '[]') as string[]));
-  const setLocks = (l: Set<string>) => { setLocksRaw(l); sessionStorage.setItem(LOCK_KEY, JSON.stringify([...l])); };
+  const [plan, setPlanRaw] = useState<Plan | null>(() => { try { return JSON.parse(sessionStorage.getItem(scopedKey(PLAN_KEY)) ?? 'null'); } catch { return null; } });
+  const setPlan = (p: Plan | null) => { setPlanRaw(p); if (p) sessionStorage.setItem(scopedKey(PLAN_KEY), JSON.stringify(p)); else sessionStorage.removeItem(scopedKey(PLAN_KEY)); };
+  const [locks, setLocksRaw] = useState<Set<string>>(() => new Set(JSON.parse(sessionStorage.getItem(scopedKey(LOCK_KEY)) ?? '[]') as string[]));
+  const setLocks = (l: Set<string>) => { setLocksRaw(l); sessionStorage.setItem(scopedKey(LOCK_KEY), JSON.stringify([...l])); };
   const [picker, setPicker] = useState<{ b: number; i: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');

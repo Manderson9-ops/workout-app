@@ -4,9 +4,13 @@
  * 본판은 예전 키 이름을 그대로 써서 기존 데이터를 유지한다.
  */
 const base = (typeof import.meta !== 'undefined' && (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL) || '/workout-app/';
-export const APP = base.split('/').filter(Boolean).pop() || 'workout-app';
+/** 배포 경로 → 앱 이름 ('/workout-app/' → 'workout-app', '/workout-app-next/' → 'workout-app-next') */
+export const appFromBase = (b: string) => b.split('/').filter(Boolean).pop() || 'workout-app';
+export const APP = appFromBase(base);
 export const DB_NAME = APP;
 const key = (k: string) => (APP === 'workout-app' ? k : `${APP}:${k}`);
+/** sessionStorage 키도 앱 이름별로 */
+export const scopedKey = key;
 const ls = (): Storage | undefined => { try { return typeof localStorage !== 'undefined' ? localStorage : undefined; } catch { return undefined; } };
 const mem = new Map<string, string>();
 /** 저장 실패(용량 초과·사생활 모드)해도 앱이 멈추지 않게 메모리로 대신함 */

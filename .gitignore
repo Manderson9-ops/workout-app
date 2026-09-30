@@ -11,3 +11,6 @@ test-results/
 playwright-report/
 reports/screens/
 sync/
+tools/gas/local.json
+tools/gas/Code.gs
+dist-next/

@@ -206,6 +206,21 @@ describe('서비스 워커 캐시: 자기 앞머리만 지움 (D-031)', () => {
   it('본판은 옛 workout-app-v1과 자기 옛 버전만 지우고, 미리 보기 판 캐시는 그대로', async () => {
     expect(await run('https://x.github.io/workout-app/', ['workout-app-v1', 'workout-app:v1', 'workout-app:v2', 'workout-app-next:v1', 'other'])).toEqual(['workout-app-v1', 'workout-app:v1']);
   });
+  it('설치 때 화면을 새로 받아 assets까지 미리 담음', async () => {
+    const src = readFileSync('public/sw.js', 'utf8');
+    const added: string[] = []; const handlers: Record<string, (e: unknown) => void> = {};
+    const html = '<script type="module" src="/workout-app/assets/index-AB.js"></script><link rel="stylesheet" href="/workout-app/assets/index-CD.css">';
+    const cache = { addAll: async (xs: (string | Request)[]) => { for (const x of xs) added.push(typeof x === 'string' ? x : `${x.url}|${x.cache}`); }, match: async () => new Response(html), put: async () => undefined };
+    const self = { registration: { scope: 'https://x.github.io/workout-app/' }, addEventListener: (n: string, h: (e: unknown) => void) => { handlers[n] = h; } };
+    const caches = { open: async () => cache };
+    new Function('self', 'caches', 'location', 'fetch', 'Request', src)(self, caches, new URL('https://x.github.io/workout-app/'), async () => undefined, class { url: string; cache: string; constructor(u: string, o: { cache: string }) { this.url = u; this.cache = o.cache; } });
+    let p: Promise<unknown> = Promise.resolve();
+    handlers.install!({ waitUntil: (x: Promise<unknown>) => { p = x; } });
+    await p;
+    expect(added).toContain('./|reload');
+    expect(added).toContain('https://x.github.io/workout-app/assets/index-AB.js');
+    expect(added).toContain('https://x.github.io/workout-app/assets/index-CD.css');
+  });
   it('미리 보기 판은 본판 캐시를 지우지 않음', async () => {
     expect(await run('https://x.github.io/workout-app-next/', ['workout-app-v1', 'workout-app:v2', 'workout-app-next:v1'])).toEqual(['workout-app-next:v1']);
   });
