@@ -103,10 +103,6 @@ export function useDragSort(count: number, onMove: (from: number, to: number) =>
     L.grid = L.rects.some((r, i) => L.rects.some((q, j) => j !== i && Math.abs(q.t - r.t) < 4));
     L.started = true;
     (document.activeElement as HTMLElement | null)?.blur?.(); // 입력 중이면 키보드 닫기 (아이폰은 버튼을 눌러도 초점이 안 빠짐)
-    // 손잡이가 DOM에서 빠지면 손잡이 이벤트가 안 옴 → 문서에서도 끝을 받음
-    const up = (e: PointerEvent) => { if (live.current === L && e.pointerId === L.pid) end(e.type === 'pointerup'); };
-    document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', up, true);
-    L.off = () => { document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', up, true); };
     L.el.classList.add('dragging');
     document.documentElement.classList.add('sorting');
     setDrag({ from: L.from, over: L.from });
@@ -141,6 +137,11 @@ export function useDragSort(count: number, onMove: (from: number, to: number) =>
       e.preventDefault(); // 글자 선택·길게 누르기 메뉴 막기
       try { handle.setPointerCapture(e.pointerId); } catch { /* 합성 이벤트 */ }
       live.current = { from: i, over: i, pid: e.pointerId, started: false, handle, el, x0: e.clientX, y0: e.clientY, sx0: window.scrollX, sy0: window.scrollY, px: e.clientX, py: e.clientY, rects: [], grid: false, raf: 0 };
+      // 손잡이가 DOM에서 빠지면(끌기 시작 전이라도) 손잡이 이벤트가 안 옴 → 문서에서도 끝을 받음. 빠진 손잡이면 옮기지 않음
+      const L = live.current;
+      const up = (ev: PointerEvent) => { if (live.current === L && ev.pointerId === L.pid) end(ev.type === 'pointerup' && L.handle.isConnected); };
+      document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', up, true);
+      L.off = () => { document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', up, true); };
     },
     onPointerMove: (e: PointerEvent) => {
       const L = live.current;
