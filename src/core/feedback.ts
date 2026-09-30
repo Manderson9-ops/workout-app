@@ -50,7 +50,7 @@ export function feedbackOk(x: unknown): boolean {
 
 interface ChangelogVersion { version: string; feedback_ids?: string[]; deferred?: { id: string; reason: string }[] }
 
-/** 지운 메모의 ID도 넘겨야 번호가 다시 쓰이지 않음 (지운 02를 새 메모가 다시 쓰면 PC 가져오기·CHANGELOG 상태가 섞임) */
+/** 새 ID가 겹치지 않는지 볼 목록: 지금 메모 + 지운 메모(지움 표시) ID */
 export const usedFeedbackIds = (live: string[], tombIds: string[]) => [...live, ...tombIds];
 
 /**
