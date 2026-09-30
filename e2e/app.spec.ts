@@ -652,7 +652,19 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   await w.click(); await w.fill('40'); await w.press('Enter');
   expect(await pc.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toMatch(/1세트 횟수$/);
   await pc.keyboard.press('Control+Enter');
+  await expect(pc.getByText('1/9세트')).toBeVisible();
   await expect(pc.getByRole('timer')).toBeVisible();
+  // 아래 고정 바는 메뉴를 덮지 않고 바닥에 붙음
+  const tb = await pc.locator('.timer').boundingBox();
+  expect(tb!.x).toBeGreaterThanOrEqual(199);
+  expect(Math.round(tb!.y + tb!.height)).toBe(900);
+  // Ctrl+Enter를 누르고 있어도(반복) 세트가 연달아 끝나지 않음
+  const doneBefore = await pc.locator('[aria-label$="완료됨"], .set.done').count();
+  await pc.keyboard.down('Control'); await pc.keyboard.down('Enter');
+  await pc.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, repeat: true })));
+  await pc.keyboard.up('Enter'); await pc.keyboard.up('Control');
+  expect(await pc.locator('[aria-label$="완료됨"], .set.done').count()).toBeLessThanOrEqual(doneBefore + 1);
+  await expect(pc.getByText(/^[12]\/9세트$/)).toBeVisible();
   await checkScreen(pc, '20-pc-workout');
   // 폰 화면으로 보기
   await pc.getByRole('link', { name: '설정' }).click();
@@ -661,6 +673,11 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   expect(main!.width).toBeLessThanOrEqual(430);
   const nav2 = await pc.locator('nav.nav').boundingBox();
   expect(nav2!.width).toBeLessThanOrEqual(430);
+  // 운동 화면 고정 바도 폰 폭
+  await pc.getByRole('link', { name: '운동', exact: true }).click();
+  const tb2 = await pc.locator('.timer').boundingBox();
+  expect(tb2!.width).toBeLessThanOrEqual(430);
+  await pc.getByRole('link', { name: '설정' }).click();
   await pc.getByLabel('폰 화면으로 보기').uncheck();
   await ctx.close();
 });

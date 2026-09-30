@@ -60,7 +60,10 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
           // PC 키보드: Enter로 다음 입력칸 (D-030)
           if (e.key !== 'Enter' || e.isComposing) return;
           e.preventDefault();
-          const all = [...document.querySelectorAll<HTMLInputElement>('input:not([type=checkbox]):not([type=file]):not([disabled])')].filter((x) => x.offsetParent !== null);
+          // 같은 시트(또는 본문) 안에서만, −/+ 조절 칸(같은 값의 두 번째 칸)은 건너뜀
+          const scope = (e.currentTarget as HTMLElement).closest('.sheet, main') ?? document;
+          const all = [...scope.querySelectorAll<HTMLInputElement>('input:not([type=checkbox]):not([type=file]):not([disabled])')]
+            .filter((x) => x.offsetParent !== null && (x === e.currentTarget || !(x.getAttribute('aria-label') ?? '').endsWith('조절')));
           const i = all.indexOf(e.currentTarget as HTMLInputElement);
           (all[i + 1] ?? (e.currentTarget as HTMLInputElement)).focus();
           if (!all[i + 1]) (e.currentTarget as HTMLInputElement).blur();

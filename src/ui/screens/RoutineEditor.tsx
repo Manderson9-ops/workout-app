@@ -40,6 +40,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         <button onClick={() => setR(applyRestToAll(r, rest.compound, rest.round))}>길게 {rest.compound}초</button>
       </div>
       {!r.blocks.length && <div class="empty">운동을 추가해 주세요</div>}
+      <div class="wide-cards">
       {r.blocks.map((b, bi) => {
         const next = r.blocks[bi + 1];
         const canMerge = !!next && b.items.length + next.items.length <= 4;
@@ -98,6 +99,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
           </div>
         );
       })}
+      </div>
       <button class="big" onClick={() => setPicker('add')}>+ 운동 추가</button>
       <div class="row" style={{ marginTop: '12px' }}>
         <button class="grow" onClick={async () => { await save(); go('#/'); }}>저장</button>

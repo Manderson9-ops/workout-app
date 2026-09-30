@@ -34,7 +34,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const shownAt = useRef(Date.now());
   // PC 키보드: Ctrl+Enter(맥 ⌘+Enter) = 현재 세트 완료 (D-030)
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.querySelector<HTMLButtonElement>('[aria-label="현재 세트 완료"]')?.click(); } };
+    const k = (e: KeyboardEvent) => {
+      // 누르고 있기(반복)·한글 조합 중·시트(메모·교체 등)가 열려 있을 때는 무시
+      if (e.repeat || e.isComposing || document.querySelector('.sheet')) return;
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.querySelector<HTMLButtonElement>('[aria-label="현재 세트 완료"]')?.click(); } };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, []);

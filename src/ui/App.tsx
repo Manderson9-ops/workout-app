@@ -49,7 +49,7 @@ export function App() {
   else screen = <Home s={s} />;
 
   const tab = (h: string, ico: string, label: string, on: boolean) => (
-    <a href={h} class={on ? 'on' : ''} aria-label={label}><span class="ico">{ico}</span>{label}</a>
+    <a href={h} class={on ? 'on' : ''} aria-label={label} aria-current={on ? 'page' : undefined}><span class="ico">{ico}</span>{label}</a>
   );
   const onWorkout = path.startsWith('/workout');
   const [update, applyUpdate] = useUpdateAvailable();
