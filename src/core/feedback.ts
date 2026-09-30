@@ -22,12 +22,18 @@ export interface Feedback {
 
 export const FB_TEXT_MAX = 2000;
 
-/** 새 메모 ID: 오늘 날짜 + 기기 + 그 기기에서 오늘 몇 번째 */
-export function newFeedbackId(now: Date, dev: string, existing: string[]): string {
-  const d = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-  const prefix = `FB-${d}-${dev}-`;
-  const n = existing.filter((x) => x.startsWith(prefix)).map((x) => Number(x.slice(prefix.length)) || 0);
-  return `${prefix}${String((n.length ? Math.max(...n) : 0) + 1).padStart(2, '0')}`;
+/**
+ * 새 메모 ID: FB-날짜-기기-시분초+난수2자리 (예: FB-20260930-ab12-10421537).
+ * 순번을 쓰지 않아 지우거나 백업을 불러온 뒤에도 옛 번호가 다시 쓰이지 않음 (PC 가져오기·CHANGELOG 상태가 섞이지 않게).
+ * existing과 겹치면 난수를 다시 뽑음
+ */
+export function newFeedbackId(now: Date, dev: string, existing: string[], rnd: () => number = Math.random): string {
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  const d = `${now.getFullYear()}${p2(now.getMonth() + 1)}${p2(now.getDate())}`;
+  const t = `${p2(now.getHours())}${p2(now.getMinutes())}${p2(now.getSeconds())}`;
+  const used = new Set(existing);
+  for (let k = 0; k < 200; k++) { const id = `FB-${d}-${dev}-${t}${p2(Math.floor(rnd() * 100))}`; if (!used.has(id)) return id; }
+  return `FB-${d}-${dev}-${t}${String(Date.now() % 100000).padStart(5, '0')}`;
 }
 
 export function feedbackOk(x: unknown): boolean {
@@ -52,16 +58,21 @@ export const usedFeedbackIds = (live: string[], tombIds: string[]) => [...live, 
  * 바뀌는 메모만 돌려줌 (그대로인 것은 저장하지 않게)
  */
 export function applyChangelog(items: Feedback[], versions: ChangelogVersion[]): Feedback[] {
+  // versions는 최신이 앞. 반영됨은 "가장 이른 버전"(뒤에 오는 것이 덮어씀) → 옛 기기·새 기기가 같은 결과 (버전이 섞여도 번갈아 바꾸지 않음)
   const done = new Map<string, string>(), deferred = new Map<string, string>();
   for (const v of versions) {
-    for (const id of v.feedback_ids ?? []) if (!done.has(id)) done.set(id, v.version);
+    for (const id of v.feedback_ids ?? []) done.set(id, v.version);
     for (const d of v.deferred ?? []) if (!deferred.has(d.id)) deferred.set(d.id, d.reason);
   }
   const out: Feedback[] = [];
   for (const f of items) {
-    if (done.has(f.id)) { const note = `${done.get(f.id)} 에 반영`; if (f.status !== '반영됨' || f.note !== note) out.push({ ...f, status: '반영됨', note }); }
-    // 더 새 버전 기기가 반영됨으로 바꾼 것을 옛 버전이 보류로 되돌리지 않게
-    else if (deferred.has(f.id) && f.status !== '반영됨') { const note = deferred.get(f.id)!; if (f.status !== '보류' || f.note !== note) out.push({ ...f, status: '보류', note }); }
+    if (done.has(f.id)) {
+      const note = `${done.get(f.id)} 에 반영`;
+      if (f.status !== '반영됨' || f.note !== note) out.push({ ...f, status: '반영됨', note });
+    } else if (deferred.has(f.id) && f.status !== '반영됨' && f.status !== '보류') {
+      // 이미 보류면 그대로 (기기마다 CHANGELOG의 이유가 달라도 서로 덮어쓰지 않게), 반영됨은 보류로 되돌리지 않음
+      out.push({ ...f, status: '보류', note: deferred.get(f.id)! });
+    }
   }
   return out;
 }

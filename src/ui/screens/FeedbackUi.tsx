@@ -51,7 +51,7 @@ export function FeedbackButton({ s }: { s: AppState }) {
           }}>저장</button>
         </Sheet>
       )}
-      {done && <div role="status" class="fb-toast" onClick={() => setDone('')}>{done}</div>}
+      {done && <button type="button" role="status" class="fb-toast" aria-label={`${done} (눌러서 닫기)`} onClick={() => setDone('')}>{done}</button>}
     </>
   );
 }
