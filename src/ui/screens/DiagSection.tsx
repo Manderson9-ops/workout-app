@@ -4,6 +4,7 @@ import { allDiag, diagEnabled, setDiagEnabled, deviceId, diag } from '../diag';
 import { summarizeDiag, verdicts, DIAG_LABEL, DIAG_TRUST } from '../../core/diag';
 import type { DiagEntry } from '../../core/diag';
 import { saveBackupFile, prepareBackup, SAVE_MESSAGE } from '../backupActions';
+import { AutoSendSection } from './AutoSendSection';
 
 const time = (t: string) => new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' });
 
@@ -30,6 +31,7 @@ export function DiagSection({ s }: { s: AppState }) {
       <p class="sub small">운동 기록과 진단 기록을 파일 하나로 보내요. 공유 → "파일에 저장" → Google Drive → <strong>WORK_OUT_APP → sync → inbox</strong> (처음 한 번만 고르면 다음부터 기억해요). PC에서 "동기화 파일 확인해 줘"라고 하면 검사 후 요약해 드려요.</p>
       <button class="primary" onClick={async () => { const r = await saveBackupFile(); if (r === 'shared' || r === 'downloaded') diag('send', { m: `파일 (${r})`, ok: true }); setMsg(SAVE_MESSAGE[r].replace('백업 파일', 'PC로 보낼 파일')); }}>PC로 보내기 (파일)</button>
       {msg && <p role="status" class="small">{msg}</p>}
+      <AutoSendSection />
 
       <h2>진단 기록</h2>
       <p class="sub small">앱이 안에서 어떻게 움직였는지(타이머 오차, 화면 꺼짐 방지, 소리 준비, 오류)를 이 기기에만 최근 1,000건 남겨요. 운동 내용·입력값은 넣지 않아요. "PC로 보내기"를 할 때만 밖으로 나가요.</p>

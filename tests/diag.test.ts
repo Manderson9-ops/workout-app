@@ -118,3 +118,24 @@ describe('sync:check (D-025): 받은 파일 검사', () => {
     expect(quote('x'.repeat(100), 10)).toBe(`「${'x'.repeat(10)}」`);
   });
 });
+
+import { parseSendConfig, maskKey } from '../src/core/autoSendConfig';
+describe('자동 보내기 설정 글 (D-023, D-025)', () => {
+  const url = 'https://script.google.com/macros/s/AKfycbz' + 'a'.repeat(40) + '/exec';
+  it('설정.txt 전체를 붙여넣어도 두 번째 줄을 찾음', () => {
+    expect(parseSendConfig(`workout-app 자동 보내기 설정 (…)\n${url}#${'k'.repeat(40)}\n`)).toEqual({ ok: true, url, key: 'k'.repeat(40) });
+  });
+  it('구글 Apps Script /exec 주소만, 키 모양 검사', () => {
+    expect(parseSendConfig(`https://evil.example.com/x/exec#${'k'.repeat(40)}`)).toMatchObject({ ok: false, error: expect.stringContaining('Apps Script') });
+    expect(parseSendConfig(url.replace('/exec', '/dev') + '#' + 'k'.repeat(40))).toMatchObject({ ok: false });
+    expect(parseSendConfig(`${url}#short`)).toMatchObject({ ok: false, error: expect.stringContaining('키') });
+    expect(parseSendConfig(url)).toMatchObject({ ok: false });
+  });
+  it('화면엔 키 끝 4자리만', () => { expect(maskKey('abcdefgh1234')).toBe('••••1234'); });
+});
+describe('자동 보내기 설정 글: 줄바꿈이 사라진 붙여넣기', () => {
+  it('한 줄 입력칸에 파일 전체를 붙여넣어도 주소를 찾음', () => {
+    const url = 'https://script.google.com/macros/s/AKfycbz' + 'a'.repeat(40) + '/exec';
+    expect(parseSendConfig(`workout-app 자동 보내기 설정 (지우세요)${url}#${'k'.repeat(40)}`)).toEqual({ ok: true, url, key: 'k'.repeat(40) });
+  });
+});

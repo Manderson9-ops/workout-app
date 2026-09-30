@@ -373,4 +373,67 @@ test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, �
   expect(await page.evaluate(() => localStorage.getItem('diag.off'))).toBe('1');
 });
 
+test.describe('서비스 워커 없이 (Playwright WebKit은 서비스 워커가 있으면 다른 주소 요청을 가짜 서버로 못 돌림)', () => {
+test.use({ serviceWorkers: 'block' });
+test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, 실패하면 다음에 열 때 다시, 키는 어디에도 안 보임', async ({ page }) => {
+  await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
+  page.on('dialog', (d) => void d.accept());
+  const KEY = 'K'.repeat(36) + 'Z9x8';
+  const URL_ = 'https://script.google.com/macros/s/AKfycbzTEST' + 'a'.repeat(30) + '/exec';
+  const got: { key: string; ping?: boolean; file?: { app: string; schema: number; data: { workouts: unknown[]; diag: { k: string }[] } } }[] = [];
+  let fail = false;
+  const ctypes: string[] = [];
+  await page.route(URL_, async (route) => {
+    if (fail) return route.abort('internetdisconnected');
+    let body: typeof got[number];
+    try { body = JSON.parse(route.request().postData() ?? '{}'); } catch (e) { console.log('PARSE', String(e)); body = { key: '' }; }
+    got.push(body);
+    ctypes.push(route.request().headers()['content-type'] ?? '');
+    await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body.key === KEY ? (body.ping ? { ok: true, ping: true } : { ok: true, name: 'auto-x.json' }) : { ok: false, error: 'bad_key' }) });
+  });
+  await page.getByRole('link', { name: '설정' }).click();
+  await page.getByLabel('자동 보내기 설정 붙여넣기').fill(`https://evil.example.com/x/exec#${KEY}`);
+  await page.getByRole('button', { name: '저장하고 연결 확인' }).click();
+  await expect(page.getByText('구글 Apps Script 주소(/exec)가 아니에요')).toBeVisible();
+  await page.getByLabel('자동 보내기 설정 붙여넣기').fill(`workout-app 자동 보내기 설정\n${URL_}#${KEY}`);
+  await page.getByRole('button', { name: '저장하고 연결 확인' }).click();
+  await expect(page.getByText('연결됐어요. 이제 설정.txt를 지워 주세요')).toBeVisible();
+  await expect(page.getByLabel('자동 보내기')).toContainText('키 ••••Z9x8');
+  await checkScreen(page, '16-settings-autosend');
+  expect(got[0]).toEqual({ key: KEY, ping: true });
+  expect(ctypes.every((t) => t.toLowerCase().startsWith('text/plain'))).toBe(true);
+  // 운동 끝 → 자동으로 보냄
+  await makeRoutine(page, ['이두'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await expect(page.getByLabel('PC로 보내기 상태')).toContainText('PC로 보냄 ✓');
+  const sent = got[got.length - 1]!;
+  expect(sent.file!.app).toBe('workout-app');
+  expect(sent.file!.schema).toBe(2);
+  expect(sent.file!.data.workouts).toHaveLength(1);
+  expect(sent.file!.data.diag.map((x) => x.k)).toContain('send');
+  // 키는 보낸 파일 안에도, 화면에도, 백업 파일에도 없음 (D-025)
+  expect(JSON.stringify(sent.file)).not.toContain(KEY);
+  expect(await page.content()).not.toContain(KEY);
+  await page.getByRole('link', { name: '설정' }).click();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
+  expect(readFileSync(await dl.path(), 'utf8')).not.toContain(KEY);
+  // 실패 → 안내, 다음에 앱을 열 때 다시 보냄
+  fail = true;
+  const n = got.length;
+  await page.getByRole('button', { name: '지금 보내기' }).click();
+  await expect(page.getByText('보내지 못했어요')).toBeVisible();
+  await expect(page.getByLabel('자동 보내기')).toContainText('보낼 것 있음');
+  fail = false;
+  await page.reload();
+  await expect.poll(() => got.length).toBe(n + 1);
+  await page.getByRole('link', { name: '설정' }).click();
+  await expect(page.getByLabel('자동 보내기')).not.toContainText('보낼 것 있음');
+  // 끄기
+  await page.getByRole('button', { name: '끄기' }).click();
+  expect(await page.evaluate(() => localStorage.getItem('send.cfg'))).toBeNull();
+});
+});
+
 void makeRoutine;

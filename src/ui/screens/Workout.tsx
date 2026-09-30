@@ -16,6 +16,7 @@ import { go } from '../nav';
 
 import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
 import { diagTimerEnd } from '../diag';
+import { sendNow } from '../autoSend';
 
 export function WorkoutScreen({ s }: { s: AppState }) {
   const w = activeOf(s);
@@ -114,7 +115,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const finish = async () => {
     const left = prog.totalSets - prog.doneSets;
     if (!confirm(left ? `아직 ${left}세트 남았어요. 운동을 끝낼까요?` : '운동을 끝낼까요?')) return;
-    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/');
+    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout');
   };
   const delta = prog.deltaSec;
 
@@ -192,7 +193,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             {nextRest ? <span class="small" style={{ fontWeight: 500 }}> → 휴식 {nextRest.sec}초</span> : null}
           </button>
         ) : (
-          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); }}>모든 세트 완료 · 운동 끝내기</button>
+          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); }}>모든 세트 완료 · 운동 끝내기</button>
         )}
       </div>
 
