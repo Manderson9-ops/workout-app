@@ -5,7 +5,7 @@
  * - 설정(주소#키)은 이 기기 localStorage 'send.cfg' 에만. 백업·진단·화면에 넣지 않음 (D-025, 테스트로 확인)
  */
 import { useEffect, useState } from 'preact/hooks';
-import { db, flushPending, getState, activeOf } from './store';
+import { db, flushPending, getState, activeOf, whenReady } from './store';
 import { exportAll } from '../db/db';
 import { makeBackup } from '../core/backup';
 import { APP_VERSION } from '../core/version';
@@ -43,6 +43,8 @@ export function saveSendConfig(text: string): { ok: true } | { ok: false; error:
   return { ok: true };
 }
 export function clearSendConfig() { localStorage.removeItem(CFG); localStorage.removeItem(PENDING); localStorage.removeItem(BLOCKED); set({ phase: 'idle' }); }
+/** 멈춘 이유를 사람 말로 */
+export const blockedReason = () => { const c = retryBlocked(); return c ? (ERR[c] ?? c) : undefined; };
 /** 자동 재시도를 멈춘 이유 (없으면 undefined). 하루 한도는 다음 날 풀림 */
 export function retryBlocked(): string | undefined {
   const b = localStorage.getItem(BLOCKED);
@@ -153,7 +155,8 @@ export function retryPending(): void {
 }
 /** 앱 시작 때 한 번 부름: 시작 시 재시도 + 다시 보일 때·온라인 될 때 재시도 연결 */
 export function retryPendingOnStart(): void {
-  retryPending();
+  // 데이터를 다 불러온 뒤 재시도 (그래야 진행 중인 운동이 있는지 알 수 있음, 검토 3차)
+  void whenReady().then(retryPending);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') retryPending(); });
   window.addEventListener('online', () => { lastRetry = 0; retryPending(); });
 }

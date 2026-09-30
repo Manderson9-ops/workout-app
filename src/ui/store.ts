@@ -94,6 +94,11 @@ export async function askPersistOnce(): Promise<void> {
 
 /** 지금 메모리 상태 (바뀔 때마다 새 객체라서, 같은 객체면 데이터도 같음) */
 export const getState = () => state;
+/** 처음 데이터를 다 불러왔을 때 (이미 불러왔으면 바로) */
+export function whenReady(): Promise<void> {
+  if (state.ready) return Promise.resolve();
+  return new Promise((res) => { const l = (s: AppState) => { if (s.ready) { listeners.delete(l); res(); } }; listeners.add(l); });
+}
 
 export const activeOf = (s: AppState) => s.workouts.find((w) => !w.endedAt);
 export const historyOf = (s: AppState) => s.workouts.filter((w) => w.endedAt);
