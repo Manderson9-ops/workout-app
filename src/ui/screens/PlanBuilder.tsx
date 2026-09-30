@@ -1,3 +1,4 @@
+import { lsGet, lsSet, lsRemove } from '../appName';
 import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { catalog, templates } from '../catalog';
@@ -23,7 +24,7 @@ const LOCK_KEY = 'planBuilder.locks';
 
 interface Form { parts: Partial<Record<Part, Priority>>; order: Part[]; minGrade: Grade; minutes?: number; groupings: Grouping[]; prefer: boolean }
 const loadForm = (): Form => {
-  try { const f = JSON.parse(localStorage.getItem(KEY) ?? ''); if (f?.order) return f; } catch { /* 처음 */ }
+  try { const f = JSON.parse(lsGet(KEY) ?? ''); if (f?.order) return f; } catch { /* 처음 */ }
   return { parts: {}, order: [], minGrade: 'B', minutes: 60, groupings: ['superset'], prefer: false };
 };
 
@@ -58,7 +59,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const [name, setName] = useState('');
   const [showReasons, setShowReasons] = useState(true);
   const [tpl, setTpl] = useState('');
-  const update = (p: Partial<Form>) => { const n = { ...f, ...p }; setF(n); localStorage.setItem(KEY, JSON.stringify(n)); };
+  const update = (p: Partial<Form>) => { const n = { ...f, ...p }; setF(n); lsSet(KEY, JSON.stringify(n)); };
 
   const cyclePart = (p: Part) => {
     const cur = f.parts[p];

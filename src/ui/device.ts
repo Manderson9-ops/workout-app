@@ -1,6 +1,7 @@
 /**
  * 아이폰 기능: 소리(휴식 끝 알림), 화면 꺼짐 방지. 실기기 확인 항목 (BLUEPRINT 7.4)
  */
+import { lsGet, lsSet, lsRemove } from './appName';
 import { useEffect } from 'preact/hooks';
 import { flushPending } from './store';
 import { diag } from './diag';
@@ -66,8 +67,8 @@ export function useWakeLock(on: boolean): void {
 
 /** 같은 휴식 끝을 두 번 알리지 않도록 기록 (새로고침해도 유지) */
 export const alertedKey = 'timerAlerted';
-export const wasAlerted = (endsAt: number) => localStorage.getItem(alertedKey) === String(endsAt);
-export const markAlerted = (endsAt: number) => localStorage.setItem(alertedKey, String(endsAt));
+export const wasAlerted = (endsAt: number) => lsGet(alertedKey) === String(endsAt);
+export const markAlerted = (endsAt: number) => lsSet(alertedKey, String(endsAt));
 
 /** 앱이 뒤로 가거나 닫히기 직전에 입력 중인 값을 저장 (아이폰은 백그라운드 앱을 자주 종료) */
 export function useFlushOnHide(): void {

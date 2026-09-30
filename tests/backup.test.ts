@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { makeBackup, parseBackup, backupFileName, backupDue, mergedLastBackupAt, BACKUP_SCHEMA } from '../src/core/backup';
-import { WorkoutDB, exportAll, importAll, DEFAULT_SETTINGS } from '../src/db/db';
+import { WorkoutDB, exportAll, importAll, DEFAULT_SETTINGS, clearAllLocal } from '../src/db/db';
 import { planToRoutine, startWorkout } from '../src/core/session';
 import { withoutStamp } from '../src/core/syncStamp';
 
@@ -29,7 +29,7 @@ describe('백업 파일', () => {
     const file = makeBackup(before, '0.1.0', now);
     expect(file.counts).toEqual({ routines: 1, workouts: 1, meta: 1, custom: 1, settings: 1, bodyweight: 1, diag: 1 });
     const text = JSON.stringify(file);
-    await Promise.all(db.tables.map((t) => t.clear()));
+    await clearAllLocal(db);
     expect(await db.workouts.count()).toBe(0);
     const parsed = parseBackup(text);
     expect(parsed.ok).toBe(true);

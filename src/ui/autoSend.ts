@@ -4,6 +4,7 @@
  *   실패하면 "보낼 것 있음"으로 두고 앱을 다시 열 때 다시 보냄.
  * - 설정(주소#키)은 이 기기 localStorage 'send.cfg' 에만. 백업·진단·화면에 넣지 않음 (D-025, 테스트로 확인)
  */
+import { lsGet, lsSet, lsRemove } from './appName';
 import { useEffect, useState } from 'preact/hooks';
 import { db, flushPending, getState, activeOf, whenReady } from './store';
 import { exportAll } from '../db/db';
@@ -30,7 +31,7 @@ export function useSendState(): SendState {
 }
 
 export function getSendConfig() {
-  const raw = localStorage.getItem(CFG);
+  const raw = lsGet(CFG);
   if (!raw) return undefined;
   const r = parseSendConfig(raw);
   return r.ok ? r : undefined;
@@ -38,23 +39,23 @@ export function getSendConfig() {
 export function saveSendConfig(text: string): { ok: true } | { ok: false; error: string } {
   const r = parseSendConfig(text);
   if (!r.ok) return r;
-  localStorage.setItem(CFG, `${r.url}#${r.key}`);
-  localStorage.removeItem(BLOCKED);
+  lsSet(CFG, `${r.url}#${r.key}`);
+  lsRemove(BLOCKED);
   return { ok: true };
 }
-export function clearSendConfig() { localStorage.removeItem(CFG); localStorage.removeItem(PENDING); localStorage.removeItem(BLOCKED); set({ phase: 'idle' }); }
+export function clearSendConfig() { lsRemove(CFG); lsRemove(PENDING); lsRemove(BLOCKED); set({ phase: 'idle' }); }
 /** 멈춘 이유를 사람 말로 */
 export const blockedReason = () => { const c = retryBlocked(); return c ? (ERR[c] ?? c) : undefined; };
 /** 자동 재시도를 멈춘 이유 (없으면 undefined). 하루 한도는 다음 날 풀림 */
 export function retryBlocked(): string | undefined {
-  const b = localStorage.getItem(BLOCKED);
+  const b = lsGet(BLOCKED);
   if (!b) return undefined;
   const [code, day] = b.split('|');
-  if (code === 'daily_limit' && day !== today()) { localStorage.removeItem(BLOCKED); return undefined; }
+  if (code === 'daily_limit' && day !== today()) { lsRemove(BLOCKED); return undefined; }
   return code;
 }
-export const lastSentAt = () => localStorage.getItem(LAST) ?? undefined;
-export const hasPending = () => localStorage.getItem(PENDING) === '1';
+export const lastSentAt = () => lsGet(LAST) ?? undefined;
+export const hasPending = () => lsGet(PENDING) === '1';
 
 const ERR: Record<string, string> = {
   bad_key: '키가 맞지 않아요 (키가 바뀌었으면 새 설정을 붙여넣어 주세요)',
@@ -108,12 +109,12 @@ let again: Promise<boolean> | null = null;
 export function sendNow(reason: 'workout' | 'manual' | 'retry'): Promise<boolean> {
   const c = getSendConfig();
   if (!c) return Promise.resolve(false);
-  localStorage.setItem(PENDING, '1');
+  lsSet(PENDING, '1');
   if (sending) {
     again ??= sending.then(() => { again = null; return sendNow(reason); });
     return again;
   }
-  if (reason !== 'retry') localStorage.removeItem(BLOCKED);
+  if (reason !== 'retry') lsRemove(BLOCKED);
   sending = (async () => {
     set({ phase: 'sending' });
     try {
@@ -124,15 +125,15 @@ export function sendNow(reason: 'workout' | 'manual' | 'retry'): Promise<boolean
       const r = await post(c.url, { key: c.key, file });
       if (r.ok) {
         const at = new Date().toISOString();
-        localStorage.setItem(LAST, at);
-        if (!again) localStorage.removeItem(PENDING); // 한 번 더 보낼 예정이면 표시를 남겨 둠 (그 사이 앱이 닫혀도 다시 보냄)
+        lsSet(LAST, at);
+        if (!again) lsRemove(PENDING); // 한 번 더 보낼 예정이면 표시를 남겨 둠 (그 사이 앱이 닫혀도 다시 보냄)
         diag('send', { m: `자동 (${reason})`, ok: true });
         set({ phase: 'sent', at });
         return true;
       }
       diag('send', { m: `자동 실패 (${reason}): ${r.error}`, ok: false });
-      if (r.error && PERMANENT.includes(r.error)) localStorage.setItem(BLOCKED, r.error);
-      if (r.error === 'daily_limit') localStorage.setItem(BLOCKED, `daily_limit|${today()}`);
+      if (r.error && PERMANENT.includes(r.error)) lsSet(BLOCKED, r.error);
+      if (r.error === 'daily_limit') lsSet(BLOCKED, `daily_limit|${today()}`);
       set({ phase: 'failed', error: ERR[r.error ?? 'server'] ?? '보내지 못했어요' });
       return false;
     } catch {

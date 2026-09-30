@@ -1,3 +1,4 @@
+import { lsGet, lsSet, lsRemove } from '../appName';
 import { useState } from 'preact/hooks';
 import { plateCalc, oneRMTable, ONE_RM_MAX_REPS, PLATE_MAX_KG } from '../../core/stats';
 import { NumInput, Sheet } from '../components';
@@ -7,8 +8,8 @@ const PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
 
 export function PlateCalculator({ initial }: { initial?: number }) {
   const [target, setTarget] = useState<number | undefined>(initial ?? 60);
-  const [bar, setBar] = useState(() => Number(localStorage.getItem('tools.bar') ?? 20));
-  const [have, setHave] = useState<number[]>(() => { try { return JSON.parse(localStorage.getItem('tools.plates') ?? '') as number[]; } catch { return PLATES; } });
+  const [bar, setBar] = useState(() => Number(lsGet('tools.bar') ?? 20));
+  const [have, setHave] = useState<number[]>(() => { try { return JSON.parse(lsGet('tools.plates') ?? '') as number[]; } catch { return PLATES; } });
   const tooBig = target !== undefined && target > PLATE_MAX_KG;
   const r = target !== undefined && !tooBig ? plateCalc(target, bar, have) : undefined;
   return (
@@ -16,11 +17,11 @@ export function PlateCalculator({ initial }: { initial?: number }) {
       <label>목표 무게</label>
       <NumInput label="원판 계산 목표 무게" value={target} suffix="kg" onChange={setTarget} />
       <label>바 무게</label>
-      <div class="row wrap">{BARS.map((b) => <button key={b} class={`chip ${bar === b ? 'on' : ''}`} aria-pressed={bar === b} onClick={() => { setBar(b); localStorage.setItem('tools.bar', String(b)); }}>{b ? `${b}kg` : '바 없음'}</button>)}</div>
+      <div class="row wrap">{BARS.map((b) => <button key={b} class={`chip ${bar === b ? 'on' : ''}`} aria-pressed={bar === b} onClick={() => { setBar(b); lsSet('tools.bar', String(b)); }}>{b ? `${b}kg` : '바 없음'}</button>)}</div>
       <label>있는 원판</label>
       <div class="row wrap">{PLATES.map((p) => {
         const on = have.includes(p);
-        return <button key={p} class={`chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => { const n = on ? have.filter((x) => x !== p) : [...have, p]; setHave(n); localStorage.setItem('tools.plates', JSON.stringify(n)); }}>{p}</button>;
+        return <button key={p} class={`chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => { const n = on ? have.filter((x) => x !== p) : [...have, p]; setHave(n); lsSet('tools.plates', JSON.stringify(n)); }}>{p}</button>;
       })}</div>
       {tooBig && <p role="alert" class="small" style={{ color: 'var(--warn)' }}>{PLATE_MAX_KG}kg 이하로 적어 주세요</p>}
       {r && (

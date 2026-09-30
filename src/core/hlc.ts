@@ -29,8 +29,9 @@ export class Clock {
   tick(dev: string): string {
     const l = this.last();
     const pt = this.now();
-    const ms = Math.max(pt, l.ms);
-    const c = ms === l.ms ? l.c + 1 : 0;
+    let ms = Math.max(pt, l.ms);
+    let c = ms === l.ms ? l.c + 1 : 0;
+    if (c > 9999) { ms += 1; c = 0; } // 카운터는 4자리 (문자열 비교 순서 유지)
     this.store.set(`${ms}.${c}`);
     return fmtHlc(ms, c, dev);
   }

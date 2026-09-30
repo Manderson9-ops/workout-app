@@ -121,17 +121,61 @@ describe('DB 층: 모든 저장에 자동 표시, 지우기는 지움 표시 (S2
     await v3.table('routines').put(routine);
     await v3.table('settings').put({ ...DEFAULT_SETTINGS, level: '상급' });
     await v3.table('bodyweight').put({ date: '2026-09-30', kg: 70 });
+    await v3.table('workouts').put({ ...startWorkout('w-open', routine, '2026-09-30T09:00:00.000Z', []) });
     v3.close();
     const db = new WorkoutDB(name, { clock: new Clock(memoryClockStore(), () => 5_000), deviceId: () => 'devM' });
     const r = (await db.routines.get('r1')) as unknown as { _s: { h: string; y: number; q: number }; name: string };
     expect(r.name).toBe('등');
-    expect(r._s).toMatchObject({ h: hlcZero('devM'), y: 1, q: 1 });
+    expect(r._s).toEqual({ h: hlcZero('devM'), d: 'devM', y: 1, q: 1 });
     const s = (await db.settings.get('main')) as unknown as { level: string; _s: { f: Record<string, string> } };
     expect(s.level).toBe('상급');
     expect(s._s.f.level).toBe(hlcZero('devM'));
     expect(s._s.f).not.toHaveProperty('soundOn');
     expect(((await db.bodyweight.get('2026-09-30')) as unknown as { _s?: unknown })._s).toBeDefined();
     expect(db.verno).toBe(4);
+    // 옛 진행 중 운동은 이 기기가 주인
+    expect(await db.workouts.get('w-open')).toMatchObject({ ownerDeviceId: 'devM', ownerAt: '2026-09-30T09:00:00.000Z' });
+    db.close();
+  });
+  it('백업 불러오기: 파일 안 _s는 떼고 새로 표시, 진행 중 운동은 이 기기가 주인', async () => {
+    const db = mkDb('devI');
+    const w = { ...startWorkout('w9', routine, '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'other', _s: { h: 'x', d: 'o', q: 1, y: 0, r: 5 } };
+    await importAll(db, { routines: [], workouts: [w as never], meta: [], custom: [], settings: [], bodyweight: [], diag: [] });
+    const got = (await db.workouts.get('w9')) as unknown as { ownerDeviceId: string; _s: { y: number; d: string } };
+    expect(got.ownerDeviceId).toBe('devI');
+    expect(got._s).toMatchObject({ y: 1, d: 'devI' });
+    db.close();
+  });
+  it('운동 표시(meta)는 항목 단위 f, update·modify 경로도 표시됨', async () => {
+    const db = mkDb();
+    await db.meta.put({ exerciseId: 'a', favorite: true });
+    const m1 = (await db.meta.get('a')) as unknown as { _s: { f: Record<string, string>; q: number } };
+    expect(Object.keys(m1._s.f)).toEqual(['favorite']);
+    await db.meta.update('a', { excluded: true });
+    const m2 = (await db.meta.get('a')) as unknown as { _s: { f: Record<string, string>; q: number } };
+    expect(m2._s.q).toBe(2);
+    expect(m2._s.f.favorite).toBe(m1._s.f.favorite);
+    expect(m2._s.f.excluded).toBeDefined();
+    await db.routines.put(routine);
+    await db.routines.toCollection().modify((r) => { r.name = '바뀜'; });
+    expect(((await db.routines.get('r1')) as unknown as { _s: { q: number } })._s.q).toBe(2);
+    db.close();
+  });
+  it('지움 표시 없이 직접 지우면 막힘 (softDelete로만)', async () => {
+    const db = mkDb();
+    await db.routines.put(routine);
+    await expect(db.routines.delete('r1')).rejects.toThrow(/softDelete/);
+    await expect(db.routines.where('id').equals('r1').delete()).rejects.toThrow(/softDelete/);
+    expect(await db.routines.get('r1')).toBeDefined();
+    db.close();
+  });
+  it('1,000건 한 번에 저장이 빠름 (불러오기)', async () => {
+    const db = mkDb();
+    const many = Array.from({ length: 1000 }, (_, i) => ({ ...routine, id: `r${i}` }));
+    const t0 = performance.now();
+    await db.routines.bulkPut(many);
+    expect(performance.now() - t0).toBeLessThan(3000);
+    expect(await db.routines.count()).toBe(1000);
     db.close();
   });
 });

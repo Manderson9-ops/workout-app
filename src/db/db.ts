@@ -46,6 +46,8 @@ export class WorkoutDB extends Dexie {
   bodyweight!: Table<BodyweightRow, string>;
   diag!: Table<DiagEntry & { id?: number }, number>;
   tombs!: Table<Tomb, string>;
+  /** 동기화 상태 등 기기 안 값 (since, epoch, 보관한 수정) */
+  kv!: Table<{ k: string; v: unknown }, string>;
   /** 동기화 시계와 기기 ID (S2a). 테스트는 메모리 시계 */
   readonly clock: Clock;
   readonly dev: () => string;
@@ -67,10 +69,14 @@ export class WorkoutDB extends Dexie {
     // v3 (P5a): 진단 기록 표 (D-024). 기존 표와 데이터는 그대로
     this.version(3).stores({ diag: '++id, t' });
     // v4 (S2a, D-029): 지움 표시 표 + 기존 기록에 동기화 표시(HLC 0, 아직 안 보냄). 기록 내용은 그대로
-    this.version(4).stores({ tombs: 'k, table' }).upgrade(async (tx) => {
+    this.version(4).stores({ tombs: 'k, table', kv: 'k' }).upgrade(async (tx) => {
       const dev = this.dev();
       for (const t of SYNC_TABLES) {
-        await tx.table(t).toCollection().modify((v: Record<string, unknown>) => { if (!v._s) v._s = { ...baseStamp(t, v, dev), remote: true }; });
+        await tx.table(t).toCollection().modify((v: Record<string, unknown>) => {
+          // 옛 진행 중 운동은 이 기기 것 (주인 표시가 없으면 다른 기기가 자기 것으로 오해함)
+          if (t === 'workouts' && !v.endedAt && !v.ownerDeviceId) { v.ownerDeviceId = dev; v.ownerAt = v.startedAt; }
+          if (!v._s) v._s = { ...baseStamp(t, v, dev), remote: true };
+        });
       }
     });
     // 모든 저장에 동기화 표시를 자동으로 붙임 (같은 트랜잭션, 빠뜨릴 곳 없음). 지우기는 softDelete로만
@@ -87,15 +93,19 @@ export class WorkoutDB extends Dexie {
             return {
               ...t,
               async mutate(req) {
-                if ((req.type === 'put' || req.type === 'add') && !('changeSpec' in req && req.changeSpec) && req.values) {
+                if ((req.type === 'put' || req.type === 'add') && req.values) {
+                  // put·add·bulkPut·update·modify 모두 값이 있으면 표시 (update/modify도 전체 값으로 옴)
                   const dev = self.dev();
-                  const values = [];
-                  for (const v of req.values as Record<string, unknown>[]) {
-                    const key = v[pk];
-                    const old = key === undefined ? undefined : await t.get({ trans: req.trans, key });
-                    values.push(stampValue(tableName, old, v, () => self.clock.tick(dev), dev));
-                  }
+                  const vals = req.values as Record<string, unknown>[];
+                  const keys = vals.map((v) => v[pk]);
+                  const olds = keys.some((k) => k !== undefined) ? await t.getMany({ trans: req.trans, keys: keys.map((k) => k ?? '\u0000') }) : [];
+                  const values = vals.map((v, i) => stampValue(tableName, keys[i] === undefined ? undefined : olds[i], v, () => self.clock.tick(dev), dev));
                   return t.mutate({ ...req, values });
+                }
+                if (req.type === 'delete' || req.type === 'deleteRange') {
+                  // 지우기는 지움 표시와 같은 트랜잭션에서만 (softDelete·불러오기·초기화·동기화 반영). 그 밖의 경로는 막음
+                  const names = (req.trans as unknown as { objectStoreNames?: DOMStringList }).objectStoreNames;
+                  if (names && !names.contains('tombs')) throw new Error(`${tableName}: 지우기는 softDelete로 (지움 표시)`);
                 }
                 return t.mutate(req);
               },
@@ -148,14 +158,17 @@ export async function exportAll(db: WorkoutDB): Promise<BackupData> {
 export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackupAt?: string } = {}): Promise<void> {
   await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag, db.tombs], async () => {
     await Promise.all([db.routines.clear(), db.workouts.clear(), db.meta.clear(), db.custom.clear(), db.settings.clear(), db.bodyweight.clear(), db.diag.clear(), db.tombs.clear()]);
-    await db.routines.bulkPut(d.routines);
-    await db.workouts.bulkPut(d.workouts);
-    await db.meta.bulkPut(d.meta as ExerciseMeta[]);
-    await db.custom.bulkPut(d.custom as unknown as CustomExercise[]);
-    const st = (d.settings as unknown as Settings[]).map((x) => (opts.lastBackupAt ? { ...x, lastBackupAt: opts.lastBackupAt } : x));
+    // 파일 안의 _s(동기화 표시)는 믿지 않고 떼어 냄 → 새로 표시(아직 안 보냄). 진행 중 운동은 이 기기가 주인
+    const clean = <T,>(xs: T[]) => xs.map((x) => withoutStamp(x as never) as unknown as T);
+    const me = db.dev(), at = new Date().toISOString();
+    await db.routines.bulkPut(clean(d.routines));
+    await db.workouts.bulkPut(clean(d.workouts).map((w) => (w.endedAt ? w : { ...w, ownerDeviceId: me, ownerAt: at })));
+    await db.meta.bulkPut(clean(d.meta as ExerciseMeta[]));
+    await db.custom.bulkPut(clean(d.custom as unknown as CustomExercise[]));
+    const st = clean(d.settings as unknown as Settings[]).map((x) => (opts.lastBackupAt ? { ...x, lastBackupAt: opts.lastBackupAt } : x));
     if (!st.length && opts.lastBackupAt) st.push({ ...DEFAULT_SETTINGS, lastBackupAt: opts.lastBackupAt });
     await db.settings.bulkPut(st);
-    await db.bodyweight.bulkPut(d.bodyweight);
+    await db.bodyweight.bulkPut(clean(d.bodyweight));
     await db.diag.bulkAdd((d.diag ?? []).map(({ id: _id, ...e }: DiagEntry & { id?: number }) => e));
   });
 }

@@ -39,7 +39,7 @@ export async function startRoutine(s: AppState, r: Routine) {
   const cur = activeOf(s);
   if (cur && !confirm(`진행 중인 운동 "${cur.name}"이 있어요. 그 운동을 끝내고 새로 시작할까요?`)) { go('#/workout'); return; }
   void askPersistOnce();
-  const w = { ...startWorkout(newId('w'), r, new Date().toISOString(), historyOf(s), { betweenSec: s.settings.rest.between }), ownerDeviceId: deviceId() };
+  const w = { ...startWorkout(newId('w'), r, new Date().toISOString(), historyOf(s), { betweenSec: s.settings.rest.between }), ownerDeviceId: deviceId(), ownerAt: new Date().toISOString() };
   await mutate(async (d) => {
     if (cur) await d.workouts.put({ ...cur, endedAt: new Date().toISOString(), timer: null });
     await d.workouts.put(w);

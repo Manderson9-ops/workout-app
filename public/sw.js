@@ -7,8 +7,16 @@
 const APP = new URL(self.registration.scope).pathname.split('/').filter(Boolean).pop() || 'app';
 const CACHE = APP + ':v2';
 const OWN = (k) => k.startsWith(APP + ':') || k === APP + '-v1';
+// 설치 때 화면(HTML)과 그 화면이 쓰는 빌드 파일(assets)까지 미리 담음: 새 버전으로 바뀐 직후 인터넷이 없어도 열리게
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest', './icons/icon-192.png'])));
+  e.waitUntil(caches.open(CACHE).then(async (c) => {
+    await c.addAll(['./', './manifest.webmanifest', './icons/icon-192.png']);
+    try {
+      const html = await (await c.match('./')).text();
+      const assets = [...html.matchAll(/(?:src|href)="([^"]*assets\/[^"]+)"/g)].map((m) => new URL(m[1], self.registration.scope).href);
+      if (assets.length) await c.addAll(assets);
+    } catch { /* 없으면 처음 열 때 담김 */ }
+  }));
 });
 self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 self.addEventListener('activate', (e) => {

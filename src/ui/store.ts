@@ -1,19 +1,18 @@
 /**
  * 화면 상태 저장소: IndexedDB 내용을 메모리에 올려 두고, 바꿀 때마다 저장 후 다시 읽는다.
  */
+import { lsGet, lsSet, DB_NAME } from './appName';
 import { useEffect, useState } from 'preact/hooks';
 import { WorkoutDB, getSettings, DEFAULT_SETTINGS, requestPersist } from '../db/db';
 import type { Settings, ExerciseMeta, CustomExercise, BodyweightRow } from '../db/db';
 import type { Routine, Workout } from '../core/session';
-import { Clock, memoryClockStore } from '../core/hlc';
+import { Clock } from '../core/hlc';
 import type { ClockStore } from '../core/hlc';
 import { deviceId } from './deviceId';
 
 /** 동기화 시계(HLC)는 localStorage에 "본 가장 큰 값"을 보관 (S2a) */
-const clockStore: ClockStore = typeof localStorage !== 'undefined'
-  ? { get: () => localStorage.getItem('sync.hlc'), set: (v) => localStorage.setItem('sync.hlc', v) }
-  : memoryClockStore();
-export const db = new WorkoutDB('workout-app', { clock: new Clock(clockStore), deviceId });
+const clockStore: ClockStore = { get: () => lsGet('sync.hlc'), set: (v) => lsSet('sync.hlc', v) };
+export const db = new WorkoutDB(DB_NAME, { clock: new Clock(clockStore), deviceId });
 
 export interface AppState {
   ready: boolean;
@@ -108,7 +107,10 @@ export function whenReady(): Promise<void> {
 }
 
 /** 이 기기가 주인인 진행 중 운동 (다른 기기에서 진행 중인 운동은 읽기 전용, D-029) */
-export const activeOf = (s: AppState) => s.workouts.find((w) => !w.endedAt && (!w.ownerDeviceId || w.ownerDeviceId === deviceId()));
+export const activeOf = (s: AppState) => s.workouts.find((w) => !w.endedAt && (!w.ownerDeviceId || w.ownerDeviceId === deviceId()) && !w.pendingMerge);
 /** 다른 기기에서 진행 중인 운동 */
 export const remoteActiveOf = (s: AppState) => s.workouts.find((w) => !w.endedAt && !!w.ownerDeviceId && w.ownerDeviceId !== deviceId());
-export const historyOf = (s: AppState) => s.workouts.filter((w) => w.endedAt);
+/** 끝난 운동 (다른 기기에서 늦게 온 기록 사본은 합치기 전까지 통계에서 뺌) */
+export const historyOf = (s: AppState) => s.workouts.filter((w) => w.endedAt && !w.pendingMerge);
+/** 다른 기기에서 늦게 온 기록 사본 (합치기/지우기 대기) */
+export const lateCopiesOf = (s: AppState) => s.workouts.filter((w) => !!w.pendingMerge);

@@ -23,6 +23,10 @@ export interface Workout {
   id: string; routineId?: string; name: string;
   /** 진행 중 운동의 주인 기기 (동기화, D-029). 없으면 이 기기 것 (옛 기록) */
   ownerDeviceId?: string;
+  /** 주인이 된 시각 (가져오기 때 새로. 더 오래된 주인의 늦은 기록을 가려냄) */
+  ownerAt?: string;
+  /** 다른 기기에서 늦게 온 기록 사본: 원래 운동 ID (통계에서 빼고 합치기/지우기) */
+  pendingMerge?: string;
   startedAt: string; endedAt?: string;
   blocks: WorkoutBlock[];
   timer: Timer | null;
