@@ -85,6 +85,16 @@ input.date { min-height: 44px; border-radius: 12px; border: 1px solid var(--line
 .fb-toast { position: fixed; left: 12px; right: 12px; top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 45; background: var(--card2); border: 1px solid var(--acc); border-radius: 12px; padding: 12px 14px; text-align: center; box-shadow: 0 8px 20px #0008; }
 html.phone-view .fb-toast { max-width: 406px; margin: 0 auto; }
 
+/* 최근 운동 카드: 위쪽 전체가 상세로 가는 링크 */
+.card-link { display: block; color: inherit; text-decoration: none; min-height: 44px; }
+/* 끝낸 운동 수정 화면의 세트 줄 */
+.edit-set { display: grid; grid-template-columns: 44px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.8fr) 44px 44px; gap: 4px; align-items: center; margin-top: 6px; }
+.edit-set > button { min-width: 44px; padding: 0; }
+/* 좁은 칸에서 숫자가 잘리지 않게 (NumInput의 단위 자리 여백 없앰) */
+.edit-set input { padding-left: 2px !important; padding-right: 2px !important; min-width: 0; }
+.edit-set .ck { display: flex; align-items: center; justify-content: center; min-height: 44px; }
+.edit-set .ck input { width: 22px; height: 22px; }
+
 /* S1 (D-030): PC 넓은 화면. 900px 이상이면 왼쪽 세로 메뉴 + 넓은 본문, 카드 2열. "폰 화면으로 보기"(html.phone-view)면 폰과 똑같이 */
 @media (min-width: 900px) {
   html:not(.phone-view) .nav { top: 0; bottom: 0; right: auto; width: 180px; height: auto; flex-direction: column; justify-content: flex-start; padding: 16px 8px; gap: 4px; border-top: 0; border-right: 1px solid var(--line); }

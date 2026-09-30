@@ -41,7 +41,7 @@ async function makeRoutine(page: Page, parts: string[], minutes: string) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./#/');
-  await expect(page.getByText('기록은 이 아이폰에만 저장돼요')).toBeVisible(); // 첫 실행 안내
+  await expect(page.getByText('기록은 이 기기에만 저장돼요')).toBeVisible(); // 첫 실행 안내
   await page.getByRole('button', { name: '알겠어요' }).click();
 });
 
@@ -617,7 +617,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await syncNowOn(page); await syncNowOn(pc);
   // PC에서 루틴 지움 → 폰에서도 사라짐
   await pc.getByRole('link', { name: '홈' }).click();
-  await pc.getByRole('button', { name: 'PC에서 짠 루틴 삭제' }).click();
+  await pc.getByRole('button', { name: 'PC에서 짠 루틴 삭제', exact: true }).click();
   await syncNowOn(pc); await syncNowOn(page);
   await page.getByRole('link', { name: '홈' }).click();
   await expect(page.getByRole('heading', { name: 'PC에서 짠 루틴' })).toHaveCount(0);
@@ -708,6 +708,70 @@ test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: /저장했어요 \(FB-\d{8}-[a-z0-9]+-\d{8}\)/i })).toBeVisible();
   await expect(page.getByLabel(/^개선 메모 FB-/).filter({ hasText: '두 번째' })).toHaveCount(1);
+});
+
+
+test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무게·시간·세트 → 저장 → 상세·통계 반영, 홈에서 삭제', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  const w = page.locator('input[aria-label$="1세트 무게"]').first();
+  await w.fill('40');
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await expect(page).toHaveURL(/#\/$/);
+  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
+  await expect(card).toContainText('작업 세트 1개');
+  // 카드 누르면 상세
+  await card.getByRole('link').click();
+  await expect(page).toHaveURL(/#\/stats\/w\//);
+  await page.getByRole('link', { name: '홈' }).click();
+  // 수정
+  await card.getByRole('button', { name: /수정$/ }).click();
+  await expect(page.getByRole('heading', { name: '운동 기록 수정' })).toBeVisible();
+  await page.getByLabel('운동 이름').fill('등 (고침)');
+  await page.getByLabel('운동 시간(분)').fill('45');
+  const first = page.locator('input[aria-label$=" 1세트 무게"]').first();
+  await first.fill('42.5');
+  await page.locator('input[aria-label$=" 2세트 완료"]').first().check();
+  await page.locator('input[aria-label$=" 2세트 무게"]').first().fill('40');
+  await page.locator('input[aria-label$=" 2세트 횟수"]').first().fill('8');
+  await checkScreen(page, '23-workout-edit');
+  // 잘못된 값은 저장 안 됨
+  await page.locator('input[aria-label$=" 1세트 RIR"]').first().fill('15');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('RIR');
+  await page.locator('input[aria-label$=" 1세트 RIR"]').first().fill('2');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '등 (고침)' })).toBeVisible();
+  await expect(page.getByText(/에 고침$/)).toBeVisible();
+  await expect(page.getByText(/42\.5kg × \d+회 · RIR 2/)).toBeVisible();
+  await expect(page.getByText(/작업 세트 2/)).toBeVisible();
+  await expect(page.getByText(/45:00/)).toBeVisible();
+  // 홈 카드에도 반영, 그리고 삭제
+  await page.getByRole('link', { name: '홈' }).click();
+  const card2 = page.getByLabel('최근 운동 등 (고침)', { exact: true });
+  await expect(card2).toContainText('작업 세트 2개 · 45분 · 고침');
+  await card2.getByRole('button', { name: '최근 운동 등 (고침) 삭제' }).click();
+  await expect(card2).toHaveCount(0);
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
+});
+
+test('수정 화면: 취소하면 기록 그대로', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
+  const before = await card.textContent();
+  await card.getByRole('button', { name: /수정$/ }).click();
+  await page.getByLabel('운동 이름').fill('바뀌면 안 됨');
+  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(page).toHaveURL(/#\/stats\/w\//);
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(page.locator('.card[aria-label^="최근 운동 "]').first()).toHaveText(before!);
 });
 
 void makeRoutine;

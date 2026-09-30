@@ -37,6 +37,8 @@ export interface Workout {
   betweenSec?: number;
   /** 루틴의 예상 시간 (예정 대비 앞서는지/늦는지 표시용) */
   plannedSec?: number;
+  /** 끝낸 뒤 고친 시각 (D-035). 상세 화면에 "고침" 표시 */
+  editedAt?: string;
 }
 
 export const REST_DEFAULTS = { betweenSec: 60, warmupSec: 60 };

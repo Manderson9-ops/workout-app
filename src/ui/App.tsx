@@ -10,6 +10,7 @@ import { RoutineEditor } from './screens/RoutineEditor';
 import { Stats, WorkoutDetail } from './screens/Stats';
 import { SyncBadge } from './screens/SyncSection';
 import { FeedbackButton, FeedbackNavItem } from './screens/FeedbackUi';
+import { WorkoutEdit } from './screens/WorkoutEdit';
 import { ToolsScreen } from './screens/Tools';
 import { mmss } from './components';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
@@ -43,6 +44,7 @@ export function App() {
   else if (path.startsWith('/exercises')) screen = <Exercises s={s} />;
   else if (path.startsWith('/workout')) screen = <WorkoutScreen s={s} />;
   else if (path.startsWith('/settings')) screen = <SettingsScreen s={s} />;
+  else if (path.startsWith('/stats/w/') && path.endsWith('/edit')) screen = <WorkoutEdit key={path} s={s} id={decodeURIComponent(path.slice(9, -5))} />;
   else if (path.startsWith('/stats/w/')) screen = <WorkoutDetail s={s} id={decodeURIComponent(path.slice(9))} />;
   else if (path.startsWith('/stats')) screen = <Stats s={s} />;
   else if (path.startsWith('/tools')) screen = <ToolsScreen />;

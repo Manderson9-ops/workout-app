@@ -275,6 +275,40 @@ describe('0.5.0 → 0.6.0 (DB v5)', () => {
   });
 });
 
+describe('끝낸 운동 고치기 동기화 (D-035)', () => {
+  const Wd = (): Workout => ({ ...startWorkout('w9', R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'A', ownerSeq: 1, endedAt: '2026-09-30T10:40:00.000Z', timer: null });
+  it('폰(A)에서 끝낸 운동을 PC(B)가 고치면 폰에도 반영, 주인은 그대로', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);
+    const b = (await B.workouts.get('w9'))!;
+    b.blocks[0]!.items[0]!.sets[0] = { weight: 70, reps: 6, warmup: false, done: true, doneAt: '2026-09-30T10:05:00.000Z' };
+    await B.workouts.put({ ...b, name: '등 (고침)', editedAt: '2026-09-30T12:00:00.000Z' }); await sync(B, transport); await sync(A, transport);
+    const a = (await A.workouts.get('w9'))!;
+    expect(a).toMatchObject({ name: '등 (고침)', ownerDeviceId: 'A', editedAt: '2026-09-30T12:00:00.000Z' });
+    expect(a.blocks[0]!.items[0]!.sets[0]!.weight).toBe(70);
+    expect(await A.workouts.filter((w) => !!w.pendingMerge).count()).toBe(0);
+  });
+  it('두 기기가 같은 기록을 동시에 고치면 한쪽으로 모이고(나중 수정), 사본은 생기지 않음', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B', 45_000);
+    await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);
+    await A.workouts.put({ ...(await A.workouts.get('w9'))!, name: 'A가 고침' });
+    await B.workouts.put({ ...(await B.workouts.get('w9'))!, name: 'B가 고침' });
+    await sync(A, transport); await sync(B, transport); await sync(A, transport);
+    const na = (await A.workouts.get('w9'))!.name, nb = (await B.workouts.get('w9'))!.name;
+    expect(na).toBe(nb);
+    expect(['A가 고침', 'B가 고침']).toContain(na);
+    expect(await A.workouts.count()).toBe(1);
+  });
+  it('한 기기가 고치는 동안 다른 기기가 지우면 고친 쪽이 이김 (수정 대 지움)', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);
+    await softDelete(A, 'workouts', 'w9');
+    await B.workouts.put({ ...(await B.workouts.get('w9'))!, name: 'B가 고침' });
+    await sync(A, transport); await sync(B, transport); await sync(A, transport);
+    expect((await A.workouts.get('w9'))?.name).toBe('B가 고침');
+  });
+});
+
 describe('S2b 2차 검토 반영', () => {
   const W = (id: string, owner: string, seq = 1): Workout => ({ ...startWorkout(id, R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: owner, ownerSeq: seq });
   it('끄고 → 다른 기기가 고침 → 다시 켜기: 고치지 않은 옛 사본은 충돌로 묻지 않고 서버 값을 받음', async () => {

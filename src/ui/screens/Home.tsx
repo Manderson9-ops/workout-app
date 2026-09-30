@@ -10,6 +10,7 @@ import { RemoteCards } from './RemoteCards';
 import { newId, softDelete } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
+import { syncEnabled } from '../sync';
 
 export function Home({ s }: { s: AppState }) {
   const all = catalog(s.custom);
@@ -29,8 +30,17 @@ export function Home({ s }: { s: AppState }) {
       )}
       {!s.settings.storageNoticeSeen && (
         <div class="card" role="note" aria-label="저장 안내">
-          <h3>기록은 이 아이폰에만 저장돼요</h3>
-          <p class="small">사파리에서 공유 → "홈 화면에 추가"로 설치해서 쓰세요. 홈 화면 아이콘을 지우면 기록도 지워져요. 설정 → 백업 파일 저장으로 가끔 백업해 주세요.</p>
+          {syncEnabled() ? (
+            <>
+              <h3>기록은 이 기기와 내 구글 드라이브에 저장돼요</h3>
+              <p class="small">PC ↔ 폰 동기화가 켜져 있어 다른 기기에서도 같은 기록이 보여요. 그래도 설정 → 백업 파일 저장으로 가끔 백업해 두세요.</p>
+            </>
+          ) : (
+            <>
+              <h3>기록은 이 기기에만 저장돼요</h3>
+              <p class="small">아이폰은 사파리에서 공유 → "홈 화면에 추가"로 설치해서 쓰세요. 앱(홈 화면 아이콘)을 지우면 기록도 지워져요. 설정 → 백업 파일 저장으로 가끔 백업하거나, 설정 → PC ↔ 폰 동기화를 켜 주세요.</p>
+            </>
+          )}
           <button onClick={() => mutate((d) => d.settings.put({ ...s.settings, key: 'main', storageNoticeSeen: true }))}>알겠어요</button>
         </div>
       )}
@@ -67,9 +77,15 @@ export function Home({ s }: { s: AppState }) {
       {recent.map((w) => {
         const sets = w.blocks.flatMap((b) => b.items.flatMap((i) => i.sets)).filter((x) => x.done && !x.warmup).length;
         return (
-          <div class="card" key={w.id}>
-            <div class="row between"><span>{w.name}</span><span class="sub small">{new Date(w.startedAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })}</span></div>
-            <div class="sub small">작업 세트 {sets}개 · {minutes((Date.parse(w.endedAt!) - Date.parse(w.startedAt)) / 1000)}</div>
+          <div class="card" key={w.id} aria-label={`최근 운동 ${w.name}`}>
+            <a class="card-link" href={`#/stats/w/${encodeURIComponent(w.id)}`} aria-label={`${w.name} 자세히 보기`}>
+              <div class="row between"><span>{w.name}</span><span class="sub small">{new Date(w.startedAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })}</span></div>
+              <div class="sub small">작업 세트 {sets}개 · {minutes((Date.parse(w.endedAt!) - Date.parse(w.startedAt)) / 1000)}{w.editedAt ? ' · 고침' : ''}</div>
+            </a>
+            <div class="row" style={{ marginTop: '6px', justifyContent: 'flex-end' }}>
+              <button aria-label={`최근 운동 ${w.name} 수정`} onClick={() => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`)}>수정</button>
+              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={async () => { if (confirm(`"${w.name}" 운동 기록을 지울까요? 되돌릴 수 없어요.`)) await mutate((d) => softDelete(d, 'workouts', w.id)); }}>삭제</button>
+            </div>
           </div>
         );
       })}
