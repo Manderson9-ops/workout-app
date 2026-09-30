@@ -3,6 +3,7 @@
  * 2초 조용할 때, 앱이 숨겨질 때 한꺼번에 저장한다. 최근 1,000건만 보관.
  * 설정에서 끌 수 있음 (localStorage 'diag.off' = '1').
  */
+import { lsGet, lsSet, lsRemove } from './appName';
 import { db } from './store';
 import { DIAG_MAX, sanitize, browserLabel, classifyTimerEnd } from '../core/diag';
 import type { DiagEntry, DiagKind } from '../core/diag';
@@ -11,16 +12,12 @@ import { APP_VERSION } from '../core/version';
 const buf: DiagEntry[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-/** 이 기기의 짧은 ID (진단이 어느 기기에서 왔는지 구분. 개인 정보 아님) */
-export function deviceId(): string {
-  let id = localStorage.getItem('deviceId');
-  if (!id) { id = Math.random().toString(36).slice(2, 8); localStorage.setItem('deviceId', id); }
-  return id;
-}
+import { deviceId } from './deviceId';
+export { deviceId };
 export const deviceInfo = () => ({ id: deviceId(), label: browserLabel(navigator.userAgent) });
 
-export const diagEnabled = () => localStorage.getItem('diag.off') !== '1';
-export function setDiagEnabled(on: boolean) { if (on) localStorage.removeItem('diag.off'); else localStorage.setItem('diag.off', '1'); }
+export const diagEnabled = () => lsGet('diag.off') !== '1';
+export function setDiagEnabled(on: boolean) { if (on) lsRemove('diag.off'); else lsSet('diag.off', '1'); }
 
 export function diag(k: DiagKind, f: { m?: string; v?: number; ok?: boolean } = {}): void {
   if (!diagEnabled()) return;

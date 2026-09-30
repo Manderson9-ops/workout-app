@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { makeBackup, parseBackup, backupFileName, backupDue, mergedLastBackupAt, BACKUP_SCHEMA } from '../src/core/backup';
-import { WorkoutDB, exportAll, importAll, DEFAULT_SETTINGS } from '../src/db/db';
+import { WorkoutDB, exportAll, importAll, DEFAULT_SETTINGS, clearAllLocal } from '../src/db/db';
 import { planToRoutine, startWorkout } from '../src/core/session';
+import { withoutStamp } from '../src/core/syncStamp';
 
 const now = '2026-09-30T10:00:00.000Z';
 const routine = planToRoutine('r1', '등', now, [{ kind: 'single', items: [{ exerciseId: 'a', name: 'A', part: '등', sets: 2, reps: 8, grade: 'S', gradeSource: 'VIDEO', estimated: false, substituted: false, locked: false, why: '', rank: 0 }], restSec: 150, timeSec: 0 }], 1200);
@@ -28,7 +29,7 @@ describe('백업 파일', () => {
     const file = makeBackup(before, '0.1.0', now);
     expect(file.counts).toEqual({ routines: 1, workouts: 1, meta: 1, custom: 1, settings: 1, bodyweight: 1, diag: 1 });
     const text = JSON.stringify(file);
-    await Promise.all(db.tables.map((t) => t.clear()));
+    await clearAllLocal(db);
     expect(await db.workouts.count()).toBe(0);
     const parsed = parseBackup(text);
     expect(parsed.ok).toBe(true);
@@ -81,13 +82,14 @@ describe('저장소 버전 올리기 (v1 → v2): 기존 기록 유지 (AGENTS �
     await v1.table('settings').put({ key: 'main', level: '초보' });
     v1.close();
     const v2 = new WorkoutDB(name);
-    expect(await v2.workouts.get('w1')).toEqual(w);
-    expect(await v2.routines.get('r1')).toEqual(routine);
+    // 기록 내용은 그대로 (v4부터 동기화 표시 _s가 붙음: tests/syncStamp.test.ts)
+    expect(withoutStamp((await v2.workouts.get('w1')) as never)).toEqual(w);
+    expect(withoutStamp((await v2.routines.get('r1')) as never)).toEqual(routine);
     expect((await v2.meta.get('a'))?.favorite).toBe(true);
     expect((await v2.settings.get('main'))?.level).toBe('초보');
     await v2.bodyweight.put({ date: '2026-09-30', kg: 70 });
     expect(await v2.bodyweight.count()).toBe(1);
-    expect(v2.verno).toBe(3);
+    expect(v2.verno).toBe(4);
     v2.close();
   });
 });
