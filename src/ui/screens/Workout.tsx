@@ -4,12 +4,13 @@ import { activeOf, historyOf, mutate, flushPending, getState } from '../store';
 import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
-  currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, setWorkoutMemo, addSet, removeSet, skipItem, replaceItem, appendExercise,
+  currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, setWorkoutMemo, addSet, removeSet, skipItem, replaceItem, appendExercise, moveWorkoutBlock,
   adjustTimer, clearTimer, timerRemaining, progress, finishWorkout, restAfter, lastSets,
 } from '../../core/session';
 import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, mmss } from '../components';
 import { resolveGrade } from '../../core/exercises';
+import { hasDbInfo } from '../../core/planEdit';
 import { updateWorkoutAfterInputs } from '../actions';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
@@ -20,6 +21,8 @@ import { diagTimerEnd } from '../diag';
 import { sendNow } from '../autoSend';
 import { syncNow } from '../sync';
 import { remoteActiveOf } from '../store';
+import { useDragSort } from '../dragSort';
+import { remapIndex } from '../../core/reorder';
 
 export function WorkoutScreen({ s }: { s: AppState }) {
   const w = activeOf(s);
@@ -43,6 +46,17 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   }, []);
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
+  // 블록 끌어서 순서 바꾸기 (D-037). 펼친 카드는 옮긴 자리를 따라감
+  // 이동은 하나씩 차례로 (빠르게 ↓↓ 눌러도 순서가 뒤바뀌지 않게), 펼친 카드는 저장된 뒤에 따라감 (깜빡임 방지)
+  const moveQ = useRef<Promise<void>>(Promise.resolve());
+  const dnd = useDragSort(w?.blocks.length ?? 0, (from, to) => {
+    if (!w) return;
+    const id = w.id;
+    moveQ.current = moveQ.current.then(async () => {
+      await updateWorkoutAfterInputs(id, (cw) => moveWorkoutBlock(cw, from, to));
+      setOpen((o) => (o === null || o < 0 ? o : remapIndex(o, from, to)));
+    }).catch(() => undefined);
+  }, (i) => (w?.blocks[i]?.items.map((it) => byId.get(it.exerciseId)?.name_ko ?? it.exerciseId).join(' + ') ?? ''));
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
 
   // 표시 시각은 렌더 순간의 현재 시각 (250ms 틱은 다시 그리기용). 오래된 시각이면 설정보다 1초 길게 보일 수 있음
@@ -144,20 +158,24 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       {w.memo && <p class="sub small">📝 {w.memo}</p>}
       <div class="row between sub small"><span>경과 {mmss(prog.elapsedSec)}</span><span>{prog.doneSets}/{prog.totalSets}세트</span><span>남은 예상 {mmss(prog.remainingSec)}</span></div>
       {delta !== undefined && Math.abs(delta) >= 60 && <div class="pill" aria-label="예정 대비">{delta > 0 ? `예정보다 약 ${Math.round(delta / 60)}분 늦음` : `예정보다 약 ${Math.round(-delta / 60)}분 빠름`}</div>}
+      <p class="sr-only" aria-live="polite">{dnd.msg}</p>
       <div class="progress" style={{ margin: '6px 0 10px' }}><div style={{ width: `${prog.totalSets ? (100 * prog.doneSets) / prog.totalSets : 0}%` }} /></div>
 
       {w.blocks.map((b, bi) => {
         const isOpen = bi === openIdx;
         const doneAll = b.items.every((it) => it.skipped || it.sets.every((x) => x.done));
         return (
-          <div class={`card ${cur?.block === bi ? 'active' : ''}`} key={bi}>
-            <div class="row between" onClick={() => setOpen(isOpen ? -1 : bi)} role="button" aria-expanded={isOpen} style={{ minHeight: '44px', cursor: 'pointer' }}>
+          <div class={`card ${cur?.block === bi ? 'active' : ''}`} key={bi} {...dnd.itemAttrs(bi)}>
+            <div class="row" style={{ alignItems: 'flex-start', gap: '4px' }}>
+            {w.blocks.length > 1 && <button {...dnd.handleProps(bi)}>≡</button>}
+            <div class="row between grow" onClick={() => setOpen(isOpen ? -1 : bi)} role="button" aria-expanded={isOpen} style={{ minHeight: '44px', cursor: 'pointer' }}>
               <div class="grow">
                 {b.kind !== 'single' && <span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'} · 번갈아</span>}
                 <div><strong>{b.items.map((it) => nameOf(it.exerciseId)).join(' + ')}</strong>{doneAll ? ' ✅' : ''}</div>
                 <div class="pill">{b.kind === 'single' ? `세트 간 휴식 ${b.restSec}초` : `라운드 후 휴식 ${b.roundRestSec}초`}</div>
               </div>
               <span class="sub">{isOpen ? '▾' : '▸'}</span>
+            </div>
             </div>
             {isOpen && b.items.map((it, ii) => {
               const ex = byId.get(it.exerciseId);
@@ -166,7 +184,9 @@ export function WorkoutScreen({ s }: { s: AppState }) {
               return (
                 <div key={ii} style={{ marginTop: '10px', opacity: it.skipped ? 0.5 : 1 }}>
                   <div class="row">{g && <GradeBadge g={g} />}<strong class="grow">{b.kind !== 'single' ? `${String.fromCharCode(65 + ii)}. ` : ''}{nameOf(it.exerciseId)}</strong>
-                    <a class="btn ghost small" href={`#/exercises/${encodeURIComponent(it.exerciseId)}`}>정보</a></div>
+                    {hasDbInfo(ex)
+                      ? <a class="btn small info-db" href={`#/exercises/${encodeURIComponent(it.exerciseId)}`} aria-label={`${nameOf(it.exerciseId)} 정보 (내 운동 DB: 영상 등급·자세 포인트)`} title="내 운동 DB 있음 (영상 등급·자세 포인트)">📚 정보</a>
+                      : <a class="btn ghost small" href={`#/exercises/${encodeURIComponent(it.exerciseId)}`} aria-label={`${nameOf(it.exerciseId)} 정보 (DB 없음)`}>정보</a>}</div>
                   {prev.length > 0 && <div class="pill">지난번: {prev.map((p) => `${p.weight ?? '-'}kg×${p.reps ?? p.seconds ?? '-'}`).join(', ')}</div>}
                   {!it.skipped && it.sets.map((x, k) => setRow(bi, ii, k, x))}
                   <div class="row wrap" style={{ marginTop: '6px' }}>
@@ -217,7 +237,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       {picker && (
         <ExercisePicker s={s} all={all} title={picker.mode === 'swap' ? '운동 교체' : '운동 추가'}
           part={picker.mode === 'swap' ? byId.get(w.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part : undefined}
-          exclude={picker.mode === 'swap' ? [w.blocks[picker.b]!.items[picker.i]!.exerciseId] : []}
+          exclude={w.blocks.flatMap((b) => b.items.map((it) => it.exerciseId))} /* 같은 운동 두 번 불가: 동기화·늦은 기록이 운동 이름으로 짝지음 (D-037) */
           onClose={() => setPicker(null)}
           onPick={(e) => {
             if (picker.mode === 'swap') upd((cw) => replaceItem(cw, picker.b, picker.i, e.id, history));

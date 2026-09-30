@@ -183,6 +183,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       <h1>{w.name}</h1>
       <p class="sub">{new Date(w.startedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {mmss(sum.durationSec)}{sum.plannedSec ? ` (예상 ${mmss(sum.plannedSec)})` : ''}</p>
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
+      {w.editedAt && <p class="sub small">{new Date(w.editedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}에 고침</p>}
       {w.memo && <p>📝 {w.memo}</p>}
       {w.blocks.map((b, bi) => b.items.map((it, ii) => (
         <div class="card" key={`${bi}-${ii}`}>
@@ -197,6 +198,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       )))}
       <div class="row" style={{ marginTop: '10px' }}>
         <button class="primary grow" onClick={async () => { const r = asRoutine(); await mutate((d) => d.routines.put(r)); await startRoutine(s, r); }}>이 운동 다시 하기</button>
+        {w.endedAt && !w.pendingMerge && <button onClick={() => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`)}>수정</button>}
         <button class="danger" onClick={async () => { if (confirm('이 운동 기록을 지울까요? 되돌릴 수 없어요.')) { await mutate((d) => softDelete(d, 'workouts', w.id)); go('#/stats'); } }}>삭제</button>
       </div>
     </main>

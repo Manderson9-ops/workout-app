@@ -7,7 +7,7 @@ import type { ServerState, SyncRequest } from '../src/core/syncMerge';
 import { syncOnce, getKv, restoreStash, collectMutations, CHUNK } from '../src/db/sync';
 import type { Transport } from '../src/db/sync';
 import { SYNC_TABLES, syncedFields, withoutStamp } from '../src/core/syncStamp';
-import { planToRoutine, startWorkout } from '../src/core/session';
+import { planToRoutine, startWorkout, moveWorkoutBlock } from '../src/core/session';
 import type { Routine, Workout } from '../src/core/session';
 
 let T = 1_750_000_000_000;
@@ -184,6 +184,21 @@ describe('S2b 검토 반영', () => {
     expect((await B.workouts.get('w1'))!.ownerDeviceId).toBe('B');
     expect(await view(A)).toEqual(await view(B));
   });
+  it('D-037: 순서를 바꾼 옛 화면에서 가져와도 서버에만 있던 세트는 옮겨진 블록에 남음', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    const r0 = R('r1', '등');
+    const r: Routine = { ...r0, blocks: [r0.blocks[0]!, { ...r0.blocks[0]!, items: [{ ...r0.blocks[0]!.items[0]!, exerciseId: 'b' }] }] };
+    await A.workouts.put({ ...startWorkout('w1', r, '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'A', ownerAt: '2026-09-30T10:00:00.000Z', ownerSeq: 1 });
+    await sync(A, transport); await sync(B, transport);
+    const a = (await A.workouts.get('w1'))!; setDone(a, 0, 50); setDone(a, 1, 51); await A.workouts.put(a); await sync(A, transport);
+    const b = (await B.workouts.get('w1'))!; // 세트 0개인 옛 화면에서 b를 맨 앞으로 옮기고 가져옴
+    await B.workouts.put({ ...moveWorkoutBlock(b, 1, 0), ownerDeviceId: 'B', ownerSeq: 2 }); await sync(B, transport); await sync(A, transport);
+    const got = (await B.workouts.get('w1'))!;
+    expect(got.blocks.map((x) => x.items[0]!.exerciseId)).toEqual(['b', 'a']);
+    expect(got.blocks[1]!.items[0]!.sets.filter((x) => x.done).map((x) => x.weight)).toEqual([50, 51]);
+    expect(got.blocks[0]!.items[0]!.sets.some((x) => x.done)).toBe(false);
+    expect(await view(A)).toEqual(await view(B));
+  });
   it('시계가 늦은 기기가 가져와도 되돌려지지 않음 (ownerSeq)', async () => {
     const { transport } = server(); const A = dev('A'), B = dev('B', -3_600_000);
     await A.workouts.put(W('w1', 'A')); await sync(A, transport); await sync(B, transport);
@@ -272,6 +287,51 @@ describe('0.5.0 → 0.6.0 (DB v5)', () => {
     await sync(B, transport);
     expect((await B.feedback.get('FB-20260930-A-01'))?.text).toBe('메모');
     expect(await names(B)).toEqual(['v1']);
+  });
+});
+
+describe('끝낸 운동 고치기 동기화 (D-035)', () => {
+  const Wd = (): Workout => ({ ...startWorkout('w9', R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: 'A', ownerSeq: 1, endedAt: '2026-09-30T10:40:00.000Z', timer: null });
+  it('폰(A)에서 끝낸 운동을 PC(B)가 고치면 폰에도 반영, 주인은 그대로', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);
+    const b = (await B.workouts.get('w9'))!;
+    b.blocks[0]!.items[0]!.sets[0] = { weight: 70, reps: 6, warmup: false, done: true, doneAt: '2026-09-30T10:05:00.000Z' };
+    await B.workouts.put({ ...b, name: '등 (고침)', editedAt: '2026-09-30T12:00:00.000Z' }); await sync(B, transport); await sync(A, transport);
+    const a = (await A.workouts.get('w9'))!;
+    expect(a).toMatchObject({ name: '등 (고침)', ownerDeviceId: 'A', editedAt: '2026-09-30T12:00:00.000Z' });
+    expect(a.blocks[0]!.items[0]!.sets[0]!.weight).toBe(70);
+    expect(await A.workouts.filter((w) => !!w.pendingMerge).count()).toBe(0);
+  });
+  it('두 기기가 같은 기록을 동시에 고치면 한쪽으로 모이고(나중 수정), 사본은 생기지 않음', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B', 45_000);
+    await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);
+    await A.workouts.put({ ...(await A.workouts.get('w9'))!, name: 'A가 고침' });
+    await B.workouts.put({ ...(await B.workouts.get('w9'))!, name: 'B가 고침' });
+    await sync(A, transport); await sync(B, transport); await sync(A, transport);
+    const na = (await A.workouts.get('w9'))!.name, nb = (await B.workouts.get('w9'))!.name;
+    expect(na).toBe(nb);
+    expect(['A가 고침', 'B가 고침']).toContain(na);
+    expect(await A.workouts.count()).toBe(1);
+  });
+  it('다른 기기가 지운 걸 받은 뒤 "되살려 저장"하면 다시 생김 (실제 저장 경로: 지움 표시 있는 기기에서 put)', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);
+    const kept = (await B.workouts.get('w9'))!;
+    await softDelete(A, 'workouts', 'w9'); await sync(A, transport); await sync(B, transport);
+    expect(await B.workouts.get('w9')).toBeUndefined();
+    await B.workouts.put({ ...kept, name: '되살림' });
+    await sync(B, transport); await sync(A, transport);
+    expect((await A.workouts.get('w9'))?.name).toBe('되살림');
+    expect((await B.workouts.get('w9'))?.name).toBe('되살림');
+  });
+  it('한 기기가 고치는 동안 다른 기기가 지우면 고친 쪽이 이김 (수정 대 지움)', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(Wd()); await sync(A, transport); await sync(B, transport);
+    await softDelete(A, 'workouts', 'w9');
+    await B.workouts.put({ ...(await B.workouts.get('w9'))!, name: 'B가 고침' });
+    await sync(A, transport); await sync(B, transport); await sync(A, transport);
+    expect((await A.workouts.get('w9'))?.name).toBe('B가 고침');
   });
 });
 

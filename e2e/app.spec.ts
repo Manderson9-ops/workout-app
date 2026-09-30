@@ -41,7 +41,7 @@ async function makeRoutine(page: Page, parts: string[], minutes: string) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./#/');
-  await expect(page.getByText('기록은 이 아이폰에만 저장돼요')).toBeVisible(); // 첫 실행 안내
+  await expect(page.getByText('기록은 이 기기에만 저장돼요')).toBeVisible(); // 첫 실행 안내
   await page.getByRole('button', { name: '알겠어요' }).click();
 });
 
@@ -617,7 +617,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await syncNowOn(page); await syncNowOn(pc);
   // PC에서 루틴 지움 → 폰에서도 사라짐
   await pc.getByRole('link', { name: '홈' }).click();
-  await pc.getByRole('button', { name: 'PC에서 짠 루틴 삭제' }).click();
+  await pc.getByRole('button', { name: 'PC에서 짠 루틴 삭제', exact: true }).click();
   await syncNowOn(pc); await syncNowOn(page);
   await page.getByRole('link', { name: '홈' }).click();
   await expect(page.getByRole('heading', { name: 'PC에서 짠 루틴' })).toHaveCount(0);
@@ -710,4 +710,347 @@ test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙
   await expect(page.getByLabel(/^개선 메모 FB-/).filter({ hasText: '두 번째' })).toHaveCount(1);
 });
 
+
+test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무게·시간·세트 → 저장 → 상세·통계 반영, 홈에서 삭제', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  const w = page.locator('input[aria-label$="1세트 무게"]').first();
+  await w.fill('40');
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await expect(page).toHaveURL(/#\/$/);
+  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
+  await expect(card).toContainText('작업 세트 1개');
+  // 카드 누르면 상세
+  await card.getByRole('link').click();
+  await expect(page).toHaveURL(/#\/stats\/w\//);
+  await page.getByRole('link', { name: '홈' }).click();
+  // 수정
+  await card.getByRole('button', { name: /수정$/ }).click();
+  await expect(page.getByRole('heading', { name: '운동 기록 수정' })).toBeVisible();
+  await page.getByLabel('운동 이름').fill('등 (고침)');
+  await page.getByLabel('운동 시간(분)').fill('45');
+  const first = page.locator('input[aria-label$=" 1세트 무게"]').first();
+  await first.fill('42.5');
+  await page.locator('input[aria-label$=" 2세트 완료"]').first().check();
+  await page.locator('input[aria-label$=" 2세트 무게"]').first().fill('40');
+  await page.locator('input[aria-label$=" 2세트 횟수"]').first().fill('8');
+  await checkScreen(page, '23-workout-edit');
+  // 잘못된 값은 저장 안 됨
+  await page.locator('input[aria-label$=" 1세트 RIR"]').first().fill('15');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('RIR');
+  await page.locator('input[aria-label$=" 1세트 RIR"]').first().fill('2');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '등 (고침)' })).toBeVisible();
+  await expect(page.getByText(/에 고침$/)).toBeVisible();
+  await expect(page.getByText(/42\.5kg × \d+회 · RIR 2/)).toBeVisible();
+  await expect(page.getByText(/작업 세트 2/)).toBeVisible();
+  await expect(page.getByText(/45:00/)).toBeVisible();
+  // 홈 카드에도 반영, 그리고 삭제
+  await page.getByRole('link', { name: '홈' }).click();
+  const card2 = page.getByLabel('최근 운동 등 (고침)', { exact: true });
+  await expect(card2).toContainText('작업 세트 2개 · 45분 · 고침');
+  await card2.getByRole('button', { name: '최근 운동 등 (고침) 삭제' }).click();
+  await expect(card2).toHaveCount(0);
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
+});
+
+test('수정 화면: 입력 중 세트를 지워도 값이 옆 세트로 가지 않음, 시작을 옮겨도 운동 시간 그대로, 편집 중 메뉴 숨김', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  const w = page.locator('input[aria-label$="1세트 무게"]').first();
+  await w.fill('40'); await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  const w2 = page.locator('input[aria-label$="2세트 무게"]').first();
+  await w2.fill('50'); await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  await page.locator('.card[aria-label^="최근 운동 "]').first().getByRole('button', { name: /수정$/ }).click();
+  await expect(page.locator('nav.nav')).toBeHidden();
+  const before = await page.getByLabel('운동 시간(분)').inputValue();
+  await page.getByLabel('시작 날짜와 시각').fill('2026-09-28T07:30');
+  await expect(page.getByLabel('운동 시간(분)')).toHaveValue(before);
+  // 1세트 무게에 입력하는 도중(포커스 유지) 1세트 지우기 → 남은 세트(원래 2세트)는 50 그대로
+  const f1 = page.locator('input[aria-label$=" 1세트 무게"]').first();
+  await f1.click(); await page.keyboard.type('9');
+  await page.locator('button[aria-label$=" 1세트 지우기"]').first().evaluate((b: HTMLButtonElement) => b.click());
+  await expect(page.locator('input[aria-label$=" 1세트 무게"]').first()).toHaveValue('50');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page).toHaveURL(/#\/stats\/w\/[^/]+$/);
+  await expect(page.getByText(/9월 28일/)).toBeVisible();
+  await expect(page.getByText(/50kg × \d+회/).first()).toBeVisible();
+  await expect(page.getByText(/409kg|409/)).toHaveCount(0);
+  await expect(page.locator('nav.nav')).toBeVisible();
+});
+
+test('수정 화면: 취소하면 기록 그대로', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await page.getByRole('button', { name: '종료' }).click();
+  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
+  const before = await card.textContent();
+  await card.getByRole('button', { name: /수정$/ }).click();
+  await page.getByLabel('운동 이름').fill('바뀌면 안 됨');
+  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(page).toHaveURL(/#\/stats\/w\//);
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(page.locator('.card[aria-label^="최근 운동 "]').first()).toHaveText(before!);
+});
+
 void makeRoutine;
+
+test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바꾸기, 운동 추가 → 저장하고 시작, 내 운동 DB 정보 버튼', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const cards = planSec.locator('.card');
+  expect(await cards.count()).toBeGreaterThan(1);
+  const first = (await cards.nth(0).locator('strong').allTextContents())[0]!;
+  const second = await cards.nth(1).locator('strong').allTextContents();
+
+  // 횟수만 +1 (세트는 그대로), 세트만 −1 (횟수는 그대로)
+  const setsBox = planSec.getByRole('group', { name: `${first} 세트` });
+  const repsBox = planSec.getByRole('group', { name: `${first} 횟수` });
+  const sets0 = Number((await setsBox.textContent())!.match(/(\d+)세트/)![1]);
+  const reps0 = Number((await repsBox.textContent())!.match(/(\d+)회/)![1]);
+  await planSec.getByRole('button', { name: `${first} 횟수 늘리기` }).click();
+  await planSec.getByRole('button', { name: `${first} 횟수 늘리기` }).click();
+  await expect(repsBox).toContainText(`${reps0 + 2}회`);
+  await expect(setsBox).toContainText(`${sets0}세트`);
+  await planSec.getByRole('button', { name: `${first} 세트 늘리기` }).click();
+  await expect(setsBox).toContainText(`${sets0 + 1}세트`);
+  await expect(repsBox).toContainText(`${reps0 + 2}회`);
+  const est0 = await planSec.getByText(/예상 \d+:\d{2}/).textContent();
+  await planSec.getByRole('button', { name: `${first} 횟수 줄이기` }).click();
+  await expect(repsBox).toContainText(`${reps0 + 1}회`);
+  expect(await planSec.getByText(/예상 \d+:\d{2}/).textContent(), '횟수를 바꾸면 예상 시간도 다시 계산').not.toBe(est0);
+
+  // 순서: 1번째 블록을 아래로 → 2번째 블록이 맨 위
+  const firstBlock = (await cards.nth(0).locator('strong').allTextContents()).join(' + ');
+  await expect(planSec.getByRole('button', { name: `${firstBlock} 위로 (지금 1번째)` })).toBeDisabled();
+  await planSec.getByRole('button', { name: `${firstBlock} 아래로 (지금 1번째)` }).click();
+  // 누른 ↓가 아직 켜져 있으면 그대로, 끝에 닿아 꺼졌으면 같은 블록의 ↑로 초점
+  await expect(planSec.getByRole('button', { name: `${firstBlock} ${(await cards.count()) > 2 ? '아래로' : '위로'} (지금 2번째)` })).toBeFocused();
+  expect(await cards.nth(0).locator('strong').allTextContents()).toEqual(second);
+  expect((await cards.nth(1).locator('strong').allTextContents())[0]).toBe(first);
+  await expect(repsBox).toContainText(`${reps0 + 1}회`); // 옮겨도 값 유지
+
+  // 운동 추가: 다른 부위(삼두)의 영상 등급 운동
+  const n0 = await cards.count();
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  const dlg = page.getByRole('dialog', { name: '운동 추가' });
+  await expect(dlg).toBeVisible();
+  await touchTargets(page);
+  await dlg.getByLabel('운동 검색').fill('JM');
+  await dlg.getByRole('button', { name: '스미스머신 JM프레스' }).click();
+  await expect(dlg).toBeHidden();
+  await expect(cards).toHaveCount(n0 + 1);
+  await expect(cards.nth(n0)).toContainText('스미스머신 JM프레스');
+  await expect(cards.nth(n0)).toContainText('직접 추가');
+  // 추가한 운동을 맨 위로
+  for (let k = n0; k > 0; k--) await planSec.getByRole('button', { name: `스미스머신 JM프레스 위로 (지금 ${k + 1}번째)` }).click();
+  await expect(planSec.getByRole('button', { name: '스미스머신 JM프레스 아래로 (지금 1번째)' })).toBeFocused(); // 맨 위에 닿아 ↑가 꺼지면 ↓로 초점
+  await expect(cards.nth(0)).toContainText('스미스머신 JM프레스');
+  await checkScreen(page, '20-plan-edit');
+
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '저장하고 시작' }).click();
+  await expect(page).toHaveURL(/#\/workout/);
+  // 첫 블록 = 추가한 JM프레스: 내 운동 DB 정보 버튼(강조)
+  const dbLink = page.getByRole('link', { name: '스미스머신 JM프레스 정보 (내 운동 DB: 영상 등급·자세 포인트)' });
+  await expect(dbLink).toBeVisible();
+  await expect(dbLink).toHaveClass(/info-db/);
+  await dbLink.locator('xpath=..').screenshot({ path: `reports/screens/${test.info().project.name}-22-info-db.png` });
+  // 바꾼 세트·횟수가 루틴으로 이어짐
+  // 카드 머리(펼치기)를 누름. 이름이 같은 손잡이(≡ 순서 옮기기)는 제외 (D-037)
+  await page.getByRole('button', { name: new RegExp(`^${first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} (세트 간|라운드 후) 휴식`) }).first().click();
+  await expect(page.getByLabel(`${first} 1세트 횟수`, { exact: true })).toHaveValue(String(reps0 + 1));
+  await expect(page.getByLabel(`${first} ${sets0 + 1}세트 횟수`, { exact: true })).toBeVisible();
+  await expect(page.getByLabel(`${first} ${sets0 + 2}세트 횟수`, { exact: true })).toHaveCount(0);
+  // 이두 운동은 내 운동 DB가 없음 → 흐린 기본 "정보"
+  const plain = page.getByRole('link', { name: `${first} 정보 (DB 없음)` });
+  await expect(plain).toBeVisible();
+  await expect(plain).not.toHaveClass(/info-db/);
+  await plain.locator('xpath=..').screenshot({ path: `reports/screens/${test.info().project.name}-23-info-plain.png` });
+  await checkScreen(page, '21-workout-info');
+});
+
+test('플랜 바로 고치기 (D-036): 시간 운동 초 −/+ 가 예상 시간에 반영, 잠금 다시 생성해도 바꾼 횟수·다른 부위 추가 운동 유지', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const est = async () => { const t = (await planSec.getByText(/예상 \d+:\d{2}/).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
+
+  // 다른 부위(코어)의 시간 운동 추가 → 초 조절
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  await page.getByRole('dialog', { name: '운동 추가' }).getByLabel('운동 검색').fill('플랭크');
+  await page.getByRole('dialog', { name: '운동 추가' }).getByRole('button', { name: '플랭크', exact: true }).click();
+  const secBox = planSec.getByRole('group', { name: '플랭크 시간' });
+  await expect(secBox).toContainText('45초');
+  const e0 = await est();
+  for (let k = 0; k < 3; k++) await planSec.getByRole('button', { name: '플랭크 시간 늘리기' }).click();
+  await expect(secBox).toContainText('60초');
+  expect(await est(), '3세트 × 15초 늘림 → 예상 +45초').toBe(e0 + 45);
+
+  // 첫 이두 운동 횟수 바꾸고 잠금, 플랭크도 잠금 → 다시 생성
+  const first = (await planSec.locator('.card').nth(0).locator('strong').allTextContents())[0]!;
+  const repsBox = planSec.getByRole('group', { name: `${first} 횟수` });
+  const r0 = Number((await repsBox.textContent())!.match(/(\d+)회/)![1]);
+  await planSec.getByRole('button', { name: `${first} 횟수 늘리기` }).click();
+  await planSec.getByRole('button', { name: `${first} 횟수 늘리기` }).click();
+  const lockBtn = (n: string) => planSec.locator('.card').filter({ hasText: n }).getByRole('button', { name: '잠금', exact: true });
+  await lockBtn(first).first().click();
+  await lockBtn('플랭크').click();
+  await planSec.getByRole('button', { name: '다시 생성 (잠금 2개 유지)' }).click();
+  await expect(planSec.getByRole('group', { name: '플랭크 시간' })).toContainText('60초');
+  await expect(planSec.getByRole('group', { name: `${first} 횟수` })).toContainText(`${r0 + 2}회`);
+  await expect(planSec.getByRole('button', { name: '다시 생성 (잠금 2개 유지)' })).toBeVisible();
+
+  // 플랭크를 지우면 잠금 수도 줄어듦
+  await planSec.getByRole('button', { name: '플랭크 삭제' }).click();
+  await expect(planSec.getByRole('button', { name: '다시 생성 (잠금 1개 유지)' })).toBeVisible();
+});
+
+/** 손잡이(≡)를 끌어 target 카드 가운데에 놓기. Chromium은 실제 터치(CDP), 그 밖에는 마우스 */
+async function dragTo(page: Page, handle: Locator, target: Locator, useTouch = false) {
+  await handle.scrollIntoViewIfNeeded();
+  const h = (await handle.boundingBox())!;
+  const x0 = h.x + h.width / 2, y0 = h.y + h.height / 2;
+  const tb = async () => (await target.boundingBox())!;
+  if (useTouch) {
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+    await touch('touchStart', x0, y0);
+    for (let k = 1; k <= 12; k++) { const t = await tb(); await touch('touchMove', x0 + ((t.x + t.width / 2 - x0) * k) / 12, y0 + ((t.y + t.height / 2 - y0) * k) / 12); }
+    await touch('touchEnd', 0, 0);
+    await cdp.detach();
+  } else {
+    await page.mouse.move(x0, y0); await page.mouse.down();
+    for (let k = 1; k <= 12; k++) { const t = await tb(); await page.mouse.move(x0 + ((t.x + t.width / 2 - x0) * k) / 12, y0 + ((t.y + t.height / 2 - y0) * k) / 12); }
+    await page.mouse.up();
+  }
+}
+const namesOf = async (cards: Locator) => { const n = await cards.count(); const out: string[] = []; for (let i = 0; i < n; i++) out.push((await cards.nth(i).locator('strong').allTextContents()).join(' + ')); return out; };
+
+test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 유지, 현재 세트 따라감, 키보드) → 루틴 편집', async ({ page }, info) => {
+  const touch = info.project.name.includes('chromium');
+  await page.getByRole('link', { name: '플랜' }).click();
+  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const cards = planSec.locator('.card');
+  expect(await cards.count()).toBeGreaterThan(2);
+  const p0 = await namesOf(cards);
+  // 1번째 블록을 3번째 카드 위로 끌기 → [2, 3, 1, ...]
+  await dragTo(page, planSec.getByRole('button', { name: `${p0[0]} 순서 옮기기, 지금 1번째 (끌거나 ↑↓ 키)` }), cards.nth(2), touch);
+  await expect.poll(() => namesOf(cards)).toEqual([p0[1], p0[2], p0[0], ...p0.slice(3)]);
+  await expect(planSec.locator('.card.dragging')).toHaveCount(0);
+  await expect(page.locator('html.sorting')).toHaveCount(0);
+  // 조금만 움직이면(6px 미만) 아무 일 없음
+  const hb = (await planSec.locator('.drag-handle').first().boundingBox())!;
+  await page.mouse.move(hb.x + 20, hb.y + 20); await page.mouse.down(); await page.mouse.move(hb.x + 22, hb.y + 23); await page.mouse.up();
+  expect(await namesOf(cards)).toEqual([p0[1], p0[2], p0[0], ...p0.slice(3)]);
+  await checkScreen(page, '24-plan-drag');
+  const p1 = await namesOf(cards);
+
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '저장하고 시작' }).click();
+  await expect(page).toHaveURL(/#\/workout/);
+  const main = page.locator('main');
+  const wcards = main.locator('.card');
+  const heads = async () => { const n = await wcards.count(); const out: string[] = []; for (let i = 0; i < n; i++) out.push((await wcards.nth(i).locator('[role=button] strong').first().textContent())!.trim()); return out; };
+  await expect.poll(heads).toEqual(p1);
+  // 첫 세트 끝내기
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await expect(page.getByRole('button', { name: '현재 세트 완료' })).toContainText(`${p1[0]} 2세트`);
+  // 마지막 블록을 맨 앞으로 → 현재 세트가 그 운동 1세트로, 앞서 끝낸 세트는 원래 운동에 그대로
+  const last = p1[p1.length - 1]!;
+  await dragTo(page, main.getByRole('button', { name: `${last} 순서 옮기기, 지금 ${p1.length}번째 (끌거나 ↑↓ 키)` }), wcards.nth(0), touch);
+  await expect.poll(heads).toEqual([last, ...p1.slice(0, -1)]);
+  await expect(page.getByRole('button', { name: '현재 세트 완료' })).toContainText(`${last} 1세트`);
+  await wcards.nth(1).locator('[role=button]').click();
+  await expect(page.getByRole('button', { name: '완료 취소' })).toHaveCount(1);
+  // 손잡이만 눌렀다 떼면 카드가 열리거나 닫히지 않음
+  const exp0 = await wcards.nth(1).locator('[role=button]').getAttribute('aria-expanded');
+  await wcards.nth(1).locator('.drag-handle').click();
+  expect(await wcards.nth(1).locator('[role=button]').getAttribute('aria-expanded')).toBe(exp0);
+  // 키보드: 손잡이에 초점 → ↓ = 한 칸 아래, 초점은 옮긴 카드 손잡이에, 소리로 읽을 글
+  const h1 = main.getByRole('button', { name: `${p1[0]} 순서 옮기기, 지금 2번째 (끌거나 ↑↓ 키)` });
+  await h1.focus(); await page.keyboard.press('ArrowDown');
+  await expect.poll(heads).toEqual([last, p1[1], p1[0], ...p1.slice(2, -1)]);
+  await expect(main.getByRole('button', { name: `${p1[0]} 순서 옮기기, 지금 3번째 (끌거나 ↑↓ 키)` })).toBeFocused();
+  await expect(main.locator('p[aria-live]').filter({ hasText: '3번째로 옮김' })).toHaveCount(1);
+  await page.keyboard.press('Home');
+  await expect.poll(heads).toEqual([p1[0], last, p1[1], ...p1.slice(2, -1)]);
+  await expect(page.getByRole('button', { name: '현재 세트 완료' })).toContainText(`${p1[0]} 2세트`); // 끝낸 1세트 유지
+  await checkScreen(page, '25-workout-drag');
+  // 새로 고쳐도 순서 저장됨
+  await page.reload();
+  await expect.poll(heads).toEqual([p1[0], last, p1[1], ...p1.slice(2, -1)]);
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: '종료' }).click();
+
+  // 루틴 편집: 끌어서 옮기고 저장 → 다시 열면 그 순서
+  await page.getByRole('button', { name: '+ 직접' }).click();
+  await page.getByLabel('루틴 이름').fill('끌기 루틴');
+  for (const q of ['해머 컬', '로프 푸시다운', '레그 프레스']) {
+    await page.getByRole('button', { name: '+ 운동 추가' }).click();
+    await page.getByLabel('운동 검색').fill(q);
+    await page.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
+  }
+  const rcards = page.locator('main .card');
+  const rn = () => page.locator('main .card').evaluateAll((els) => els.map((e) => e.querySelector('strong')?.textContent?.trim() ?? ''));
+  const r0 = await rn();
+  await dragTo(page, rcards.nth(2).locator('.drag-handle'), rcards.nth(0), touch);
+  await expect.poll(rn).toEqual([r0[2], r0[0], r0[1]]);
+  await checkScreen(page, '26-routine-drag');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.locator('main .card').filter({ has: page.getByRole('heading', { name: '끌기 루틴' }) }).getByRole('button', { name: '편집' }).click();
+  await expect(async () => expect(await rn()).toEqual([r0[2], r0[0], r0[1]])).toPass({ timeout: 5000 });
+});
+
+test('끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으로, 놓을 칸 테두리, 끄는 도중 카드가 사라져도 멈추지 않음', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const pc = await ctx.newPage();
+  await pc.goto('./#/');
+  await pc.getByRole('button', { name: '알겠어요' }).click();
+  await pc.getByRole('button', { name: '+ 직접' }).click();
+  for (const q of ['해머 컬', '로프 푸시다운', '레그 프레스']) {
+    await pc.getByRole('button', { name: '+ 운동 추가' }).click();
+    await pc.getByLabel('운동 검색').fill(q);
+    await pc.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
+  }
+  const cards = pc.locator('main .card');
+  const rn = () => pc.locator('main .card').evaluateAll((els) => els.map((e) => e.querySelector('strong')?.textContent?.trim() ?? ''));
+  const r0 = await rn();
+  const b0 = (await cards.nth(0).boundingBox())!, b1 = (await cards.nth(1).boundingBox())!;
+  expect(Math.abs(b0.y - b1.y), '2단 배치').toBeLessThan(4);
+  // 2번째(오른쪽) 카드를 1번째(왼쪽) 위로: 끄는 도중 놓을 칸 테두리
+  const h = (await cards.nth(1).locator('.drag-handle').boundingBox())!;
+  await pc.mouse.move(h.x + h.width / 2, h.y + h.height / 2); await pc.mouse.down();
+  for (let k = 1; k <= 10; k++) await pc.mouse.move(h.x + h.width / 2 + ((b0.x + b0.width / 2 - h.x - h.width / 2) * k) / 10, h.y + h.height / 2 + ((b0.y + b0.height / 2 - h.y - h.height / 2) * k) / 10);
+  await expect(cards.nth(0)).toHaveAttribute('data-drop', 'before');
+  await expect(cards.nth(0)).toHaveAttribute('data-drop-grid', '');
+  await expect(cards.nth(1)).toHaveClass(/dragging/);
+  await pc.screenshot({ path: `reports/screens/${test.info().project.name}-27-pc-drag.png` });
+  await pc.mouse.up();
+  await expect.poll(rn).toEqual([r0[1], r0[0], r0[2]]);
+  // 끄는 도중 손잡이가 사라지면(다른 화면으로 바뀜 등) 끌기 상태가 풀림
+  const h2 = (await cards.nth(2).locator('.drag-handle').boundingBox())!;
+  await pc.mouse.move(h2.x + 20, h2.y + 20); await pc.mouse.down(); await pc.mouse.move(h2.x + 20, h2.y - 60);
+  await expect(pc.locator('html.sorting')).toHaveCount(1);
+  await pc.evaluate(() => document.querySelectorAll('.drag-handle').forEach((e) => e.remove()));
+  await expect(pc.locator('html.sorting')).toHaveCount(0);
+  await expect(pc.locator('.card.dragging')).toHaveCount(0);
+  await pc.mouse.up();
+  await ctx.close();
+});

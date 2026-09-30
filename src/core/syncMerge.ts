@@ -59,8 +59,19 @@ type ItemL = { exerciseId: string; sets: SetL[] };
 type BlockL = { items: ItemL[] };
 const contentKey = (s: SetL) => JSON.stringify(s, Object.keys(s).sort());
 const blocksOf = (w: Record<string, unknown>) => (w.blocks as BlockL[] | undefined) ?? [];
-/** 같은 자리(블록 순번·운동)의 운동 항목 */
-const itemAt = (w: Record<string, unknown>, bi: number, it: ItemL) => blocksOf(w)[bi]?.items.find((x) => x.exerciseId === it.exerciseId);
+/**
+ * 같은 운동 항목 찾기 (동기화 병합·늦은 기록 합치기 공용, D-037): 같은 블록 자리에 같은 운동이 있으면 그것,
+ * 없으면(순서를 바꿨거나 빈 블록이 빠져 번호가 당겨짐) 다른 블록에서 같은 운동. 운동 중에는 같은 운동을 두 번 넣지 못하게 막는다.
+ */
+export function findItem<T extends { exerciseId: string }>(blocks: ReadonlyArray<{ items: ReadonlyArray<T> }>, bi: number, exerciseId: string): T | undefined {
+  return blocks[bi]?.items.find((x) => x.exerciseId === exerciseId) ?? blocks.flatMap((b) => b.items).find((x) => x.exerciseId === exerciseId);
+}
+
+/**
+ * 같은 자리(블록 순번·운동)의 운동 항목. 운동 중 순서를 바꿨으면(D-037) 같은 자리에 없으므로
+ * 다른 블록에서 같은 운동을 찾는다 (못 찾으면 완료 세트를 놓칠 수 있음)
+ */
+const itemAt = (w: Record<string, unknown>, bi: number, it: ItemL) => findItem(blocksOf(w), bi, it.exerciseId);
 
 /**
  * 완료 세트 짝 맞추기: 끝낸 시각(doneAt)이 같으면 같은 세트 (무게·RIR을 나중에 고쳐도 같은 세트로 봄).

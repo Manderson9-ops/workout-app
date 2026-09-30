@@ -5,6 +5,8 @@ import type { PlanBlock } from './planner';
 import type { Exercise } from './types';
 import { blockTime, DEFAULT_TIME } from './time';
 import type { TimedBlock } from './time';
+import { moveItem } from './reorder';
+import { findItem } from './syncMerge';
 
 export interface RoutineItem { exerciseId: string; sets: number; reps: number; seconds?: number }
 export interface RoutineBlock { kind: 'single' | 'superset' | 'compound'; items: RoutineItem[]; restSec: number; roundRestSec: number; transitionSec: number }
@@ -37,6 +39,8 @@ export interface Workout {
   betweenSec?: number;
   /** 루틴의 예상 시간 (예정 대비 앞서는지/늦는지 표시용) */
   plannedSec?: number;
+  /** 끝낸 뒤 고친 시각 (D-035). 상세 화면에 "고침" 표시 */
+  editedAt?: string;
 }
 
 export const REST_DEFAULTS = { betweenSec: 60, warmupSec: 60 };
@@ -270,7 +274,7 @@ export function emptyRoutine(id: string, name: string, now: string): Routine {
 export function routineEstimate(r: Routine, byId: Map<string, Exercise>, betweenSec = DEFAULT_TIME.betweenRestSec): number {
   const blocks = r.blocks.filter((b) => b.items.every((i) => byId.has(i.exerciseId)));
   const t = blocks.reduce((s, b) => {
-    const items = b.items.map((i) => ({ exercise: byId.get(i.exerciseId)!, sets: i.sets, reps: i.reps }));
+    const items = b.items.map((i) => ({ exercise: byId.get(i.exerciseId)!, sets: i.sets, reps: i.reps, seconds: i.seconds }));
     const tb: TimedBlock = b.kind === 'single' || items.length === 1 ? { kind: 'single', items, rest: b.restSec } : { kind: 'group', items, roundRest: b.roundRestSec };
     return s + blockTime(tb, { ...DEFAULT_TIME, transitionSec: b.transitionSec });
   }, 0);
@@ -285,6 +289,21 @@ export function mergeWithNext(r: Routine, bi: number, kind: 'superset' | 'compou
   return { ...r, blocks: [...r.blocks.slice(0, bi), merged, ...r.blocks.slice(bi + 2)] };
 }
 
+/** 루틴 블록 순서 바꾸기 (끌어서 놓기·↑↓, D-037). 범위 밖·같은 자리면 그대로 */
+export function moveRoutineBlock(r: Routine, from: number, to: number): Routine {
+  const blocks = moveItem(r.blocks, from, to);
+  return blocks === r.blocks ? r : { ...r, blocks: blocks as RoutineBlock[] };
+}
+
+/**
+ * 운동 중 블록 순서 바꾸기 (D-037). 세트 기록·완료 여부는 블록과 함께 옮겨지고,
+ * 현재 세트는 새 순서에서 "아직 안 끝낸 첫 세트"로 다시 정해진다 (currentStep). 휴식 타이머는 그대로.
+ */
+export function moveWorkoutBlock(w: Workout, from: number, to: number): Workout {
+  const blocks = moveItem(w.blocks, from, to);
+  return blocks === w.blocks ? w : { ...w, blocks: blocks as WorkoutBlock[] };
+}
+
 /** 묶음을 풀어 운동마다 일반 블록으로 */
 export function splitBlock(r: Routine, bi: number, restFor: (exerciseId: string) => number): Routine {
   const b = r.blocks[bi];
@@ -296,4 +315,25 @@ export function splitBlock(r: Routine, bi: number, restFor: (exerciseId: string)
 /** 루틴 전체 휴식 한 번에 바꾸기 (루틴 기본값) */
 export function applyRestToAll(r: Routine, singleRestSec: number, roundRestSec: number): Routine {
   return { ...r, blocks: r.blocks.map((b) => ({ ...b, restSec: singleRestSec, roundRestSec })) };
+}
+
+/**
+ * 늦게 온 기록을 원래 운동에 합치기: 같은 운동(같은 자리 먼저, 순서를 바꿨으면 다른 블록, D-037)의 아직 안 한 세트를 채우고,
+ * 남는 세트가 없으면 뒤에 붙임. 원래 운동에 없는 운동(그사이 교체·삭제)은 맨 뒤에 새 블록으로 (버리지 않음)
+ */
+export function mergeLate(orig: Workout, copy: Workout): Workout {
+  const blocks = orig.blocks.map((b) => ({ ...b, items: b.items.map((i) => ({ ...i, sets: [...i.sets] })) }));
+  copy.blocks.forEach((cb, bi) => cb.items.forEach((ci) => {
+    const item = findItem(blocks, bi, ci.exerciseId);
+    if (!item) {
+      if (ci.sets.some((s) => s.done)) blocks.push({ kind: 'single', restSec: cb.restSec, roundRestSec: cb.roundRestSec, transitionSec: cb.transitionSec, items: [{ ...ci, sets: [...ci.sets] }] });
+      return;
+    }
+    for (const s of ci.sets) {
+      if (s.doneAt && item.sets.some((x) => x.done && x.doneAt === s.doneAt)) continue; // 이미 있는 세트 (끝낸 시각이 같음)
+      const k = item.sets.findIndex((x) => !x.done && x.warmup === s.warmup);
+      if (k >= 0) item.sets[k] = s; else item.sets.push(s);
+    }
+  }));
+  return { ...orig, blocks };
 }
