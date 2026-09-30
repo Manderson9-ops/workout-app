@@ -483,4 +483,51 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
 });
 });
 
+test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 그대로, 지우기는 지움 표시', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept());
+  // 앱이 연 저장소를 닫고 지운 뒤, 0.3.0(v3)과 같은 구조로 직접 만들어 기록을 넣음
+  await page.evaluate(async () => {
+    await new Promise<void>((res) => { const r = indexedDB.deleteDatabase('workout-app'); r.onsuccess = () => res(); r.onerror = () => res(); r.onblocked = () => res(); });
+    await new Promise<void>((res, rej) => {
+      const o = indexedDB.open('workout-app', 30);
+      o.onupgradeneeded = () => {
+        const db = o.result;
+        db.createObjectStore('routines', { keyPath: 'id' }).createIndex('updatedAt', 'updatedAt');
+        const w = db.createObjectStore('workouts', { keyPath: 'id' }); w.createIndex('startedAt', 'startedAt'); w.createIndex('endedAt', 'endedAt');
+        db.createObjectStore('meta', { keyPath: 'exerciseId' });
+        db.createObjectStore('custom', { keyPath: 'id' });
+        db.createObjectStore('settings', { keyPath: 'key' });
+        db.createObjectStore('bodyweight', { keyPath: 'date' });
+        db.createObjectStore('diag', { keyPath: 'id', autoIncrement: true }).createIndex('t', 't');
+      };
+      o.onsuccess = () => {
+        const db = o.result; const tx = db.transaction(['routines', 'settings', 'bodyweight'], 'readwrite');
+        tx.objectStore('routines').put({ id: 'r-old', name: '예전 루틴', createdAt: '2026-09-29T10:00:00.000Z', updatedAt: '2026-09-29T10:00:00.000Z', blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: 'hammer_curl', sets: 3, reps: 10 }] }] });
+        tx.objectStore('settings').put({ key: 'main', level: '상급', storageNoticeSeen: true });
+        tx.objectStore('bodyweight').put({ date: '2026-09-29', kg: 71 });
+        tx.oncomplete = () => { db.close(); res(); }; tx.onerror = () => rej(tx.error);
+      };
+      o.onerror = () => rej(o.error);
+    });
+  });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '예전 루틴' })).toBeVisible();
+  await page.getByRole('link', { name: '설정' }).click();
+  await expect(page.getByRole('button', { name: '상급' })).toHaveAttribute('aria-pressed', 'true');
+  const info = await page.evaluate(async () => new Promise<{ ver: number; stamped: boolean }>((res) => {
+    const o = indexedDB.open('workout-app');
+    o.onsuccess = () => { const db = o.result; const g = db.transaction('routines').objectStore('routines').get('r-old'); g.onsuccess = () => { res({ ver: db.version, stamped: !!g.result?._s && g.result._s.y === 1 }); db.close(); }; };
+  }));
+  expect(info).toEqual({ ver: 40, stamped: true });
+  // 지우면 기록은 없어지고 지움 표시가 남음
+  await page.getByRole('link', { name: '홈' }).click();
+  await page.getByRole('button', { name: '예전 루틴 삭제' }).click();
+  await expect(page.getByRole('heading', { name: '예전 루틴' })).toHaveCount(0);
+  const tomb = await page.evaluate(async () => new Promise<boolean>((res) => {
+    const o = indexedDB.open('workout-app');
+    o.onsuccess = () => { const db = o.result; const g = db.transaction('tombs').objectStore('tombs').get('routines/r-old'); g.onsuccess = () => { res(!!g.result); db.close(); }; };
+  }));
+  expect(tomb).toBe(true);
+});
+
 void makeRoutine;

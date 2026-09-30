@@ -5,8 +5,15 @@ import { useEffect, useState } from 'preact/hooks';
 import { WorkoutDB, getSettings, DEFAULT_SETTINGS, requestPersist } from '../db/db';
 import type { Settings, ExerciseMeta, CustomExercise, BodyweightRow } from '../db/db';
 import type { Routine, Workout } from '../core/session';
+import { Clock, memoryClockStore } from '../core/hlc';
+import type { ClockStore } from '../core/hlc';
+import { deviceId } from './deviceId';
 
-export const db = new WorkoutDB();
+/** 동기화 시계(HLC)는 localStorage에 "본 가장 큰 값"을 보관 (S2a) */
+const clockStore: ClockStore = typeof localStorage !== 'undefined'
+  ? { get: () => localStorage.getItem('sync.hlc'), set: (v) => localStorage.setItem('sync.hlc', v) }
+  : memoryClockStore();
+export const db = new WorkoutDB('workout-app', { clock: new Clock(clockStore), deviceId });
 
 export interface AppState {
   ready: boolean;
@@ -100,5 +107,8 @@ export function whenReady(): Promise<void> {
   return new Promise((res) => { const l = (s: AppState) => { if (s.ready) { listeners.delete(l); res(); } }; listeners.add(l); });
 }
 
-export const activeOf = (s: AppState) => s.workouts.find((w) => !w.endedAt);
+/** 이 기기가 주인인 진행 중 운동 (다른 기기에서 진행 중인 운동은 읽기 전용, D-029) */
+export const activeOf = (s: AppState) => s.workouts.find((w) => !w.endedAt && (!w.ownerDeviceId || w.ownerDeviceId === deviceId()));
+/** 다른 기기에서 진행 중인 운동 */
+export const remoteActiveOf = (s: AppState) => s.workouts.find((w) => !w.endedAt && !!w.ownerDeviceId && w.ownerDeviceId !== deviceId());
 export const historyOf = (s: AppState) => s.workouts.filter((w) => w.endedAt);

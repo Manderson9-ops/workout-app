@@ -13,6 +13,7 @@ import { resolveGrade } from '../../core/exercises';
 import { updateWorkoutAfterInputs } from '../actions';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
+import { softDelete } from '../../db/db';
 
 import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
 import { diagTimerEnd } from '../diag';
@@ -216,4 +217,4 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   );
 }
 
-export async function discardWorkout(w: Workout) { await mutate((d) => d.workouts.delete(w.id)); }
+export async function discardWorkout(w: Workout) { await mutate((d) => softDelete(d, 'workouts', w.id)); }

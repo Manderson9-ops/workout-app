@@ -21,6 +21,8 @@ export interface WorkoutBlock { kind: RoutineBlock['kind']; items: WorkoutItem[]
 export interface Timer { startedAt: number; endsAt: number; label: string; kind: 'set' | 'transition' | 'round' | 'between' | 'warmup' }
 export interface Workout {
   id: string; routineId?: string; name: string;
+  /** 진행 중 운동의 주인 기기 (동기화, D-029). 없으면 이 기기 것 (옛 기록) */
+  ownerDeviceId?: string;
   startedAt: string; endedAt?: string;
   blocks: WorkoutBlock[];
   timer: Timer | null;

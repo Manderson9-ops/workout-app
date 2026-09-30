@@ -8,6 +8,9 @@ import type { Exercise, Level, Part, Equipment } from '../core/types';
 import type { Grade } from '../core/version';
 import type { BackupData } from '../core/backup';
 import type { DiagEntry } from '../core/diag';
+import { Clock, memoryClockStore } from '../core/hlc';
+import { SYNC_TABLES, PK, stampValue, baseStamp, tombKey, withoutStamp } from '../core/syncStamp';
+import type { SyncTable, Tomb } from '../core/syncStamp';
 
 export interface BodyweightRow { date: string; kg: number }
 export interface ExerciseMeta { exerciseId: string; favorite?: boolean; userGrade?: Grade; excluded?: boolean }
@@ -42,8 +45,14 @@ export class WorkoutDB extends Dexie {
   settings!: Table<Settings, string>;
   bodyweight!: Table<BodyweightRow, string>;
   diag!: Table<DiagEntry & { id?: number }, number>;
-  constructor(name = 'workout-app') {
+  tombs!: Table<Tomb, string>;
+  /** 동기화 시계와 기기 ID (S2a). 테스트는 메모리 시계 */
+  readonly clock: Clock;
+  readonly dev: () => string;
+  constructor(name = 'workout-app', opts: { clock?: Clock; deviceId?: () => string } = {}) {
     super(name);
+    this.clock = opts.clock ?? new Clock(memoryClockStore());
+    this.dev = opts.deviceId ?? (() => 'test');
     // 스키마(색인) 변경 시에만 버전을 올린다. 설정에 필드를 더하는 것은 색인이 아니라 버전 변경이 필요 없고,
     // getSettings가 기본값과 합쳐 옛 데이터를 채운다(테스트: '저장된 예전 설정에 휴식 기본값이 없어도 채워짐').
     this.version(1).stores({
@@ -57,6 +66,44 @@ export class WorkoutDB extends Dexie {
     this.version(2).stores({ bodyweight: 'date' });
     // v3 (P5a): 진단 기록 표 (D-024). 기존 표와 데이터는 그대로
     this.version(3).stores({ diag: '++id, t' });
+    // v4 (S2a, D-029): 지움 표시 표 + 기존 기록에 동기화 표시(HLC 0, 아직 안 보냄). 기록 내용은 그대로
+    this.version(4).stores({ tombs: 'k, table' }).upgrade(async (tx) => {
+      const dev = this.dev();
+      for (const t of SYNC_TABLES) {
+        await tx.table(t).toCollection().modify((v: Record<string, unknown>) => { if (!v._s) v._s = { ...baseStamp(t, v, dev), remote: true }; });
+      }
+    });
+    // 모든 저장에 동기화 표시를 자동으로 붙임 (같은 트랜잭션, 빠뜨릴 곳 없음). 지우기는 softDelete로만
+    const self = this;
+    this.use({
+      stack: 'dbcore', name: 'sync-stamp',
+      create(down) {
+        return {
+          ...down,
+          table(tableName: string) {
+            const t = down.table(tableName);
+            if (!(SYNC_TABLES as readonly string[]).includes(tableName)) return t;
+            const pk = PK[tableName as SyncTable];
+            return {
+              ...t,
+              async mutate(req) {
+                if ((req.type === 'put' || req.type === 'add') && !('changeSpec' in req && req.changeSpec) && req.values) {
+                  const dev = self.dev();
+                  const values = [];
+                  for (const v of req.values as Record<string, unknown>[]) {
+                    const key = v[pk];
+                    const old = key === undefined ? undefined : await t.get({ trans: req.trans, key });
+                    values.push(stampValue(tableName, old, v, () => self.clock.tick(dev), dev));
+                  }
+                  return t.mutate({ ...req, values });
+                }
+                return t.mutate(req);
+              },
+            };
+          },
+        };
+      },
+    });
   }
 }
 
@@ -92,13 +139,15 @@ export async function exportAll(db: WorkoutDB): Promise<BackupData> {
       db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.settings.toArray(), db.bodyweight.toArray(), db.diag.orderBy('id').toArray(),
     ]);
     const diag = diagRows.map(({ id: _id, ...e }) => e);
-    return { routines, workouts, meta, custom: custom as unknown as Record<string, unknown>[], settings: settings as unknown as Record<string, unknown>[], bodyweight, diag };
+    // 동기화 표시(_s)는 기기 안 정보라 백업 파일에 넣지 않음
+    const strip = <T,>(xs: T[]) => xs.map((x) => withoutStamp(x as never) as unknown as T);
+    return { routines: strip(routines), workouts: strip(workouts), meta: strip(meta), custom: strip(custom) as unknown as Record<string, unknown>[], settings: strip(settings) as unknown as Record<string, unknown>[], bodyweight: strip(bodyweight), diag };
   });
 }
 /** 백업으로 전부 바꾸기. 한 트랜잭션이라 중간에 실패하면 아무것도 바뀌지 않음 */
 export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackupAt?: string } = {}): Promise<void> {
-  await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag], async () => {
-    await Promise.all([db.routines.clear(), db.workouts.clear(), db.meta.clear(), db.custom.clear(), db.settings.clear(), db.bodyweight.clear(), db.diag.clear()]);
+  await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag, db.tombs], async () => {
+    await Promise.all([db.routines.clear(), db.workouts.clear(), db.meta.clear(), db.custom.clear(), db.settings.clear(), db.bodyweight.clear(), db.diag.clear(), db.tombs.clear()]);
     await db.routines.bulkPut(d.routines);
     await db.workouts.bulkPut(d.workouts);
     await db.meta.bulkPut(d.meta as ExerciseMeta[]);
@@ -109,4 +158,26 @@ export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackup
     await db.bodyweight.bulkPut(d.bodyweight);
     await db.diag.bulkAdd((d.diag ?? []).map(({ id: _id, ...e }: DiagEntry & { id?: number }) => e));
   });
+}
+
+/**
+ * 지우기 (S2a, D-029): 기록을 지우고 같은 트랜잭션에서 지움 표시를 남긴다 (다른 기기에 "지웠다"를 알리기 위해).
+ * 동기화하는 표의 기록은 반드시 이 함수로만 지운다 (tests/syncStamp.test.ts 가 다른 곳의 직접 지우기를 찾아냄)
+ */
+export async function softDelete(db: WorkoutDB, table: SyncTable, id: string): Promise<void> {
+  await db.transaction('rw', [db.table(table), db.tombs], async () => {
+    const old = (await db.table(table).get(id)) as { _s?: Tomb['_s'] } | undefined;
+    await db.table(table).delete(id);
+    const dev = db.dev();
+    const s: Tomb['_s'] = { h: db.clock.tick(dev), d: dev, q: (old?._s?.q ?? 0) + 1, y: 1 };
+    const base = old?._s?.y === 1 ? old._s.b : old?._s?.r;
+    if (base !== undefined) s.b = base;
+    if (old?._s?.r !== undefined) s.r = old._s.r;
+    await db.tombs.put({ k: tombKey(table, id), table, id, _s: s });
+  });
+}
+
+/** 모든 데이터 지우기 (설정의 초기화): 동기화 전에는 이 기기만 비움 */
+export async function clearAllLocal(db: WorkoutDB): Promise<void> {
+  await db.transaction('rw', db.tables, async () => { await Promise.all(db.tables.map((t) => t.clear())); });
 }

@@ -8,7 +8,7 @@
  */
 import { db, mutate, load, flushPending, getState } from './store';
 import type { AppState } from './store';
-import { exportAll, importAll, getSettings } from '../db/db';
+import { exportAll, importAll, getSettings, clearAllLocal } from '../db/db';
 import { makeBackup, backupFileName, parseBackup, mergedLastBackupAt } from '../core/backup';
 import type { BackupFile } from '../core/backup';
 import { APP_VERSION } from '../core/version';
@@ -95,7 +95,7 @@ export async function restoreBackup(file: BackupFile): Promise<void> {
 /** 모든 데이터 지우기 (설정의 "초기화"). 백업 권고 후 두 번 확인한 다음에만 호출 */
 export async function resetAll(): Promise<void> {
   await flushPending();
-  await db.transaction('rw', db.tables, async () => { await Promise.all(db.tables.map((t) => t.clear())); });
+  await clearAllLocal(db);
   prepared = null;
   await load();
 }

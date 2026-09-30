@@ -11,12 +11,8 @@ import { APP_VERSION } from '../core/version';
 const buf: DiagEntry[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-/** 이 기기의 짧은 ID (진단이 어느 기기에서 왔는지 구분. 개인 정보 아님) */
-export function deviceId(): string {
-  let id = localStorage.getItem('deviceId');
-  if (!id) { id = Math.random().toString(36).slice(2, 8); localStorage.setItem('deviceId', id); }
-  return id;
-}
+import { deviceId } from './deviceId';
+export { deviceId };
 export const deviceInfo = () => ({ id: deviceId(), label: browserLabel(navigator.userAgent) });
 
 export const diagEnabled = () => localStorage.getItem('diag.off') !== '1';

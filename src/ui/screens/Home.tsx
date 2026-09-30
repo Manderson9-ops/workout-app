@@ -6,7 +6,7 @@ import { emptyRoutine } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { BackupBanner } from './BackupSection';
 import { SendStatus } from './AutoSendSection';
-import { newId } from '../../db/db';
+import { newId, softDelete } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
 
@@ -54,7 +54,7 @@ export function Home({ s }: { s: AppState }) {
           <div class="row" style={{ marginTop: '8px' }}>
             <button class="primary grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}>시작</button>
             <button onClick={() => go(`#/routine/${encodeURIComponent(r.id)}`)}>편집</button>
-            <button class="danger" onClick={async () => { if (confirm(`"${r.name}" 루틴을 지울까요? 운동 기록은 남아요.`)) await mutate((d) => d.routines.delete(r.id)); }} aria-label={`${r.name} 삭제`}>삭제</button>
+            <button class="danger" onClick={async () => { if (confirm(`"${r.name}" 루틴을 지울까요? 운동 기록은 남아요.`)) await mutate((d) => softDelete(d, 'routines', r.id)); }} aria-label={`${r.name} 삭제`}>삭제</button>
           </div>
         </div>
       ))}
