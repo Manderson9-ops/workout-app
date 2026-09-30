@@ -12,7 +12,7 @@ import type { SyncRequest, ServerRec } from '../core/syncMerge';
 import { SYNC_TABLES, PK, FIELD_TABLES, syncedFields, withoutStamp } from '../core/syncStamp';
 import type { SyncStamp } from '../core/syncStamp';
 import { getSendConfig } from './autoSend';
-import { lsGet, lsSet, APP } from './appName';
+import { lsGet, lsSet, APP, IS_PREVIEW } from './appName';
 import { diag } from './diag';
 import { applyFeedbackStatus } from './feedbackStatus';
 
@@ -29,7 +29,7 @@ export function useSyncStatus(): SyncStatus {
   return s;
 }
 
-export const syncEnabled = () => lsGet('sync.on') === '1';
+export const syncEnabled = () => !IS_PREVIEW && lsGet('sync.on') === '1';
 
 const ERR: Record<string, string> = {
   bad_key: '키가 맞지 않아요 (새 설정을 붙여넣어 주세요)', update_app: '앱을 새 버전으로 업데이트해 주세요',
@@ -124,6 +124,7 @@ export function startSync(): void {
 
 /** 동기화 켜기 (연결 마법사 마지막 단계). 처음이면 받기 → 비교·선택 → 올리기 */
 export async function enableSync(): Promise<void> {
+  if (IS_PREVIEW) return; // 미리 보기 판은 동기화하지 않음 (D-031)
   lsSet('sync.on', '1');
   set({ phase: 'idle' });
   await syncNow('connect');

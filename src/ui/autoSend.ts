@@ -4,7 +4,7 @@
  *   실패하면 "보낼 것 있음"으로 두고 앱을 다시 열 때 다시 보냄.
  * - 설정(주소#키)은 이 기기 localStorage 'send.cfg' 에만. 백업·진단·화면에 넣지 않음 (D-025, 테스트로 확인)
  */
-import { lsGet, lsSet, lsRemove } from './appName';
+import { lsGet, lsSet, lsRemove, IS_PREVIEW } from './appName';
 import { useEffect, useState } from 'preact/hooks';
 import { db, flushPending, getState, activeOf, whenReady } from './store';
 import { exportAll } from '../db/db';
@@ -107,6 +107,7 @@ let again: Promise<boolean> | null = null;
  * "보낼 것 있음"은 보내기 **시작 전에** 켜고 성공했을 때만 끈다: 보내는 도중 앱이 닫히거나 멈춰도 다음에 다시 보냄 (검토 1차)
  */
 export function sendNow(reason: 'workout' | 'manual' | 'retry'): Promise<boolean> {
+  if (IS_PREVIEW && reason !== 'manual') return Promise.resolve(false); // 미리 보기 판은 자동으로 보내지 않음 (D-031)
   const c = getSendConfig();
   if (!c) return Promise.resolve(false);
   lsSet(PENDING, '1');

@@ -8,6 +8,8 @@ const base = (typeof import.meta !== 'undefined' && (import.meta as { env?: { BA
 export const appFromBase = (b: string) => b.split('/').filter(Boolean).pop() || 'workout-app';
 export const APP = appFromBase(base);
 export const DB_NAME = APP;
+/** 미리 보기 판(D-031): 동기화·자동 보내기를 하지 않음 (본판 데이터와 섞이지 않게) */
+export const IS_PREVIEW = APP !== 'workout-app';
 const key = (k: string) => (APP === 'workout-app' ? k : `${APP}:${k}`);
 /** sessionStorage 키도 앱 이름별로 */
 export const scopedKey = key;
