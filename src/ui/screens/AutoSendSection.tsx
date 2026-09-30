@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { getSendConfig, saveSendConfig, clearSendConfig, pingSend, sendNow, lastSentAt, hasPending, useSendState, getSendState, retryBlocked, blockedReason } from '../autoSend';
 import { maskKey } from '../../core/autoSendConfig';
+import { IS_PREVIEW } from '../appName';
 
 const when = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '없음');
 
@@ -16,6 +17,7 @@ export function SendStatus() {
 
 /** 설정: 자동 보내기 (D-023). 설정 글은 이 기기에만 저장, 화면엔 키 끝 4자리만 (D-025) */
 export function AutoSendSection() {
+  if (IS_PREVIEW) return <><h2>자동 보내기</h2><p class="sub small">미리 보기 판은 PC(구글 드라이브)로 보내지 않아요. 데이터는 본판 → 미리 보기 한 방향이에요 (본판에서 백업 저장 → 여기서 불러오기).</p></>;
   const [cfg, setCfg] = useState(getSendConfig());
   const [text, setText] = useState('');
   const [msg, setMsg] = useState<{ t: string; ok: boolean } | null>(null);

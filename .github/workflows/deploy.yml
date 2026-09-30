@@ -24,10 +24,19 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
-      - run: npx vite build
-      - uses: actions/upload-pages-artifact@v3
+      # 본판(workout-app)과 미리 보기 판(workout-app-next, D-031)이 같은 파일을 씀: 저장소 이름으로 빌드를 고름
+      - if: github.event.repository.name != 'workout-app-next'
+        run: npx vite build
+      - if: github.event.repository.name != 'workout-app-next'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+      - if: github.event.repository.name == 'workout-app-next'
+        run: npx vite build --base /workout-app-next/ --outDir dist-next && node tools/next_brand.ts dist-next
+      - if: github.event.repository.name == 'workout-app-next'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-next
   deploy:
     needs: build
     runs-on: ubuntu-latest

@@ -13,6 +13,7 @@ import { makeBackup, backupFileName, parseBackup, mergedLastBackupAt } from '../
 import type { BackupFile } from '../core/backup';
 import { APP_VERSION } from '../core/version';
 import { diag, flushDiag, deviceInfo } from './diag';
+import { IS_PREVIEW } from './appName';
 
 export type SaveResult = 'shared' | 'downloaded' | 'cancelled' | 'retry';
 
@@ -24,7 +25,7 @@ async function build(): Promise<{ file: File; state: AppState }> {
   const state = getState();
   const now = new Date();
   await flushDiag();
-  const data = makeBackup(await exportAll(db), APP_VERSION, now.toISOString(), deviceInfo());
+  const data = makeBackup(await exportAll(db), APP_VERSION, now.toISOString(), deviceInfo(), IS_PREVIEW);
   return { file: new File([JSON.stringify(data)], backupFileName(now), { type: 'application/json' }), state };
 }
 

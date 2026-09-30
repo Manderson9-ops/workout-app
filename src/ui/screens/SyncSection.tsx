@@ -5,6 +5,7 @@ import { getSendConfig } from '../autoSend';
 import { saveBackupFile, SAVE_MESSAGE } from '../backupActions';
 import { tombKey } from '../../core/syncStamp';
 import type { Conflict } from '../../db/sync';
+import { IS_PREVIEW } from '../appName';
 
 /** 충돌 비교 정보: 이 기기 / 서버 */
 function compare(c: Conflict): string {
@@ -37,6 +38,7 @@ export function SyncBadge() {
 
 /** 설정: PC ↔ 폰 동기화 (D-027). 연결 마법사: ① 백업 ② 받기 ③ 비교 ④ 고르기 ⑤ 올리기 */
 export function SyncSection({ s }: { s: AppState }) {
+  if (IS_PREVIEW) return <><h2>PC ↔ 폰 동기화</h2><p class="sub small">미리 보기 판은 동기화하지 않아요 (본판 데이터와 섞이지 않게). 본판 데이터로 써 보려면 본판에서 백업 파일을 저장해 여기서 불러오세요.</p></>;
   const st = useSyncStatus();
   const [on, setOn] = useState(syncEnabled());
   const [step, setStep] = useState<'idle' | 'backup' | 'go'>('idle');
