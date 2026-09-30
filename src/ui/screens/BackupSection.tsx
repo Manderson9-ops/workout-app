@@ -37,11 +37,11 @@ export function BackupSection({ s }: { s: AppState }) {
       else return;
     }
     try {
-      await restoreBackup(r.file);
       if (scope === 'server') {
-        const x = await replaceServerWithLocal();
+        // 동기화를 멈춘 상태에서 불러오고 곧바로 서버를 바꿈
+        const x = await replaceServerWithLocal(() => restoreBackup(r.file));
         setMsg({ text: x.ok ? '백업을 불러오고 서버까지 바꿨어요' : `백업은 이 기기에 불러왔지만 서버는 못 바꿨어요: ${syncErrorText(x.error)}`, ok: x.ok });
-      } else setMsg({ text: '백업을 불러왔어요', ok: true });
+      } else { await restoreBackup(r.file); setMsg({ text: '백업을 불러왔어요', ok: true }); }
     }
     catch { setMsg({ text: '불러오는 중 문제가 생겨 아무것도 바꾸지 않았어요', ok: false }); }
   };

@@ -91,7 +91,7 @@ export async function applyResponse(db: WorkoutDB, resp: SyncResponse, sent: Mut
       //  - 보관본은 덮어쓰지 않고 합침 (되돌리기가 두 번 일어나도 처음 보관한 수정이 남게)
       const me = db.dev();
       const keepSettings = (await db.table('settings').get('main')) as Row | undefined;
-      const mine = ((await db.table('workouts').toArray()) as Row[]).filter((w) => !w.endedAt && w.ownerDeviceId === me);
+      const mine = ((await db.table('workouts').toArray()) as Row[]).filter((w) => !w.endedAt && !w.pendingMerge && (!w.ownerDeviceId || w.ownerDeviceId === me));
       const mineKeys = new Set(mine.map((w) => String(w.id)));
       const dirty = (await collectMutations(db)).filter((m) => !(m.table === 'workouts' && mineKeys.has(m.id)));
       const prev = (await getKv(db)).stash ?? [];
@@ -128,6 +128,8 @@ export async function applyResponse(db: WorkoutDB, resp: SyncResponse, sent: Mut
       if (cur && cur.h === m.hlc && cur.y === 1) {
         await writeRemote(db, r.rec, cur.q);
         confirmed++;
+        // 동시 수정에서 져서 서버 값이 보낸 것과 다르면 화면도 다시 읽어야 함
+        if (r.rec.deleted !== !!m.deleted || (!m.deleted && JSON.stringify(sortObj(r.rec.data)) !== JSON.stringify(sortObj(FIELD_TABLES.includes(m.table) ? { ...(r.rec.data ?? {}), ...m.data } : m.data)))) received++;
         done.add(tombKey(r.rec.table, r.rec.id));
         // 서버가 내 시각을 낮춰 다시 찍었으면(미래 시계) 기기 기준도 낮춤
         if (r.rec.dev === m.dev && r.rec.hlc < m.hlc) db.clock.lower(r.rec.hlc);
@@ -174,7 +176,8 @@ export async function firstConnect(db: WorkoutDB, transport: Transport, choose: 
   for (const c of pull.changes) {
     if (c.deleted || !(SYNC_TABLES as readonly string[]).includes(c.table)) continue;
     const local = (await db.table(c.table).get(c.id)) as Row | undefined;
-    if (!local) continue;
+    // 이 기기에서 고친(아직 안 보낸) 기록만 비교. 서버 확정본을 그대로 가진 기록은 서버 값을 받음 (끄고 켠 뒤 옛 사본이 새 수정을 덮지 않게)
+    if (!local || local._s?.y !== 1) continue;
     const mine = FIELD_TABLES.includes(c.table) ? syncedFields(c.table, local) : (withoutStamp(local) as Record<string, unknown>);
     const theirs = FIELD_TABLES.includes(c.table) ? syncedFields(c.table, c.data) : (c.data ?? {});
     if (!same(mine, theirs)) conflicts.push({ table: c.table, id: c.id, label: String(mine.name ?? theirs.name ?? c.id), local: mine, server: theirs, rev: c.rev });

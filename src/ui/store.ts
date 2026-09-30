@@ -29,12 +29,12 @@ const listeners = new Set<(s: AppState) => void>();
 
 /** 이 기기에서 진행 중 운동을 바꾼 횟수: load가 읽는 도중 바뀌면 옛 값으로 덮지 않도록 다시 읽음 (S2b 검토) */
 let localVer = 0;
-export async function load(): Promise<void> {
+export async function load(retry = 0): Promise<void> {
   const startVer = localVer;
   const [settings, routines, workouts, meta, custom, bodyweight] = await Promise.all([
     getSettings(db), db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.bodyweight.toArray(),
   ]);
-  if (startVer !== localVer) return load();
+  if (startVer !== localVer && retry < 3) return load(retry + 1);
   state = {
     ready: true, settings,
     routines: routines.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),

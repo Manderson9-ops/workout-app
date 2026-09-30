@@ -98,7 +98,7 @@ export function syncNow(reason: string): Promise<void> {
     if (locks) await locks.request(`${APP}-sync`, { ifAvailable: false }, work); else await work();
   })().finally(() => {
     running = null;
-    if (again) { again = false; void syncNow('again'); }
+    if (again && !replacing) { again = false; void syncNow('again'); }
   });
   return running;
 }
@@ -154,11 +154,14 @@ async function localRecs(): Promise<ServerRec[]> {
 /** 서버를 이 기기 데이터로 바꿈: 서버가 먼저 스냅숏, epoch를 올려 다른 기기는 다시 받음. 이 기기는 다시 연결 */
 let replacing = false;
 /** 서버를 이 기기 데이터로 바꿈. 도는 동기화가 끝난 뒤, 그동안 다른 동기화는 멈춤. 실패하면 동기화를 끔 (어긋난 채 계속되지 않게) */
-export async function replaceServerWithLocal(): Promise<{ ok: boolean; error?: string }> {
+export async function replaceServerWithLocal(before?: () => Promise<void>): Promise<{ ok: boolean; error?: string }> {
   const c = getSendConfig();
   if (!c) return { ok: false, error: 'no_config' };
-  if (running) await running;
+  // 먼저 다른 동기화를 멈추고(도는 것은 끝날 때까지 기다림) 그다음 이 기기 데이터를 바꿈 (그 사이 처음 연결이 끼어들지 않게)
   replacing = true;
+  again = false;
+  if (running) await running;
+  if (before) await before();
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 60000);
   try {
@@ -166,7 +169,7 @@ export async function replaceServerWithLocal(): Promise<{ ok: boolean; error?: s
     let j: { ok: boolean; error?: string };
     try { j = (await r.json()) as { ok: boolean; error?: string }; } catch { j = { ok: false, error: 'bad_response' }; }
     if (!j.ok) { replacing = false; await disableSync(); return j; }
-    await setKv(db, { epoch: 0, since: 0, stash: undefined });
+    await setKv(db, { epoch: 0, since: 0 }); // 보관본은 남김 (설정에서 다시 올리기/버리기)
     replacing = false;
     await syncNow('replace');
     return { ok: true };

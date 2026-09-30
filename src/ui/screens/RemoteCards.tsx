@@ -17,6 +17,7 @@ export function mergeLate(orig: Workout, copy: Workout): Workout {
     const item = blocks[bi]?.items.find((i) => i.exerciseId === ci.exerciseId);
     if (!item) return;
     for (const s of ci.sets) {
+      if (s.doneAt && item.sets.some((x) => x.done && x.doneAt === s.doneAt)) continue; // 이미 있는 세트 (끝낸 시각이 같음)
       const k = item.sets.findIndex((x) => !x.done && x.warmup === s.warmup);
       if (k >= 0) item.sets[k] = s; else item.sets.push(s);
     }

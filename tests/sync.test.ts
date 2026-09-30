@@ -34,6 +34,8 @@ async function view(db: WorkoutDB) {
   }
   return out;
 }
+/** 동기화 끄기와 같은 효과: 연결 상태만 비움 (ui/sync.ts disableSync) */
+const setKvLike = async (db: WorkoutDB) => { const kv = await getKv(db); await db.kv.put({ k: 'sync', v: { ...kv, epoch: 0, since: 0 } }); };
 const names = async (db: WorkoutDB) => (await db.routines.toArray()).map((r) => r.name).sort();
 
 describe('양방향 동기화: 기본', () => {
@@ -243,6 +245,45 @@ describe('S2b 검토 반영', () => {
   });
 });
 
+describe('S2b 2차 검토 반영', () => {
+  const W = (id: string, owner: string, seq = 1): Workout => ({ ...startWorkout(id, R('r1', '등'), '2026-09-30T10:00:00.000Z', []), ownerDeviceId: owner, ownerSeq: seq });
+  it('끄고 → 다른 기기가 고침 → 다시 켜기: 고치지 않은 옛 사본은 충돌로 묻지 않고 서버 값을 받음', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.routines.put(R('r1', 'v1')); await sync(A, transport); await sync(B, transport);
+    await setKvLike(B);
+    await A.routines.put({ ...(await A.routines.get('r1'))!, name: 'A가 고침' }); await sync(A, transport);
+    let asked = -1;
+    await syncOnce(B, transport, async (cs) => { asked = cs.length; return {}; });
+    expect(asked).toBe(-1);
+    expect(await names(B)).toEqual(['A가 고침']);
+    await sync(A, transport);
+    expect(await names(A)).toEqual(['A가 고침']);
+  });
+  it('끝낸 시각(doneAt)으로 같은 세트를 알아봄: 서버에서 무게를 고친 세트를 옛 화면에서 가져와도 두 번 생기지 않음', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(W('w1', 'A')); await sync(A, transport);
+    const a = (await A.workouts.get('w1'))!;
+    a.blocks[0]!.items[0]!.sets[0] = { weight: 60, reps: 8, warmup: false, done: true, doneAt: '2026-09-30T10:01:00.000Z' };
+    await A.workouts.put(a); await sync(A, transport); await sync(B, transport);
+    const a2 = (await A.workouts.get('w1'))!; a2.blocks[0]!.items[0]!.sets[0]!.weight = 62.5; a2.blocks[0]!.items[0]!.sets[0]!.rir = 1;
+    await A.workouts.put(a2); await sync(A, transport);
+    const b = (await B.workouts.get('w1'))!; // 60kg 옛 화면
+    await B.workouts.put({ ...b, ownerDeviceId: 'B', ownerSeq: 2 }); await sync(B, transport);
+    const done = (await B.workouts.get('w1'))!.blocks[0]!.items[0]!.sets.filter((x) => x.done);
+    expect(done.map((x) => x.weight)).toEqual([62.5]);
+  });
+  it('끝낸 시각이 없는 같은 세트 여러 개는 개수로 비교 (3개가 1개로 줄지 않음)', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(W('w1', 'A')); await sync(A, transport); await sync(B, transport);
+    const a = (await A.workouts.get('w1'))!;
+    for (let k = 0; k < 3; k++) a.blocks[0]!.items[0]!.sets[k] = { weight: 50, reps: 10, warmup: false, done: true };
+    await A.workouts.put(a); await sync(A, transport);
+    const b = (await B.workouts.get('w1'))!;
+    await B.workouts.put({ ...b, ownerDeviceId: 'B', ownerSeq: 2 }); await sync(B, transport);
+    expect((await B.workouts.get('w1'))!.blocks[0]!.items[0]!.sets.filter((x) => x.done)).toHaveLength(3);
+  });
+});
+
 describe('수렴 검사: 기기 3대 무작위 500가지', () => {
   it('어떤 순서·장애가 있어도 마지막에 모든 기기와 서버가 같아짐', async () => {
     let seed = 42; const rnd = () => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed / 2 ** 31; };
@@ -289,7 +330,8 @@ describe('수렴 + 세트 손실 0: 운동·가져오기·늦은 기록 포함 �
         else if (op < 0.45 && w && !w.endedAt && w.ownerDeviceId === me && !w.pendingMerge) {
           const sets = w.blocks[0]!.items[0]!.sets; const k = sets.findIndex((x) => !x.done);
           const kg = weight++; recorded.push(kg);
-          if (k >= 0) sets[k] = { weight: kg, reps: 8, warmup: false, done: true }; else sets.push({ weight: kg, reps: 8, warmup: false, done: true });
+          const set = { weight: kg, reps: 8, warmup: false, done: true, doneAt: new Date(T).toISOString() + kg };
+          if (k >= 0) sets[k] = set; else sets.push(set);
           await d.workouts.put(w);
         }
         else if (op < 0.55 && w && !w.endedAt && w.ownerDeviceId !== me) { await d.workouts.put({ ...w, ownerDeviceId: me, ownerSeq: (w.ownerSeq ?? 1) + 1 }); }

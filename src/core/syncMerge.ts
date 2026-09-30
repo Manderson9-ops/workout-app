@@ -54,44 +54,56 @@ function clampFuture(h: string, nowMs: number, dev: string): string {
   return parse(h).ms > nowMs + FUTURE_MS ? fmt(nowMs, 0, dev) : h;
 }
 
-type SetL = { done?: boolean; warmup?: boolean };
+type SetL = { done?: boolean; warmup?: boolean; doneAt?: string };
 type ItemL = { exerciseId: string; sets: SetL[] };
 type BlockL = { items: ItemL[] };
-const setKey = (s: SetL) => JSON.stringify(s, Object.keys(s).sort());
+const contentKey = (s: SetL) => JSON.stringify(s, Object.keys(s).sort());
 const blocksOf = (w: Record<string, unknown>) => (w.blocks as BlockL[] | undefined) ?? [];
 /** 같은 자리(블록 순번·운동)의 운동 항목 */
 const itemAt = (w: Record<string, unknown>, bi: number, it: ItemL) => blocksOf(w)[bi]?.items.find((x) => x.exerciseId === it.exerciseId);
 
 /**
- * a에 b의 완료 세트 가운데 a에 없는 것(내용 기준)을 채움: 가져오기가 최신 화면이 아닐 때 서버 세트를 잃지 않게.
- * 자리(순번)가 아니라 내용으로 비교 → 두 기기가 같은 자리에 세트를 적어도 둘 다 남음
+ * 완료 세트 짝 맞추기: 끝낸 시각(doneAt)이 같으면 같은 세트 (무게·RIR을 나중에 고쳐도 같은 세트로 봄).
+ * doneAt이 없는 옛 세트는 내용으로, 같은 내용이 여러 개면 개수로 비교.
+ * 돌려주는 값: other에만 있는 완료 세트들
  */
+function onlyIn(other: SetL[], base: SetL[]): SetL[] {
+  const baseAt = new Set(base.filter((s) => s.done && s.doneAt).map((s) => s.doneAt!));
+  const baseCount = new Map<string, number>();
+  for (const s of base) if (s.done && !s.doneAt) baseCount.set(contentKey(s), (baseCount.get(contentKey(s)) ?? 0) + 1);
+  const out: SetL[] = [];
+  for (const s of other) {
+    if (!s.done) continue;
+    if (s.doneAt) { if (!baseAt.has(s.doneAt)) out.push(s); continue; }
+    const k = contentKey(s); const n = baseCount.get(k) ?? 0;
+    if (n > 0) baseCount.set(k, n - 1); else out.push(s);
+  }
+  return out;
+}
+
+/** a에 b에만 있는 완료 세트를 채움 (가져오기가 최신 화면이 아닐 때 서버 세트를 잃지 않게). 같은 세트(doneAt 같음)는 b(서버) 값으로 */
 function fillDone(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
   const blocks = blocksOf(a).map((blk, bi) => ({ ...blk, items: blk.items.map((it) => {
     const o = itemAt(b, bi, it);
     if (!o) return it;
-    const have = new Set(it.sets.filter((s) => s.done).map(setKey));
-    const sets = [...it.sets];
-    for (const s of o.sets) {
-      if (!s.done || have.has(setKey(s))) continue;
+    const byAt = new Map(o.sets.filter((s) => s.done && s.doneAt).map((s) => [s.doneAt!, s]));
+    const sets = it.sets.map((s) => (s.done && s.doneAt && byAt.has(s.doneAt) ? byAt.get(s.doneAt)! : s));
+    for (const s of onlyIn(o.sets, sets)) {
       const k = sets.findIndex((x) => !x.done && !!x.warmup === !!s.warmup);
       if (k >= 0) sets[k] = s; else sets.push(s);
-      have.add(setKey(s));
     }
     return { ...it, sets };
   }) }));
   return { ...a, blocks };
 }
 
-/** 늦게 온 세트 사본: 기기가 끝낸 세트 가운데 서버본에 (내용이 같은 것이) 없는 것만 */
+/** 늦게 온 세트 사본: 기기가 끝낸 세트 가운데 서버본에 없는 것만 */
 function lateSets(server: Record<string, unknown>, mine: Record<string, unknown>): Record<string, unknown> | undefined {
   let any = false;
   const blocks = blocksOf(mine).map((b, bi) => ({
     ...b,
     items: b.items.map((it) => {
-      const sItem = itemAt(server, bi, it);
-      const onServer = new Set((sItem?.sets ?? []).filter((s) => s.done).map(setKey));
-      const sets = it.sets.filter((s) => s.done && !onServer.has(setKey(s)));
+      const sets = onlyIn(it.sets, itemAt(server, bi, it)?.sets ?? []);
       if (sets.length) any = true;
       return { ...it, sets };
     }).filter((it) => it.sets.length),
