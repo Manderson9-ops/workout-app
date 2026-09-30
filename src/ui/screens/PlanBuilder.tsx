@@ -128,7 +128,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
       ...(e.measure === 'time' ? { seconds: e.default_seconds ?? 30 } : {}),
       grade: g.value, gradeSource: g.source, estimated: g.estimated, substituted: false, locked: false, why: `${e.part} ${g.value} (직접 추가)`, rank: 99 };
     // 빈 플랜(시간 부족·후보 없음)에 처음 넣으면 웜업도 정해서 정상 플랜으로
-    const base: Plan = plan.blocks.length ? plan : { ...plan, status: 'ok', warmup: warmupFor(f.minutes, e.part === '하체', { exercise: e, sets: 1, reps: item.reps, ...(item.seconds !== undefined ? { seconds: item.seconds } : {}) }) };
+    const base: Plan = plan.blocks.length ? plan : { ...plan, status: 'ok', warmup: warmupFor(plan.targetSec !== undefined ? plan.targetSec / 60 : undefined, e.part === '하체', { exercise: e, sets: 1, reps: item.reps, ...(item.seconds !== undefined ? { seconds: item.seconds } : {}) }) };
     setPlan(recompute(addBlock(base, item), all));
   };
   // 순서를 바꾼 뒤: 같은 블록의 누른 방향 버튼에 초점(끝에 닿아 꺼졌으면 반대쪽), 바뀐 자리는 aria-live로 읽음

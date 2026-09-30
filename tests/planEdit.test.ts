@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { stepSets, stepReps, moveBlock, addBlock, hasDbInfo, regenerateWithLocks } from '../src/core/planEdit';
 import type { Plan, PlanItem, PlanRequest } from '../src/core/planner';
-import { setTime, blockTime } from '../src/core/time';
+import { setTime, blockTime, warmupFor } from '../src/core/time';
+import { routineEstimate } from '../src/core/session';
+import type { Routine } from '../src/core/session';
+import { KEEP_ALL, ONLY_LOCKED } from '../src/core/planEdit';
 import type { Exercise } from '../src/core/types';
 
 const item = (id: string, o: Partial<PlanItem> = {}): PlanItem => ({
@@ -54,6 +57,11 @@ describe('D-036 플랜 바로 고치기', () => {
     const b = (s?: number) => blockTime({ kind: 'single', items: [{ exercise: plank, sets: 3, reps: 0, seconds: s }], rest: 60 });
     expect(b(60) - b(45)).toBe(45);
     expect(b(undefined)).toBe(b(45));
+    // 웜업 세트·루틴 편집 예상 시간도 같은 초 기준
+    expect(warmupFor(15, false, { exercise: plank, sets: 1, reps: 0, seconds: 60 }).seconds).toBe(70 + 60);
+    const r = (s: number): Routine => ({ id: 'r', name: 'r', createdAt: '', updatedAt: '', blocks: [{ kind: 'single', items: [{ exerciseId: 'plank', sets: 3, reps: 0, seconds: s }], restSec: 60, roundRestSec: 120, transitionSec: 10 }] } as unknown as Routine);
+    const m = new Map([['plank', plank]]);
+    expect(routineEstimate(r(60), m) - routineEstimate(r(45), m)).toBe(45);
   });
   it('잠금 다시 생성: 바꾼 횟수·초 유지, 고르지 않은 부위 잠금은 뒤에 붙임', () => {
     const old = plan('a', 'b');
@@ -73,12 +81,16 @@ describe('D-036 플랜 바로 고치기', () => {
     const old = plan('x');
     old.blocks[0]!.items[0] = item('x', { part: '코어' });
     const req = { parts: [{ part: '가슴', priority: 'high' }] } as PlanRequest;
-    expect(regenerateWithLocks(old, new Set(['x']), req, () => { throw new Error('부르면 안 됨'); })).toBe(old);
+    const same = regenerateWithLocks(old, new Set(['x']), req, () => { throw new Error('부르면 안 됨'); });
+    expect(same.blocks).toBe(old.blocks);
+    expect(same.reasons[0]).toBe(KEEP_ALL); // 조용히 아무 일 없는 것처럼 보이지 않게 이유 표시
+    expect(regenerateWithLocks(same, new Set(['x']), req, () => old).reasons.filter((r) => r === KEEP_ALL)).toHaveLength(1);
     const old2 = plan('a');
     old2.blocks.push({ kind: 'single', items: [item('x', { part: '코어' })], timeSec: 0 });
     const empty = { ...plan(), status: 'too_short' as const };
-    const out = regenerateWithLocks(old2, new Set(['x']), req, () => empty);
+    const out = regenerateWithLocks(old2, new Set(['x']), req, () => ({ ...empty, reasons: ['60분 이상 필요'] }));
     expect(out.status).toBe('ok');
+    expect(out.reasons).toEqual([ONLY_LOCKED]);
     expect(out.blocks.map((b) => b.items[0]!.exerciseId)).toEqual(['x']);
   });
   it('내 운동 DB 정보 판별: 영상 등급 또는 자세 포인트', () => {

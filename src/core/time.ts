@@ -88,7 +88,7 @@ export function warmupFor(targetMin: number | undefined, hasLegs: boolean, first
   if (targetMin === undefined || targetMin >= 30) return { kind: 'minutes', seconds: 480 + legs, label: `웜업 ${8 + legs / 60}분` };
   if (targetMin >= 20) return { kind: 'minutes', seconds: 240 + legs, label: `웜업 ${4 + legs / 60}분` };
   if (!firstItem) return { kind: 'none', seconds: 0, label: '웜업 없음' };
-  return { kind: 'sets', seconds: setTime(firstItem.exercise, firstItem.reps, p) + 60, label: `첫 운동 가벼운 웜업 세트 1개` };
+  return { kind: 'sets', seconds: setTime(firstItem.exercise, firstItem.reps, p, firstItem.seconds) + 60, label: `첫 운동 가벼운 웜업 세트 1개` };
 }
 
 export function planTime(warmupSec: number, blocks: TimedBlock[], p: TimeParams = DEFAULT_TIME): number {

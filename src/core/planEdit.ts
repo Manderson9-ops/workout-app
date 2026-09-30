@@ -44,6 +44,8 @@ export function addBlock(plan: Plan, item: PlanItem): Plan {
  * - 모두 잠갔는데 고른 부위 운동이 하나도 없으면 지금 플랜 그대로
  * 시간은 부르는 쪽이 다시 계산한다.
  */
+export const KEEP_ALL = '잠근 운동이 모두 고르지 않은 부위라 플랜을 그대로 둠 (부위를 더 고르거나 잠금을 풀면 새로 짬)';
+export const ONLY_LOCKED = '고른 부위로는 조건에 맞게 짤 수 없어 잠근 운동만 남김';
 export function regenerateWithLocks(old: Plan, locks: ReadonlySet<string>, req: PlanRequest, gen: (r: PlanRequest) => Plan): Plan {
   const items = old.blocks.flatMap((b) => b.items);
   const locked = items.filter((i) => locks.has(i.exerciseId));
@@ -51,7 +53,7 @@ export function regenerateWithLocks(old: Plan, locks: ReadonlySet<string>, req: 
   const inPart = locked.filter((i) => wanted.has(i.part));
   const offPart = locked.filter((i) => !wanted.has(i.part));
   const allLocked = items.length > 0 && locked.length === items.length;
-  if (allLocked && !inPart.length) return old;
+  if (allLocked && !inPart.length) return { ...old, reasons: [KEEP_ALL, ...old.reasons.filter((r) => r !== KEEP_ALL)] };
   const p = gen({ ...req, locked: inPart.map((i) => ({ exerciseId: i.exerciseId, part: i.part, sets: i.sets })), lockedOnly: allLocked });
   const byId = new Map(locked.map((i) => [i.exerciseId, i]));
   let out: Plan = { ...p, blocks: p.blocks.map((b) => ({ ...b, items: b.items.map((it) => {
@@ -60,7 +62,7 @@ export function regenerateWithLocks(old: Plan, locks: ReadonlySet<string>, req: 
     return o.seconds !== undefined ? { ...it, seconds: o.seconds } : { ...it, reps: o.reps };
   }) })) };
   if (offPart.length) {
-    if (!out.blocks.length) out = { ...out, status: 'ok', warmup: old.warmup };
+    if (!out.blocks.length) out = { ...out, status: 'ok', warmup: old.warmup, reasons: [ONLY_LOCKED] };
     for (const i of offPart) out = addBlock(out, { ...i, locked: true });
   }
   return out;

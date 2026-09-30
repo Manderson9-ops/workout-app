@@ -272,7 +272,7 @@ export function emptyRoutine(id: string, name: string, now: string): Routine {
 export function routineEstimate(r: Routine, byId: Map<string, Exercise>, betweenSec = DEFAULT_TIME.betweenRestSec): number {
   const blocks = r.blocks.filter((b) => b.items.every((i) => byId.has(i.exerciseId)));
   const t = blocks.reduce((s, b) => {
-    const items = b.items.map((i) => ({ exercise: byId.get(i.exerciseId)!, sets: i.sets, reps: i.reps }));
+    const items = b.items.map((i) => ({ exercise: byId.get(i.exerciseId)!, sets: i.sets, reps: i.reps, seconds: i.seconds }));
     const tb: TimedBlock = b.kind === 'single' || items.length === 1 ? { kind: 'single', items, rest: b.restSec } : { kind: 'group', items, roundRest: b.roundRestSec };
     return s + blockTime(tb, { ...DEFAULT_TIME, transitionSec: b.transitionSec });
   }, 0);
