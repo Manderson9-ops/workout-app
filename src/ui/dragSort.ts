@@ -15,16 +15,17 @@ interface Live {
   handle: HTMLElement; el: HTMLElement;
   x0: number; y0: number; sx0: number; sy0: number; px: number; py: number;
   rects: { l: number; t: number; r: number; b: number }[]; // 문서 좌표 (끄는 동안 배치는 안 바뀜)
-  grid: boolean; raf: number;
+  grid: boolean; raf: number; off?: () => void;
 }
 
 const START_PX = 6;
 const EDGE_PX = 70;
 const MAX_SPEED = 16;
 
-/** 화면 아래를 가리는 고정 요소(휴식 타이머·아래 메뉴) 윗선. PC 왼쪽 메뉴는 제외 */
+/** 화면 아래를 가리는 고정 요소(휴식 타이머·아래 메뉴) 윗선. PC 왼쪽 메뉴는 제외. 아이폰 키보드가 열려 있으면 보이는 영역(visualViewport) 기준 */
 function bottomLimit(): number {
-  let b = window.innerHeight;
+  const vv = window.visualViewport;
+  let b = vv ? Math.min(window.innerHeight, vv.height + vv.offsetTop) : window.innerHeight;
   for (const e of document.querySelectorAll<HTMLElement>('.timer, .nav')) {
     const r = e.getBoundingClientRect();
     if (r.height > 0 && r.top > window.innerHeight / 2 && r.width > window.innerWidth / 2) b = Math.min(b, r.top);
@@ -61,7 +62,9 @@ export function useDragSort(count: number, onMove: (from: number, to: number) =>
   // 화면을 떠나면 끌기 정리
   useEffect(() => () => { const L = live.current; if (L) { cancelAnimationFrame(L.raf); reset(L); } }, []);
 
-  const announce = (from: number, to: number) => setMsg(`${cb.current.nameOf(from)}: ${to + 1}번째로 옮김 (전체 ${cb.current.count}개)`);
+  // 같은 문장이 이어지면 화면 읽기가 다시 안 읽음 → 보이지 않는 글자를 번갈아 붙임
+  const flip = useRef(false);
+  const announce = (from: number, to: number) => { flip.current = !flip.current; setMsg(`${cb.current.nameOf(from)}: ${to + 1}번째로 옮김 (전체 ${cb.current.count}개)${flip.current ? '\u200b' : ''}`); };
   const commit = (from: number, to: number) => {
     if (from === to || to < 0 || to >= cb.current.count) return false;
     announce(from, to);
@@ -85,6 +88,7 @@ export function useDragSort(count: number, onMove: (from: number, to: number) =>
   function tick() {
     const L = live.current;
     if (!L || !L.started) return;
+    if (!L.handle.isConnected) { end(false); return; } // 끄는 도중 카드가 사라짐 (다른 기기가 운동을 가져감 등)
     const top = EDGE_PX, bottom = bottomLimit() - EDGE_PX;
     let v = 0;
     if (L.py < top) v = -Math.ceil(MAX_SPEED * Math.min(1, (top - L.py) / EDGE_PX));
@@ -98,6 +102,11 @@ export function useDragSort(count: number, onMove: (from: number, to: number) =>
     L.rects = els.map((e) => { const r = e.getBoundingClientRect(); return { l: r.left + window.scrollX, t: r.top + window.scrollY, r: r.right + window.scrollX, b: r.bottom + window.scrollY }; });
     L.grid = L.rects.some((r, i) => L.rects.some((q, j) => j !== i && Math.abs(q.t - r.t) < 4));
     L.started = true;
+    (document.activeElement as HTMLElement | null)?.blur?.(); // 입력 중이면 키보드 닫기 (아이폰은 버튼을 눌러도 초점이 안 빠짐)
+    // 손잡이가 DOM에서 빠지면 손잡이 이벤트가 안 옴 → 문서에서도 끝을 받음
+    const up = (e: PointerEvent) => { if (live.current === L && e.pointerId === L.pid) end(e.type === 'pointerup'); };
+    document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', up, true);
+    L.off = () => { document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', up, true); };
     L.el.classList.add('dragging');
     document.documentElement.classList.add('sorting');
     setDrag({ from: L.from, over: L.from });
@@ -109,6 +118,7 @@ export function useDragSort(count: number, onMove: (from: number, to: number) =>
     if (!L) return;
     live.current = null;
     cancelAnimationFrame(L.raf);
+    L.off?.();
     try { if (L.handle.hasPointerCapture(L.pid)) L.handle.releasePointerCapture(L.pid); } catch { /* 이미 풀림 */ }
     reset(L);
     setDrag(null);
@@ -154,7 +164,7 @@ export function useDragSort(count: number, onMove: (from: number, to: number) =>
 
   const itemAttrs = (i: number) => ({
     'data-sort-i': String(i),
-    ...(drag && drag.over === i && drag.from !== i ? { 'data-drop': drag.from < i ? 'after' : 'before' } : {}),
+    ...(drag && drag.over === i && drag.from !== i ? { 'data-drop': drag.from < i ? 'after' : 'before', ...(live.current?.grid ? { 'data-drop-grid': '' } : {}) } : {}),
   });
 
   return { drag, msg, handleProps, itemAttrs };

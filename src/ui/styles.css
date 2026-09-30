@@ -139,6 +139,7 @@ html.phone-view .timer, html.phone-view .sheet { max-width: 430px; margin: 0 aut
 .drag-handle { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; font-size: 22px; line-height: 1; color: var(--sub); padding: 0 8px; min-width: 44px; flex: none; }
 .drag-handle:hover, .drag-handle:focus-visible { color: var(--text); }
 html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
-.card.dragging { position: relative; z-index: 30; opacity: .92; box-shadow: 0 12px 28px #000c; border-color: var(--acc); }
+.card.dragging { position: relative; z-index: 30; box-shadow: 0 12px 28px #000c; border-color: var(--acc); }
 .card[data-drop="before"] { box-shadow: 0 -4px 0 0 var(--acc); }
 .card[data-drop="after"] { box-shadow: 0 4px 0 0 var(--acc); }
+.card[data-drop][data-drop-grid] { box-shadow: 0 0 0 3px var(--acc); } /* PC 2단: 위·아래 선은 좌우 이동에서 헷갈려 칸 전체 테두리로 */

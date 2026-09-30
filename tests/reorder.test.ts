@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { moveItem, remapIndex } from '../src/core/reorder';
 import { moveBlockTo, moveBlock } from '../src/core/planEdit';
-import { moveRoutineBlock, moveWorkoutBlock, currentStep, completeSet } from '../src/core/session';
+import { moveRoutineBlock, moveWorkoutBlock, currentStep, completeSet, mergeLate } from '../src/core/session';
 import type { Workout, Routine } from '../src/core/session';
 import type { Plan } from '../src/core/planner';
 import { nearestIndex } from '../src/ui/dragSort';
@@ -72,5 +72,33 @@ describe('nearestIndex (놓을 자리 찾기)', () => {
     const grid = [{ l: 0, r: 100, t: 0, b: 100 }, { l: 110, r: 210, t: 0, b: 100 }, { l: 0, r: 100, t: 110, b: 210 }];
     expect(nearestIndex(grid, 150, 50)).toBe(1);
     expect(nearestIndex(grid, 50, 150)).toBe(2);
+  });
+});
+
+describe('늦은 기록 합치기 (mergeLate, D-037)', () => {
+  const blk = (id: string, done = 0) => ({ kind: 'single' as const, restSec: 60, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: id, target: { sets: 3, reps: 10 }, sets: [0, 1, 2].map((k) => ({ reps: 10, done: k < done, ...(k < done ? { doneAt: `${id}${k}`, weight: 50 + k } : {}) })) }] });
+  const W = (blocks: ReturnType<typeof blk>[]) => ({ id: 'w', name: 'n', startedAt: '', timer: null, blocks } as unknown as Workout);
+  const doneOf = (w: Workout, id: string) => w.blocks.flatMap((b) => b.items).filter((i) => i.exerciseId === id).flatMap((i) => i.sets.filter((s) => s.done).map((s) => s.doneAt));
+  it('원래 운동 순서를 바꾼 뒤에도 같은 운동에 채움 (자리로만 찾으면 버려지던 경우)', () => {
+    const orig = moveWorkoutBlock(W([blk('x'), blk('y')]), 1, 0); // [y, x]
+    const copy = W([blk('x', 2)]); // 옛 순서의 x (블록 0)
+    const m = mergeLate(orig, copy);
+    expect(m.blocks.map((b) => b.items[0]!.exerciseId)).toEqual(['y', 'x']);
+    expect(doneOf(m, 'x')).toEqual(['x0', 'x1']);
+    expect(doneOf(m, 'y')).toEqual([]);
+  });
+  it('사본의 빈 블록이 빠져 번호가 당겨져도 맞는 운동에 채움', () => {
+    const m = mergeLate(W([blk('x'), blk('y')]), W([blk('y', 1)])); // y가 블록 0으로 당겨진 사본
+    expect(doneOf(m, 'y')).toEqual(['y0']);
+    expect(doneOf(m, 'x')).toEqual([]);
+  });
+  it('원래 운동에 없는 운동(그사이 교체)은 버리지 않고 맨 뒤 새 블록으로', () => {
+    const m = mergeLate(W([blk('x')]), W([blk('z', 2)]));
+    expect(m.blocks.map((b) => b.items[0]!.exerciseId)).toEqual(['x', 'z']);
+    expect(doneOf(m, 'z')).toEqual(['z0', 'z1']);
+  });
+  it('이미 있는 세트(doneAt 같음)는 두 번 넣지 않음', () => {
+    const m = mergeLate(W([blk('x', 1)]), W([blk('x', 2)]));
+    expect(doneOf(m, 'x')).toEqual(['x0', 'x1']);
   });
 });

@@ -47,10 +47,15 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
   // 블록 끌어서 순서 바꾸기 (D-037). 펼친 카드는 옮긴 자리를 따라감
+  // 이동은 하나씩 차례로 (빠르게 ↓↓ 눌러도 순서가 뒤바뀌지 않게), 펼친 카드는 저장된 뒤에 따라감 (깜빡임 방지)
+  const moveQ = useRef<Promise<void>>(Promise.resolve());
   const dnd = useDragSort(w?.blocks.length ?? 0, (from, to) => {
     if (!w) return;
-    setOpen((o) => (o === null || o < 0 ? o : remapIndex(o, from, to)));
-    void updateWorkoutAfterInputs(w.id, (cw) => moveWorkoutBlock(cw, from, to));
+    const id = w.id;
+    moveQ.current = moveQ.current.then(async () => {
+      await updateWorkoutAfterInputs(id, (cw) => moveWorkoutBlock(cw, from, to));
+      setOpen((o) => (o === null || o < 0 ? o : remapIndex(o, from, to)));
+    }).catch(() => undefined);
   }, (i) => (w?.blocks[i]?.items.map((it) => byId.get(it.exerciseId)?.name_ko ?? it.exerciseId).join(' + ') ?? ''));
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
 
@@ -232,7 +237,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       {picker && (
         <ExercisePicker s={s} all={all} title={picker.mode === 'swap' ? '운동 교체' : '운동 추가'}
           part={picker.mode === 'swap' ? byId.get(w.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part : undefined}
-          exclude={picker.mode === 'swap' ? [w.blocks[picker.b]!.items[picker.i]!.exerciseId] : []}
+          exclude={w.blocks.flatMap((b) => b.items.map((it) => it.exerciseId))} /* 같은 운동 두 번 불가: 동기화·늦은 기록이 운동 이름으로 짝지음 (D-037) */
           onClose={() => setPicker(null)}
           onPick={(e) => {
             if (picker.mode === 'swap') upd((cw) => replaceItem(cw, picker.b, picker.i, e.id, history));

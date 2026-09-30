@@ -1017,3 +1017,40 @@ test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 �
   await page.locator('main .card').filter({ has: page.getByRole('heading', { name: '끌기 루틴' }) }).getByRole('button', { name: '편집' }).click();
   await expect(async () => expect(await rn()).toEqual([r0[2], r0[0], r0[1]])).toPass({ timeout: 5000 });
 });
+
+test('끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으로, 놓을 칸 테두리, 끄는 도중 카드가 사라져도 멈추지 않음', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const pc = await ctx.newPage();
+  await pc.goto('./#/');
+  await pc.getByRole('button', { name: '알겠어요' }).click();
+  await pc.getByRole('button', { name: '+ 직접' }).click();
+  for (const q of ['해머 컬', '로프 푸시다운', '레그 프레스']) {
+    await pc.getByRole('button', { name: '+ 운동 추가' }).click();
+    await pc.getByLabel('운동 검색').fill(q);
+    await pc.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
+  }
+  const cards = pc.locator('main .card');
+  const rn = () => pc.locator('main .card').evaluateAll((els) => els.map((e) => e.querySelector('strong')?.textContent?.trim() ?? ''));
+  const r0 = await rn();
+  const b0 = (await cards.nth(0).boundingBox())!, b1 = (await cards.nth(1).boundingBox())!;
+  expect(Math.abs(b0.y - b1.y), '2단 배치').toBeLessThan(4);
+  // 2번째(오른쪽) 카드를 1번째(왼쪽) 위로: 끄는 도중 놓을 칸 테두리
+  const h = (await cards.nth(1).locator('.drag-handle').boundingBox())!;
+  await pc.mouse.move(h.x + h.width / 2, h.y + h.height / 2); await pc.mouse.down();
+  for (let k = 1; k <= 10; k++) await pc.mouse.move(h.x + h.width / 2 + ((b0.x + b0.width / 2 - h.x - h.width / 2) * k) / 10, h.y + h.height / 2 + ((b0.y + b0.height / 2 - h.y - h.height / 2) * k) / 10);
+  await expect(cards.nth(0)).toHaveAttribute('data-drop', 'before');
+  await expect(cards.nth(0)).toHaveAttribute('data-drop-grid', '');
+  await expect(cards.nth(1)).toHaveClass(/dragging/);
+  await pc.screenshot({ path: `reports/screens/${test.info().project.name}-27-pc-drag.png` });
+  await pc.mouse.up();
+  await expect.poll(rn).toEqual([r0[1], r0[0], r0[2]]);
+  // 끄는 도중 손잡이가 사라지면(다른 화면으로 바뀜 등) 끌기 상태가 풀림
+  const h2 = (await cards.nth(2).locator('.drag-handle').boundingBox())!;
+  await pc.mouse.move(h2.x + 20, h2.y + 20); await pc.mouse.down(); await pc.mouse.move(h2.x + 20, h2.y - 60);
+  await expect(pc.locator('html.sorting')).toHaveCount(1);
+  await pc.evaluate(() => document.querySelectorAll('.drag-handle').forEach((e) => e.remove()));
+  await expect(pc.locator('html.sorting')).toHaveCount(0);
+  await expect(pc.locator('.card.dragging')).toHaveCount(0);
+  await pc.mouse.up();
+  await ctx.close();
+});

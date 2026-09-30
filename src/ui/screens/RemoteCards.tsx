@@ -4,26 +4,12 @@ import { softDelete } from '../../db/db';
 import { deviceId } from '../deviceId';
 import { parseHlc } from '../../core/hlc';
 import type { Workout } from '../../core/session';
+import { mergeLate } from '../../core/session';
 import { syncNow } from '../sync';
 import { go } from '../nav';
 
 const since = (ms: number) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.round(m / 60)}시간 전`; };
 const doneSets = (w: Workout) => w.blocks.flatMap((b) => b.items.flatMap((i) => i.sets)).filter((x) => x.done && !x.warmup).length;
-
-/** 늦게 온 기록을 원래 운동에 합치기: 같은 자리(블록·운동)의 아직 안 한 세트를 채우고, 없으면 뒤에 붙임 */
-export function mergeLate(orig: Workout, copy: Workout): Workout {
-  const blocks = orig.blocks.map((b) => ({ ...b, items: b.items.map((i) => ({ ...i, sets: [...i.sets] })) }));
-  copy.blocks.forEach((cb, bi) => cb.items.forEach((ci) => {
-    const item = blocks[bi]?.items.find((i) => i.exerciseId === ci.exerciseId);
-    if (!item) return;
-    for (const s of ci.sets) {
-      if (s.doneAt && item.sets.some((x) => x.done && x.doneAt === s.doneAt)) continue; // 이미 있는 세트 (끝낸 시각이 같음)
-      const k = item.sets.findIndex((x) => !x.done && x.warmup === s.warmup);
-      if (k >= 0) item.sets[k] = s; else item.sets.push(s);
-    }
-  }));
-  return { ...orig, blocks };
-}
 
 /** 홈: 다른 기기에서 진행 중인 운동(읽기 전용, 가져오기), 늦게 온 기록(합치기/지우기) */
 export function RemoteCards({ s }: { s: AppState }) {
