@@ -1,8 +1,9 @@
+import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, activeOf, historyOf } from '../store';
 import { catalog } from '../catalog';
-import { startRoutine } from '../actions';
-import { emptyRoutine, homeRecent, hideFromHome } from '../../core/session';
+import { startRoutine, setHomeHidden } from '../actions';
+import { emptyRoutine, homeRecent } from '../../core/session';
 import type { Workout } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { BackupBanner } from './BackupSection';
@@ -18,25 +19,27 @@ import { syncEnabled } from '../sync';
  * 홈 "최근 운동" 삭제 (D-040): 목록에서만 빼기(기록·통계 그대로, 기록 상세에서 되돌림) / 완전 삭제(되돌릴 수 없음).
  * 안전한 쪽(목록에서만 빼기)이 첫 버튼·초점. 완전 삭제는 빨간 버튼. 닫기·Esc·취소는 아무것도 안 함
  */
-async function removeRecent(w: Workout) {
+async function removeRecent(w: Workout): Promise<'ok' | 'alt' | false | null> {
   const pick = await askChoice({
     title: '이 운동을 어떻게 할까요?',
     message: `"${w.name}"\n· 목록에서만 빼기: 홈에서만 안 보여요. 기록 탭·통계에는 남고, 기록 상세에서 되돌릴 수 있어요\n· 완전 삭제: 기록·통계에서도 지워져요. 되돌릴 수 없어요`,
     ok: '목록에서만 빼기', alt: '완전 삭제', altDanger: true,
   });
   if (pick === 'ok') {
-    // 묻는 동안 동기화로 바뀌었을 수 있어 저장소의 지금 값에 표시만 더함 (없어졌으면 아무것도 안 함)
-    await mutate(async (d) => { const cur = await d.workouts.get(w.id); if (cur) await d.workouts.put(hideFromHome(cur)); });
+    await setHomeHidden(w.id, true); // 운동 기록은 그대로, 설정의 "뺀 목록"에만 더함
   } else if (pick === 'alt') {
     await mutate((d) => softDelete(d, 'workouts', w.id));
   }
+  return pick;
 }
 
 export function Home({ s }: { s: AppState }) {
   const all = catalog(s.custom);
   const name = (id: string) => all.find((e) => e.id === id)?.name_ko ?? id;
   const active = activeOf(s);
-  const recent = homeRecent(historyOf(s), 5); // "목록에서만 빼기" 한 것은 건너뜀 (D-040)
+  // 빼기·완전 삭제 뒤 카드가 사라지므로 결과를 글로 알림 (화면 읽기 프로그램도 읽음)
+  const [done, setDone] = useState<string | null>(null);
+  const recent = homeRecent(historyOf(s), s.settings.homeHidden, 5); // "목록에서만 빼기" 한 것은 건너뜀 (D-040)
   return (
     <main>
       <h1>운동 기록</h1>
@@ -104,12 +107,13 @@ export function Home({ s }: { s: AppState }) {
             </a>
             <div class="row" style={{ marginTop: '6px', justifyContent: 'flex-end' }}>
               <button aria-label={`최근 운동 ${w.name} 수정`} onClick={() => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`)}>수정</button>
-              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={() => void removeRecent(w)}>삭제</button>
+              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={() => void removeRecent(w).then((p) => { if (p === 'ok') setDone(`"${w.name}"을(를) 홈에서 뺐어요. 기록 탭의 상세에서 되돌릴 수 있어요`); else if (p === 'alt') setDone(`"${w.name}"을(를) 완전히 지웠어요`); })}>삭제</button>
             </div>
           </div>
         );
       })}
       </div>
+      {done && <p role="status" class="small sub">{done}</p>}
     </main>
   );
 }

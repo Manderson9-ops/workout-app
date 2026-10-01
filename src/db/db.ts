@@ -30,6 +30,8 @@ export interface Settings {
   storageNoticeSeen?: boolean;
   /** 마지막으로 백업 파일을 저장한 시각 (7일 알림용) */
   lastBackupAt?: string;
+  /** 홈 "최근 운동"에서만 뺀 운동 ID (D-040). 기록·통계에는 그대로. 기기 사이 동기화 */
+  homeHidden?: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {

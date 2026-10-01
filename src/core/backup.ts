@@ -70,7 +70,7 @@ function setOk(s: unknown): boolean {
     && optIso(s.doneAt) && optBool(s.auto) && optStr(s.memo);
 }
 function workoutOk(w: unknown): boolean {
-  if (!isObj(w) || !str(w.id) || !str(w.name) || !isoDate(w.startedAt) || !optIso(w.endedAt) || !Array.isArray(w.blocks) || !optStr(w.memo) || !optNum(w.plannedSec) || !optStr(w.ownerDeviceId) || !optIso(w.ownerAt) || !optStr(w.pendingMerge) || !optNum(w.ownerSeq) || !optIso(w.editedAt) || !optBool(w.hiddenFromHome)) return false;
+  if (!isObj(w) || !str(w.id) || !str(w.name) || !isoDate(w.startedAt) || !optIso(w.endedAt) || !Array.isArray(w.blocks) || !optStr(w.memo) || !optNum(w.plannedSec) || !optStr(w.ownerDeviceId) || !optIso(w.ownerAt) || !optStr(w.pendingMerge) || !optNum(w.ownerSeq) || !optIso(w.editedAt)) return false;
   if (w.timer !== null && w.timer !== undefined && !(isObj(w.timer) && num(w.timer.startedAt) && num(w.timer.endsAt) && TIMER_KINDS.includes(w.timer.kind as string))) return false;
   return w.blocks.every((b) => isObj(b) && KINDS.includes(b.kind as string) && restOk(b) && Array.isArray(b.items)
     && b.items.every((i) => isObj(i) && str(i.exerciseId) && isObj(i.target) && num(i.target.sets) && num(i.target.reps) && optNum(i.target.seconds)
@@ -91,6 +91,7 @@ function settingsOk(s: unknown): boolean {
   return (s.level === undefined || LEVELS.includes(s.level as string))
     && (s.equipment === undefined || (Array.isArray(s.equipment) && s.equipment.every((e) => EQUIPMENT.includes(e as never))))
     && (s.defaultParts === undefined || (Array.isArray(s.defaultParts) && s.defaultParts.every((p) => PARTS.includes(p as never))))
+    && (s.homeHidden === undefined || (Array.isArray(s.homeHidden) && s.homeHidden.every((x) => typeof x === 'string')))
     && optNum(s.defaultMinutes) && optBool(s.soundOn) && optBool(s.keepAwake) && optBool(s.storageNoticeSeen) && optIso(s.lastBackupAt)
     && (r === undefined || (isObj(r) && ['compound', 'isolation', 'round', 'between', 'transition'].every((k) => num(r[k]) && (r[k] as number) >= 0)));
 }

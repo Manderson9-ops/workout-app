@@ -8,10 +8,9 @@ import { BW_MIN, BW_MAX } from '../../core/backup';
 import { PARTS } from '../../core/types';
 import { LineChart, BarChart } from '../charts';
 import { NumInput, mmss } from '../components';
-import { startRoutine } from '../actions';
+import { startRoutine, setHomeHidden } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import type { Routine } from '../../core/session';
-import { showOnHome } from '../../core/session';
 import { go } from '../nav';
 import { askConfirm } from '../confirm';
 
@@ -27,6 +26,7 @@ export function Stats({ s }: { s: AppState }) {
   const [ym, setYm] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; });
   const [day, setDay] = useState<number | null>(null);
   const sums = done.map((w) => summarize(w, byId, s.bodyweight));
+  const hiddenSet = new Set(s.settings.homeHidden ?? []); // 홈에서 뺀 기록 표시 (D-040)
   const weeks = weeklyPartSets(done, byId, today, 4);
   const thisWeek = weeks[weeks.length - 1]!;
   const totals = weeklyTotals(done, byId, today, 8, s.bodyweight);
@@ -68,7 +68,7 @@ export function Stats({ s }: { s: AppState }) {
             );
           })}
         </div>
-        {dayList.map((x) => <SummaryRow key={x.id} x={x} />)}
+        {dayList.map((x) => <SummaryRow key={x.id} x={x} hidden={hiddenSet.has(x.id)} />)}
       </div>
 
       <h2>이번 주 부위별 세트</h2>
@@ -103,7 +103,7 @@ export function Stats({ s }: { s: AppState }) {
 
       <h2>운동 기록</h2>
       {!sums.length && <div class="empty">아직 끝낸 운동이 없어요</div>}
-      {sums.slice(0, 30).map((x) => <SummaryRow key={x.id} x={x} />)}
+      {sums.slice(0, 30).map((x) => <SummaryRow key={x.id} x={x} hidden={hiddenSet.has(x.id)} />)}
     </main>
   );
 }
@@ -153,12 +153,12 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
   );
 }
 
-function SummaryRow({ x }: { x: WorkoutSummary }) {
+function SummaryRow({ x, hidden }: { x: WorkoutSummary; hidden: boolean }) {
   const diff = x.plannedSec ? x.durationSec - x.plannedSec : undefined;
   return (
-    <button class="list-item" aria-label={`${x.date} ${x.name}${x.hiddenFromHome ? ' (홈에서 뻐)' : ''}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
+    <button class="list-item" aria-label={`${x.date} ${x.name}${hidden ? ' (홈에서 뺌)' : ''}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
       <div class="grow">
-        <div>{x.name} <span class="pill">{md(x.date)}</span>{x.hiddenFromHome && <span class="pill">홈에서 뻐</span>}</div>
+        <div>{x.name} <span class="pill">{md(x.date)}</span>{hidden && <span class="pill">홈에서 뺌</span>}</div>
         <div class="pill">{mmss(x.durationSec)}{diff !== undefined && Math.abs(diff) >= 60 ? ` (예상보다 ${Math.round(Math.abs(diff) / 60)}분 ${diff > 0 ? '김' : '짧음'})` : ''} · 작업 세트 {x.workSets} · 볼륨 {x.volume.toLocaleString()}kg</div>
       </div>
       <span class="sub">›</span>
@@ -187,10 +187,10 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
       {w.editedAt && <p class="sub small">{new Date(w.editedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}에 고침</p>}
       {w.memo && <p>📝 {w.memo}</p>}
-      {w.hiddenFromHome && (
-        <div class="card row between" role="note" aria-label="홈에서 뻐 기록">
+      {(s.settings.homeHidden ?? []).includes(w.id) && (
+        <div class="card row between" role="note" aria-label="홈에서 뺌 기록">
           <span class="small">홈 "최근 운동"에서 뺀 기록이에요. 기록·통계에는 그대로예요.</span>
-          <button onClick={() => void mutate(async (d) => { const cur = await d.workouts.get(w.id); if (cur) await d.workouts.put(showOnHome(cur)); })}>홈에 다시 보이기</button>
+          <button onClick={() => void setHomeHidden(w.id, false)}>홈에 다시 보이기</button>
         </div>
       )}
       {w.blocks.map((b, bi) => b.items.map((it, ii) => (
