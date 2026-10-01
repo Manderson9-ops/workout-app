@@ -155,8 +155,8 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 .bodymap-fig { margin: 0; text-align: center; width: 46%; max-width: 190px; }
 .bodymap-fig svg { width: 100%; height: auto; display: block; touch-action: manipulation; }
 .bm-head { fill: var(--card2); }
-.bm-part { fill: var(--card2); stroke: var(--line); stroke-width: 1; cursor: pointer; }
-.bm-part:hover { stroke: var(--acc); }
+.bm-part { fill: var(--card2); stroke: var(--line); stroke-width: 1; pointer-events: none; }
+.bm-hit { fill: transparent; cursor: pointer; pointer-events: all; }
 .bm-part.p-high { fill: #1d4ed8; stroke: #93c5fd; }
 .bm-part.p-normal { fill: #2563eb88; stroke: #3b82f6; }
 .bm-part.p-low { fill: #1e3a8a55; stroke: #3b82f6; }

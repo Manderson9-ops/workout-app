@@ -100,26 +100,37 @@ export function Sheet({ onClose, title, children, modal }: { onClose: () => void
 }
 
 /** 운동 고르기 (교체·추가). part가 있으면 그 부위 후보를 등급 순으로 먼저 */
-export function ExercisePicker({ s, all, part, exclude, onPick, onClose, title }: {
-  s: AppState; all: BuiltExercise[]; part?: Part; exclude?: string[]; onPick: (e: BuiltExercise) => void; onClose: () => void; title: string;
+export function ExercisePicker({ s, all, part, exclude, ctxParts: ctxIn, onPick, onClose, title }: {
+  s: AppState; all: BuiltExercise[]; part?: Part; exclude?: string[];
+  /** 지금 들어 있는 부위 (플랜은 항목의 실제 부위를 넘김). 없으면 빼기 목록 운동의 기본 부위 */
+  ctxParts?: Part[];
+  onPick: (e: BuiltExercise) => void; onClose: () => void; title: string;
 }) {
   const [q, setQ] = useState('');
-  // D-044: 교체는 그 운동의 부위, 추가는 마지막으로 고른 부위로 시작
+  // D-044: 교체는 그 운동의 부위로 시작하고 기억에 손대지 않음. 추가는 마지막으로 고른 부위로 시작
+  const swap = part !== undefined;
   const [p, setPRaw] = useState<Part | undefined>(() => {
     if (part) return part;
     const last = lsGet(PICKER_PART_KEY) as Part | null;
     return last && (PARTS as readonly string[]).includes(last) ? last : undefined;
   });
-  const setP = (x: Part | undefined) => { setPRaw(x); if (x) lsSet(PICKER_PART_KEY, x); else lsRemove(PICKER_PART_KEY); };
-  // 지금 루틴·플랜·운동에 들어 있는 부위 (빼기 목록 = 이미 들어 있는 운동)
+  const setP = (x: Part | undefined) => {
+    setPRaw(x);
+    if (swap) return;
+    if (x) lsSet(PICKER_PART_KEY, x); else lsRemove(PICKER_PART_KEY);
+  };
   const byIdP = new Map(all.map((e) => [e.id, e.part]));
-  const ctxParts = PARTS.filter((x) => (exclude ?? []).some((id) => byIdP.get(id) === x));
+  const ctxSet = new Set<Part>(ctxIn ?? (exclude ?? []).map((id) => byIdP.get(id)).filter((x): x is Part => !!x));
+  const ctxParts = PARTS.filter((x) => ctxSet.has(x));
   const level = s.settings.level;
-  const list = all
+  const base = all
     .filter((e) => !(exclude ?? []).includes(e.id) && !s.meta.get(e.id)?.excluded && equipmentAvailable(e, s.settings.equipment))
-    .filter((e) => (p ? eligibleParts(e).includes(p) : true))
-    .filter((e) => matchesQuery(q, [e.name_ko, ...(e.aliases ?? [])]))
-    .map((e) => ({ e, g: resolveGrade(e, p ?? e.part, level, undefined, s.meta.get(e.id)?.userGrade) }))
+    .filter((e) => matchesQuery(q, [e.name_ko, ...(e.aliases ?? [])]));
+  const inPart = base.filter((e) => (p ? eligibleParts(e).includes(p) : true));
+  // 고른 부위에 검색 결과가 없으면 모든 부위에서 찾아 보여 줌 (기억된 부위 때문에 못 찾는 일이 없게)
+  const widened = !!p && !!q.trim() && !inPart.length && base.length > 0;
+  const list = (widened ? base : inPart)
+    .map((e) => ({ e, g: resolveGrade(e, widened ? e.part : (p ?? e.part), level, undefined, s.meta.get(e.id)?.userGrade) }))
     .sort((a, b) => GRADES.indexOf(a.g.value) - GRADES.indexOf(b.g.value) || (a.g.estimated ? 1 : 0) - (b.g.estimated ? 1 : 0) || a.e.name_ko.localeCompare(b.e.name_ko))
     .slice(0, 60);
   return (
@@ -130,9 +141,10 @@ export function ExercisePicker({ s, all, part, exclude, onPick, onClose, title }
         {ctxParts.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} aria-pressed={p === x} onClick={() => setP(x)}>{x}</button>)}
       </div>}
       <div class="row wrap" role="group" aria-label="모든 부위" style={{ margin: '8px 0' }}>
-        <button class={`chip ${!p ? 'on' : ''}`} onClick={() => setP(undefined)}>전체</button>
-        {PARTS.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} onClick={() => setP(x)}>{x}</button>)}
+        <button class={`chip ${!p ? 'on' : ''}`} aria-pressed={!p} onClick={() => setP(undefined)}>전체</button>
+        {PARTS.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} aria-pressed={p === x} onClick={() => setP(x)}>{x}</button>)}
       </div>
+      {widened && <p class="sub small" role="status">{p}에는 "{q.trim()}" 운동이 없어 모든 부위에서 찾았어요</p>}
       {list.map(({ e, g }) => (
         <div class="list-item" key={e.id} onClick={() => onPick(e)} role="button" aria-label={e.name_ko}>
           <GradeBadge g={g} />
@@ -143,7 +155,6 @@ export function ExercisePicker({ s, all, part, exclude, onPick, onClose, title }
     </Sheet>
   );
 }
-
 export const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.max(0, Math.round(sec)) % 60).padStart(2, '0')}`;
 export const minutes = (sec: number) => `${Math.round(sec / 60)}분`;
 

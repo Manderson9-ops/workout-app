@@ -32,7 +32,7 @@ export function App() {
   const hash = useHash();
   const [, tick] = useState(0);
   const active = activeOf(s);
-  useAudioUnlock();
+  useAudioUnlock(s.settings.soundOn);
   useFlushOnHide();
   useWakeLock(!!active && s.settings.keepAwake);
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);

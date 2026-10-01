@@ -309,7 +309,14 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   await page.getByLabel('등 우선순위').selectOption('low');
   await expect(page.getByRole('button', { name: '등 낮음' })).toBeVisible();
   expect(await page.getByRole('group', { name: '고른 부위의 우선순위' }).locator('select').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['가슴 우선순위', '등 우선순위']);
-  await expect(map.locator('path[data-part="등"].p-low')).toHaveCount(1);
+  await expect(map.locator('path[data-vis="등"].p-low')).toHaveCount(1);
+  // 팔: 보이는 이두 모양 위 실제 탭 위치(왼팔 가운데)로 눌러도 켜짐, 누르는 영역은 44px 안팎
+  const fsvg = map.locator('figure').nth(0).locator('svg');
+  const fb = (await fsvg.boundingBox())!;
+  await page.mouse.click(fb.x + 21.5 * fb.width / 100, fb.y + 64 * fb.height / 200);
+  await expect(page.getByRole('button', { name: '이두 높음' })).toBeVisible();
+  expect(25 * fb.width / 100).toBeGreaterThanOrEqual(40);
+  await page.getByRole('button', { name: '이두 높음' }).click();
   await checkScreen(page, '46-plan-bodymap');
   // 다시 누르면 빼기 (그림·버튼 같은 동작)
   await map.locator('figure').nth(0).locator('path[data-part="가슴"]').click();
@@ -337,21 +344,46 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '코어' })).toHaveClass(/\bon\b/);
   await dlg.getByRole('group', { name: '지금 들어 있는 부위' }).getByRole('button', { name: '이두' }).click();
   await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '이두' })).toHaveClass(/\bon\b/);
+  // 기억된 부위(이두)에 없는 운동을 검색하면 모든 부위에서 찾아 줌
+  await dlg.getByLabel('운동 검색').fill('플랭크');
+  await expect(dlg.getByRole('status')).toContainText('이두에는 "플랭크" 운동이 없어 모든 부위에서 찾았어요');
+  await expect(dlg.getByRole('button', { name: '플랭크', exact: true })).toBeVisible();
   await dlg.getByRole('button', { name: '닫기' }).click();
-  // 음악과 같이 듣기 (D-045): 기본 mix(transient), 고르면 이 기기에 저장
-  await page.getByRole('link', { name: '설정' }).click();
+  // 교체 창에서 부위를 바꿔도 추가 창의 기억은 그대로 (이두)
+  await planSec.getByRole('button', { name: '교체' }).first().click();
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '가슴' }).click();
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: '닫기' }).click();
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '이두' })).toHaveAttribute('aria-pressed', 'true');
+  await dlg.getByRole('button', { name: '닫기' }).click();
+  // 음악과 같이 듣기 (D-045): 두 엔진 모두 navigator.audioSession이 없어 가짜 객체로 실제 값을 검사
+  await page.addInitScript(() => { Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto' }, configurable: true }); });
+  await page.goto('./#/settings');
+  await page.reload(); // 해시만 바뀌면 문서가 그대로라 초기 스크립트가 안 들어감
   const am = page.getByLabel('다른 앱 음악과 같이 들을 때 (이 기기만)');
   await expect(am).toHaveValue('mix');
   const sessionType = () => page.evaluate(() => (navigator as Navigator & { audioSession?: { type: string } }).audioSession?.type ?? 'none');
+  expect(await sessionType()).toBe('auto'); // 누르기 전에는 바꾸지 않음
   await page.locator('main h1').first().click();
-  expect(['transient', 'none']).toContain(await sessionType());
+  expect(await sessionType()).toBe('transient');
   await am.selectOption('solo');
-  expect(['playback', 'none']).toContain(await sessionType());
+  expect(await sessionType()).toBe('playback');
   await expect(page.getByText('앱을 누르면 다른 앱 음악이 멈춰요')).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('다른 앱 음악과 같이 들을 때 (이 기기만)')).toHaveValue('solo');
-  await page.getByLabel('다른 앱 음악과 같이 들을 때 (이 기기만)').selectOption('mix');
-  expect(['transient', 'none']).toContain(await sessionType());
+  await expect(am).toHaveValue('solo');
+  await page.locator('main h1').first().click();
+  expect(await sessionType()).toBe('playback');
+  await am.selectOption('mix');
+  expect(await sessionType()).toBe('transient');
+  await expect(page.getByText('무음 모드(무음 스위치)에서는 휴식 끝 알림음이 안 나요')).toBeVisible();
+  // 소리 끔이면 눌러도 세션을 잡지 않음
+  await page.getByRole('button', { name: '소리 켬' }).click();
+  await expect(page.getByRole('button', { name: '소리 끔' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '소리 끔' })).toBeVisible();
+  await page.locator('main h1').first().click();
+  expect(await sessionType()).toBe('auto');
+  await page.getByRole('button', { name: '소리 끔' }).click();
 });
 
 test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본 휴식', async ({ page }) => {

@@ -27,8 +27,16 @@ export function setAudioMode(m: AudioMode): void {
   try { applySessionType(); } catch { /* 지원 안 함 */ }
 }
 
+/** 설정의 "소리 끔"이면 오디오를 아예 깨우지 않음 (세션을 잡지 않아 다른 앱 음악에 영향 없음) */
+let soundEnabled = true;
+export function setSoundEnabled(on: boolean): void {
+  if (soundEnabled && !on && ctx && ctx.state === 'running') void ctx.suspend().catch(() => undefined); // 끄면 잡고 있던 소리 장치도 멈춤
+  soundEnabled = on;
+}
+
 /** 사용자 탭 안에서 오디오를 깨움. 세션 종류는 설정(D-045) */
 export function unlockAudio(): void {
+  if (!soundEnabled) return;
   try {
     applySessionType();
     ctx ??= new AudioContext();
@@ -49,7 +57,8 @@ export function beep(freq: number, ms: number, when = 0): void {
 }
 
 /** 앱 전체에서 한 번: 여러 종류의 탭으로 오디오를 깨우고, 앱으로 돌아오면 다시 깨움 */
-export function useAudioUnlock(): void {
+export function useAudioUnlock(soundOn = true): void {
+  setSoundEnabled(soundOn);
   useEffect(() => {
     const evs = ['pointerdown', 'touchend', 'click'] as const;
     evs.forEach((e) => document.addEventListener(e, unlockAudio, { passive: true }));

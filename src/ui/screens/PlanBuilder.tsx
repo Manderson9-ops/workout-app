@@ -17,6 +17,7 @@ import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
 import { useDragSort } from '../dragSort';
 import { BodyMap } from '../bodyMap';
+import { togglePart as togglePartForm, setPartPriority } from '../../core/planForm';
 import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
 import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 
@@ -73,12 +74,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const update = (p: Partial<Form>) => { const n = { ...f, ...p }; setF(n); lsSet(KEY, JSON.stringify(n)); };
 
   // D-043: 부위는 켜기/끄기만 (켜면 우선순위 '높음'), 우선순위는 고른 부위의 선택 상자로. 고른 순서(같은 우선순위의 앞뒤)는 유지
-  const togglePart = (p: Part) => {
-    const parts = { ...f.parts };
-    if (parts[p]) { delete parts[p]; update({ parts, order: f.order.filter((x) => x !== p) }); }
-    else { parts[p] = 'high'; update({ parts, order: [...f.order.filter((x) => x !== p), p] }); }
-  };
-  const setPriority = (p: Part, pr: Priority) => update({ parts: { ...f.parts, [p]: pr } });
+  const togglePart = (p: Part) => { const n = togglePartForm(f, p); update({ parts: n.parts, order: n.order }); };
+  const setPriority = (p: Part, pr: Priority) => update({ parts: setPartPriority(f, p, pr).parts });
   const request = (form: Form = f): PlanRequest => ({
     parts: form.order.filter((p) => form.parts[p]).map((p) => ({ part: p, priority: form.parts[p]! })),
     level: s.settings.level, minGrade: form.minGrade, targetMinutes: form.minutes, groupings: form.groupings,
@@ -311,7 +308,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
           }} />
       )}
       {adding && plan && (
-        <ExercisePicker s={s} all={all} title="운동 추가"
+        <ExercisePicker s={s} all={all} title="운동 추가" ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setAdding(false)}
           onPick={(e) => { addExercise(e); setAdding(false); }} />

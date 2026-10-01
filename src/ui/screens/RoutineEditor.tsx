@@ -9,7 +9,7 @@ import { targetReps } from '../../core/time';
 import { ExercisePicker, mmss } from '../components';
 import { startRoutine } from '../actions';
 import { go } from '../nav';
-import { SETS_MAX } from '../../core/planEdit';
+import { SETS_MIN, SETS_MAX } from '../../core/planEdit';
 
 const KIND_LABEL: Record<RoutineBlock['kind'], string> = { single: '일반', superset: '슈퍼세트', compound: '컴파운드 세트' };
 
@@ -61,7 +61,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
               <div key={ii} style={{ marginTop: '8px' }}>
                 <strong>{b.kind !== 'single' ? `${String.fromCharCode(65 + ii)}. ` : ''}{byId.get(it.exerciseId)?.name_ko ?? it.exerciseId}</strong>
                 <div class="row wrap" style={{ marginTop: '4px' }}>
-                  <button aria-label="세트 줄이기" onClick={() => setItem(bi, ii, (y) => ({ ...y, sets: Math.max(1, y.sets - 1) }))}>−</button>
+                  <button aria-label="세트 줄이기" onClick={() => setItem(bi, ii, (y) => ({ ...y, sets: Math.max(SETS_MIN, y.sets - 1) }))}>−</button>
                   <span>{it.sets}세트</span>
                   <button aria-label="세트 늘리기" disabled={it.sets >= SETS_MAX} onClick={() => setItem(bi, ii, (y) => ({ ...y, sets: Math.min(SETS_MAX, y.sets + 1) }))}>+</button>
                   {it.seconds !== undefined ? (

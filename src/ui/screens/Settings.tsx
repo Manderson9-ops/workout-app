@@ -52,7 +52,9 @@ export function SettingsScreen({ s }: { s: AppState }) {
         <option value="mix">음악 계속 · 알림음만 위에 (기본)</option>
         <option value="solo">앱 소리 우선 · 음악이 멈춤</option>
       </select>
-      <p class="sub small">{am === 'mix' ? '음악을 멈추지 않아요. 아이폰 무음 모드에서 휴식 끝 알림음이 울리는지는 한 번 확인해 주세요.' : '앱을 누르면 다른 앱 음악이 멈춰요 (0.8.4까지의 동작).'}</p>
+      <p class="sub small">{am === 'mix'
+        ? '다른 앱 음악과 섞여 울려요. 단, 아이폰 무음 모드(무음 스위치)에서는 휴식 끝 알림음이 안 나요. 무음 모드에서도 들으려면 "앱 소리 우선"을 고르세요. (근거: WebKit 담당자 답변. 아이폰 실기기로는 아직 확인 전)'
+        : '무음 모드에서도 알림음이 나지만, 앱을 누르면 다른 앱 음악이 멈춰요 (0.8.4까지의 동작).'}</p>
       <p class="sub small">화면을 잠그거나 다른 앱으로 가면 휴식 끝 알림이 오지 않아요 (웹앱 한계). 앱으로 돌아오면 남은 시간은 정확해요.</p>
       <label>플랜에서 제외한 운동 ({excluded.length})</label>
       {!excluded.length && <p class="sub small">없음</p>}
