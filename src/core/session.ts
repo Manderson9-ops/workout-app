@@ -360,6 +360,8 @@ export function mergeLate(orig: Workout, copy: Workout): Workout {
  */
 export function withHidden(list: readonly string[] | undefined, id: string): string[] { const l = list ?? []; return l.includes(id) ? [...l] : [...l, id]; }
 export function withoutHidden(list: readonly string[] | undefined, id: string): string[] { return (list ?? []).filter((x) => x !== id); }
+/** 홈에서 뺀 기록 표시 글자 (기록 탭 목록·상세, 시험에서도 같이 씀) */
+export const HOME_HIDDEN_LABEL = '홈에서 뺌';
 /** 홈 "최근 운동" 목록: 뺀 것을 건너뛰고 n개 (history는 최신순) */
 export function homeRecent(history: Workout[], hidden: readonly string[] | undefined, n: number): Workout[] {
   const h = new Set(hidden ?? []);

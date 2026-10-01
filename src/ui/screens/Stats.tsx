@@ -11,6 +11,7 @@ import { NumInput, mmss } from '../components';
 import { startRoutine, setHomeHidden } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import type { Routine } from '../../core/session';
+import { HOME_HIDDEN_LABEL } from '../../core/session';
 import { go } from '../nav';
 import { askConfirm } from '../confirm';
 
@@ -156,9 +157,9 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
 function SummaryRow({ x, hidden }: { x: WorkoutSummary; hidden: boolean }) {
   const diff = x.plannedSec ? x.durationSec - x.plannedSec : undefined;
   return (
-    <button class="list-item" aria-label={`${x.date} ${x.name}${hidden ? ' (홈에서 뺌)' : ''}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
+    <button class="list-item" aria-label={`${x.date} ${x.name}${hidden ? ` (${HOME_HIDDEN_LABEL})` : ''}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
       <div class="grow">
-        <div>{x.name} <span class="pill">{md(x.date)}</span>{hidden && <span class="pill">홈에서 뺌</span>}</div>
+        <div>{x.name} <span class="pill">{md(x.date)}</span>{hidden && <span class="pill">{HOME_HIDDEN_LABEL}</span>}</div>
         <div class="pill">{mmss(x.durationSec)}{diff !== undefined && Math.abs(diff) >= 60 ? ` (예상보다 ${Math.round(Math.abs(diff) / 60)}분 ${diff > 0 ? '김' : '짧음'})` : ''} · 작업 세트 {x.workSets} · 볼륨 {x.volume.toLocaleString()}kg</div>
       </div>
       <span class="sub">›</span>
@@ -188,7 +189,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       {w.editedAt && <p class="sub small">{new Date(w.editedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}에 고침</p>}
       {w.memo && <p>📝 {w.memo}</p>}
       {(s.settings.homeHidden ?? []).includes(w.id) && (
-        <div class="card row between" role="note" aria-label="홈에서 뺌 기록">
+        <div class="card row between" role="note" aria-label={`${HOME_HIDDEN_LABEL} 기록`}>
           <span class="small">홈 "최근 운동"에서 뺀 기록이에요. 기록·통계에는 그대로예요.</span>
           <button onClick={() => void setHomeHidden(w.id, false)}>홈에 다시 보이기</button>
         </div>

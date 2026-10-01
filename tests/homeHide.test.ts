@@ -52,4 +52,13 @@ describe('setHomeHidden (저장)', () => {
     await setHomeHidden('w1', false);
     expect((await db.settings.get('main'))!.homeHidden).toEqual(['old']);
   });
+  it('바뀐 게 없으면 저장하지 않음 (완전 삭제 때 정리 호출이 동기화를 만들지 않게)', async () => {
+    await db.settings.put({ ...DEFAULT_SETTINGS, homeHidden: ['old'] });
+    const stamp = async () => ((await db.settings.get('main')) as unknown as { _s?: unknown })._s;
+    const h0 = await stamp();
+    await setHomeHidden('none', false);
+    await setHomeHidden('old', true);
+    expect(await stamp()).toEqual(h0);
+    expect(h0).toBeDefined();
+  });
 });

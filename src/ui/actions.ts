@@ -147,6 +147,8 @@ export async function setMeta(exerciseId: string, patch: { favorite?: boolean; u
 export async function setHomeHidden(id: string, hidden: boolean): Promise<void> {
   await mutate(async (d) => {
     const st = (await d.settings.get('main')) ?? DEFAULT_SETTINGS;
-    await d.settings.put({ ...st, key: 'main', homeHidden: hidden ? withHidden(st.homeHidden, id) : withoutHidden(st.homeHidden, id) });
+    const next = hidden ? withHidden(st.homeHidden, id) : withoutHidden(st.homeHidden, id);
+    if (next.length === (st.homeHidden ?? []).length) return; // 바뀐 게 없으면 저장·동기화하지 않음
+    await d.settings.put({ ...st, key: 'main', homeHidden: next });
   });
 }

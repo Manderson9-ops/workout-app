@@ -29,6 +29,7 @@ async function removeRecent(w: Workout): Promise<'ok' | 'alt' | false | null> {
     await setHomeHidden(w.id, true); // 운동 기록은 그대로, 설정의 "뺀 목록"에만 더함
   } else if (pick === 'alt') {
     await mutate((d) => softDelete(d, 'workouts', w.id));
+    await setHomeHidden(w.id, false); // 뺀 목록에 남아 있었다면 정리 (보통은 없음)
   }
   return pick;
 }
@@ -113,7 +114,7 @@ export function Home({ s }: { s: AppState }) {
         );
       })}
       </div>
-      {done && <p role="status" class="small sub">{done}</p>}
+      <p role="status" class="small sub" style={{ minHeight: done ? undefined : 0, margin: done ? undefined : 0 }}>{done ?? ''}</p>
     </main>
   );
 }
