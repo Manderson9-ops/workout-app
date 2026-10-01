@@ -11,6 +11,7 @@ import { NumInput, mmss } from '../components';
 import { startRoutine } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import type { Routine } from '../../core/session';
+import { showOnHome } from '../../core/session';
 import { go } from '../nav';
 import { askConfirm } from '../confirm';
 
@@ -155,9 +156,9 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
 function SummaryRow({ x }: { x: WorkoutSummary }) {
   const diff = x.plannedSec ? x.durationSec - x.plannedSec : undefined;
   return (
-    <button class="list-item" aria-label={`${x.date} ${x.name}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
+    <button class="list-item" aria-label={`${x.date} ${x.name}${x.hiddenFromHome ? ' (홈에서 뻐)' : ''}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
       <div class="grow">
-        <div>{x.name} <span class="pill">{md(x.date)}</span></div>
+        <div>{x.name} <span class="pill">{md(x.date)}</span>{x.hiddenFromHome && <span class="pill">홈에서 뻐</span>}</div>
         <div class="pill">{mmss(x.durationSec)}{diff !== undefined && Math.abs(diff) >= 60 ? ` (예상보다 ${Math.round(Math.abs(diff) / 60)}분 ${diff > 0 ? '김' : '짧음'})` : ''} · 작업 세트 {x.workSets} · 볼륨 {x.volume.toLocaleString()}kg</div>
       </div>
       <span class="sub">›</span>
@@ -186,6 +187,12 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
       {w.editedAt && <p class="sub small">{new Date(w.editedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}에 고침</p>}
       {w.memo && <p>📝 {w.memo}</p>}
+      {w.hiddenFromHome && (
+        <div class="card row between" role="note" aria-label="홈에서 뻐 기록">
+          <span class="small">홈 "최근 운동"에서 뺀 기록이에요. 기록·통계에는 그대로예요.</span>
+          <button onClick={() => void mutate(async (d) => { const cur = await d.workouts.get(w.id); if (cur) await d.workouts.put(showOnHome(cur)); })}>홈에 다시 보이기</button>
+        </div>
+      )}
       {w.blocks.map((b, bi) => b.items.map((it, ii) => (
         <div class="card" key={`${bi}-${ii}`}>
           <div class="row between"><strong>{byId.get(it.exerciseId)?.name_ko ?? it.exerciseId}</strong>{it.skipped && <span class="pill">건너뜀</span>}</div>

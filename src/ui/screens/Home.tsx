@@ -2,7 +2,8 @@ import type { AppState } from '../store';
 import { mutate, activeOf, historyOf } from '../store';
 import { catalog } from '../catalog';
 import { startRoutine } from '../actions';
-import { emptyRoutine } from '../../core/session';
+import { emptyRoutine, homeRecent, hideFromHome } from '../../core/session';
+import type { Workout } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { BackupBanner } from './BackupSection';
 import { SendStatus } from './AutoSendSection';
@@ -10,14 +11,32 @@ import { RemoteCards } from './RemoteCards';
 import { newId, softDelete } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
-import { askConfirm } from '../confirm';
+import { askConfirm, askChoice } from '../confirm';
 import { syncEnabled } from '../sync';
+
+/**
+ * 홈 "최근 운동" 삭제 (D-040): 목록에서만 빼기(기록·통계 그대로, 기록 상세에서 되돌림) / 완전 삭제(되돌릴 수 없음).
+ * 안전한 쪽(목록에서만 빼기)이 첫 버튼·초점. 완전 삭제는 빨간 버튼. 닫기·Esc·취소는 아무것도 안 함
+ */
+async function removeRecent(w: Workout) {
+  const pick = await askChoice({
+    title: '이 운동을 어떻게 할까요?',
+    message: `"${w.name}"\n· 목록에서만 빼기: 홈에서만 안 보여요. 기록 탭·통계에는 남고, 기록 상세에서 되돌릴 수 있어요\n· 완전 삭제: 기록·통계에서도 지워져요. 되돌릴 수 없어요`,
+    ok: '목록에서만 빼기', alt: '완전 삭제', altDanger: true,
+  });
+  if (pick === 'ok') {
+    // 묻는 동안 동기화로 바뀌었을 수 있어 저장소의 지금 값에 표시만 더함 (없어졌으면 아무것도 안 함)
+    await mutate(async (d) => { const cur = await d.workouts.get(w.id); if (cur) await d.workouts.put(hideFromHome(cur)); });
+  } else if (pick === 'alt') {
+    await mutate((d) => softDelete(d, 'workouts', w.id));
+  }
+}
 
 export function Home({ s }: { s: AppState }) {
   const all = catalog(s.custom);
   const name = (id: string) => all.find((e) => e.id === id)?.name_ko ?? id;
   const active = activeOf(s);
-  const recent = historyOf(s).slice(0, 5);
+  const recent = homeRecent(historyOf(s), 5); // "목록에서만 빼기" 한 것은 건너뜀 (D-040)
   return (
     <main>
       <h1>운동 기록</h1>
@@ -85,7 +104,7 @@ export function Home({ s }: { s: AppState }) {
             </a>
             <div class="row" style={{ marginTop: '6px', justifyContent: 'flex-end' }}>
               <button aria-label={`최근 운동 ${w.name} 수정`} onClick={() => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`)}>수정</button>
-              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={async () => { if (await askConfirm({ title: '운동 기록을 지울까요?', message: `"${w.name}" · 되돌릴 수 없어요.`, ok: '지우기', danger: true })) await mutate((d) => softDelete(d, 'workouts', w.id)); }}>삭제</button>
+              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={() => void removeRecent(w)}>삭제</button>
             </div>
           </div>
         );

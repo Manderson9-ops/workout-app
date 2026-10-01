@@ -865,9 +865,45 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await page.getByRole('link', { name: '홈' }).click();
   const card2 = page.getByLabel('최근 운동 등 (고침)', { exact: true });
   await expect(card2).toContainText('작업 세트 2개 · 45분 · 고침');
-  await card2.getByRole('button', { name: '최근 운동 등 (고침) 삭제' }).click();
-  await answer(page, '지우기');
+  // 삭제 → 두 갈래 (D-040). 닫기·Esc는 아무것도 안 함, 처음 초점은 안전한 "목록에서만 빼기"
+  const del2 = card2.getByRole('button', { name: '최근 운동 등 (고침) 삭제' });
+  const sheet = page.locator('.sheet[aria-modal="true"]');
+  await del2.click();
+  await expect(sheet.getByRole('heading', { name: '이 운동을 어떻게 할까요?' })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: '목록에서만 빼기', exact: true })).toBeFocused();
+  await expect(sheet.getByRole('button', { name: '완전 삭제', exact: true })).toHaveClass(/danger-fill/);
+  await noHorizontalScroll(page);
+  await checkScreen(page, '34-recent-delete-choice');
+  await page.keyboard.press('Escape');
+  await expect(card2).toBeVisible();
+  // 1) 목록에서만 빼기 → 홈에서 사라짐, 기록 탭·통계에는 그대로("홈에서 뻐" 표시)
+  await del2.click();
+  await answer(page, '목록에서만 빼기');
   await expect(card2).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '최근 운동' })).toHaveCount(0);
+  await page.getByRole('link', { name: '기록' }).click();
+  const row = page.getByRole('button', { name: /등 \(고침\) \(홈에서 뻐\)$/ });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('홈에서 뻐');
+  await expect(page.getByText('아직 끝낸 운동이 없어요')).toHaveCount(0);
+  // 고쳐도 "홈에서 뻐"은 유지
+  await row.click();
+  await expect(page.getByLabel('홈에서 뻐 기록')).toBeVisible();
+  await page.getByRole('button', { name: '수정', exact: true }).click();
+  await page.getByLabel('운동 이름').fill('등 (고침)2');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '등 (고침)2' })).toBeVisible();
+  await expect(page.getByLabel('홈에서 뻐 기록')).toBeVisible();
+  // 2) 기록 상세에서 "홈에 다시 보이기" → 홈에 다시 나타남
+  await page.getByRole('button', { name: '홈에 다시 보이기' }).click();
+  await expect(page.getByLabel('홈에서 뻐 기록')).toHaveCount(0);
+  await page.getByRole('link', { name: '홈' }).click();
+  const card3 = page.getByLabel('최근 운동 등 (고침)2', { exact: true });
+  await expect(card3).toBeVisible();
+  // 3) 완전 삭제 → 기록 탭에서도 사라짐
+  await card3.getByRole('button', { name: /삭제$/ }).click();
+  await answer(page, '완전 삭제');
+  await expect(card3).toHaveCount(0);
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
 });

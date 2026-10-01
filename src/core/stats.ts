@@ -58,7 +58,7 @@ export function exerciseHistory(workouts: Workout[], exerciseId: string, ex: Exe
   return out;
 }
 
-export interface WorkoutSummary { id: string; name: string; date: string; durationSec: number; plannedSec?: number; workSets: number; volume: number; parts: Partial<Record<Part, number>> }
+export interface WorkoutSummary { id: string; name: string; date: string; durationSec: number; plannedSec?: number; workSets: number; volume: number; parts: Partial<Record<Part, number>>; /** 홈 최근 운동에서 뺀 기록 (D-040) */ hiddenFromHome?: boolean }
 
 export function summarize(w: Workout, byId: Map<string, Exercise>, bw: BodyweightEntry[] = []): WorkoutSummary {
   const date = localDate(w.startedAt);
@@ -75,7 +75,7 @@ export function summarize(w: Workout, byId: Map<string, Exercise>, bw: Bodyweigh
     }
   }
   const end = w.endedAt ?? w.startedAt;
-  return { id: w.id, name: w.name, date, durationSec: Math.max(0, Math.round((Date.parse(end) - Date.parse(w.startedAt)) / 1000)), ...(w.plannedSec ? { plannedSec: w.plannedSec } : {}), workSets: n, volume: Math.round(volume), parts };
+  return { id: w.id, name: w.name, date, durationSec: Math.max(0, Math.round((Date.parse(end) - Date.parse(w.startedAt)) / 1000)), ...(w.plannedSec ? { plannedSec: w.plannedSec } : {}), workSets: n, volume: Math.round(volume), parts, ...(w.hiddenFromHome ? { hiddenFromHome: true } : {}) };
 }
 
 /** 주의 시작(월요일) 날짜 */

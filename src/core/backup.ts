@@ -70,7 +70,7 @@ function setOk(s: unknown): boolean {
     && optIso(s.doneAt) && optBool(s.auto) && optStr(s.memo);
 }
 function workoutOk(w: unknown): boolean {
-  if (!isObj(w) || !str(w.id) || !str(w.name) || !isoDate(w.startedAt) || !optIso(w.endedAt) || !Array.isArray(w.blocks) || !optStr(w.memo) || !optNum(w.plannedSec) || !optStr(w.ownerDeviceId) || !optIso(w.ownerAt) || !optStr(w.pendingMerge) || !optNum(w.ownerSeq) || !optIso(w.editedAt)) return false;
+  if (!isObj(w) || !str(w.id) || !str(w.name) || !isoDate(w.startedAt) || !optIso(w.endedAt) || !Array.isArray(w.blocks) || !optStr(w.memo) || !optNum(w.plannedSec) || !optStr(w.ownerDeviceId) || !optIso(w.ownerAt) || !optStr(w.pendingMerge) || !optNum(w.ownerSeq) || !optIso(w.editedAt) || !optBool(w.hiddenFromHome)) return false;
   if (w.timer !== null && w.timer !== undefined && !(isObj(w.timer) && num(w.timer.startedAt) && num(w.timer.endsAt) && TIMER_KINDS.includes(w.timer.kind as string))) return false;
   return w.blocks.every((b) => isObj(b) && KINDS.includes(b.kind as string) && restOk(b) && Array.isArray(b.items)
     && b.items.every((i) => isObj(i) && str(i.exerciseId) && isObj(i.target) && num(i.target.sets) && num(i.target.reps) && optNum(i.target.seconds)

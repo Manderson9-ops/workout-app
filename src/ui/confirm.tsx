@@ -12,7 +12,7 @@ import { diag } from './diag';
 
 export interface ConfirmOpts { title: string; message?: string; ok: string; cancel?: string; danger?: boolean }
 /** 내부 요청: alt = 세 번째 선택지(askChoice), notice = 취소 없이 확인만(showNotice) */
-interface Req extends ConfirmOpts { alt?: string; notice?: boolean; resolve: (v: Answer) => void }
+interface Req extends ConfirmOpts { alt?: string; altDanger?: boolean; notice?: boolean; resolve: (v: Answer) => void }
 /** true = 확인, 'alt' = 두 번째 선택지, false = 취소·닫기·Esc, null = 다른 창이 대신함 */
 type Answer = boolean | 'alt' | null;
 
@@ -31,7 +31,7 @@ export function askConfirm(o: ConfirmOpts): Promise<boolean | null> {
  * 두 가지 중 고르기 + 취소 (예: "서버까지 바꾸기" / "이 기기만"). 'ok' | 'alt' | false(취소·닫기·Esc) | null(대신됨).
  * 기본 confirm의 [확인]/[취소]에 서로 다른 일을 맡기던 곳을 대신함: 닫기·Esc가 두 번째 일을 하지 않게.
  */
-export async function askChoice(o: ConfirmOpts & { alt: string }): Promise<'ok' | 'alt' | false | null> {
+export async function askChoice(o: ConfirmOpts & { alt: string; altDanger?: boolean }): Promise<'ok' | 'alt' | false | null> {
   const v = await open(o);
   return v === true ? 'ok' : v;
 }
@@ -102,7 +102,7 @@ export function ConfirmHost() {
         // 선택지가 셋이면 세로로 (폰에서 글자가 잘리지 않게). 취소는 맨 아래
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
           <button ref={okRef} class={`big ${req.danger ? 'danger-fill' : 'primary'}`} onClick={() => answer(true)}>{req.ok}</button>
-          <button class="big" onClick={() => answer('alt')}>{req.alt}</button>
+          <button class={`big ${req.altDanger ? 'danger-fill' : ''}`} onClick={() => answer('alt')}>{req.alt}</button>
           <button ref={cancelRef} class="big" onClick={() => answer(false)}>{req.cancel ?? '취소'}</button>
         </div>
       ) : (
