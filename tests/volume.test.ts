@@ -152,3 +152,30 @@ describe('짧을 때 원인이 사실과 맞음: 모든 부위 × 3수준 × 45~
     expect(tri.reasons.some((r) => r.includes('이두·가슴을 더하면'))).toBe(true);
   });
 });
+
+describe('짝 캐시는 실제로 고른 운동 기준 (D-041 검토 2차 필수 1)', () => {
+  it('재현: 등(낮음)+전완·악력(높음) 중급 120분, 어깨 초보 90분 컴파운드 → 검증 위반 0', () => {
+    const qs: PlanRequest[] = [
+      { parts: [{ part: '전완·악력', priority: 'high' }, { part: '등', priority: 'low' }], level: '중급', minGrade: 'B-', targetMinutes: 120, groupings: ['superset', 'compound'] },
+      { parts: [{ part: '어깨', priority: 'high' }], level: '초보', minGrade: 'B-', targetMinutes: 90, groupings: ['compound'] },
+      // 이전 키(운동 수)였을 때 '무거운 운동 묶음: 뉴트럴 그립 풀업+랙풀' (검토 2차 재현을 격자 탐색으로 고정)
+      { parts: [{ part: '전완·악력', priority: 'high' }, { part: '등', priority: 'high' }], level: '중급', minGrade: 'A-', targetMinutes: 60, groupings: ['compound'], groupingPreference: 'prefer' },
+      { parts: [{ part: '전완·악력', priority: 'low' }, { part: '등', priority: 'low' }], level: '상급', minGrade: 'A-', targetMinutes: 60, groupings: ['compound'], groupingPreference: 'prefer' },
+    ];
+    for (const q of qs) expect(validatePlan(generatePlan(q, real), q, real)).toEqual([]);
+  });
+  it('여러 부위 + 묶음 허용 + 모든 수준 전수 (2부위 28쌍·3부위 일부 × 3수준 × 60·120분): 검증 위반 0, 원인 "시간"뿐이면 12분 이하', () => {
+    const P: Part[] = ['가슴', '등', '어깨', '이두', '삼두', '전완·악력', '하체', '코어'];
+    const combos: Part[][] = [];
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) combos.push([P[i]!, P[j]!]);
+    for (let i = 0; i < P.length; i++) combos.push([P[i]!, P[(i + 3) % 8]!, P[(i + 5) % 8]!]);
+    const pr = ['high', 'low', 'normal'] as const;
+    for (const parts of combos) for (const level of LEVELS) for (const t of [60, 120]) {
+      const q: PlanRequest = { parts: parts.map((part, k) => ({ part, priority: pr[k]! })), level, minGrade: 'B-', targetMinutes: t, groupings: ['superset', 'compound'] };
+      const p = generatePlan(q, real);
+      const label = `${parts.join('+')} ${level} ${t}`;
+      expect(validatePlan(p, q, real), label).toEqual([]);
+      if (p.slack?.cause.every((c) => c === 'time')) expect(t * 60 - p.estimatedSec, label).toBeLessThanOrEqual(12 * 60);
+    }
+  });
+});

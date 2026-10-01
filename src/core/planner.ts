@@ -393,7 +393,8 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
       const removedEx = active.map((s, k) => Math.max(0, s.baseCount - counts[k]!));
       const removedSets = active.map((s, k) => chosen.filter((c) => c.part === s && c.entry.locked === undefined).slice(0, Math.min(s.baseCount, counts[k]!))
         .reduce((r) => r + Math.max(0, BASE_SETS - setsFor(s)), 0));
-      const ck = counts.join(',');
+      // 짝 캐시 키 = 실제로 고른 운동 (D-041: 상한 건너뛰기 때문에 같은 운동 수라도 세트 값에 따라 고른 운동이 다를 수 있음)
+      const ck = chosen.map((c) => c.part.order + ':' + c.poolIdx).join(',');
       let pairIdx = pairCache.get(ck);
       if (!pairIdx) {
         pairIdx = kinds.length ? makePairs(chosen, kinds, !!req.allowHeavyInGroups).map((pr) => [chosen.indexOf(pr.a), chosen.indexOf(pr.b), pr.kind] as [number, number, Grouping]) : [];

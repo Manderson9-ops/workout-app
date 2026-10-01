@@ -233,6 +233,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
               <strong>목표보다 약 {Math.floor((plan.targetSec - plan.estimatedSec) / 60)}분 짧아요</strong>
               <ul class="reasons">
                 {plan.slack.cause.includes('cap') && <li>{plan.slack.level === '초보' ? `초보 기준(앱 판단)으로 한 근육은 한 번에 ${plan.slack.cap}세트까지라 더 넣지 않았어요` : `연구(회차당 볼륨 메타 회귀)에서 한 근육을 한 번에 약 ${plan.slack.cap}세트보다 많이 해도 근성장 차이를 확인하기 어려웠다고 해서 더 넣지 않았어요`}</li>}
+                {plan.slack.level === '초보' && <li>초보는 운동당 최대 {plan.slack.maxSets}세트(앱 기준)라 세트도 더 늘리지 않았어요</li>}
                 {plan.slack.cause.includes('pool') && <li>고를 수 있는 후보 운동을 모두 썼어요. 최소 등급을 낮추거나 부위를 더하면 늘어나요</li>}
                 {plan.slack.cause.includes('time') && <li>운동이나 세트를 하나 더 넣으면 목표 시간을 넘어요</li>}
               </ul>
