@@ -206,7 +206,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
           </select></div>
         <div><label>수준</label><button class="chip on" style={{ width: '100%' }} onClick={() => go('#/settings')}>{s.settings.level} (설정에서 변경)</button></div>
       </div>
-      <p class="sub small" data-testid="level-rule">{s.settings.level}: 운동당 최대 {MAX_SETS_BY_LEVEL[s.settings.level]}세트 · 한 근육은 한 번에 {SESSION_CAP[s.settings.level]}세트까지 (보조로 쓰이면 0.5세트로 셈)</p>
+      <p class="sub small" data-testid="level-rule">{s.settings.level}: 운동당 최대 {MAX_SETS_BY_LEVEL[s.settings.level]}세트(앱 기준) · 한 근육은 한 번에 {SESSION_CAP[s.settings.level]}세트까지({s.settings.level === '초보' ? '앱 기준' : '연구 근거'}, 보조로 쓰이면 0.5세트로 셈)</p>
       <label>세트 방식 (시간이 부족하면 자동으로 묶음)</label>
       <div class="row wrap">
         {(['superset', 'compound'] as Grouping[]).map((g) => (
@@ -232,8 +232,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
             <div class="slack-note" role="status" aria-label="목표 시간보다 짧은 이유">
               <strong>목표보다 약 {Math.floor((plan.targetSec - plan.estimatedSec) / 60)}분 짧아요</strong>
               <ul class="reasons">
-                {plan.slack.cause.includes('cap') && <li>한 근육을 한 번에 {SESSION_CAP[s.settings.level]}세트보다 많이 해도 근성장 이득을 확인하기 어려워 더 넣지 않았어요{s.settings.level === '초보' ? ' (초보 8세트는 앱 기준)' : ''}</li>}
-                {plan.slack.cause.includes('pool') && <li>조건(최소 등급·장비·제외)에 맞는 운동을 모두 썼어요. 최소 등급을 낮추면 늘어나요</li>}
+                {plan.slack.cause.includes('cap') && <li>{plan.slack.level === '초보' ? `초보 기준(앱 판단)으로 한 근육은 한 번에 ${plan.slack.cap}세트까지라 더 넣지 않았어요` : `연구(회차당 볼륨 메타 회귀)에서 한 근육을 한 번에 약 ${plan.slack.cap}세트보다 많이 해도 근성장 차이를 확인하기 어려웠다고 해서 더 넣지 않았어요`}</li>}
+                {plan.slack.cause.includes('pool') && <li>고를 수 있는 후보 운동을 모두 썼어요. 최소 등급을 낮추거나 부위를 더하면 늘어나요</li>}
                 {plan.slack.cause.includes('time') && <li>운동이나 세트를 하나 더 넣으면 목표 시간을 넘어요</li>}
               </ul>
               {plan.slack.suggest.length > 0 && <div class="row wrap">{plan.slack.suggest.map((p) => <button key={p} class="chip" onClick={() => addPartAndGenerate(p)}>+ {p} 더해서 다시 만들기</button>)}</div>}

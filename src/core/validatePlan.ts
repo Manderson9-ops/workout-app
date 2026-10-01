@@ -8,7 +8,7 @@ import { gradeAtLeast, GRADES } from './version';
 import { isHeavyHinge, equipmentAvailable, eligibleParts, resolveGrade } from './exercises';
 import type { Plan, PlanRequest } from './planner';
 import { MUSCLE_CAP } from './planner';
-import { sessionLoad, overCap, SESSION_CAP, MAX_SETS_BY_LEVEL } from './volume';
+import { sessionLoad, overCap, groupOf, SESSION_CAP, MAX_SETS_BY_LEVEL } from './volume';
 
 export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[]): string[] {
   const errs: string[] = [];
@@ -118,7 +118,9 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
       if (sameVideoGrade) continue;
       // D-041: 추천 순서에 없는 추정 등급끼리는 근육 그룹 분산 때문에 순서가 바뀔 수 있음
       const noStaple = (i: (typeof items)[number]) => byId.get(i.exerciseId)!.staple?.[part] === undefined;
-      if (x.grade === y.grade && x.estimated && y.estimated && noStaple(x) && noStaple(y)) continue;
+      // 면제는 생성 규칙과 같은 범위만: 뒤로 밀린 쪽(x)과 앞으로 온 쪽(y)의 주 근육 그룹이 다를 때
+      const g0 = (i: (typeof items)[number]) => groupOf(byId.get(i.exerciseId)!.muscles[0] ?? i.part);
+      if (x.grade === y.grade && x.estimated && y.estimated && noStaple(x) && noStaple(y) && g0(x) !== g0(y)) continue;
       const kx = rankKey(x), ky = rankKey(y);
       const c0 = cmpKey(kx, ky) || (x.name < y.name ? -1 : x.name > y.name ? 1 : 0);
       if (c0 < 0 && x.rank > y.rank) errs.push(`순위가 생성 규칙과 다름: ${part} ${x.name} / ${y.name}`);

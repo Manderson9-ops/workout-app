@@ -25,6 +25,8 @@ export const MUSCLE_GROUP: Record<string, string> = {
   비복근: '종아리', 가자미근: '종아리',
   복직근: '복근', '복직근 하부': '복근', 복횡근: '복근', 복사근: '복근', 코어: '복근',
   '고관절 굴곡근': '고관절 굴곡근',
+  // 직접 추가한 운동은 근육 칸에 부위 이름이 들어감. 한 근육으로 분명한 부위만 맞춤 (어깨·하체는 여러 근육이라 부위 이름 그대로)
+  등: '광배근', 가슴: '가슴', '전완·악력': '전완·악력',
 };
 
 /** 표에 없는 이름(직접 추가한 운동의 부위 이름 등)은 그 이름 그대로 한 그룹 */
@@ -71,6 +73,22 @@ export function overCap(load: Map<string, number>, cap: number, lockedLoad?: Map
   const out: string[] = [];
   for (const [g, v] of load) if (v > Math.max(cap, lockedLoad?.get(g) ?? 0) + 1e-9) out.push(g);
   return out;
+}
+
+/** 이 운동을 sets세트 더하면 상한을 넘는지 (load는 바꾸지 않음) */
+export function exceedsWith(load: ReadonlyMap<string, number>, muscles: readonly string[], sets: number, cap: number, lockedLoad?: ReadonlyMap<string, number>): boolean {
+  for (const [g, v] of sharesRO(muscles)) if ((load.get(g) ?? 0) + v * sets > Math.max(cap, lockedLoad?.get(g) ?? 0) + 1e-9) return true;
+  return false;
+}
+/** load에 더함 (제자리) */
+export function addLoad(load: Map<string, number>, muscles: readonly string[], sets: number): void {
+  for (const [g, v] of sharesRO(muscles)) load.set(g, (load.get(g) ?? 0) + v * sets);
+}
+
+/** 받침에 맞는 목적격 조사 (을/를) */
+export function objParticle(word: string): string {
+  const c = word.charCodeAt(word.length - 1);
+  return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0 ? '을' : '를';
 }
 
 /** 표시용: 0.5 단위 숫자 */

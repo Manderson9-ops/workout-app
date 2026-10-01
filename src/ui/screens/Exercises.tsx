@@ -21,7 +21,9 @@ import { groupOf } from '../../core/volume';
 
 /** D-041: 주 근육·보조 근육 표시 (플랜은 주 1세트, 보조 0.5세트로 셈) */
 export const muscleText = (muscles: readonly string[]) =>
-  muscles.length ? `주 ${muscles[0]}${muscles.length > 1 ? ` · 보조 ${muscles.slice(1).join(', ')}` : ''}` : '';
+  muscles.length ? `주 ${label(muscles[0]!)}${muscles.length > 1 ? ` · 보조 ${muscles.slice(1).map(label).join(', ')}` : ''}` : '';
+/** 근육 이름이 그룹 이름과 다르면 그룹을 괄호로 (필터의 그룹 이름과 맞춰 보이게: 비복근(종아리)) */
+const label = (m: string) => (groupOf(m) !== m ? `${m}(${groupOf(m)})` : m);
 
 const KEY = 'exerciseFilter.v1';
 
@@ -138,7 +140,7 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
       <button class="ghost" onClick={() => history.back()} aria-label="뒤로">← 뒤로</button>
       <div class="row"><GradeBadge g={g} /><h1 class="grow" style={{ margin: '4px 0' }}>{e.name_ko}</h1></div>
       <p class="sub">{e.part} · {e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.unilateral ? ' · 한쪽씩' : ''}{e.heavy ? ' · 무거운 운동' : ''}</p>
-      <p class="sub small">주 근육: {e.muscles.join(', ')} · 묶음: {families[e.family] ?? '직접 추가'}{e.aliases?.length ? ` · 다른 이름: ${e.aliases.join(', ')}` : ''}</p>
+      <p class="sub small">{muscleText(e.muscles)} · 묶음: {families[e.family] ?? '직접 추가'}{e.aliases?.length ? ` · 다른 이름: ${e.aliases.join(', ')}` : ''}</p>
       {e.note && <p class="sub small">메모: {e.note}</p>}
       <div class="row wrap" style={{ marginTop: '8px' }}>
         <button class={`chip ${m?.favorite ? 'on' : ''}`} aria-pressed={!!m?.favorite} onClick={() => setMeta(e.id, { favorite: !m?.favorite })}>{m?.favorite ? '★ 즐겨찾기' : '☆ 즐겨찾기'}</button>

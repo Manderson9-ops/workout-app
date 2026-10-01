@@ -262,7 +262,7 @@ test('운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링�
 
 test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 → 짧은 이유·삼두 더해서 다시 만들기, 종목 탭 주/보조 근육·근육 필터', async ({ page }) => {
   await page.getByRole('link', { name: '플랜' }).click();
-  await expect(page.getByTestId('level-rule')).toHaveText('중급: 운동당 최대 4세트 · 한 근육은 한 번에 11세트까지 (보조로 쓰이면 0.5세트로 셈)');
+  await expect(page.getByTestId('level-rule')).toHaveText('중급: 운동당 최대 4세트(앱 기준) · 한 근육은 한 번에 11세트까지(연구 근거, 보조로 쓰이면 0.5세트로 셈)');
   await page.getByRole('button', { name: '하체 선택 안 함' }).click();
   await page.getByRole('button', { name: '75분' }).click();
   await page.getByLabel('최소 등급').selectOption('B-');
@@ -278,7 +278,7 @@ test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 →
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const note = page.getByRole('status', { name: '목표 시간보다 짧은 이유' });
   await expect(note).toContainText(/목표보다 약 \d+분 짧아요/);
-  await expect(note).toContainText('한 근육을 한 번에 11세트보다');
+  await expect(note).toContainText('한 근육을 한 번에 약 11세트보다 많이 해도 근성장 차이를 확인하기 어려웠다');
   await checkScreen(page, '42-plan-chest-slack');
   const before = (await page.getByText(/^예상 \d+:\d\d \/ 75분$/).textContent())!;
   await note.getByRole('button', { name: '+ 삼두 더해서 다시 만들기' }).click();

@@ -10,7 +10,7 @@ import { eligibleParts, resolveGrade, equipmentAvailable, isHeavyHinge } from '.
 import type { ResolvedGrade } from './exercises';
 import { DEFAULT_TIME, targetReps, setTime, blockTime, warmupFor } from './time';
 import type { TimeParams, TimedBlock, TimedItem, Warmup } from './time';
-import { groupOf, sessionLoad, overCap, fmtSets, SESSION_CAP, MAX_SETS_BY_LEVEL } from './volume';
+import { groupOf, sessionLoad, overCap, fmtSets, exceedsWith, addLoad, objParticle, SESSION_CAP, MAX_SETS_BY_LEVEL } from './volume';
 
 /** M-27: 부위별 같은 주 근육(muscles[0]) 운동 상한 */
 export const MUSCLE_CAP: Partial<Record<Part, Record<string, number>>> = { 하체: { 대퇴사두: 2 } };
@@ -69,7 +69,7 @@ export interface Plan {
   missingParts: Part[];
   candidateCount: number;
   /** 목표보다 5분 넘게 짧을 때: 원인과 더하면 채울 수 있는 부위 제안 (D-041) */
-  slack?: { cause: SlackCause[]; suggest: Part[] };
+  slack?: { cause: SlackCause[]; suggest: Part[]; level: Level; cap: number; maxSets: number };
 }
 export type SlackCause = 'cap' | 'pool' | 'time';
 
@@ -85,7 +85,7 @@ const ANTAGONISTS: [Part, Part][] = [['가슴', '등'], ['이두', '삼두']];
 const STATION_EQUIP: Equipment[] = ['cable', 'dumbbell', 'band'];
 
 interface PoolEntry { ex: BuiltExercise; grade: ResolvedGrade; substituted: boolean; locked?: number }
-interface PartState { part: Part; priority: Priority; order: number; pool: PoolEntry[]; baseCount: number; lockedCount: number }
+interface PartState { part: Part; priority: Priority; order: number; pool: PoolEntry[]; baseCount: number; lockedCount: number; /** 풀 크기 한도 때문에 못 넣은 후보가 있음 */ more: boolean }
 interface Chosen { entry: PoolEntry; part: PartState; poolIdx: number; sets: number; reps: number }
 interface Pair { a: Chosen; b: Chosen; kind: Grouping }
 
@@ -196,7 +196,8 @@ function buildPools(req: PlanRequest, all: BuiltExercise[], reasons: string[]): 
       take(remaining.splice(idx, 1)[0]!, substituted);
     }
     if (capped) reasons.push(`${p.part}: ${Object.entries(cap).map(([m, n]) => `${m} 운동은 ${n}개까지`).join(', ')} (M-27)`);
-    states.push({ part: p.part, priority: p.priority, order: p.order, pool, baseCount: Math.max(lockedCount, Math.min(base, pool.length)), lockedCount });
+    const more = pool.length >= limit && remaining.some((c) => fits(c.ex));
+    states.push({ part: p.part, priority: p.priority, order: p.order, pool, baseCount: Math.max(lockedCount, Math.min(base, pool.length)), lockedCount, more });
   }
   return states;
 }
@@ -369,15 +370,19 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
       const fams = new Set<string>(lockedAll.map((e) => e.ex.family));
       let heavyTaken = lockedAll.some((e) => isHeavyHinge(e.ex));
       for (const e of lockedAll) ids.add(e.ex.id);
+      // D-041: 근육 그룹별 상한을 넘기는 후보는 건너뛰고 다음 후보로 (앞 순번 하나 때문에 조합 전체가 버려지지 않게)
+      const running = new Map(lockedLoad);
       active.forEach((s, k) => {
         let taken = 0;
         for (let i = 0; i < s.pool.length && taken < counts[k]!; i++) {
           const e = s.pool[i]!;
+          const sets = e.locked ?? setsFor(s);
           if (e.locked === undefined) {
             if (ids.has(e.ex.id) || fams.has(e.ex.family) || (isHeavyHinge(e.ex) && heavyTaken)) continue;
+            if (exceedsWith(running, e.ex.muscles, sets, cap, lockedLoad)) continue;
             ids.add(e.ex.id); fams.add(e.ex.family); if (isHeavyHinge(e.ex)) heavyTaken = true;
+            addLoad(running, e.ex.muscles, sets);
           }
-          const sets = e.locked ?? setsFor(s);
           taken++;
           chosen.push({ entry: e, part: s, poolIdx: i, sets, reps: targetReps(e.ex) });
         }
@@ -444,17 +449,23 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
   if (targetSec !== undefined && !cut(best)) {
     const paired = new Set(best.pairs.flatMap((pr) => [pr.a, pr.b]));
     const order = best.chosen.filter((c) => c.entry.locked === undefined && !paired.has(c)).sort((x, y) => lexCmp(chosenKey(x), chosenKey(y)));
+    const dtOf = (c: Chosen) => st(c) + (isComp(c) ? p.restCompound : p.restIsolation);
+    const canGrow = (c: Chosen) => {
+      if (c.sets >= maxSets || best!.time + dtOf(c) > targetSec) return false;
+      c.sets++; const bad = overCap(loadOf(best!.chosen), cap, lockedLoad).length > 0; c.sets--;
+      return !bad;
+    };
+    const prIdx = (c: Chosen) => PRIORITY_ORDER.indexOf(c.part.priority);
     let grew = true;
     while (grew) {
       grew = false;
       for (const c of order) {
-        if (c.sets >= maxSets) continue;
-        const dt = st(c) + (isComp(c) ? p.restCompound : p.restIsolation);
-        if (best.time + dt > targetSec) continue;
-        c.sets++;
-        if (overCap(loadOf(best.chosen), cap, lockedLoad).length) { c.sets--; continue; }
-        if (!fillFrom.has(c)) fillFrom.set(c, c.sets - 1);
-        best.time += dt; grew = true;
+        if (!canGrow(c)) continue;
+        // 우선순위를 뒤집지 않음: 더 높은 부위 운동이 아직 늘 수 있는데 세트가 더 적으면 낮은 부위는 기다림
+        if (order.some((h) => prIdx(h) < prIdx(c) && h.sets < c.sets + 1 && canGrow(h))) continue;
+        const dt = dtOf(c);
+        if (!fillFrom.has(c)) fillFrom.set(c, c.sets);
+        c.sets++; best.time += dt; grew = true;
       }
     }
   }
@@ -522,7 +533,7 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
       }
       if (!addFits && !plusFits) {
         if (blockedBy.size) { causes.add('cap'); parts.push(`${capText} 때문에 더 늘리지 않음(더하면 넘음): ${loadText(blockedBy)}`); }
-        else { causes.add('pool'); parts.push(`더 넣을 후보 운동이 없음 (조건에 맞는 ${s.pool.length}개를 모두 씀${free.length && free.every((f) => f.sets >= maxSets) ? `, 운동당 최대 ${maxSets}세트(${req.level})` : ''})`); }
+        else { causes.add('pool'); parts.push(`더 넣을 후보 운동이 없음 (${s.more ? `후보 한도 ${s.pool.length}개` : `조건에 맞는 ${s.pool.length}개`}를 모두 씀${free.length && free.every((f) => f.sets >= maxSets) ? `, 운동당 최대 ${maxSets}세트(${req.level})` : ''})`); }
       } else causes.add('time');
     }
     if (s.lockedCount) parts.push(`잠금 ${s.lockedCount}개`);
@@ -538,11 +549,11 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
   let slackInfo: Plan['slack'];
   if (targetSec !== undefined && win(best)) {
     const cs = (['cap', 'pool', 'time'] as SlackCause[]).filter((c) => causes.has(c));
-    const why = cs.map((c) => c === 'cap' ? '근육별 한 번 상한에 닿음' : c === 'pool' ? '더 넣을 후보 운동이 없음(등급·장비·제외 조건)' : '하나 더 넣으면 목표를 넘음');
+    const why = cs.map((c) => c === 'cap' ? '근육별 한 번 상한에 닿음' : c === 'pool' ? '더 넣을 후보 운동이 없음' : '하나 더 넣으면 목표를 넘음');
     const chosenParts = new Set(req.parts.map((x) => x.part));
     const suggest = cs.some((c) => c !== 'time') ? [...new Set(sortedParts(req).flatMap((x) => COMPLEMENT[x.part]))].filter((x) => !chosenParts.has(x)).slice(0, 2) : [];
-    reasons.push(`목표보다 약 ${Math.floor((targetSec - best.time) / 60)}분 여유: ${why.join(' · ') || '하나 더 넣으면 목표를 넘음'}${suggest.length ? ` → ${suggest.join('·')}를 더하면 채울 수 있음` : ''}`);
-    slackInfo = { cause: cs.length ? cs : ['time'], suggest };
+    reasons.push(`목표보다 약 ${Math.floor((targetSec - best.time) / 60)}분 여유: ${why.join(' · ') || '하나 더 넣으면 목표를 넘음'}${suggest.length ? ` → ${suggest.join('·')}${objParticle(suggest[suggest.length - 1]!)} 더하면 채울 수 있음` : ''}`);
+    slackInfo = { cause: cs.length ? cs : ['time'], suggest, level: req.level, cap, maxSets };
   }
   const est = best.chosen.filter((c) => c.entry.grade.estimated).length;
   if (est) reasons.push(`추정 등급 운동 ${est}개 포함: 영상 근거가 없어 B로 보고 앱 추천 순서로 고름 (M-09, M-14)`);
