@@ -5,13 +5,14 @@ import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
   currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, setWorkoutMemo, addSet, removeSet, skipItem, replaceItem, appendExercise, moveWorkoutBlock,
-  adjustTimer, clearTimer, timerRemaining, progress, finishWorkout, restAfter, lastSets,
+  adjustTimer, clearTimer, timerRemaining, progress, restAfter, lastSets,
 } from '../../core/session';
 import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, mmss } from '../components';
 import { resolveGrade } from '../../core/exercises';
 import { hasDbInfo } from '../../core/planEdit';
-import { updateWorkoutAfterInputs } from '../actions';
+import { updateWorkoutAfterInputs, finishActiveWorkout } from '../actions';
+import { askConfirm } from '../confirm';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
 import { softDelete } from '../../db/db';
@@ -46,6 +47,19 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   }, []);
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
+  /** 운동 끝내기가 안 됐을 때 이유 (D-038). 타이머 자리(화면 아래 고정)에 보여 어느 위치에서 눌러도 보임 */
+  const [finishErr, setFinishErr] = useState<string | null>(null);
+  const finishing = useRef(false);
+  /** 확인 뒤 끝내기. 두 번 눌러도 한 번만 */
+  const doFinish = async (id: string) => {
+    if (finishing.current) return;
+    finishing.current = true;
+    try {
+      setFinishErr(null);
+      const r = await finishActiveWorkout(id);
+      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); } else setFinishErr(r.message);
+    } finally { finishing.current = false; }
+  };
   // 블록 끌어서 순서 바꾸기 (D-037). 펼친 카드는 옮긴 자리를 따라감
   // 이동은 하나씩 차례로 (빠르게 ↓↓ 눌러도 순서가 뒤바뀌지 않게), 펼친 카드는 저장된 뒤에 따라감 (깜빡임 방지)
   const moveQ = useRef<Promise<void>>(Promise.resolve());
@@ -84,6 +98,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       <main>
         <h1>운동</h1>
         {remoteActiveOf(s) && <p role="status" class="card small">📱 운동 「{remoteActiveOf(s)!.name}」은 다른 기기에서 진행 중이에요 (다른 기기로 넘어갔어요). 홈에서 볼 수 있어요.</p>}
+        {finishErr && <p role="alert" class="finish-err">⚠️ {finishErr}</p>}
         <div class="empty"><p>진행 중인 운동이 없어요.</p><p class="small">홈에서 루틴을 시작하거나 플랜을 만들어 보세요.</p></div>
         <button class="primary big" onClick={() => go('#/')}>루틴 고르기</button>
       </main>
@@ -141,10 +156,12 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     );
   };
 
+  // 브라우저 기본 confirm()은 조용히 취소될 수 있어 앱 안 확인 창을 씀 (D-038)
   const finish = async () => {
     const left = prog.totalSets - prog.doneSets;
-    if (!confirm(left ? `아직 ${left}세트 남았어요. 운동을 끝낼까요?` : '운동을 끝낼까요?')) return;
-    await updateWorkoutAfterInputs(w.id, (cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); void syncNow('finish');
+    const id = w.id;
+    if (!(await askConfirm({ title: '운동을 끝낼까요?', message: left ? `아직 ${left}세트 남았어요.` : undefined, ok: '끝내기', danger: true }))) return;
+    await doFinish(id);
   };
   const delta = prog.deltaSec;
 
@@ -209,6 +226,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
 
       {/* 휴식 타이머 / 다음 세트 */}
       <div class={`timer ${w.timer && rem === 0 ? 'end flash' : ''}`} role="timer" aria-live="polite">
+        {finishErr && <p role="alert" class="finish-err">⚠️ {finishErr}</p>}
         {w.timer && (rem > 0 || ended) ? (
           <div class="row between">
             <div>
@@ -228,7 +246,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             {nextRest ? <span class="small" style={{ fontWeight: 500 }}> → 휴식 {nextRest.sec}초</span> : null}
           </button>
         ) : (
-          <button class="primary big" onClick={async () => { await upd((cw) => finishWorkout(cw, new Date().toISOString())); go('#/'); void sendNow('workout'); void syncNow('finish'); }}>모든 세트 완료 · 운동 끝내기</button>
+          <button class="primary big" onClick={() => void doFinish(w.id)}>모든 세트 완료 · 운동 끝내기</button>
         )}
       </div>
 

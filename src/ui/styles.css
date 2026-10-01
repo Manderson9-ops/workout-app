@@ -26,6 +26,8 @@ button:disabled { opacity: .45; }
 button.primary, .btn.primary { background: var(--acc); border-color: var(--acc); color: #fff; }
 button.ok { background: var(--ok); border-color: var(--ok); color: #06210f; }
 button.danger { color: var(--bad); }
+button.danger-fill { background: var(--bad); border-color: var(--bad); color: #fff; }
+.finish-err { background: #3b0d0d; border: 1px solid var(--bad); color: #fecaca; border-radius: 12px; padding: 10px 12px; margin: 0 0 8px; font-size: 15px; }
 button.ghost { background: transparent; }
 button.big { min-height: 56px; font-size: 18px; width: 100%; }
 button.chip { min-height: 44px; border-radius: 22px; padding: 0 14px; font-weight: 500; }
