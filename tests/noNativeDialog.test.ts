@@ -11,10 +11,17 @@ import { askChoice, showNotice } from '../src/ui/confirm';
 import { db } from '../src/ui/store';
 import { flushDiag } from '../src/ui/diag';
 
-/** 주석을 뺀 코드에서 기본 창 호출을 찾음 (obj.confirm(...) 같은 메서드는 제외) */
+/**
+ * 기본 창을 쓰는 곳을 찾음. 주석·문자열을 먼저 지운 뒤 이름 자체를 찾음 (부르기·담기·넘기기 모두).
+ * 제외: 다른 객체의 같은 이름 메서드(x.confirm), 객체 키(confirm:), 더 긴 이름(askConfirm, confirmed).
+ * 대괄호로 부르기(window['alert'])는 문자열을 지우기 전에 따로 찾음.
+ */
 export function nativeDialogCalls(src: string): string[] {
-  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
-  return [...code.matchAll(/(?<![\w.$])(?:window\.|globalThis\.|self\.)?(confirm|alert|prompt)\s*\(/g)].map((m) => m[0]);
+  const bracket = [...src.matchAll(/(?:window|globalThis|self)\s*(?:\?\.)?\[\s*['"`](confirm|alert|prompt)['"`]\s*\]/g)].map((m) => m[0]);
+  const code = src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g, ' ');
+  const named = [...code.matchAll(/(?:(?:window|globalThis|self)\s*\??\.\s*)?(?<![\w$.])\b(confirm|alert|prompt)\b(?!\s*:)/g)].map((m) => m[0]);
+  const global = [...code.matchAll(/(?:window|globalThis|self)\s*\??\.\s*(confirm|alert|prompt)\b/g)].map((m) => m[0]);
+  return [...bracket, ...named, ...global];
 }
 
 const files = (d: string): string[] => readdirSync(d).flatMap((f) => {
@@ -24,8 +31,9 @@ const files = (d: string): string[] => readdirSync(d).flatMap((f) => {
 
 describe('기본 확인·알림 창 0개 (D-039)', () => {
   it('찾는 규칙이 실제로 잡음 (음성 대조)', () => {
-    expect(nativeDialogCalls(`if (confirm('x')) a(); window.alert('y'); globalThis.prompt('z')`)).toHaveLength(3);
-    expect(nativeDialogCalls(`askConfirm({}); x.confirm(1); // confirm('주석')\n/* alert('주석') */ const s = 'confirm 글자';`)).toHaveLength(0);
+    for (const bad of [`if (confirm('x')) a();`, `window.alert('y');`, `globalThis.prompt('z')`, `window?.confirm('a')`, `window['alert']('b')`, `const c = window.confirm; c('x')`, `const u = 'a//b'; confirm('c')`, `[1].forEach(alert)`])
+      expect(nativeDialogCalls(bad), bad).not.toHaveLength(0);
+    expect(nativeDialogCalls(`askConfirm({}); x.confirm(1); const confirmed = 1; // confirm('주석')\n/* alert('주석') */ const s = 'confirm 글자'; const o = { alert: 1 }; <p role="alert">x</p>`)).toEqual([]);
   });
   it('src 전체에 기본 창 호출이 없음', () => {
     const found = files('src').flatMap((f) => nativeDialogCalls(readFileSync(f, 'utf8')).map((c) => `${f}: ${c}`));

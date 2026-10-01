@@ -907,31 +907,15 @@ test('수정 화면: 취소하면 기록 그대로', async ({ page }) => {
 
 void makeRoutine;
 
-test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기면 그대로, 지우기만 지움 / 세 갈래 선택에서 닫으면 아무것도 안 바꿈', async ({ page }) => {
+test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동이면 그대로 / 동기화 중 초기화·불러오기 두 갈래: 닫으면 아무것도 안 바꿈, "이 기기만"은 동기화 끄고 진행', async ({ page }) => {
+  await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
   await makeRoutine(page, ['등'], '30분');
   const del = page.getByRole('button', { name: '등 30분 삭제', exact: true });
   const card = page.getByRole('heading', { name: '등 30분', exact: true });
   const sheet = page.locator('.sheet[aria-modal="true"]');
-  // 동기화가 켜진 채 "모든 데이터 지우기": 세 갈래 선택에서 Esc → 지우지 않음 (예전 기본 창은 [취소]가 "동기화 끄고 비우기"였음)
-  await page.evaluate(() => localStorage.setItem('sync.on', '1'));
-  await page.getByRole('link', { name: '설정' }).click();
-  await page.getByText('모든 데이터 지우기 (초기화)').click();
-  await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
-  await answer(page, '지우기');
-  await answer(page, '계속 지우기');
-  await expect(sheet.getByRole('heading', { name: '동기화가 켜져 있어요' })).toBeVisible();
-  for (const b of ['비우고 서버에서 다시 받기', '비우고 동기화 끄기', '취소']) await expect(sheet.getByRole('button', { name: b, exact: true })).toBeVisible();
-  await noHorizontalScroll(page);
-  await checkScreen(page, '32-in-app-choice');
-  await page.keyboard.press('Escape');
-  await expect(sheet).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem('sync.on'))).toBe('1'); // 동기화도 그대로
-  await expect(page.getByText(/지웠어요|다시 받았어요/)).toHaveCount(0);
-  await page.evaluate(() => localStorage.setItem('sync.on', '0'));
-  await page.getByRole('link', { name: '홈' }).click();
-  await expect(card).toBeVisible(); // 루틴이 남아 있음
+  const syncOn = () => page.evaluate(() => localStorage.getItem('sync.on'));
 
-  // 취소 (위험한 확인은 취소에 초점: Enter 한 번으로 지워지지 않게)
+  // 1) 삭제 확인: 취소(위험한 확인은 취소에 초점, Enter 한 번으로 안 지워짐)·Esc·✕·화면 이동은 그대로
   await del.click();
   await expect(sheet.getByRole('heading', { name: '루틴을 지울까요?' })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '취소', exact: true })).toBeFocused();
@@ -940,20 +924,136 @@ test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기면 그대로, �
   await expect(card).toBeVisible();
   // 연 버튼으로 초점이 돌아옴 (WebKit은 버튼을 눌러도 초점을 주지 않아 Chromium에서만 봄)
   if (test.info().project.name.includes('chromium')) await expect(del).toBeFocused();
-  // Esc
   await del.click(); await expect(sheet).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   await expect(card).toBeVisible();
-  // ✕ 닫기
   await del.click();
   await checkScreen(page, '31-in-app-confirm-home');
   await sheet.getByRole('button', { name: '닫기' }).click();
   await expect(card).toBeVisible();
-  // 지우기
+  // 창이 열린 채 뒤로 가기(스와이프) → 창이 닫히고 지우지 않음 (떠난 화면의 일을 나중에 하지 않게)
+  await page.getByRole('link', { name: '기록' }).click();
+  await page.getByRole('link', { name: '홈' }).click();
+  await del.click(); await expect(sheet).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/stats/);
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(card).toBeVisible();
+
+  // 백업 파일 하나 만들어 둠
+  await page.getByRole('link', { name: '설정' }).click();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
+  const file = await dl.path();
+  const restoreWith = async () => { await page.getByLabel('백업 파일 고르기').setInputFiles(file); await answer(page, '바꾸기'); };
+
+  // 2) 동기화 켜진 채 초기화: 세 갈래 선택에서 Esc → 지우지 않음 (예전 기본 창은 [취소]가 "동기화 끄고 비우기"였음)
+  await page.evaluate(() => localStorage.setItem('sync.on', '1'));
+  const resetTo = async (pick: string | null) => {
+    await page.getByRole('link', { name: '설정' }).click();
+    const summary = page.getByText('모든 데이터 지우기 (초기화)');
+    if (!(await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).isVisible())) await summary.click();
+    await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
+    await answer(page, '지우기');
+    await answer(page, '계속 지우기');
+    await expect(sheet.getByRole('heading', { name: '동기화가 켜져 있어요' })).toBeVisible();
+    if (pick) await answer(page, pick); else await page.keyboard.press('Escape');
+  };
+  await resetTo(null);
+  for (const b of ['비우고 서버에서 다시 받기', '비우고 동기화 끄기', '취소']) await expect(page.getByRole('button', { name: b, exact: true })).toHaveCount(0);
+  expect(await syncOn()).toBe('1');
+  await expect(page.getByText(/지웠어요|다시 받았어요/)).toHaveCount(0);
+
+  // 3) 동기화 켜진 채 불러오기: 세 갈래 선택에서 Esc → 아무것도 안 바꿈 / "이 기기만" → 동기화 끄고 불러옴
+  await page.getByLabel('백업 파일 고르기').setInputFiles(file);
+  await answer(page, '바꾸기');
+  await expect(sheet.getByRole('heading', { name: '동기화가 켜져 있어요' })).toBeVisible();
+  for (const b of ['서버·다른 기기까지', '이 기기만 (동기화 끄기)', '취소']) await expect(sheet.getByRole('button', { name: b, exact: true })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: '취소', exact: true })).toBeFocused();
+  await noHorizontalScroll(page);
+  await checkScreen(page, '32-in-app-choice');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByText('백업을 불러왔어요')).toHaveCount(0);
+  expect(await syncOn()).toBe('1');
+  await restoreWith();
+  await answer(page, '이 기기만 (동기화 끄기)');
+  await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
+  expect(await syncOn()).toBe('0');
+
+  // 4) 동기화 켜진 채 초기화 "비우고 동기화 끄기" → 비우고 동기화 꺼짐
+  await page.evaluate(() => localStorage.setItem('sync.on', '1'));
+  await resetTo('비우고 동기화 끄기');
+  await expect(page.getByText('모든 데이터를 지웠어요')).toBeVisible();
+  expect(await syncOn()).toBe('0');
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(card).toHaveCount(0);
+
+  // 5) 동기화 꺼진 채 불러오기(확인 한 번) → 루틴이 돌아옴 → 삭제 확인에서 "지우기"만 지움
+  await page.getByRole('link', { name: '설정' }).click();
+  await restoreWith();
+  await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(card).toBeVisible();
   await del.click();
   await answer(page, '지우기');
   await expect(card).toHaveCount(0);
+});
+
+test('기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바뀌면 묻고, 묻는 동안 또 바뀌면 다시 물음 / 지워졌으면 되살려 저장', async ({ page }) => {
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await endWorkout(page);
+  await expect(page).toHaveURL(/#\/$/);
+  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
+  const id = decodeURIComponent((await card.getByRole('link').first().getAttribute('href'))!.split('/').pop()!);
+  // 다른 기기 흉내: 앱을 거치지 않고 저장소의 기록을 직접 바꿈 (동기화로 들어온 것과 같은 결과)
+  const remote = (memo: string | null) => page.evaluate(([wid, m]) => new Promise<void>((res, rej) => {
+    const o = indexedDB.open('workout-app');
+    o.onsuccess = () => {
+      const tx = o.result.transaction('workouts', 'readwrite'); const st = tx.objectStore('workouts');
+      if (m === null) st.delete(wid!); else { const g = st.get(wid!); g.onsuccess = () => st.put({ ...g.result, memo: m }); }
+      tx.oncomplete = () => { o.result.close(); res(); }; tx.onerror = () => rej(tx.error);
+    };
+  }), [id, memo] as const);
+  const stored = () => page.evaluate((wid) => new Promise<{ name: string; memo?: string } | undefined>((res) => {
+    const o = indexedDB.open('workout-app');
+    o.onsuccess = () => { const g = o.result.transaction('workouts').objectStore('workouts').get(wid); g.onsuccess = () => { res(g.result); o.result.close(); }; };
+  }), id);
+  const sheet = page.locator('.sheet[aria-modal="true"]');
+
+  // 바뀜 → 묻는 동안 또 바뀜 → 덮어쓰기 → 다시 물음 → 덮어쓰기 → 저장
+  await card.getByRole('button', { name: /수정$/ }).click();
+  await page.getByLabel('운동 이름').fill('내 수정 1');
+  await remote('다른 기기 A');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(sheet.getByRole('heading', { name: '다른 기기에서 이 기록이 바뀌었어요' })).toBeVisible();
+  await remote('다른 기기 B');
+  await answer(page, '덮어쓰기');
+  await expect(sheet.getByRole('heading', { name: '다른 기기에서 이 기록이 바뀌었어요' })).toBeVisible(); // 다시 물음
+  expect((await stored())!.name).not.toBe('내 수정 1');
+  await answer(page, '덮어쓰기');
+  await expect(page).toHaveURL(/#\/stats\/w\//);
+  expect((await stored())!.name).toBe('내 수정 1');
+
+  // 계속 고치기 → 저장 안 됨, 편집 화면에 남음
+  await page.getByRole('button', { name: '수정', exact: true }).click();
+  await page.getByLabel('운동 이름').fill('내 수정 2');
+  await remote('다른 기기 C');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await answer(page, '계속 고치기');
+  await expect(page).toHaveURL(/\/edit$/);
+  expect((await stored())!.name).toBe('내 수정 1');
+
+  // 지워짐 → 되살려 저장
+  await remote(null);
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(sheet.getByRole('heading', { name: '다른 기기에서 이 기록이 지워졌어요' })).toBeVisible();
+  await answer(page, '되살려 저장');
+  await expect(page).toHaveURL(/#\/stats\/w\//);
+  expect((await stored())!.name).toBe('내 수정 2');
 });
 
 test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바꾸기, 운동 추가 → 저장하고 시작, 내 운동 DB 정보 버튼', async ({ page }) => {

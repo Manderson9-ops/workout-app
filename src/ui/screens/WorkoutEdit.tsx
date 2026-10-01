@@ -62,17 +62,16 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
       if (problem) { setErr(problem); return; }
       // 저장소의 지금 값과 비교. 앱 안 확인 창은 기다리는 동안 동기화가 계속 돌므로,
       // 답한 뒤 다시 읽어 사용자가 동의한 그 상태 그대로일 때만 저장 (그새 또 바뀌면 다시 물음)
-      let agreed: string | null = null;
+      let agreed: { w?: Workout } | null = null; // 사용자가 덮어쓰기에 동의한 그 상태 (w 없음 = 지워진 상태)
       for (;;) {
         const now = await db.workouts.get(id);
         if (now && sameWorkout(now, orig)) break;
-        const k = now ? JSON.stringify(withoutStamp(now as never)) : '∅';
-        if (k === agreed) break;
+        if (agreed && (agreed.w ? !!now && sameWorkout(now, agreed.w) : !now)) break;
         const yes = now
           ? await askConfirm({ title: '다른 기기에서 이 기록이 바뀌었어요', message: '고치는 동안 바뀌었어요. 내 수정으로 덮어쓸까요?', ok: '덮어쓰기', cancel: '계속 고치기', danger: true })
           : await askConfirm({ title: '다른 기기에서 이 기록이 지워졌어요', message: '고치는 동안 지워졌어요. 내 수정으로 되살려 저장할까요?', ok: '되살려 저장', cancel: '계속 고치기' });
         if (!yes) return;
-        agreed = k;
+        agreed = { w: now };
       }
       await mutate((d) => d.workouts.put(withoutStamp(out as never) as unknown as Workout));
       go(detail);
