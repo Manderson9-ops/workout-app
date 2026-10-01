@@ -76,7 +76,25 @@ export async function flushKey(key: string): Promise<void> {
 }
 /** 이미 저장이 시작된 입력 (예: 입력칸에서 포커스가 빠질 때 시작된 저장). flushPending이 이것까지 기다림 */
 const inflight = new Set<Promise<unknown>>();
-export function trackInflight(p: Promise<unknown>): void { inflight.add(p); void p.finally(() => inflight.delete(p)); }
+export function trackInflight(p: Promise<unknown>): void { inflight.add(p); p.finally(() => inflight.delete(p)).catch(() => undefined); /* 실패는 기다리는 쪽(flushPending)이 처리 */ }
+
+/**
+ * 늦춘 입력 저장 하나 (NumInput). box에 남은 값을 저장하고, 실패하면 값을 되돌리고 다시 등록한 뒤 오류를 던진다.
+ * 그래서 다음 flushPending(세트 완료·운동 끝내기)이 저장을 다시 시도한다 (D-038 검토 M2: 실패한 값이 조용히 사라지지 않게).
+ * 저장 도중 새 값이 들어오면(box가 다시 채워짐) 새 값이 우선.
+ */
+export async function flushValue<T>(key: string, box: { current: T | null }, save: (v: T) => unknown, again: () => Promise<void>): Promise<void> {
+  registerPending(key, null);
+  if (box.current === null) return;
+  const v = box.current; box.current = null;
+  let p: Promise<unknown>;
+  try { p = Promise.resolve(save(v)); } catch (e) { p = Promise.reject(e); }
+  trackInflight(p);
+  try { await p; } catch (e) {
+    if (box.current === null) { box.current = v; registerPending(key, again); }
+    throw e;
+  }
+}
 let flushDepth = 0;
 /** 돌려주는 값: 이번에 먼저 저장한 대기 입력 수 (진단용, 이미 저장 중이던 것은 세지 않음) */
 export async function flushPending(): Promise<number> {
@@ -89,8 +107,11 @@ export async function flushPending(): Promise<number> {
   // 부른 시점에 이미 시작된 저장만 기다린다 (나중에 시작된 저장, 특히 자기 자신을 기다리면 영원히 멈춤: 검토 N1)
   const before = [...inflight];
   const fns = [...pending.values()]; pending.clear();
-  for (const fn of fns) await fn();
-  await Promise.allSettled(before);
+  // 하나가 실패해도 나머지는 모두 저장하고, 실패가 있었으면 끝에 알림 (D-038 검토 M2). 이미 시작된 저장의 실패도 알림
+  const errs: unknown[] = [];
+  for (const fn of fns) { try { await fn(); } catch (e) { errs.push(e); } }
+  for (const r of await Promise.allSettled(before)) if (r.status === 'rejected') errs.push(r.reason);
+  if (errs.length) throw errs[0];
   return fns.length;
   } finally { flushDepth--; }
 }

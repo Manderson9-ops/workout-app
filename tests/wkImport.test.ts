@@ -113,3 +113,36 @@ describe('WORK_OUT_K 가져오기', () => {
     expect(r.unresolved).toEqual(['[등] X: 별칭 대상 운동 없음: ghost', '[등] Y: 별칭 대상 묶음 비어 있음']);
   });
 });
+
+describe('새 티어 반영용 규칙 (M-15~M-26, 2026-10-01)', () => {
+  const fails = (r: { unresolved: string[] }) => r.unresolved.filter((x) => !x.startsWith('[규칙 미사용]'));
+  it('운동이 아닌 주제는 등급으로 쓰지 않되 자세 포인트는 봄, 연결 실패도 아님 (M-25)', () => {
+    const r = runImport(input([{ ...rec([{ exercise: '작은 키', grade: '망함' }]), tier_list: { key: 'genes', topic: '유전자', items: [{ exercise: '작은 키', grade: '망함' }] }, key_points: [{ type: 'tip', exercise: '랫풀다운', text: 'x', timestamp: '00:10' }] }], { ignoreTopics: ['genes'] }));
+    expect(fails(r)).toEqual([]);
+    expect(r.tierItemCount).toBe(0);
+    expect(r.guides.lat_pulldown).toHaveLength(1);
+  });
+  it('매핑 없는 주제는 여전히 연결 실패로 알리고, 자세 포인트는 계속 봄', () => {
+    const r = runImport(input([{ ...rec([]), tier_list: { key: 'neck', topic: '목', items: [{ exercise: '랫풀다운', grade: 'S' }] }, key_points: [{ type: 'tip', exercise: '랫풀다운', text: 'x', timestamp: '00:10' }] }]));
+    expect(fails(r)).toEqual(['[주제] neck (topic_parts에 부위 매핑 없음)']);
+    expect(r.guides.lat_pulldown).toHaveLength(1);
+  });
+  it('빼기로 한 티어 항목·이름은 미적용(반영 안 함)으로, 실패 아님', () => {
+    const r = runImport(input([rec([{ exercise: '랫풀다운 (붐빌 때)', grade: 'B' }, { exercise: '랫풀다운', grade: 'S' }], { key_points: [{ type: 'tip', exercise: '잽', text: 'x', timestamp: '00:10' }] })], {
+      skipItems: [{ video_id: 'v1', exercise: '랫풀다운 (붐빌 때)', grade: 'B', reason: '대안 설명' }], skipNames: [{ name: '잽', reason: '격투기' }],
+    }));
+    expect(fails(r)).toEqual([]);
+    expect(r.unapplied.map((u) => u.reason)).toEqual(['반영 안 함: 대안 설명', '반영 안 함: 격투기']);
+    expect(r.grades.lat_pulldown).toHaveLength(1);
+  });
+  it('쓰이지 않는 빼기 규칙은 알림(빌드 중단)', () => {
+    const r = runImport(input([rec([{ exercise: '랫풀다운', grade: 'S' }])], { skipItems: [{ video_id: 'v1', exercise: '없는 항목', reason: 'x' }], skipNames: [{ name: '없는 이름', reason: 'y' }] }));
+    expect(r.unresolved).toEqual(expect.arrayContaining(['[규칙 미사용] 빼기 v1 없는 항목', '[규칙 미사용] 빼기 이름 없는 이름']));
+  });
+  it('별칭이 여러 운동을 가리키면 모두에 등급 (M-21 해머·리버스 컬), 없는 운동이면 실패', () => {
+    const r = runImport(input([rec([{ exercise: '두 로우', grade: 'B' }])], { aliases: [{ name: '두 로우', exercises: ['row_a', 'row_b'], status: 'CONFIRMED' }] }));
+    expect(Object.keys(r.grades).sort()).toEqual(['row_a', 'row_b']);
+    const bad = runImport(input([rec([{ exercise: '두 로우', grade: 'B' }])], { aliases: [{ name: '두 로우', exercises: ['row_a', 'ghost'], status: 'CONFIRMED' }] }));
+    expect(bad.unresolved[0]).toContain('ghost');
+  });
+});

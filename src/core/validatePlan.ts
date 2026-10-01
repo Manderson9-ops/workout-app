@@ -7,7 +7,7 @@ import { EQUIPMENT } from './types';
 import { gradeAtLeast, GRADES } from './version';
 import { isHeavyHinge, equipmentAvailable, eligibleParts, resolveGrade } from './exercises';
 import type { Plan, PlanRequest } from './planner';
-import { PART_SET_CAP } from './planner';
+import { PART_SET_CAP, MUSCLE_CAP } from './planner';
 
 export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[]): string[] {
   const errs: string[] = [];
@@ -47,6 +47,12 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
   const heavyFree = free.filter((i) => isHeavyHinge(byId.get(i.exerciseId)!)).length;
   const heavyLocked = items.filter((i) => i.locked && byId.has(i.exerciseId) && isHeavyHinge(byId.get(i.exerciseId)!)).length;
   if (heavyFree > (heavyLocked ? 0 : 1)) errs.push('무거운 힌지 2개 이상 (M-12)');
+  // M-27: 부위별 같은 주 근육 상한 (잠금은 사용자 선택: 잠금이 상한보다 많으면 잠금 수까지 인정, 잠금 아닌 것은 더하지 않음)
+  for (const [part, caps] of Object.entries(MUSCLE_CAP)) for (const [m, n] of Object.entries(caps ?? {})) {
+    const inPart = items.filter((i) => i.part === part && byId.get(i.exerciseId)?.muscles[0] === m);
+    const lockedN = inPart.filter((i) => i.locked).length;
+    if (inPart.length > Math.max(n, lockedN)) errs.push(`${part} ${m} 운동 ${n}개 초과 (M-27)`);
+  }
 
   for (const b of plan.blocks) {
     if (b.kind === 'single' && b.items.length !== 1) errs.push('단일 블록 운동 수 오류');

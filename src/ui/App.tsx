@@ -15,6 +15,7 @@ import { ToolsScreen } from './screens/Tools';
 import { mmss } from './components';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
 import { useUpdateAvailable } from './update';
+import { ConfirmHost } from './confirm';
 
 export function useHash(): string {
   const [h, set] = useState(location.hash || '#/');
@@ -71,6 +72,7 @@ export function App() {
           <span>운동 중 · {active.name}</span><span>{mmss((Date.now() - Date.parse(active.startedAt)) / 1000)} ▶</span>
         </a>
       )}
+      <ConfirmHost />
       <nav class="nav">
         {tab('#/', '🏠', '홈', path === '/' || path === '' || path.startsWith('/routine'))}
         {tab('#/plan', '🧩', '플랜', path.startsWith('/plan'))}

@@ -239,6 +239,21 @@ export function timerRemaining(t: Timer | null, nowMs: number): number {
 
 export function finishWorkout(w: Workout, now: string): Workout { return { ...w, endedAt: now, timer: null }; }
 
+/**
+ * 운동 끝내기 판단 (D-038). 끝낼 수 없을 때 조용히 넘어가지 않도록 이유를 돌려준다.
+ *  - missing: 저장소에 기록이 없음 (다른 기기에서 지워짐 등)
+ *  - other-device: 다른 기기로 넘어간 운동 (이 기기에서 고치면 새 주인 기록과 부딪힘)
+ *  - already: 이미 끝난 운동 (두 번 눌림, 다른 기기에서 끝냄 등) → 성공으로 봄, 기존 끝난 시각 유지
+ */
+export type FinishDecision = { kind: 'ok'; w: Workout } | { kind: 'already'; w: Workout } | { kind: 'missing' } | { kind: 'other-device' };
+export function decideFinish(cur: Workout | undefined, myDeviceId: string, now: string): FinishDecision {
+  if (!cur) return { kind: 'missing' };
+  // 이미 끝남(다른 기기에서 끝낸 것 포함)은 성공으로: 끝내려던 목적은 이뤄짐 (검토 N1)
+  if (cur.endedAt) return { kind: 'already', w: cur };
+  if (cur.ownerDeviceId && cur.ownerDeviceId !== myDeviceId) return { kind: 'other-device' };
+  return { kind: 'ok', w: finishWorkout(cur, now) };
+}
+
 export interface Progress {
   doneSets: number; totalSets: number; elapsedSec: number; remainingSec: number;
   /** 예상 종료 - 예정 종료 (초). 양수면 늦음. 루틴 예상 시간이 없으면 undefined */

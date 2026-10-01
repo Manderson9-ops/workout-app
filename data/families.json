@@ -1,15 +1,15 @@
 {
   "_note": "운동 변형 묶음. 한 플랜에는 같은 family에서 1개만 들어간다 (BLUEPRINT 5.2). 묶음 확정은 사용자 확인 대상 (P1)",
   "families": {
-    "chest_press_flat": "플랫 체스트 프레스", "chest_press_incline": "인클라인 체스트 프레스", "push_up": "푸시업", "dip": "딥스 (가슴)", "dip_triceps": "딥스 (삼두: 벤치·머신)", "chest_fly": "플라이",
+    "chest_press_flat": "플랫 체스트 프레스", "chest_press_incline": "인클라인 체스트 프레스", "push_up": "푸시업", "dip": "딥스 (가슴)", "dip_triceps": "딥스 (삼두: 벤치·머신)", "chest_fly": "플라이", "pinch_press": "핀치 프레스",
     "pull_up": "풀업 계열", "lat_pulldown": "랫풀다운 계열", "pullover": "풀오버·스트레이트 암", "cable_row": "케이블 로우", "free_row": "프리웨이트 로우",
     "supported_row": "체스트 서포티드 로우", "inverted_row": "인버티드 로우", "kelso_shrug": "켈소 슈러그", "machine_high_row": "하이 로우 머신", "shrug": "슈러그", "back_extension": "백 익스텐션",
     "shoulder_press": "숄더 프레스", "pike_push_up": "파이크 푸시업", "y_raise": "Y 레이즈", "landmine_press": "랜드마인 프레스", "lateral_raise": "레터럴 레이즈", "front_raise": "프론트 레이즈", "rear_delt_fly": "리어 델트 플라이", "face_pull": "페이스풀", "upright_row": "업라이트 로우",
     "curl": "기본 컬", "hammer_curl": "해머 컬", "curl_stretch": "늘린 자세 컬 (장두)", "curl_short": "수축 강조 컬 (단두)",
     "jm_press": "JM프레스", "overhead_ext": "오버헤드 익스텐션", "pushdown": "푸시다운", "triceps_push_up": "삼두 푸시업", "lying_ext": "라잉 익스텐션", "close_grip_press": "클로즈그립 프레스", "kickback": "킥백", "triceps_machine": "트라이셉 머신",
-    "wrist_curl": "리스트 컬", "reverse_curl": "리버스 컬", "carry": "캐리", "hang": "매달리기", "pinch": "핀치 그립",
+    "wrist_curl": "리스트 컬 (굽히기)", "wrist_ext": "리스트 익스텐션 (펴기)", "reverse_curl": "리버스 컬", "carry": "캐리", "hang": "매달리기", "pinch": "핀치 그립", "wrist_roller": "리스트 롤러", "grip": "악력기",
     "squat_barbell": "바벨 스쿼트", "squat_light": "맨몸·고블릿 스쿼트", "squat_machine": "머신 스쿼트", "leg_press": "레그 프레스", "lunge": "런지·스플릿 스쿼트·스텝업",
-    "leg_extension": "레그 익스텐션", "leg_curl": "레그 컬", "deadlift": "데드리프트·랙풀 (무거운 힌지)", "rdl": "루마니안 데드리프트·힌지", "hip_thrust": "힙 쓰러스트·브릿지", "glute_kickback": "힙 킥백",
+    "leg_extension": "레그 익스텐션", "sissy_squat": "시시 스쿼트", "leg_curl": "레그 컬", "deadlift": "데드리프트·랙풀 (무거운 힌지)", "rdl": "루마니안 데드리프트·힌지", "hip_thrust": "힙 쓰러스트·브릿지", "glute_kickback": "힙 킥백",
     "hip_abduction": "힙 어브덕션", "hip_adduction": "힙 어덕션", "calf_raise": "카프 레이즈",
     "plank": "플랭크", "crunch": "크런치", "leg_raise": "레그 레이즈", "ab_rollout": "롤아웃", "anti_extension": "안티 익스텐션", "anti_rotation": "안티 로테이션", "rotation": "로테이션"
   }

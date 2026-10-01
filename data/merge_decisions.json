@@ -140,6 +140,146 @@
       "decided_at": "2026-09-30",
       "decided_by": "사용자 (\"제안대로 진행. P3 진행 승인.\")",
       "resolution": "제안대로 (하체 3번째 레그 프레스 유지)"
+    },
+    {
+      "id": "M-15",
+      "status": "APPROVED",
+      "title": "스미스 머신 벤치프레스가 가슴 티어에 S / A+(단두대형) / A(일반형)로 세 번 나옴",
+      "proposal": "스미스머신 벤치프레스 = S 하나. A+·A는 기계 종류 차이 설명으로만",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-16",
+      "status": "APPROVED",
+      "title": "케이블 플라이가 A와 A-(헬스장이 붐빌 때)로 두 번 나옴",
+      "proposal": "A 하나. A-는 붐빌 때 대안 설명으로만",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-17",
+      "status": "APPROVED",
+      "title": "체스트 프레스 머신 3종류 (누워서 레버 A+, 캠·케이블 A, 앉아서 레버 A-)",
+      "proposal": "기존 \"체스트 프레스 머신\" = 캠·케이블(A). 레버 구조 2종은 새 운동 (등 영상의 캠/레버 로우 머신과 같은 방식)",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-18",
+      "status": "APPROVED",
+      "title": "플랭크: 중량 B, 맨몸 D",
+      "proposal": "\"중량 플랭크\"를 새 운동(B), 기존 \"플랭크\" = D",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-19",
+      "status": "APPROVED",
+      "title": "크런치 머신: 캠 구조 S, 레버 구조는 미평가",
+      "proposal": "기존 \"크런치 머신\"에 S + \"캠 구조 기준\" 표시",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-20",
+      "status": "APPROVED",
+      "title": "전완 영상은 바벨 리스트 컬 3종, 앱에는 덤벨 리스트 컬만 있음",
+      "proposal": "바벨 3종(시티드 컬·시티드 익스텐션·스탠딩 컬)을 새 운동으로. 덤벨 리스트 컬·리버스 리스트 컬은 등급 없음(B 추정) 유지",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-21",
+      "status": "APPROVED",
+      "title": "해머 컬·리버스 컬 B는 상완요골근(전완) 목적",
+      "proposal": "두 운동에 전완·악력 목적 B (상완요골근). 해머 컬의 이두 등급은 따로",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-22",
+      "status": "APPROVED",
+      "title": "운동이 아닌 관점의 평가: 스쿼트·데드(복근 관점) F, 데드·랙풀·매달리기(전완 관점) D",
+      "proposal": "M-04처럼 데드·스쿼트·랙풀에는 등급을 만들지 않음. 데드 행(매달리기)만 전완 목적 D",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-23",
+      "status": "APPROVED",
+      "title": "등 S 두 개가 세부 목표(능형근·등 상부 / 대원근) 평가",
+      "proposal": "세부 목표 전용 등급 (M-03과 같은 방식): 체스트 서포티드 T바로우 S(등 상부·능형근), 새 운동 양옆 케이블 풀다운 S(대원근)",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-24",
+      "status": "APPROVED",
+      "title": "F 등급뿐인 운동 (덤벨 윗가슴 레이즈, 웨이터 컬)",
+      "proposal": "앱에 추가하지 않음",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-25",
+      "status": "APPROVED",
+      "title": "운동이 아닌 티어 주제 4개 (근성장 유전자, 키우기 어려운 근육, 남성성 저하 원인, 패션 근육)",
+      "proposal": "등급으로 쓰지 않음 (자세 포인트는 그대로 봄)",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-26",
+      "status": "APPROVED",
+      "title": "자세 포인트에만 나오고 앱에 없는 운동·근력 운동이 아닌 이름 (목·회전근개·전거근·드래그 컬 등 27개)",
+      "proposal": "이번엔 추가하지 않고 grade_rules.json skip_names에 목록만 남김",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (\"추천안 대로 진행 수행 승인\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-27",
+      "status": "APPROVED",
+      "title": "대퇴사두 영상의 S 3개(스미스 스쿼트·레그 익스텐션·시시 스쿼트) 때문에 하체 플랜이 대퇴사두 운동만으로 채워짐",
+      "proposal": "하체 플랜에서 주 근육이 대퇴사두인 운동은 2개까지 (planner MUSCLE_CAP). 나머지는 햄스트링·둔근 (예: 스미스 스쿼트 + 레그 익스텐션 + 루마니안 데드리프트)",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (질문 답변: \"대퇴사두 최대 2개 (추천)\", \"나눔 (추천)\")",
+      "resolution": "제안대로"
+    },
+    {
+      "id": "M-28",
+      "status": "APPROVED",
+      "title": "리스트 컬(굽히기)과 리스트 익스텐션(펴기)이 같은 묶음이라 전완 플랜에 시티드 바벨 리스트 익스텐션(A+)이 못 들어감",
+      "proposal": "펴는 운동(시티드 바벨 리스트 익스텐션, 리버스 리스트 컬)을 새 묶음 wrist_ext로",
+      "while_pending": "제안대로 적용",
+      "decided_at": "2026-10-01",
+      "decided_by": "사용자 (질문 답변: \"대퇴사두 최대 2개 (추천)\", \"나눔 (추천)\")",
+      "resolution": "제안대로"
     }
   ]
 }
