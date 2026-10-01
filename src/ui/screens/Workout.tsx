@@ -11,7 +11,7 @@ import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, mmss } from '../components';
 import { resolveGrade } from '../../core/exercises';
 import { hasDbInfo } from '../../core/planEdit';
-import { updateWorkoutAfterInputs, finishActiveWorkout } from '../actions';
+import { updateWorkoutAfterInputs, finishActiveWorkout, useFinishError, setFinishError } from '../actions';
 import { askConfirm } from '../confirm';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
@@ -48,16 +48,16 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [memo, setMemo] = useState<{ title: string; value?: string; save: (m: string | undefined) => void } | null>(null);
   const warned = useRef<number>(0);
   /** 운동 끝내기가 안 됐을 때 이유 (D-038). 타이머 자리(화면 아래 고정)에 보여 어느 위치에서 눌러도 보임 */
-  const [finishErr, setFinishErr] = useState<string | null>(null);
+  const finishErr = useFinishError();
   const finishing = useRef(false);
   /** 확인 뒤 끝내기. 두 번 눌러도 한 번만 */
   const doFinish = async (id: string) => {
     if (finishing.current) return;
     finishing.current = true;
     try {
-      setFinishErr(null);
-      const r = await finishActiveWorkout(id);
-      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); } else setFinishErr(r.message);
+      setFinishError(null);
+      const r = await finishActiveWorkout(id); // 실패 문구는 finishActiveWorkout이 setFinishError로 남김
+      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); }
     } finally { finishing.current = false; }
   };
   // 블록 끌어서 순서 바꾸기 (D-037). 펼친 카드는 옮긴 자리를 따라감
@@ -98,7 +98,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       <main>
         <h1>운동</h1>
         {remoteActiveOf(s) && <p role="status" class="card small">📱 운동 「{remoteActiveOf(s)!.name}」은 다른 기기에서 진행 중이에요 (다른 기기로 넘어갔어요). 홈에서 볼 수 있어요.</p>}
-        {finishErr && <p role="alert" class="finish-err">⚠️ {finishErr}</p>}
+        {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" style={{ margin: 0 }}>⚠️ {finishErr}</p><button class="ghost" aria-label="알림 닫기" onClick={() => setFinishError(null)}>✕</button></div>}
         <div class="empty"><p>진행 중인 운동이 없어요.</p><p class="small">홈에서 루틴을 시작하거나 플랜을 만들어 보세요.</p></div>
         <button class="primary big" onClick={() => go('#/')}>루틴 고르기</button>
       </main>
@@ -226,7 +226,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
 
       {/* 휴식 타이머 / 다음 세트 */}
       <div class={`timer ${w.timer && rem === 0 ? 'end flash' : ''}`} role="timer" aria-live="polite">
-        {finishErr && <p role="alert" class="finish-err">⚠️ {finishErr}</p>}
+        {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" style={{ margin: 0 }}>⚠️ {finishErr}</p><button class="ghost" aria-label="알림 닫기" onClick={() => setFinishError(null)}>✕</button></div>}
         {w.timer && (rem > 0 || ended) ? (
           <div class="row between">
             <div>

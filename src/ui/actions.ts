@@ -1,7 +1,8 @@
 /**
  * 화면에서 쓰는 저장 동작 모음
  */
-import { mutate, activeOf, historyOf, db, setWorkoutLocal, askPersistOnce, flushPending, load } from './store';
+import { useEffect, useState } from 'preact/hooks';
+import { mutate, activeOf, historyOf, db, setWorkoutLocal, askPersistOnce, flushPending, load, getState } from './store';
 import { askConfirm } from './confirm';
 import { diag } from './diag';
 import { deviceId } from './deviceId';
@@ -43,7 +44,7 @@ export async function updateWorkoutAfterInputs(id: string, fn: (w: Workout) => W
 export type FinishFail = 'input' | 'missing' | 'other-device' | 'not-saved' | 'error';
 export type FinishResult = { ok: true } | { ok: false; reason: FinishFail; message: string };
 export const FINISH_MSG: Record<FinishFail, string> = {
-  input: '마지막으로 입력한 값을 저장하지 못해 끝내지 않았어요. 값을 확인하고 다시 눌러 주세요.',
+  input: '마지막으로 입력한 값을 저장하지 못해 끝내지 않았어요. 다시 누르면 저장을 다시 시도해요.',
   missing: '이 운동 기록을 찾지 못했어요. 다른 기기에서 지워졌을 수 있어요.',
   'other-device': '이 운동은 다른 기기로 넘어가서 여기서 끝낼 수 없어요. 그 기기에서 끝내 주세요.',
   'not-saved': '끝내기가 저장되지 않았어요. 다시 눌러 주세요.',
@@ -51,13 +52,25 @@ export const FINISH_MSG: Record<FinishFail, string> = {
 };
 const errText = (e: unknown) => (e as Error)?.message ?? String(e);
 
+/** 마지막 끝내기 실패 문구. 운동 화면이 보여 줌 (시작 화면에서 실패해도 운동 화면으로 가서 보이게) */
+let finishErr: string | null = null;
+const finishErrListeners = new Set<(m: string | null) => void>();
+export const getFinishError = () => finishErr;
+export function setFinishError(m: string | null): void { finishErr = m; finishErrListeners.forEach((f) => f(m)); }
+export function useFinishError(): string | null {
+  const [m, setM] = useState(finishErr);
+  useEffect(() => { finishErrListeners.add(setM); setM(finishErr); return () => { finishErrListeners.delete(setM); }; }, []);
+  return m;
+}
+
 /**
- * 진행 중 운동 끝내기 (D-038). 입력 먼저 저장 → 끝낸 시각 저장 → 다시 읽어 저장됐는지 확인.
- * 끝내지 못하면 이유를 돌려주고 진단 기록(오류)에 남긴다. 성공일 때만 true.
+ * 진행 중 운동 끝내기 (D-038). 입력 먼저 저장 → 끝낸 시각 저장(쓰기 트랜잭션 안에서 판단) → 다시 읽어 저장됐는지 확인.
+ * 끝내지 못하면 이유를 돌려주고, 화면 문구(setFinishError)와 진단 기록(오류)에 남긴다.
  */
 export async function finishActiveWorkout(id: string): Promise<FinishResult> {
   const fail = (reason: FinishFail, detail?: string): FinishResult => {
     diag('error', { m: `운동 끝내기 안 됨: ${reason}${detail ? ` · ${detail}` : ''}` });
+    setFinishError(FINISH_MSG[reason]);
     return { ok: false, reason, message: FINISH_MSG[reason] };
   };
   try {
@@ -73,22 +86,41 @@ export async function finishActiveWorkout(id: string): Promise<FinishResult> {
     });
   } catch (e) { return fail('error', errText(e)); }
   if (d.kind === 'missing' || d.kind === 'other-device') { await load().catch(() => undefined); return fail(d.kind); }
-  const saved = await db.workouts.get(id).catch(() => undefined);
+  let saved: Workout | undefined;
+  try { saved = await db.workouts.get(id); } catch (e) { return fail('error', `다시 읽기 · ${errText(e)}`); }
   if (!saved?.endedAt) return fail('not-saved');
   setWorkoutLocal(saved);
+  setFinishError(null);
   return { ok: true };
 }
 
+let starting = false;
+/**
+ * 루틴 시작. 진행 중인 운동이 있으면 앱 안 확인 창으로 묻고, 확인하면 그 운동을 finishActiveWorkout으로 끝낸 뒤 시작 (D-038).
+ * 확인 창이 열린 사이 동기화로 바뀌었을 수 있으므로 확인 뒤 최신 상태로 다시 고른다 (검토 M1).
+ * 앞 운동을 끝내지 못하면 새로 만들지 않고 운동 화면으로 가서 이유를 보여 준다. 두 번 눌러도 한 번만.
+ */
 export async function startRoutine(s: AppState, r: Routine) {
-  const cur = activeOf(s);
-  if (cur && !(await askConfirm({ title: '진행 중인 운동이 있어요', message: `"${cur.name}"을(를) 끝내고 새로 시작할까요?`, ok: '끝내고 새로 시작', danger: true }))) { go('#/workout'); return; }
-  void askPersistOnce();
-  const w = { ...startWorkout(newId('w'), r, new Date().toISOString(), historyOf(s), { betweenSec: s.settings.rest.between }), ownerDeviceId: deviceId(), ownerAt: new Date().toISOString(), ownerSeq: 1 };
-  await mutate(async (d) => {
-    if (cur) await d.workouts.put({ ...cur, endedAt: new Date().toISOString(), timer: null });
-    await d.workouts.put(w);
-  });
-  go('#/workout');
+  if (starting) return;
+  starting = true;
+  try {
+    const first = activeOf(s);
+    if (first) {
+      const ans = await askConfirm({ title: '진행 중인 운동이 있어요', message: `"${first.name}"을(를) 끝내고 새로 시작할까요?`, ok: '끝내고 새로 시작', danger: true });
+      if (ans === null) return; // 다른 확인 창으로 바뀜: 아무것도 안 함
+      if (!ans) { go('#/workout'); return; }
+      const cur = activeOf(getState());
+      if (cur) {
+        const f = await finishActiveWorkout(cur.id);
+        if (!f.ok) { go('#/workout'); return; }
+      }
+    }
+    void askPersistOnce();
+    const st = getState();
+    const w = { ...startWorkout(newId('w'), r, new Date().toISOString(), historyOf(st), { betweenSec: st.settings.rest.between }), ownerDeviceId: deviceId(), ownerAt: new Date().toISOString(), ownerSeq: 1 };
+    await mutate((d) => d.workouts.put(w));
+    go('#/workout');
+  } finally { starting = false; }
 }
 
 export async function savePlanAsRoutine(name: string, blocks: PlanBlock[], estimatedSec: number, warmupSec?: number): Promise<Routine> {

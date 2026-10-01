@@ -154,7 +154,12 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   await page.getByRole('button', { name: '운동 끝내기' }).click();
   const dlg = page.getByRole('dialog', { name: '운동을 끝낼까요?' });
   await expect(dlg).toContainText(/아직 \d+세트 남았어요/);
-  await expect(dlg.getByRole('button', { name: '끝내기' })).toBeFocused(); // PC: Enter = 확인
+  await expect(dlg.getByRole('button', { name: '취소' })).toBeFocused(); // 위험한 확인은 취소에 초점 (Enter 한 번으로 끝나지 않게)
+  await expect(dlg).toHaveAttribute('aria-modal', 'true');
+  await page.keyboard.press('Tab');
+  await expect(dlg.getByRole('button', { name: '끝내기' })).toBeFocused();
+  await page.keyboard.press('Tab'); // 창 안에서만 돎 (✕ → 취소 → 끝내기)
+  await expect(dlg.getByRole('button', { name: '닫기' })).toBeFocused();
   await touchTargets(page);
   await dlg.getByRole('button', { name: '취소' }).click();
   await expect(dlg).toBeHidden();
@@ -179,6 +184,8 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   await setOwner('zzzzzz');
   await endWorkout(page);
   await expect(page.getByRole('alert')).toContainText('다른 기기로 넘어가서 여기서 끝낼 수 없어요');
+  await page.getByRole('button', { name: '알림 닫기' }).click(); // 닫을 수 있음 (검토 N5)
+  await expect(page.getByRole('alert')).toHaveCount(0);
   // 진단 기록(오류)에 남음 (2초 모았다 저장)
   await expect.poll(() => page.evaluate(async () => new Promise<string[]>((res) => {
     const q = indexedDB.open('workout-app');
@@ -203,9 +210,10 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   await page.getByRole('link', { name: '홈' }).click();
   await expect(page.getByRole('group', { name: /^최근 운동 / })).toHaveCount(1); // 앞 운동은 끝난 기록으로
 
-  // 4) 정상 끝내기 → 홈, 최근 운동 2개, 기본 확인 창은 한 번도 안 뜨었음
+  // 4) 정상 끝내기 (끝내기 두 번 빠르게 눌러도 한 번) → 홈, 최근 운동 2개, 기본 확인 창은 한 번도 안 뜨었음
   await page.getByRole('link', { name: '운동', exact: true }).click();
-  await endWorkout(page);
+  await page.getByRole('button', { name: '종료' }).click();
+  await dlg.getByRole('button', { name: '끝내기' }).dblclick();
   await expect(page.getByText('최근 운동')).toBeVisible();
   await expect(page.getByRole('group', { name: /^최근 운동 / })).toHaveCount(2);
   await page.getByRole('link', { name: '운동', exact: true }).click();
@@ -1087,7 +1095,6 @@ test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 �
   // 새로 고쳐도 순서 저장됨
   await page.reload();
   await expect.poll(heads).toEqual([p1[0], last, p1[1], ...p1.slice(2, -1)]);
-  page.once('dialog', (d) => d.accept());
   await endWorkout(page);
 
   // 루틴 편집: 끌어서 옮기고 저장 → 다시 열면 그 순서

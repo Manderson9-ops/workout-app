@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
-import { registerPending, flushKey, trackInflight } from './store';
+import { registerPending, flushKey, flushValue } from './store';
 import type { ComponentChildren } from 'preact';
 import type { BuiltExercise, Part } from '../core/types';
 import { PARTS, EQUIPMENT_LABEL } from '../core/types';
@@ -45,17 +45,17 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
   const latest = useRef<number | undefined | null>(null);
   const flush = async () => {
     if (timer.current) { clearTimeout(timer.current); timer.current = undefined; }
-    registerPending(key, null);
-    if (latest.current !== null) { const v = latest.current; latest.current = null; const p = Promise.resolve(onChange(v)); trackInflight(p); await p; }
+    // 실패하면 값을 되돌려 다시 대기 (다음 버튼 때 다시 저장)
+    await flushValue(key, latest, onChange, flush);
   };
-  useEffect(() => () => { void flush(); }, []);
+  useEffect(() => () => { flush().catch(() => undefined); }, []);
   // 저장된 값이 다른 경로(−/+, 앞 세트 이어받기)로 바뀌면, 저장 대기 중인 입력이 없을 때 화면 글자도 맞춤
   useEffect(() => { if (text !== null && latest.current === null) setText(value === undefined ? '' : String(value)); }, [value]);
   const shown = text ?? (value === undefined ? '' : String(value));
   return (
     <div style={{ position: 'relative' }}>
       <input inputMode={integer ? 'numeric' : 'decimal'} aria-label={label} value={shown} placeholder="-" style={{ textAlign: 'center', paddingRight: '26px' }}
-        onFocus={() => setText(shown)} onBlur={() => { setText(null); void flush(); }}
+        onFocus={() => setText(shown)} onBlur={() => { setText(null); flush().catch(() => undefined); /* 실패하면 대기로 남아 다음 버튼 때 다시 */ }}
         onKeyDown={(e) => {
           // PC 키보드: Enter로 다음 입력칸 (D-030)
           if (e.key !== 'Enter' || e.isComposing) return;
@@ -76,18 +76,18 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
           else if (Number.isFinite(n) && n >= 0) latest.current = n;
           else return;
           if (timer.current) clearTimeout(timer.current);
-          timer.current = setTimeout(() => { void flush(); }, 300);
+          timer.current = setTimeout(() => { flush().catch(() => undefined); }, 300);
           registerPending(key, flush);
         }} />
       <span class="pill" style={{ position: 'absolute', right: '8px', top: '13px', pointerEvents: 'none' }}>{suffix}</span>
     </div>
   );
 }
-export function Sheet({ onClose, title, children }: { onClose: () => void; title: string; children: ComponentChildren }) {
+export function Sheet({ onClose, title, children, modal }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean }) {
   return (
     <>
       <div class="sheet-bg" onClick={onClose} />
-      <div class="sheet" role="dialog" aria-label={title}>
+      <div class="sheet" role="dialog" aria-label={title} aria-modal={modal ? 'true' : undefined}>
         <div class="row between"><h3>{title}</h3><button class="ghost" onClick={onClose} aria-label="닫기">✕</button></div>
         {children}
       </div>
