@@ -16,6 +16,7 @@ import { GradeBadge, ExercisePicker, Sheet, mmss } from '../components';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
 import { useDragSort } from '../dragSort';
+import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
 import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
@@ -78,17 +79,17 @@ export function PlanBuilder({ s }: { s: AppState }) {
     if (nx) { parts[p] = nx; order = [...order, p]; } else delete parts[p];
     update({ parts, order });
   };
-  const request = (): PlanRequest => ({
-    parts: f.order.filter((p) => f.parts[p]).map((p) => ({ part: p, priority: f.parts[p]! })),
-    level: s.settings.level, minGrade: f.minGrade, targetMinutes: f.minutes, groupings: f.groupings,
-    groupingPreference: f.prefer ? 'prefer' : 'when_needed', equipment: s.settings.equipment,
+  const request = (form: Form = f): PlanRequest => ({
+    parts: form.order.filter((p) => form.parts[p]).map((p) => ({ part: p, priority: form.parts[p]! })),
+    level: s.settings.level, minGrade: form.minGrade, targetMinutes: form.minutes, groupings: form.groupings,
+    groupingPreference: form.prefer ? 'prefer' : 'when_needed', equipment: s.settings.equipment,
     excluded: [...s.meta.values()].filter((m) => m.excluded).map((m) => m.exerciseId),
     favorites: [...s.meta.values()].filter((m) => m.favorite).map((m) => m.exerciseId),
     userGrades: Object.fromEntries([...s.meta.values()].filter((m) => m.userGrade).map((m) => [m.exerciseId, m.userGrade!])),
     recent: s.workouts.filter((w) => w.endedAt && Date.now() - Date.parse(w.endedAt) < 14 * 86400000).flatMap((w) => w.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))),
   });
-  const generate = (keepLocks = false) => {
-    const req = request();
+  const generate = (keepLocks = false, form: Form = f) => {
+    const req = request(form);
     const t0 = performance.now();
     let p: Plan;
     if (keepLocks && plan) {
@@ -102,6 +103,12 @@ export function PlanBuilder({ s }: { s: AppState }) {
     setPlan(p);
     if (noop) setShowReasons(true); // 그대로 둔 이유가 보이게
     else setName(defaultName(req));
+  };
+  // D-041: 목표보다 짧을 때 제안 부위를 '보통'으로 더해 바로 다시 만듦 (잠금은 유지)
+  const addPartAndGenerate = (p: Part) => {
+    const n: Form = { ...f, parts: { ...f.parts, [p]: 'normal' }, order: [...f.order.filter((x) => x !== p), p] };
+    update(n);
+    generate(locks.size > 0, n);
   };
   const defaultName = (req: PlanRequest) => `${req.parts.map((p) => p.part).join('+')}${req.targetMinutes ? ` ${req.targetMinutes}분` : ''}`;
   const applyTemplate = (id: string, day: number) => {
@@ -199,6 +206,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
           </select></div>
         <div><label>수준</label><button class="chip on" style={{ width: '100%' }} onClick={() => go('#/settings')}>{s.settings.level} (설정에서 변경)</button></div>
       </div>
+      <p class="sub small" data-testid="level-rule">{s.settings.level}: 운동당 최대 {MAX_SETS_BY_LEVEL[s.settings.level]}세트 · 한 근육은 한 번에 {SESSION_CAP[s.settings.level]}세트까지 (보조로 쓰이면 0.5세트로 셈)</p>
       <label>세트 방식 (시간이 부족하면 자동으로 묶음)</label>
       <div class="row wrap">
         {(['superset', 'compound'] as Grouping[]).map((g) => (
@@ -220,6 +228,17 @@ export function PlanBuilder({ s }: { s: AppState }) {
           </div>
           <p class="sr-only" aria-live="polite">{moved?.msg ?? dnd.msg}</p>
           {plan.blocks.length > 0 && plan.targetSec !== undefined && plan.estimatedSec > plan.targetSec && <p class="pill warn-text" role="status">목표 시간보다 약 {Math.ceil((plan.estimatedSec - plan.targetSec) / 60)}분 길어요 (직접 바꾼 내용은 그대로 둠)</p>}
+          {plan.blocks.length > 0 && plan.slack && plan.targetSec !== undefined && plan.estimatedSec < plan.targetSec - 300 && (
+            <div class="slack-note" role="status" aria-label="목표 시간보다 짧은 이유">
+              <strong>목표보다 약 {Math.floor((plan.targetSec - plan.estimatedSec) / 60)}분 짧아요</strong>
+              <ul class="reasons">
+                {plan.slack.cause.includes('cap') && <li>한 근육을 한 번에 {SESSION_CAP[s.settings.level]}세트보다 많이 해도 근성장 이득을 확인하기 어려워 더 넣지 않았어요{s.settings.level === '초보' ? ' (초보 8세트는 앱 기준)' : ''}</li>}
+                {plan.slack.cause.includes('pool') && <li>조건(최소 등급·장비·제외)에 맞는 운동을 모두 썼어요. 최소 등급을 낮추면 늘어나요</li>}
+                {plan.slack.cause.includes('time') && <li>운동이나 세트를 하나 더 넣으면 목표 시간을 넘어요</li>}
+              </ul>
+              {plan.slack.suggest.length > 0 && <div class="row wrap">{plan.slack.suggest.map((p) => <button key={p} class="chip" onClick={() => addPartAndGenerate(p)}>+ {p} 더해서 다시 만들기</button>)}</div>}
+            </div>
+          )}
           {plan.blocks.length > 0 && <p class="sub small">{plan.warmup.label ? `${plan.warmup.label} · ` : ''}휴식 다관절 {plan.rest.compound}초 · 단관절 {plan.rest.isolation}초{plan.blocks.some((b) => b.kind !== 'single') ? ` · 묶음 라운드 후 ${plan.rest.round}초` : ''}</p>}
           {plan.blocks.map((b, bi) => (
             <div class="card" key={blockKey(b)} {...dnd.itemAttrs(bi)}>

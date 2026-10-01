@@ -260,6 +260,44 @@ test('운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링�
   await shot(page, '07-exercise-detail');
 });
 
+test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 → 짧은 이유·삼두 더해서 다시 만들기, 종목 탭 주/보조 근육·근육 필터', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await expect(page.getByTestId('level-rule')).toHaveText('중급: 운동당 최대 4세트 · 한 근육은 한 번에 11세트까지 (보조로 쓰이면 0.5세트로 셈)');
+  await page.getByRole('button', { name: '하체 선택 안 함' }).click();
+  await page.getByRole('button', { name: '75분' }).click();
+  await page.getByLabel('최소 등급').selectOption('B-');
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  // 이전에는 "예상 33:12 / 75분"
+  await expect(page.getByText(/^예상 7[0-5]:\d\d \/ 75분$/)).toBeVisible();
+  await expect(page.getByRole('status', { name: '목표 시간보다 짧은 이유' })).toHaveCount(0);
+  for (const n of ['스미스머신 스쿼트', '루마니안 데드리프트', '라잉 레그 컬', '바벨 힙 쓰러스트', '스탠딩 카프 레이즈']) await expect(page.getByRole('button', { name: `${n} 삭제` })).toBeVisible();
+  await shot(page, '41-plan-legs-75');
+  // 하체 빼고(높음→보통→낮음→빼기) 가슴만
+  for (const lbl of ['하체 높음', '하체 보통', '하체 낮음']) await page.getByRole('button', { name: lbl }).click();
+  await page.getByRole('button', { name: '가슴 선택 안 함' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const note = page.getByRole('status', { name: '목표 시간보다 짧은 이유' });
+  await expect(note).toContainText(/목표보다 약 \d+분 짧아요/);
+  await expect(note).toContainText('한 근육을 한 번에 11세트보다');
+  await checkScreen(page, '42-plan-chest-slack');
+  const before = (await page.getByText(/^예상 \d+:\d\d \/ 75분$/).textContent())!;
+  await note.getByRole('button', { name: '+ 삼두 더해서 다시 만들기' }).click();
+  await expect(page.getByRole('button', { name: '삼두 보통' })).toBeVisible();
+  await expect(page.getByText(/^삼두 [SABCDF][+-]? \(/).first()).toBeVisible();
+  const after = (await page.getByText(/^예상 \d+:\d\d \/ 75분$/).textContent())!;
+  const mins = (t: string) => Number(/(\d+):/.exec(t)![1]);
+  expect(mins(after)).toBeGreaterThan(mins(before) + 10);
+  // 종목 탭: 주/보조 근육 표시, 주 근육 필터
+  await page.getByRole('link', { name: '종목' }).click();
+  await page.getByRole('button', { name: '하체', exact: true }).click();
+  await expect(page.getByRole('button', { name: '스미스머신 스쿼트' })).toContainText('주 대퇴사두 · 보조 둔근');
+  await page.getByLabel('주 근육 필터').selectOption('햄스트링');
+  const rows = page.locator('.list-item .muscles');
+  expect(await rows.count()).toBeGreaterThanOrEqual(5);
+  for (const t of await rows.allTextContents()) expect(t.startsWith('주 햄스트링')).toBe(true);
+  await checkScreen(page, '43-exercises-muscle-filter');
+});
+
 test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본 휴식', async ({ page }) => {
   await page.getByRole('link', { name: '종목' }).click();
   await page.getByRole('button', { name: '+ 직접 추가' }).click();
@@ -766,7 +804,7 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   await w.click(); await w.fill('40'); await w.press('Enter');
   expect(await pc.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toMatch(/1세트 횟수$/);
   await pc.keyboard.press('Control+Enter');
-  await expect(pc.getByText('1/9세트')).toBeVisible();
+  await expect(pc.getByText(/^1\/\d+세트$/)).toBeVisible(); // 세트 수는 플랜 규칙(D-041)에 따라 바뀜
   await expect(pc.getByRole('timer')).toBeVisible();
   // 아래 고정 바는 메뉴를 덮지 않고 바닥에 붙음
   const tb = await pc.locator('.timer').boundingBox();
@@ -778,7 +816,7 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   await pc.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, repeat: true })));
   await pc.keyboard.up('Enter'); await pc.keyboard.up('Control');
   expect(await pc.locator('[aria-label$="완료됨"], .set.done').count()).toBeLessThanOrEqual(doneBefore + 1);
-  await expect(pc.getByText(/^[12]\/9세트$/)).toBeVisible();
+  await expect(pc.getByText(/^[12]\/\d+세트$/)).toBeVisible();
   await checkScreen(pc, '20-pc-workout');
   // 폰 화면으로 보기
   await pc.getByRole('link', { name: '설정' }).click();

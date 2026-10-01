@@ -7,7 +7,8 @@ import { EQUIPMENT } from './types';
 import { gradeAtLeast, GRADES } from './version';
 import { isHeavyHinge, equipmentAvailable, eligibleParts, resolveGrade } from './exercises';
 import type { Plan, PlanRequest } from './planner';
-import { PART_SET_CAP, MUSCLE_CAP } from './planner';
+import { MUSCLE_CAP } from './planner';
+import { sessionLoad, overCap, SESSION_CAP, MAX_SETS_BY_LEVEL } from './volume';
 
 export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[]): string[] {
   const errs: string[] = [];
@@ -24,7 +25,7 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
     if (!it.locked) {
       if (!it.substituted && !gradeAtLeast(it.grade, minGrade)) errs.push(`최소 등급 미만: ${it.name} ${it.grade}`);
       if (it.sets < 2) errs.push(`운동당 2세트 미만: ${it.name}`);
-      if (it.sets > 4) errs.push(`운동당 4세트 초과: ${it.name}`);
+      if (it.sets > MAX_SETS_BY_LEVEL[req.level]) errs.push(`운동당 ${MAX_SETS_BY_LEVEL[req.level]}세트 초과: ${it.name}`);
       if ((req.excluded ?? []).includes(it.exerciseId)) errs.push(`제외한 운동 포함: ${it.name}`);
       if (!equipmentAvailable(e, equip)) errs.push(`없는 장비: ${it.name}`);
       const g = resolveGrade(e, it.part, req.level, req.subGoals?.[it.part], req.userGrades?.[e.id]);
@@ -70,11 +71,11 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
       if (b.kind === 'compound' && b.items[x]!.part !== b.items[y]!.part) errs.push(`컴파운드 세트가 다른 부위: ${a.name_ko}+${c.name_ko}`);
     }
   }
+  // D-041: 근육 그룹별 한 번 상한 (fractional, 부위를 넘어 합산). 잠금만으로 넘으면 그 양까지 인정
+  const known = items.filter((i) => byId.has(i.exerciseId)).map((i) => ({ muscles: byId.get(i.exerciseId)!.muscles, sets: i.sets, locked: i.locked }));
+  for (const g of overCap(sessionLoad(known), SESSION_CAP[req.level], sessionLoad(known.filter((k) => k.locked)))) errs.push(`근육별 상한 초과: ${g}`);
   for (const { part } of req.parts) {
     const mine = items.filter((i) => i.part === part);
-    const n = mine.reduce((s, i) => s + i.sets, 0);
-    const lockedSets = mine.filter((i) => i.locked).reduce((s, i) => s + i.sets, 0);
-    if (n > Math.max(PART_SET_CAP, lockedSets)) errs.push(`부위당 세트 상한 초과: ${part} ${n}`);
     if (!mine.length && !plan.missingParts.includes(part)) errs.push(`부위 누락(이유 없음): ${part}`);
   }
   for (const m of plan.missingParts) {
@@ -115,6 +116,9 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
       if (x === y || x.locked || y.locked) continue;
       const sameVideoGrade = x.grade === y.grade && !x.estimated && !y.estimated;
       if (sameVideoGrade) continue;
+      // D-041: 추천 순서에 없는 추정 등급끼리는 근육 그룹 분산 때문에 순서가 바뀔 수 있음
+      const noStaple = (i: (typeof items)[number]) => byId.get(i.exerciseId)!.staple?.[part] === undefined;
+      if (x.grade === y.grade && x.estimated && y.estimated && noStaple(x) && noStaple(y)) continue;
       const kx = rankKey(x), ky = rankKey(y);
       const c0 = cmpKey(kx, ky) || (x.name < y.name ? -1 : x.name > y.name ? 1 : 0);
       if (c0 < 0 && x.rank > y.rank) errs.push(`순위가 생성 규칙과 다름: ${part} ${x.name} / ${y.name}`);

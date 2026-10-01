@@ -17,6 +17,11 @@ import { setMeta } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import { go } from '../nav';
 import { askConfirm } from '../confirm';
+import { groupOf } from '../../core/volume';
+
+/** D-041: 주 근육·보조 근육 표시 (플랜은 주 1세트, 보조 0.5세트로 셈) */
+export const muscleText = (muscles: readonly string[]) =>
+  muscles.length ? `주 ${muscles[0]}${muscles.length > 1 ? ` · 보조 ${muscles.slice(1).join(', ')}` : ''}` : '';
 
 const KEY = 'exerciseFilter.v1';
 
@@ -30,10 +35,15 @@ export function Exercises({ s }: { s: AppState }) {
   const [adding, setAdding] = useState(false);
   const [equip, setEquip] = useState<Equipment | ''>(saved.equip ?? '');
   const [minG, setMinG] = useState<Grade | ''>(saved.minG ?? '');
-  const remember = (p: object) => sessionStorage.setItem(scopedKey(KEY), JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, ...p }));
+  const [muscle, setMuscle] = useState<string>(saved.muscle ?? '');
+  const remember = (p: object) => sessionStorage.setItem(scopedKey(KEY), JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, muscle, ...p }));
   const level = s.settings.level;
-  const rows = all
-    .filter((e) => (part ? eligibleParts(e).includes(part) : true))
+  const inPart = all.filter((e) => (part ? eligibleParts(e).includes(part) : true));
+  // 근육 필터 목록: 고른 부위 운동들의 주 근육 그룹 (가나다순)
+  const groups = [...new Set(inPart.map((e) => groupOf(e.muscles[0] ?? e.part)))].sort((a, b) => a.localeCompare(b));
+  const mg = groups.includes(muscle) ? muscle : '';
+  const rows = inPart
+    .filter((e) => (mg ? groupOf(e.muscles[0] ?? e.part) === mg : true))
     .filter((e) => matchesQuery(q, [e.name_ko, ...(e.aliases ?? [])]))
     .filter((e) => (favOnly ? s.meta.get(e.id)?.favorite : true))
     .map((e) => ({ e, g: resolveGrade(e, part ?? e.part, level, undefined, s.meta.get(e.id)?.userGrade) }))
@@ -62,6 +72,9 @@ export function Exercises({ s }: { s: AppState }) {
           <option value="">등급 전체</option>{GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
         </select>
       </div>
+      <select value={mg} aria-label="주 근육 필터" style={{ marginTop: '8px' }} onChange={(e) => { const v = (e.target as HTMLSelectElement).value; setMuscle(v); remember({ muscle: v }); }}>
+        <option value="">주 근육 전체</option>{groups.map((g) => <option key={g} value={g}>주 근육: {g}</option>)}
+      </select>
       <div class="card" style={{ padding: '0 10px' }}>
         {rows.map(({ e, g }) => {
           const m = s.meta.get(e.id);
@@ -71,6 +84,7 @@ export function Exercises({ s }: { s: AppState }) {
               <div class="grow">
                 <div>{m?.favorite ? '★ ' : ''}{e.name_ko}{m?.excluded ? ' (제외됨)' : ''}</div>
                 <div class="pill">{e.part} · {e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.guide.length ? ` · 자세 포인트 ${e.guide.length}` : ''}</div>
+                {e.muscles.length > 0 && <div class="muscles">{muscleText(e.muscles)}</div>}
               </div>
             </div>
           );

@@ -1,0 +1,126 @@
+import { describe, expect, it } from 'vitest';
+import baseFile from '../data/exercises.base.json';
+import wkFile from '../data/exercises.workout_k.json';
+import stapleFile from '../data/staples.json';
+import { buildExercises } from '../src/core/exercises';
+import type { WorkoutKData } from '../src/core/exercises';
+import { generatePlan } from '../src/core/planner';
+import type { PlanRequest } from '../src/core/planner';
+import { validatePlan } from '../src/core/validatePlan';
+import { MUSCLE_GROUP, groupOf, setShares, sessionLoad, overCap, fmtSets, SESSION_CAP, MAX_SETS_BY_LEVEL } from '../src/core/volume';
+import type { Exercise, Part, Level } from '../src/core/types';
+import { LEVELS } from '../src/core/types';
+
+const real = buildExercises(baseFile.exercises as Exercise[], wkFile as unknown as WorkoutKData, stapleFile.order as Partial<Record<Part, string[]>>);
+const byId = new Map(real.map((e) => [e.id, e]));
+const items = (p: ReturnType<typeof generatePlan>) => p.blocks.flatMap((b) => b.items);
+const loadOfPlan = (p: ReturnType<typeof generatePlan>) => sessionLoad(items(p).map((i) => ({ muscles: byId.get(i.exerciseId)!.muscles, sets: i.sets })));
+const legs = (level: Level, targetMinutes?: number): PlanRequest => ({ parts: [{ part: '하체', priority: 'high' }], level, minGrade: 'B-', ...(targetMinutes ? { targetMinutes } : {}) });
+
+describe('근육 그룹과 fractional 세트 (D-041)', () => {
+  it('운동 데이터의 모든 근육 이름이 그룹 표에 있음 (새 이름이 생기면 여기서 실패)', () => {
+    const names = new Set(real.flatMap((e) => e.muscles));
+    expect([...names].filter((m) => !(m in MUSCLE_GROUP))).toEqual([]);
+  });
+  it('주 근육 1세트, 보조 0.5세트, 같은 그룹은 큰 값 하나', () => {
+    expect([...setShares(['대퇴사두', '둔근', '내전근'])]).toEqual([['대퇴사두', 1], ['둔근', 0.5], ['내전근', 0.5]]);
+    expect([...setShares(['대퇴사두', '대퇴직근'])]).toEqual([['대퇴사두', 1]]);
+    expect([...setShares(['둔근', '중둔근', '햄스트링'])]).toEqual([['둔근', 1], ['햄스트링', 0.5]]);
+    expect(groupOf('하체')).toBe('하체'); // 직접 추가한 운동(근육 = 부위 이름)
+    const load = sessionLoad([{ muscles: ['대퇴사두', '둔근'], sets: 4 }, { muscles: ['둔근'], sets: 3 }]);
+    expect(load.get('대퇴사두')).toBe(4);
+    expect(load.get('둔근')).toBe(5);
+    expect(fmtSets(5)).toBe('5');
+    expect(fmtSets(5.5)).toBe('5.5');
+  });
+  it('상한 초과 판정: 잠금만으로 넘으면 그 양까지 인정', () => {
+    const load = new Map([['가슴', 12], ['삼두', 11]]);
+    expect(overCap(load, 11)).toEqual(['가슴']);
+    expect(overCap(load, 11, new Map([['가슴', 12]]))).toEqual([]);
+    expect(overCap(new Map([['가슴', 12.5]]), 11, new Map([['가슴', 12]]))).toEqual(['가슴']);
+  });
+  it('수준별 값: 초보 8·3세트(앱 판단), 중급·상급 11·4세트', () => {
+    expect(SESSION_CAP).toEqual({ 초보: 8, 중급: 11, 상급: 11 });
+    expect(MAX_SETS_BY_LEVEL).toEqual({ 초보: 3, 중급: 4, 상급: 4 });
+  });
+});
+
+describe('사용자 신고 재현: 하체 · 75분 · B- 이상 (이전 33분 12초)', () => {
+  it('중급: 70분 이상 75분 이하, 운동 7개 이상, 햄스트링·둔근·종아리까지 들어감, 검증 위반 0', () => {
+    const q = legs('중급', 75);
+    const p = generatePlan(q, real);
+    expect(p.estimatedSec).toBeGreaterThanOrEqual(70 * 60);
+    expect(p.estimatedSec).toBeLessThanOrEqual(75 * 60);
+    expect(items(p).length).toBeGreaterThanOrEqual(7);
+    const groups = new Set(items(p).map((i) => groupOf(byId.get(i.exerciseId)!.muscles[0]!)));
+    for (const g of ['대퇴사두', '햄스트링', '둔근', '종아리']) expect(groups.has(g)).toBe(true);
+    expect(p.slack).toBeUndefined();
+    expect(validatePlan(p, q, real)).toEqual([]);
+  });
+  it('수준이 결과를 바꿈: 초보는 운동당 3세트·근육별 8 이하, 남는 시간은 이유와 코어 추가 제안', () => {
+    const q = legs('초보', 75);
+    const p = generatePlan(q, real);
+    expect(items(p).every((i) => i.sets <= 3)).toBe(true);
+    expect(Math.max(...loadOfPlan(p).values())).toBeLessThanOrEqual(8);
+    expect(validatePlan(p, q, real)).toEqual([]);
+    expect(p.slack).toEqual({ cause: ['cap'], suggest: ['코어'] });
+    expect(p.reasons.some((r) => r.includes('초보 8세트, 앱 판단'))).toBe(true);
+    // 추천 순서 밖에서는 이미 있는 둔근보다 새 근육(내전근) 먼저
+    expect(items(p).map((i) => i.exerciseId)).toContain('hip_adduction');
+    const mid = generatePlan(legs('중급', 75), real);
+    expect(items(p).reduce((s, i) => s + i.sets, 0)).toBeLessThan(items(mid).reduce((s, i) => s + i.sets, 0));
+  });
+  it('세 수준 × 45·60·75·90분: 목표 넘지 않음, 근육별 상한·운동당 최대 세트 지킴, 60분 이상이면 이전(33분)보다 김', () => {
+    for (const level of LEVELS) for (const t of [45, 60, 75, 90]) {
+      const q = legs(level, t);
+      const p = generatePlan(q, real);
+      expect(validatePlan(p, q, real)).toEqual([]);
+      expect(p.estimatedSec).toBeLessThanOrEqual(t * 60);
+      expect(items(p).every((i) => i.sets <= MAX_SETS_BY_LEVEL[level])).toBe(true);
+      expect(Math.max(...loadOfPlan(p).values())).toBeLessThanOrEqual(SESSION_CAP[level]);
+      if (t >= 60) expect(p.estimatedSec).toBeGreaterThan(1992 + 15 * 60);
+    }
+  });
+});
+
+describe('채울 수 없을 때는 이유와 제안 (D-041)', () => {
+  it('가슴만 75분: 가슴 11/11에서 멈추고, 삼두·어깨 추가 제안', () => {
+    const q: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }], level: '중급', minGrade: 'B-', targetMinutes: 75 };
+    const p = generatePlan(q, real);
+    expect(loadOfPlan(p).get('가슴')).toBe(11);
+    expect(p.slack).toEqual({ cause: ['cap'], suggest: ['삼두', '어깨'] });
+    expect(p.reasons.some((r) => r.includes('가슴 지금 11/11'))).toBe(true);
+    expect(p.reasons.some((r) => r.includes('여유') && r.includes('삼두·어깨를 더하면'))).toBe(true);
+    // 제안대로 삼두를 더하면 더 길어짐
+    const more = generatePlan({ ...q, parts: [...q.parts, { part: '삼두', priority: 'normal' }] }, real);
+    expect(more.estimatedSec).toBeGreaterThan(p.estimatedSec + 15 * 60);
+    expect(validatePlan(more, { ...q, parts: [...q.parts, { part: '삼두', priority: 'normal' }] }, real)).toEqual([]);
+  });
+  it('부위를 넘어 합산: 가슴 프레스의 삼두 0.5세트가 삼두 상한에 들어감', () => {
+    const q: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }, { part: '삼두', priority: 'normal' }], level: '중급', minGrade: 'B-', targetMinutes: 90 };
+    const p = generatePlan(q, real);
+    const direct = items(p).filter((i) => groupOf(byId.get(i.exerciseId)!.muscles[0]!) === '삼두').reduce((s, i) => s + i.sets, 0);
+    expect(loadOfPlan(p).get('삼두')!).toBeGreaterThan(direct);
+    expect(loadOfPlan(p).get('삼두')!).toBeLessThanOrEqual(11);
+  });
+  it('목표 시간 없음 + 초보 이두: 기본안 3개 중 상한을 넘는 하나는 "상한" 이유로 뺌 (시간 부족 아님)', () => {
+    const p = generatePlan({ parts: [{ part: '이두', priority: 'high' }], level: '초보' }, real);
+    expect(items(p)).toHaveLength(2);
+    const r = p.reasons.find((x) => x.startsWith('이두:'))!;
+    expect(r).toContain('상한');
+    expect(r).not.toContain('시간 부족');
+  });
+  it('검증 함수가 근육별 상한 초과와 수준별 최대 세트 초과를 잡음', () => {
+    const q = legs('중급', 75);
+    const p = generatePlan(q, real);
+    const forged = structuredClone(p);
+    const ext = forged.blocks.flatMap((b) => b.items).find((i) => i.exerciseId === 'leg_extension')!;
+    ext.sets = 4;
+    forged.blocks.push({ kind: 'single', items: [{ ...ext, exerciseId: 'hack_squat', name: '핵 스쿼트 머신', sets: 5, rank: 50 }], timeSec: 0 });
+    const errs = validatePlan(forged, q, real);
+    expect(errs).toContain('근육별 상한 초과: 대퇴사두');
+    const beginner = generatePlan(legs('초보', 45), real);
+    const f2 = structuredClone(beginner); f2.blocks[0]!.items[0]!.sets = 4;
+    expect(validatePlan(f2, legs('초보', 45), real)).toContain(`운동당 3세트 초과: ${f2.blocks[0]!.items[0]!.name}`);
+  });
+});
