@@ -1,8 +1,10 @@
+import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, activeOf, historyOf } from '../store';
 import { catalog } from '../catalog';
-import { startRoutine } from '../actions';
-import { emptyRoutine } from '../../core/session';
+import { startRoutine, setHomeHidden } from '../actions';
+import { emptyRoutine, homeRecent } from '../../core/session';
+import type { Workout } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { BackupBanner } from './BackupSection';
 import { SendStatus } from './AutoSendSection';
@@ -10,13 +12,35 @@ import { RemoteCards } from './RemoteCards';
 import { newId, softDelete } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
+import { askConfirm, askChoice } from '../confirm';
 import { syncEnabled } from '../sync';
+
+/**
+ * 홈 "최근 운동" 삭제 (D-040): 목록에서만 빼기(기록·통계 그대로, 기록 상세에서 되돌림) / 완전 삭제(되돌릴 수 없음).
+ * 안전한 쪽(목록에서만 빼기)이 첫 버튼·초점. 완전 삭제는 빨간 버튼. 닫기·Esc·취소는 아무것도 안 함
+ */
+async function removeRecent(w: Workout): Promise<'ok' | 'alt' | false | null> {
+  const pick = await askChoice({
+    title: '이 운동을 어떻게 할까요?',
+    message: `"${w.name}"\n· 목록에서만 빼기: 홈에서만 안 보여요. 기록 탭·통계에는 남고, 기록 상세에서 되돌릴 수 있어요\n· 완전 삭제: 기록·통계에서도 지워져요. 되돌릴 수 없어요`,
+    ok: '목록에서만 빼기', alt: '완전 삭제', altDanger: true,
+  });
+  if (pick === 'ok') {
+    await setHomeHidden(w.id, true); // 운동 기록은 그대로, 설정의 "뺀 목록"에만 더함
+  } else if (pick === 'alt') {
+    await mutate((d) => softDelete(d, 'workouts', w.id));
+    await setHomeHidden(w.id, false); // 뺀 목록에 남아 있었다면 정리 (보통은 없음)
+  }
+  return pick;
+}
 
 export function Home({ s }: { s: AppState }) {
   const all = catalog(s.custom);
   const name = (id: string) => all.find((e) => e.id === id)?.name_ko ?? id;
   const active = activeOf(s);
-  const recent = historyOf(s).slice(0, 5);
+  // 빼기·완전 삭제 뒤 카드가 사라지므로 결과를 글로 알림 (화면 읽기 프로그램도 읽음)
+  const [done, setDone] = useState<string | null>(null);
+  const recent = homeRecent(historyOf(s), s.settings.homeHidden, 5); // "목록에서만 빼기" 한 것은 건너뜀 (D-040)
   return (
     <main>
       <h1>운동 기록</h1>
@@ -67,7 +91,7 @@ export function Home({ s }: { s: AppState }) {
           <div class="row" style={{ marginTop: '8px' }}>
             <button class="primary grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}>시작</button>
             <button onClick={() => go(`#/routine/${encodeURIComponent(r.id)}`)}>편집</button>
-            <button class="danger" onClick={async () => { if (confirm(`"${r.name}" 루틴을 지울까요? 운동 기록은 남아요.`)) await mutate((d) => softDelete(d, 'routines', r.id)); }} aria-label={`${r.name} 삭제`}>삭제</button>
+            <button class="danger" onClick={async () => { if (await askConfirm({ title: '루틴을 지울까요?', message: `"${r.name}" · 운동 기록은 남아요.`, ok: '지우기', danger: true })) await mutate((d) => softDelete(d, 'routines', r.id)); }} aria-label={`${r.name} 삭제`}>삭제</button>
           </div>
         </div>
       ))}
@@ -84,12 +108,13 @@ export function Home({ s }: { s: AppState }) {
             </a>
             <div class="row" style={{ marginTop: '6px', justifyContent: 'flex-end' }}>
               <button aria-label={`최근 운동 ${w.name} 수정`} onClick={() => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`)}>수정</button>
-              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={async () => { if (confirm(`"${w.name}" 운동 기록을 지울까요? 되돌릴 수 없어요.`)) await mutate((d) => softDelete(d, 'workouts', w.id)); }}>삭제</button>
+              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={() => void removeRecent(w).then((p) => { if (p === 'ok') setDone(`"${w.name}"을(를) 홈에서 뺐어요. 기록 탭의 상세에서 되돌릴 수 있어요`); else if (p === 'alt') setDone(`"${w.name}"을(를) 완전히 지웠어요`); })}>삭제</button>
             </div>
           </div>
         );
       })}
       </div>
+      <p role="status" class="small sub" style={{ minHeight: done ? undefined : 0, margin: done ? undefined : 0 }}>{done ?? ''}</p>
     </main>
   );
 }

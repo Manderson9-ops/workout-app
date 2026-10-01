@@ -78,6 +78,10 @@ label { display: block; font-size: 14px; color: var(--sub); margin: 12px 0 6px; 
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 80vh; overflow-y: auto; background: var(--card); border-radius: 18px 18px 0 0; padding: 14px 14px calc(14px + var(--safe-b)); z-index: 41; }
 .reasons { margin: 6px 0 0; padding-left: 18px; color: var(--sub); font-size: 14px; }
 .reasons li { margin: 3px 0; }
+/* D-041: 목표보다 짧을 때 이유와 부위 추가 제안 */
+.slack-note { background: var(--card); border: 1px solid var(--warn); border-radius: 14px; padding: 12px; margin: 10px 0; }
+.slack-note strong { color: var(--warn); }
+.muscles { color: var(--sub); font-size: 13px; margin-top: 2px; }
 .empty { text-align: center; color: var(--sub); padding: 30px 10px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pill { font-size: 12px; color: var(--sub); }

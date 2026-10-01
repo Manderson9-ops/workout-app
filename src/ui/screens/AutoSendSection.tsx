@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { getSendConfig, saveSendConfig, clearSendConfig, pingSend, sendNow, lastSentAt, hasPending, useSendState, getSendState, retryBlocked, blockedReason } from '../autoSend';
 import { maskKey } from '../../core/autoSendConfig';
 import { IS_PREVIEW } from '../appName';
+import { askConfirm } from '../confirm';
 
 const when = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '없음');
 
@@ -32,7 +33,7 @@ export function AutoSendSection() {
           <div class="row wrap">
             <button onClick={async () => { const r = await pingSend(); setMsg({ t: r.message, ok: r.ok }); }}>연결 확인</button>
             <button class="primary" disabled={st.phase === 'sending'} onClick={async () => { const ok = await sendNow('manual'); setMsg({ t: ok ? 'PC로 보냈어요' : `보내지 못했어요: ${getSendState().error ?? ''}`, ok }); }}>지금 보내기</button>
-            <button class="danger" onClick={() => { if (confirm('자동 보내기를 끌까요? 이 기기에서 설정이 지워져요.')) { clearSendConfig(); setCfg(undefined); setMsg({ t: '자동 보내기를 껐어요', ok: true }); } }}>끄기</button>
+            <button class="danger" onClick={async () => { if (await askConfirm({ title: '자동 보내기를 끌까요?', message: '이 기기에서 설정이 지워져요.', ok: '끄기', danger: true })) { clearSendConfig(); setCfg(undefined); setMsg({ t: '자동 보내기를 껐어요', ok: true }); } }}>끄기</button>
           </div>
         </>
       ) : (

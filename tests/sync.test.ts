@@ -7,7 +7,7 @@ import type { ServerState, SyncRequest } from '../src/core/syncMerge';
 import { syncOnce, getKv, restoreStash, collectMutations, CHUNK } from '../src/db/sync';
 import type { Transport } from '../src/db/sync';
 import { SYNC_TABLES, syncedFields, withoutStamp } from '../src/core/syncStamp';
-import { planToRoutine, startWorkout, moveWorkoutBlock } from '../src/core/session';
+import { planToRoutine, startWorkout, moveWorkoutBlock, withHidden, withoutHidden } from '../src/core/session';
 import type { Routine, Workout } from '../src/core/session';
 
 let T = 1_750_000_000_000;
@@ -302,6 +302,24 @@ describe('끝낸 운동 고치기 동기화 (D-035)', () => {
     expect(a).toMatchObject({ name: '등 (고침)', ownerDeviceId: 'A', editedAt: '2026-09-30T12:00:00.000Z' });
     expect(a.blocks[0]!.items[0]!.sets[0]!.weight).toBe(70);
     expect(await A.workouts.filter((w) => !!w.pendingMerge).count()).toBe(0);
+  });
+  it('폰(A)이 기록을 고치는 동안 PC(B)가 "목록에서만 빼기" → 둘 다 남음: 고친 세트 그대로 + 양쪽에서 홈에서 빠짐, 다시 보이기도 전파 (D-040)', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    await A.workouts.put(Wd()); await A.settings.put({ ...DEFAULT_SETTINGS }); await sync(A, transport); await sync(B, transport);
+    // 동기화 전에 양쪽이 각자 바꿈: A는 세트 무게, B는 뺀 목록(설정)
+    const a0 = (await A.workouts.get('w9'))!;
+    a0.blocks[0]!.items[0]!.sets[0] = { weight: 80, reps: 5, warmup: false, done: true, doneAt: '2026-09-30T10:05:00.000Z' };
+    await A.workouts.put({ ...a0, editedAt: '2026-09-30T12:00:00.000Z' });
+    const sb = (await B.settings.get('main'))!; await B.settings.put({ ...sb, homeHidden: withHidden(sb.homeHidden, 'w9') });
+    await sync(A, transport); await sync(B, transport); await sync(A, transport);
+    for (const X of [A, B]) {
+      expect((await X.workouts.get('w9'))!.blocks[0]!.items[0]!.sets[0]!.weight).toBe(80);
+      expect((await X.settings.get('main'))!.homeHidden).toEqual(['w9']);
+      expect(await X.tombs.count()).toBe(0);
+    }
+    const sa = (await A.settings.get('main'))!; await A.settings.put({ ...sa, homeHidden: withoutHidden(sa.homeHidden, 'w9') });
+    await sync(A, transport); await sync(B, transport);
+    expect((await B.settings.get('main'))!.homeHidden).toEqual([]);
   });
   it('두 기기가 같은 기록을 동시에 고치면 한쪽으로 모이고(나중 수정), 사본은 생기지 않음', async () => {
     const { transport } = server(); const A = dev('A'), B = dev('B', 45_000);

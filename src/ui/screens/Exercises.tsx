@@ -16,6 +16,14 @@ import { GradeBadge, Sheet } from '../components';
 import { setMeta } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import { go } from '../nav';
+import { askConfirm } from '../confirm';
+import { groupOf } from '../../core/volume';
+
+/** D-041: 주 근육·보조 근육 표시 (플랜은 주 1세트, 보조 0.5세트로 셈) */
+export const muscleText = (muscles: readonly string[]) =>
+  muscles.length ? `주 ${label(muscles[0]!)}${muscles.length > 1 ? ` · 보조 ${muscles.slice(1).map(label).join(', ')}` : ''}` : '';
+/** 근육 이름이 그룹 이름과 다르면 그룹을 괄호로 (필터의 그룹 이름과 맞춰 보이게: 비복근(종아리)) */
+const label = (m: string) => (groupOf(m) !== m ? `${m}(${groupOf(m)})` : m);
 
 const KEY = 'exerciseFilter.v1';
 
@@ -29,10 +37,15 @@ export function Exercises({ s }: { s: AppState }) {
   const [adding, setAdding] = useState(false);
   const [equip, setEquip] = useState<Equipment | ''>(saved.equip ?? '');
   const [minG, setMinG] = useState<Grade | ''>(saved.minG ?? '');
-  const remember = (p: object) => sessionStorage.setItem(scopedKey(KEY), JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, ...p }));
+  const [muscle, setMuscle] = useState<string>(saved.muscle ?? '');
+  const remember = (p: object) => sessionStorage.setItem(scopedKey(KEY), JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, muscle, ...p }));
   const level = s.settings.level;
-  const rows = all
-    .filter((e) => (part ? eligibleParts(e).includes(part) : true))
+  const inPart = all.filter((e) => (part ? eligibleParts(e).includes(part) : true));
+  // 근육 필터 목록: 고른 부위 운동들의 주 근육 그룹 (가나다순)
+  const groups = [...new Set(inPart.map((e) => groupOf(e.muscles[0] ?? e.part)))].sort((a, b) => a.localeCompare(b));
+  const mg = groups.includes(muscle) ? muscle : '';
+  const rows = inPart
+    .filter((e) => (mg ? groupOf(e.muscles[0] ?? e.part) === mg : true))
     .filter((e) => matchesQuery(q, [e.name_ko, ...(e.aliases ?? [])]))
     .filter((e) => (favOnly ? s.meta.get(e.id)?.favorite : true))
     .map((e) => ({ e, g: resolveGrade(e, part ?? e.part, level, undefined, s.meta.get(e.id)?.userGrade) }))
@@ -61,6 +74,9 @@ export function Exercises({ s }: { s: AppState }) {
           <option value="">등급 전체</option>{GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
         </select>
       </div>
+      <select value={mg} aria-label="주 근육 필터" style={{ marginTop: '8px' }} onChange={(e) => { const v = (e.target as HTMLSelectElement).value; setMuscle(v); remember({ muscle: v }); }}>
+        <option value="">주 근육 전체</option>{groups.map((g) => <option key={g} value={g}>주 근육: {g}</option>)}
+      </select>
       <div class="card" style={{ padding: '0 10px' }}>
         {rows.map(({ e, g }) => {
           const m = s.meta.get(e.id);
@@ -70,6 +86,7 @@ export function Exercises({ s }: { s: AppState }) {
               <div class="grow">
                 <div>{m?.favorite ? '★ ' : ''}{e.name_ko}{m?.excluded ? ' (제외됨)' : ''}</div>
                 <div class="pill">{e.part} · {e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.guide.length ? ` · 자세 포인트 ${e.guide.length}` : ''}</div>
+                {e.muscles.length > 0 && <div class="muscles">{muscleText(e.muscles)}</div>}
               </div>
             </div>
           );
@@ -123,7 +140,7 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
       <button class="ghost" onClick={() => history.back()} aria-label="뒤로">← 뒤로</button>
       <div class="row"><GradeBadge g={g} /><h1 class="grow" style={{ margin: '4px 0' }}>{e.name_ko}</h1></div>
       <p class="sub">{e.part} · {e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.unilateral ? ' · 한쪽씩' : ''}{e.heavy ? ' · 무거운 운동' : ''}</p>
-      <p class="sub small">주 근육: {e.muscles.join(', ')} · 묶음: {families[e.family] ?? '직접 추가'}{e.aliases?.length ? ` · 다른 이름: ${e.aliases.join(', ')}` : ''}</p>
+      <p class="sub small">{muscleText(e.muscles)} · 묶음: {families[e.family] ?? '직접 추가'}{e.aliases?.length ? ` · 다른 이름: ${e.aliases.join(', ')}` : ''}</p>
       {e.note && <p class="sub small">메모: {e.note}</p>}
       <div class="row wrap" style={{ marginTop: '8px' }}>
         <button class={`chip ${m?.favorite ? 'on' : ''}`} aria-pressed={!!m?.favorite} onClick={() => setMeta(e.id, { favorite: !m?.favorite })}>{m?.favorite ? '★ 즐겨찾기' : '☆ 즐겨찾기'}</button>
@@ -171,7 +188,7 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
             </div>
           ))}
         </div>
-      )}      {'custom' in e && <button class="danger" onClick={async () => { if (confirm('직접 추가한 운동을 지울까요? 운동 기록은 남아요.')) { await mutate((d) => softDelete(d, 'custom', e.id)); go('#/exercises'); } }}>이 운동 삭제</button>}
+      )}      {'custom' in e && <button class="danger" onClick={async () => { if (await askConfirm({ title: '직접 추가한 운동을 지울까요?', message: '운동 기록은 남아요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'custom', e.id)); go('#/exercises'); } }}>이 운동 삭제</button>}
     </main>
   );
 }

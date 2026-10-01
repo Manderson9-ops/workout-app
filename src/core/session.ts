@@ -352,3 +352,18 @@ export function mergeLate(orig: Workout, copy: Workout): Workout {
   }));
   return { ...orig, blocks };
 }
+
+/**
+ * 홈 "최근 운동"에서만 빼기 (D-040). 뺀 운동 ID 목록은 설정(settings.homeHidden)에 둠:
+ * 운동 기록 자체를 고치지 않으므로, 다른 기기에서 같은 기록을 고친 것과 부딪혀 고친 내용을 잃는 일이 없음.
+ * (설정은 항목 단위로 합쳐짐. 두 기기가 동시에 빼면 한쪽 빼기만 남을 수 있음 = 표시만의 문제)
+ */
+export function withHidden(list: readonly string[] | undefined, id: string): string[] { const l = list ?? []; return l.includes(id) ? [...l] : [...l, id]; }
+export function withoutHidden(list: readonly string[] | undefined, id: string): string[] { return (list ?? []).filter((x) => x !== id); }
+/** 홈에서 뺀 기록 표시 글자 (기록 탭 목록·상세, 시험에서도 같이 씀) */
+export const HOME_HIDDEN_LABEL = '홈에서 뺌';
+/** 홈 "최근 운동" 목록: 뺀 것을 건너뛰고 n개 (history는 최신순) */
+export function homeRecent(history: Workout[], hidden: readonly string[] | undefined, n: number): Workout[] {
+  const h = new Set(hidden ?? []);
+  return history.filter((w) => !h.has(w.id)).slice(0, n);
+}

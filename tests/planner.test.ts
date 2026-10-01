@@ -65,18 +65,21 @@ describe('BLUEPRINT 5.7.1 계산 예시 (고정 사례)', () => {
     expect(p.estimatedSec).toBe(3060);
     expect(names(p)).toEqual(['one_arm_lat_pulldown', 'pull_up_neutral', 'kelso_shrug', 'smith_jm_press', 'oh_cable_ext_single']);
   });
-  it('60분: 등은 상한(11)에 걸려 그대로, 삼두 긴 로프 푸시다운 추가 → 58분 18초', () => {
+  it('60분 (D-041): 부위 11세트 상한이 없어져 등에 체스트 서포티드 T바로우 추가 → 59분 42초 (이전 58분 18초)', () => {
     const p = generatePlan(req571(60), ex571);
-    expect(p.estimatedSec).toBe(3498);
-    expect(names(p)).toContain('long_rope_pushdown');
+    expect(p.estimatedSec).toBe(3582);
+    expect(names(p)).toContain('chest_supported_tbar_row');
     expect(p.rest).toEqual({ compound: 150, isolation: 90, round: 120 });
-    expect(p.reasons.some((r) => r.startsWith('등:') && r.includes('에 걸려 더 늘리지 않음'))).toBe(true);
+    expect(p.reasons.some((r) => r.startsWith('등:') && r.includes("남는 시간에 '체스트 서포티드 T바로우'"))).toBe(true);
+    expect(p.slack).toBeUndefined();
   });
-  it('45분: 슈퍼세트 2쌍(원암+오버헤드 케이블, 켈소+JM) → 41분 00초, 휴식 그대로', () => {
+  it('45분: 슈퍼세트 2쌍(원암+오버헤드 케이블, 켈소+JM) + 남는 시간에 뉴트럴 풀업 3→4세트 (D-041) → 44분 14초, 휴식 그대로', () => {
     const p = generatePlan(req571(45), ex571);
-    expect(p.estimatedSec).toBe(2460);
+    expect(p.estimatedSec).toBe(2654);
     expect(names(p)).toEqual(['one_arm_lat_pulldown+oh_cable_ext_single', 'pull_up_neutral', 'kelso_shrug+smith_jm_press']);
     expect(p.blocks.filter((b) => b.kind === 'superset')).toHaveLength(2);
+    expect(p.blocks[1]!.items[0]!.sets).toBe(4);
+    expect(p.reasons.some((r) => r.includes("세트 추가: '뉴트럴 그립 풀업' 3→4"))).toBe(true);
   });
   it('45분 변형(풀업 즐겨찾기): 짝이 바뀌어 2쌍이면 39분(창 밖) → 3쌍 + 긴 로프 추가, 43분 18초 (D-013 정정)', () => {
     const p = generatePlan(req571(45, { favorites: ['pull_up_neutral'] }), ex571);
@@ -412,7 +415,7 @@ describe('검토 지적 회귀 테스트', () => {
     const tri = generatePlan({ parts: [{ part: '삼두', priority: 'high' }], level: '중급', targetMinutes: 20, groupings: ['compound'] }, real);
     expect(tri.reasons.some((x) => x.includes('세트 3→2'))).toBe(true);
     const r60 = generatePlan(req571(60), ex571);
-    expect(r60.reasons.some((x) => x.includes('남는 시간에') && x.includes('긴 로프'))).toBe(true);
+    expect(r60.reasons.some((x) => x.includes('남는 시간에') && x.includes('T바로우'))).toBe(true);
     const r45 = generatePlan(req571(45), ex571);
     expect(r45.reasons.some((x) => /약 \d+분 절약/.test(x))).toBe(true);
     const sh = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, real);

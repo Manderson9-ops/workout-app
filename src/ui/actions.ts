@@ -7,8 +7,8 @@ import { askConfirm } from './confirm';
 import { diag } from './diag';
 import { deviceId } from './deviceId';
 import type { AppState } from './store';
-import { newId } from '../db/db';
-import { startWorkout, planToRoutine, decideFinish } from '../core/session';
+import { newId, DEFAULT_SETTINGS } from '../db/db';
+import { startWorkout, planToRoutine, decideFinish, withHidden, withoutHidden } from '../core/session';
 import type { FinishDecision } from '../core/session';
 import type { Routine, Workout } from '../core/session';
 import type { PlanBlock } from '../core/planner';
@@ -137,5 +137,18 @@ export async function setMeta(exerciseId: string, patch: { favorite?: boolean; u
     const next = { ...cur, ...patch } as Record<string, unknown>;
     for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
     await d.meta.put(next as never);
+  });
+}
+
+/**
+ * 홈 "최근 운동"에서만 빼기·다시 보이기 (D-040). 설정의 지금 값을 저장소에서 읽어 이 ID만 더하거나 뺌
+ * (화면이 들고 있던 설정으로 덮어써 다른 항목을 되돌리지 않게)
+ */
+export async function setHomeHidden(id: string, hidden: boolean): Promise<void> {
+  await mutate(async (d) => {
+    const st = (await d.settings.get('main')) ?? DEFAULT_SETTINGS;
+    const next = hidden ? withHidden(st.homeHidden, id) : withoutHidden(st.homeHidden, id);
+    if (next.length === (st.homeHidden ?? []).length) return; // 바뀐 게 없으면 저장·동기화하지 않음
+    await d.settings.put({ ...st, key: 'main', homeHidden: next });
   });
 }

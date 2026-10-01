@@ -15,6 +15,16 @@ async function endWorkout(p: Page) {
   await p.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' }).click();
 }
 
+/** 앱 안 확인 창(D-038·D-039)에서 버튼 하나 누름. 확인 창은 aria-modal 시트 */
+async function answer(p: Page, button: string) {
+  await p.locator('.sheet[aria-modal="true"]').getByRole('button', { name: button, exact: true }).click();
+}
+
+/** 브라우저 기본 확인·알림 창은 하나도 뜨면 안 됨 (D-039). 뜨면 취소로 답하고 시험 끝에 실패 */
+const nativeDialogs: string[] = [];
+function noNativeDialog(p: Page) { p.on('dialog', (d) => { nativeDialogs.push(`${d.type()}: ${d.message()}`); void d.dismiss().catch(() => undefined); }); }
+test.afterEach(() => { expect(nativeDialogs, '브라우저 기본 확인·알림 창 (D-039)').toEqual([]); });
+
 /** 가로 스크롤 없음 (7.1) */
 async function noHorizontalScroll(page: Page) {
   const r = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
@@ -46,6 +56,8 @@ async function makeRoutine(page: Page, parts: string[], minutes: string) {
 }
 
 test.beforeEach(async ({ page }) => {
+  nativeDialogs.length = 0;
+  noNativeDialog(page);
   await page.goto('./#/');
   await expect(page.getByText('기록은 이 기기에만 저장돼요')).toBeVisible(); // 첫 실행 안내
   await page.getByRole('button', { name: '알겠어요' }).click();
@@ -54,7 +66,6 @@ test.beforeEach(async ({ page }) => {
 test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3개 → 종료 (탭 수 12 이하)', async ({ page }) => {
   let taps = 0;
   const tap = async (l: Locator) => { taps++; await l.click(); };
-  page.on('dialog', (d) => { taps++; void d.accept(); }); // 확인창도 한 번의 탭으로 셈
 
   await page.getByRole('link', { name: '플랜' }).click();
   await page.getByRole('button', { name: '등 선택 안 함' }).click();
@@ -203,6 +214,15 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   await ask.getByRole('button', { name: '취소' }).click();
   await expect(page).toHaveURL(/#\/workout$/);
   await expect(doneBtn).toBeVisible();
+  // 창이 열린 채 뒤로 가기 → 창만 닫히고 가려던 화면으로 (취소처럼 운동 화면으로 끌고 가지 않음, D-039 검토)
+  await page.getByRole('link', { name: '기록' }).click();
+  await page.getByRole('link', { name: '홈' }).click();
+  await startBtn.click();
+  await expect(ask).toBeVisible();
+  await page.goBack();
+  await expect(ask).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(page).toHaveURL(/#\/stats$/);
   await page.getByRole('link', { name: '홈' }).click();
   await startBtn.click();
   await ask.getByRole('button', { name: '끝내고 새로 시작' }).click();
@@ -238,6 +258,44 @@ test('운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링�
   await expect(page.getByRole('button', { name: '★ 즐겨찾기' })).toBeVisible();
   await noHorizontalScroll(page); await touchTargets(page);
   await shot(page, '07-exercise-detail');
+});
+
+test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 → 짧은 이유·삼두 더해서 다시 만들기, 종목 탭 주/보조 근육·근육 필터', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await expect(page.getByTestId('level-rule')).toHaveText('중급: 운동당 최대 4세트(앱 기준) · 한 근육은 한 번에 11세트까지(연구 근거, 보조로 쓰이면 0.5세트로 셈)');
+  await page.getByRole('button', { name: '하체 선택 안 함' }).click();
+  await page.getByRole('button', { name: '75분' }).click();
+  await page.getByLabel('최소 등급').selectOption('B-');
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  // 이전에는 "예상 33:12 / 75분"
+  await expect(page.getByText(/^예상 7[0-5]:\d\d \/ 75분$/)).toBeVisible();
+  await expect(page.getByRole('status', { name: '목표 시간보다 짧은 이유' })).toHaveCount(0);
+  for (const n of ['스미스머신 스쿼트', '루마니안 데드리프트', '라잉 레그 컬', '바벨 힙 쓰러스트', '스탠딩 카프 레이즈']) await expect(page.getByRole('button', { name: `${n} 삭제` })).toBeVisible();
+  await shot(page, '41-plan-legs-75');
+  // 하체 빼고(높음→보통→낮음→빼기) 가슴만
+  for (const lbl of ['하체 높음', '하체 보통', '하체 낮음']) await page.getByRole('button', { name: lbl }).click();
+  await page.getByRole('button', { name: '가슴 선택 안 함' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const note = page.getByRole('status', { name: '목표 시간보다 짧은 이유' });
+  await expect(note).toContainText(/목표보다 약 \d+분 짧아요/);
+  await expect(note).toContainText('한 근육을 한 번에 약 11세트보다 많이 해도 근성장 차이를 확인하기 어려웠다');
+  await checkScreen(page, '42-plan-chest-slack');
+  const before = (await page.getByText(/^예상 \d+:\d\d \/ 75분$/).textContent())!;
+  await note.getByRole('button', { name: '+ 삼두 더해서 다시 만들기' }).click();
+  await expect(page.getByRole('button', { name: '삼두 보통' })).toBeVisible();
+  await expect(page.getByText(/^삼두 [SABCDF][+-]? \(/).first()).toBeVisible();
+  const after = (await page.getByText(/^예상 \d+:\d\d \/ 75분$/).textContent())!;
+  const mins = (t: string) => Number(/(\d+):/.exec(t)![1]);
+  expect(mins(after)).toBeGreaterThan(mins(before) + 10);
+  // 종목 탭: 주/보조 근육 표시, 주 근육 필터
+  await page.getByRole('link', { name: '종목' }).click();
+  await page.getByRole('button', { name: '하체', exact: true }).click();
+  await expect(page.getByRole('button', { name: '스미스머신 스쿼트' })).toContainText('주 대퇴사두 · 보조 둔근');
+  await page.getByLabel('주 근육 필터').selectOption('햄스트링');
+  const rows = page.locator('.list-item .muscles');
+  expect(await rows.count()).toBeGreaterThanOrEqual(5);
+  for (const t of await rows.allTextContents()) expect(t.startsWith('주 햄스트링')).toBe(true);
+  await checkScreen(page, '43-exercises-muscle-filter');
 });
 
 test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본 휴식', async ({ page }) => {
@@ -323,7 +381,6 @@ test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 �
 test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원판·1RM, 백업 → 초기화 → 복원 100% 일치', async ({ page }) => {
   // 공유 시트 대신 다운로드 경로로 고정 (테스트 브라우저에는 공유 시트가 없음)
   await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
-  page.on('dialog', (d) => void d.accept());
   // 운동 하나 끝내기: 바벨 컬 1세트 30kg × 10 (기본 목표 횟수)
   await page.getByRole('button', { name: '+ 직접' }).click();
   await page.getByLabel('루틴 이름').fill('팔 테스트');
@@ -406,11 +463,14 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await checkScreen(page, '13-settings-backup');
   await page.getByText('모든 데이터 지우기 (초기화)').click();
   await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
+  await answer(page, '지우기');
+  await answer(page, '계속 지우기');
   await expect(page.getByText('모든 데이터를 지웠어요')).toBeVisible();
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
   await page.getByRole('link', { name: '설정' }).click();
   await page.getByLabel('백업 파일 고르기').setInputFiles(file);
+  await answer(page, '바꾸기');
   await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
   await expect(page.getByText('마지막 백업: 없음')).toHaveCount(0); // 복원해도 백업 시각 유지
   const [dl2] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
@@ -431,7 +491,6 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
 });
 test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, 끄기', async ({ page }) => {
   await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
-  page.on('dialog', (d) => void d.accept());
   // 비밀 값 흉내: 자동 보내기 키는 localStorage에만. 어떤 파일에도 나가면 안 됨 (D-025)
   await page.evaluate(() => localStorage.setItem('send.cfg', 'https://script.google.com/macros/s/AKfycbzTESTaaaaaaaaaaaaaaaaaaaa/exec#SECRETKEY1234567890ABCDEFGH'));
   await makeRoutine(page, ['등'], '30분'); // 플랜 생성 → 진단 'plan'
@@ -469,7 +528,6 @@ test.describe('서비스 워커 없이 (Playwright WebKit은 서비스 워커가
 test.use({ serviceWorkers: 'block' });
 test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, 실패하면 다음에 열 때 다시, 키는 어디에도 안 보임', async ({ page }) => {
   await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
-  page.on('dialog', (d) => void d.accept());
   const KEY = 'K'.repeat(36) + 'Z9x8';
   const URL_ = 'https://script.google.com/macros/s/AKfycbzTEST' + 'a'.repeat(30) + '/exec';
   const got: { key: string; ping?: boolean; file?: { app: string; schema: number; data: { workouts: unknown[]; diag: { k: string }[] } } }[] = [];
@@ -571,12 +629,12 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   // 끄기
   await page.getByRole('link', { name: '설정' }).click();
   await page.getByRole('button', { name: '끄기' }).click();
-  expect(await page.evaluate(() => localStorage.getItem('send.cfg'))).toBeNull();
+  await answer(page, '끄기');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('send.cfg'))).toBeNull();
 });
 });
 
 test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 그대로, 지우기는 지움 표시', async ({ page }) => {
-  page.on('dialog', (d) => void d.accept());
   // 앱이 연 저장소를 닫고 지운 뒤, 0.3.0(v3)과 같은 구조로 직접 만들어 기록을 넣음
   await page.evaluate(async () => {
     await new Promise<void>((res) => { const r = indexedDB.deleteDatabase('workout-app'); r.onsuccess = () => res(); r.onerror = () => res(); r.onblocked = () => res(); });
@@ -614,6 +672,7 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
   // 지우면 기록은 없어지고 지움 표시가 남음
   await page.getByRole('link', { name: '홈' }).click();
   await page.getByRole('button', { name: '예전 루틴 삭제' }).click();
+  await answer(page, '지우기');
   await expect(page.getByRole('heading', { name: '예전 루틴' })).toHaveCount(0);
   const tomb = await page.evaluate(async () => new Promise<boolean>((res) => {
     const o = indexedDB.open('workout-app');
@@ -637,7 +696,6 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
     if (body.key === KEY) res = body.op === 'sync' ? handleSync(state, JSON.parse(JSON.stringify(body)), Date.now()) : body.ping ? { ok: true, ping: true } : { ok: true };
     await r.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(res) });
   });
-  page.on('dialog', (d) => void d.accept());
   const connect = async (p: Page) => {
     await p.evaluate(([u, k]) => localStorage.setItem('send.cfg', `${u}#${k}`), [URL_, KEY]);
     await p.reload();
@@ -651,7 +709,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   // 폰 = 기본 page (아이폰 크기), PC = 새 창 (넓은 화면)
   const pcCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
   const pc = await pcCtx.newPage();
-  pc.on('dialog', (d) => void d.accept());
+  noNativeDialog(pc);
   await route(page); await route(pc);
   await pc.goto('./#/');
   await pc.getByRole('button', { name: '알겠어요' }).click();
@@ -680,6 +738,8 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await checkScreen(pc, '17-pc-remote-workout');
   // PC가 가져오기 → PC가 주인, 폰은 "다른 기기로 넘어갔어요" (세트는 그대로)
   await pc.getByRole('button', { name: '이 기기로 가져오기' }).click();
+  await answer(pc, '가져오기');
+  await answer(pc, '가져오기');
   await expect(pc).toHaveURL(/#\/workout/);
   await expect(pc.getByText(/1\/\d+세트/)).toBeVisible();
   await syncNowOn(pc); await syncNowOn(page);
@@ -709,6 +769,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   // PC에서 루틴 지움 → 폰에서도 사라짐
   await pc.getByRole('link', { name: '홈' }).click();
   await pc.getByRole('button', { name: 'PC에서 짠 루틴 삭제', exact: true }).click();
+  await answer(pc, '지우기');
   await syncNowOn(pc); await syncNowOn(page);
   await page.getByRole('link', { name: '홈' }).click();
   await expect(page.getByRole('heading', { name: 'PC에서 짠 루틴' })).toHaveCount(0);
@@ -720,7 +781,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
 test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 화면으로 보기', async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const pc = await ctx.newPage();
-  pc.on('dialog', (d) => void d.accept());
+  noNativeDialog(pc);
   await pc.goto('./#/');
   await pc.getByRole('button', { name: '알겠어요' }).click();
   const nav = await pc.locator('nav.nav').boundingBox();
@@ -743,7 +804,7 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   await w.click(); await w.fill('40'); await w.press('Enter');
   expect(await pc.evaluate(() => document.activeElement?.getAttribute('aria-label'))).toMatch(/1세트 횟수$/);
   await pc.keyboard.press('Control+Enter');
-  await expect(pc.getByText('1/9세트')).toBeVisible();
+  await expect(pc.getByText(/^1\/\d+세트$/)).toBeVisible(); // 세트 수는 플랜 규칙(D-041)에 따라 바뀜
   await expect(pc.getByRole('timer')).toBeVisible();
   // 아래 고정 바는 메뉴를 덮지 않고 바닥에 붙음
   const tb = await pc.locator('.timer').boundingBox();
@@ -755,7 +816,7 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   await pc.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, repeat: true })));
   await pc.keyboard.up('Enter'); await pc.keyboard.up('Control');
   expect(await pc.locator('[aria-label$="완료됨"], .set.done').count()).toBeLessThanOrEqual(doneBefore + 1);
-  await expect(pc.getByText(/^[12]\/9세트$/)).toBeVisible();
+  await expect(pc.getByText(/^[12]\/\d+세트$/)).toBeVisible();
   await checkScreen(pc, '20-pc-workout');
   // 폰 화면으로 보기
   await pc.getByRole('link', { name: '설정' }).click();
@@ -775,7 +836,6 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
 
 
 test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙음 → 설정에서 상태 보기·지우기', async ({ page }) => {
-  page.on('dialog', (d) => void d.accept());
   await makeRoutine(page, ['등'], '30분');
   await page.getByRole('button', { name: /시작/ }).first().click();
   await expect(page).toHaveURL(/#\/workout/);
@@ -791,6 +851,7 @@ test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙
   await expect(card).toContainText('#/workout');
   await checkScreen(page, '22-feedback-list');
   await card.getByRole('button', { name: /지우기/ }).click();
+  await answer(page, '지우기');
   await expect(card).toHaveCount(0);
   // 저장 알림은 시트 밖에 보임, 새 메모도 목록에
   await page.getByRole('button', { name: '개선 메모 쓰기' }).click();
@@ -803,7 +864,6 @@ test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙
 
 
 test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무게·시간·세트 → 저장 → 상세·통계 반영, 홈에서 삭제', async ({ page }) => {
-  page.on('dialog', (d) => void d.accept());
   await makeRoutine(page, ['등'], '30분');
   await page.getByRole('button', { name: /시작/ }).first().click();
   const w = page.locator('input[aria-label$="1세트 무게"]').first();
@@ -843,14 +903,51 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await page.getByRole('link', { name: '홈' }).click();
   const card2 = page.getByLabel('최근 운동 등 (고침)', { exact: true });
   await expect(card2).toContainText('작업 세트 2개 · 45분 · 고침');
-  await card2.getByRole('button', { name: '최근 운동 등 (고침) 삭제' }).click();
+  // 삭제 → 두 갈래 (D-040). 닫기·Esc는 아무것도 안 함, 처음 초점은 안전한 "목록에서만 빼기"
+  const del2 = card2.getByRole('button', { name: '최근 운동 등 (고침) 삭제' });
+  const sheet = page.locator('.sheet[aria-modal="true"]');
+  await del2.click();
+  await expect(sheet.getByRole('heading', { name: '이 운동을 어떻게 할까요?' })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: '목록에서만 빼기', exact: true })).toBeFocused();
+  await expect(sheet.getByRole('button', { name: '완전 삭제', exact: true })).toHaveClass(/danger-fill/);
+  await noHorizontalScroll(page);
+  await checkScreen(page, '34-recent-delete-choice');
+  await page.keyboard.press('Escape');
+  await expect(card2).toBeVisible();
+  // 1) 목록에서만 빼기 → 홈에서 사라짐, 기록 탭·통계에는 그대로("홈에서 뺌" 표시)
+  await del2.click();
+  await answer(page, '목록에서만 빼기');
   await expect(card2).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: '홈에서 뺐어요' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '최근 운동' })).toHaveCount(0);
+  await page.getByRole('link', { name: '기록' }).click();
+  const row = page.getByRole('button', { name: /등 \(고침\) \(홈에서 뺌\)$/ });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('홈에서 뺌');
+  await expect(page.getByText('아직 끝낸 운동이 없어요')).toHaveCount(0);
+  // 고쳐도 "홈에서 뺌"은 유지
+  await row.click();
+  await expect(page.getByLabel('홈에서 뺌 기록')).toBeVisible();
+  await page.getByRole('button', { name: '수정', exact: true }).click();
+  await page.getByLabel('운동 이름').fill('등 (고침)2');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '등 (고침)2' })).toBeVisible();
+  await expect(page.getByLabel('홈에서 뺌 기록')).toBeVisible();
+  // 2) 기록 상세에서 "홈에 다시 보이기" → 홈에 다시 나타남
+  await page.getByRole('button', { name: '홈에 다시 보이기' }).click();
+  await expect(page.getByLabel('홈에서 뺌 기록')).toHaveCount(0);
+  await page.getByRole('link', { name: '홈' }).click();
+  const card3 = page.getByLabel('최근 운동 등 (고침)2', { exact: true });
+  await expect(card3).toBeVisible();
+  // 3) 완전 삭제 → 기록 탭에서도 사라짐
+  await card3.getByRole('button', { name: /삭제$/ }).click();
+  await answer(page, '완전 삭제');
+  await expect(card3).toHaveCount(0);
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
 });
 
 test('수정 화면: 입력 중 세트를 지워도 값이 옆 세트로 가지 않음, 시작을 옮겨도 운동 시간 그대로, 편집 중 메뉴 숨김', async ({ page }) => {
-  page.on('dialog', (d) => void d.accept());
   await makeRoutine(page, ['등'], '30분');
   await page.getByRole('button', { name: /시작/ }).first().click();
   const w = page.locator('input[aria-label$="1세트 무게"]').first();
@@ -877,7 +974,6 @@ test('수정 화면: 입력 중 세트를 지워도 값이 옆 세트로 가지 
 });
 
 test('수정 화면: 취소하면 기록 그대로', async ({ page }) => {
-  page.on('dialog', (d) => void d.accept());
   await makeRoutine(page, ['등'], '30분');
   await page.getByRole('button', { name: /시작/ }).first().click();
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
@@ -887,12 +983,162 @@ test('수정 화면: 취소하면 기록 그대로', async ({ page }) => {
   await card.getByRole('button', { name: /수정$/ }).click();
   await page.getByLabel('운동 이름').fill('바뀌면 안 됨');
   await page.getByRole('button', { name: '취소', exact: true }).click();
+  await answer(page, '버리기');
   await expect(page).toHaveURL(/#\/stats\/w\//);
   await page.getByRole('link', { name: '홈' }).click();
   await expect(page.locator('.card[aria-label^="최근 운동 "]').first()).toHaveText(before!);
 });
 
 void makeRoutine;
+
+test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동이면 그대로 / 동기화 중 초기화·불러오기 두 갈래: 닫으면 아무것도 안 바꿈, "이 기기만"은 동기화 끄고 진행', async ({ page }) => {
+  await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
+  await makeRoutine(page, ['등'], '30분');
+  const del = page.getByRole('button', { name: '등 30분 삭제', exact: true });
+  const card = page.getByRole('heading', { name: '등 30분', exact: true });
+  const sheet = page.locator('.sheet[aria-modal="true"]');
+  const syncOn = () => page.evaluate(() => localStorage.getItem('sync.on'));
+
+  // 1) 삭제 확인: 취소(위험한 확인은 취소에 초점, Enter 한 번으로 안 지워짐)·Esc·✕·화면 이동은 그대로
+  await del.click();
+  await expect(sheet.getByRole('heading', { name: '루틴을 지울까요?' })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: '취소', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(sheet).toHaveCount(0);
+  await expect(card).toBeVisible();
+  // 연 버튼으로 초점이 돌아옴 (WebKit은 버튼을 눌러도 초점을 주지 않아 Chromium에서만 봄)
+  if (test.info().project.name.includes('chromium')) await expect(del).toBeFocused();
+  await del.click(); await expect(sheet).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(card).toBeVisible();
+  await del.click();
+  await checkScreen(page, '31-in-app-confirm-home');
+  await sheet.getByRole('button', { name: '닫기' }).click();
+  await expect(card).toBeVisible();
+  // 창이 열린 채 뒤로 가기(스와이프) → 창이 닫히고 지우지 않음 (떠난 화면의 일을 나중에 하지 않게)
+  await page.getByRole('link', { name: '기록' }).click();
+  await page.getByRole('link', { name: '홈' }).click();
+  await del.click(); await expect(sheet).toBeVisible();
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/stats/);
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(card).toBeVisible();
+
+  // 백업 파일 하나 만들어 둠
+  await page.getByRole('link', { name: '설정' }).click();
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
+  const file = await dl.path();
+  const restoreWith = async () => { await page.getByLabel('백업 파일 고르기').setInputFiles(file); await answer(page, '바꾸기'); };
+
+  // 2) 동기화 켜진 채 초기화: 세 갈래 선택에서 Esc → 지우지 않음 (예전 기본 창은 [취소]가 "동기화 끄고 비우기"였음)
+  await page.evaluate(() => localStorage.setItem('sync.on', '1'));
+  const resetTo = async (pick: string | null) => {
+    await page.getByRole('link', { name: '설정' }).click();
+    const summary = page.getByText('모든 데이터 지우기 (초기화)');
+    if (!(await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).isVisible())) await summary.click();
+    await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
+    await answer(page, '지우기');
+    await answer(page, '계속 지우기');
+    await expect(sheet.getByRole('heading', { name: '동기화가 켜져 있어요' })).toBeVisible();
+    if (pick) await answer(page, pick); else await page.keyboard.press('Escape');
+  };
+  await resetTo(null);
+  for (const b of ['비우고 서버에서 다시 받기', '비우고 동기화 끄기', '취소']) await expect(page.getByRole('button', { name: b, exact: true })).toHaveCount(0);
+  expect(await syncOn()).toBe('1');
+  await expect(page.getByText(/지웠어요|다시 받았어요/)).toHaveCount(0);
+
+  // 3) 동기화 켜진 채 불러오기: 세 갈래 선택에서 Esc → 아무것도 안 바꿈 / "이 기기만" → 동기화 끄고 불러옴
+  await page.getByLabel('백업 파일 고르기').setInputFiles(file);
+  await answer(page, '바꾸기');
+  await expect(sheet.getByRole('heading', { name: '동기화가 켜져 있어요' })).toBeVisible();
+  for (const b of ['서버·다른 기기까지', '이 기기만 (동기화 끄기)', '취소']) await expect(sheet.getByRole('button', { name: b, exact: true })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: '취소', exact: true })).toBeFocused();
+  await noHorizontalScroll(page);
+  await checkScreen(page, '32-in-app-choice');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByText('백업을 불러왔어요')).toHaveCount(0);
+  expect(await syncOn()).toBe('1');
+  await restoreWith();
+  await answer(page, '이 기기만 (동기화 끄기)');
+  await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
+  expect(await syncOn()).toBe('0');
+
+  // 4) 동기화 켜진 채 초기화 "비우고 동기화 끄기" → 비우고 동기화 꺼짐
+  await page.evaluate(() => localStorage.setItem('sync.on', '1'));
+  await resetTo('비우고 동기화 끄기');
+  await expect(page.getByText('모든 데이터를 지웠어요')).toBeVisible();
+  expect(await syncOn()).toBe('0');
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(card).toHaveCount(0);
+
+  // 5) 동기화 꺼진 채 불러오기(확인 한 번) → 루틴이 돌아옴 → 삭제 확인에서 "지우기"만 지움
+  await page.getByRole('link', { name: '설정' }).click();
+  await restoreWith();
+  await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
+  await page.getByRole('link', { name: '홈' }).click();
+  await expect(card).toBeVisible();
+  await del.click();
+  await answer(page, '지우기');
+  await expect(card).toHaveCount(0);
+});
+
+test('기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바뀌면 묻고, 묻는 동안 또 바뀌면 다시 물음 / 지워졌으면 되살려 저장', async ({ page }) => {
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: /시작/ }).first().click();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await endWorkout(page);
+  await expect(page).toHaveURL(/#\/$/);
+  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
+  const id = decodeURIComponent((await card.getByRole('link').first().getAttribute('href'))!.split('/').pop()!);
+  // 다른 기기 흉내: 앱을 거치지 않고 저장소의 기록을 직접 바꿈 (동기화로 들어온 것과 같은 결과)
+  const remote = (memo: string | null) => page.evaluate(([wid, m]) => new Promise<void>((res, rej) => {
+    const o = indexedDB.open('workout-app');
+    o.onsuccess = () => {
+      const tx = o.result.transaction('workouts', 'readwrite'); const st = tx.objectStore('workouts');
+      if (m === null) st.delete(wid!); else { const g = st.get(wid!); g.onsuccess = () => st.put({ ...g.result, memo: m }); }
+      tx.oncomplete = () => { o.result.close(); res(); }; tx.onerror = () => rej(tx.error);
+    };
+  }), [id, memo] as const);
+  const stored = () => page.evaluate((wid) => new Promise<{ name: string; memo?: string } | undefined>((res) => {
+    const o = indexedDB.open('workout-app');
+    o.onsuccess = () => { const g = o.result.transaction('workouts').objectStore('workouts').get(wid); g.onsuccess = () => { res(g.result); o.result.close(); }; };
+  }), id);
+  const sheet = page.locator('.sheet[aria-modal="true"]');
+
+  // 바뀜 → 묻는 동안 또 바뀜 → 덮어쓰기 → 다시 물음 → 덮어쓰기 → 저장
+  await card.getByRole('button', { name: /수정$/ }).click();
+  await page.getByLabel('운동 이름').fill('내 수정 1');
+  await remote('다른 기기 A');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(sheet.getByRole('heading', { name: '다른 기기에서 이 기록이 바뀌었어요' })).toBeVisible();
+  await remote('다른 기기 B');
+  await answer(page, '덮어쓰기');
+  await expect(sheet.getByRole('heading', { name: '다른 기기에서 이 기록이 바뀌었어요' })).toBeVisible(); // 다시 물음
+  expect((await stored())!.name).not.toBe('내 수정 1');
+  await answer(page, '덮어쓰기');
+  await expect(page).toHaveURL(/#\/stats\/w\//);
+  expect((await stored())!.name).toBe('내 수정 1');
+
+  // 계속 고치기 → 저장 안 됨, 편집 화면에 남음
+  await page.getByRole('button', { name: '수정', exact: true }).click();
+  await page.getByLabel('운동 이름').fill('내 수정 2');
+  await remote('다른 기기 C');
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await answer(page, '계속 고치기');
+  await expect(page).toHaveURL(/\/edit$/);
+  expect((await stored())!.name).toBe('내 수정 1');
+
+  // 지워짐 → 되살려 저장
+  await remote(null);
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await expect(sheet.getByRole('heading', { name: '다른 기기에서 이 기록이 지워졌어요' })).toBeVisible();
+  await answer(page, '되살려 저장');
+  await expect(page).toHaveURL(/#\/stats\/w\//);
+  expect((await stored())!.name).toBe('내 수정 2');
+});
 
 test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바꾸기, 운동 추가 → 저장하고 시작, 내 운동 DB 정보 버튼', async ({ page }) => {
   await page.getByRole('link', { name: '플랜' }).click();
