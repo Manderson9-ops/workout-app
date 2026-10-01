@@ -69,7 +69,7 @@ export interface Plan {
   missingParts: Part[];
   candidateCount: number;
   /** 목표보다 5분 넘게 짧을 때: 원인과 더하면 채울 수 있는 부위 제안 (D-041) */
-  slack?: { cause: SlackCause[]; suggest: Part[]; level: Level; cap: number; maxSets: number };
+  slack?: { cause: SlackCause[]; suggest: Part[]; level: Level; cap: number; maxSets: number; /** 잠금 아닌 운동이 모두 운동당 최대 세트 */ atMax: boolean };
 }
 export type SlackCause = 'cap' | 'pool' | 'time';
 
@@ -554,7 +554,8 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
     const chosenParts = new Set(req.parts.map((x) => x.part));
     const suggest = cs.some((c) => c !== 'time') ? [...new Set(sortedParts(req).flatMap((x) => COMPLEMENT[x.part]))].filter((x) => !chosenParts.has(x)).slice(0, 2) : [];
     reasons.push(`목표보다 약 ${Math.floor((targetSec - best.time) / 60)}분 여유: ${why.join(' · ') || '하나 더 넣으면 목표를 넘음'}${suggest.length ? ` → ${suggest.join('·')}${objParticle(suggest[suggest.length - 1]!)} 더하면 채울 수 있음` : ''}`);
-    slackInfo = { cause: cs.length ? cs : ['time'], suggest, level: req.level, cap, maxSets };
+    const freeAll = best.chosen.filter((x) => x.entry.locked === undefined);
+    slackInfo = { cause: cs.length ? cs : ['time'], suggest, level: req.level, cap, maxSets, atMax: freeAll.length > 0 && freeAll.every((x) => x.sets >= maxSets) };
   }
   const est = best.chosen.filter((c) => c.entry.grade.estimated).length;
   if (est) reasons.push(`추정 등급 운동 ${est}개 포함: 영상 근거가 없어 B로 보고 앱 추천 순서로 고름 (M-09, M-14)`);

@@ -179,3 +179,13 @@ describe('짝 캐시는 실제로 고른 운동 기준 (D-041 검토 2차 필수
     }
   });
 });
+
+describe('초보 "최대 3세트" 안내는 실제로 모두 3세트일 때만 (D-041 검토 3차)', () => {
+  it('이두 초보 C 90분: 2세트 운동이 있어 atMax 아님 / 하체 초보 75분: 모두 3세트라 atMax', () => {
+    const bi = generatePlan({ parts: [{ part: '이두', priority: 'high' }], level: '초보', minGrade: 'C', targetMinutes: 90 }, real);
+    expect(bi.slack?.atMax).toBe(false);
+    expect(items(bi).some((i) => i.sets < 3)).toBe(true);
+    const lg = generatePlan(legs('초보', 75), real);
+    expect(lg.slack?.atMax).toBe(true);
+  });
+});
