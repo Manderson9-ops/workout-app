@@ -6,7 +6,8 @@ import type { Plan, PlanBlock, PlanItem, PlanRequest } from './planner';
 import type { BuiltExercise } from './types';
 import { moveItem } from './reorder';
 
-export const SETS_MIN = 1, SETS_MAX = 8;
+/** 직접 고치는 세트 범위 (D-042: 사실상 제한 없음. 이전 D-036은 1~8, 앱 판단). 자동 생성 기준(수준별 3·4, 근육별 상한)과는 별개 */
+export const SETS_MIN = 1, SETS_MAX = 99;
 export const REPS_MIN = 1, REPS_MAX = 50;
 export const SECS_MIN = 5, SECS_MAX = 300, SECS_STEP = 5;
 

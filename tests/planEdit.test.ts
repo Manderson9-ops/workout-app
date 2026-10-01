@@ -24,7 +24,8 @@ describe('D-036 플랜 바로 고치기', () => {
   });
   it('범위 밖으로 나가지 않는다', () => {
     expect(stepSets(item('a', { sets: 1 }), -1).sets).toBe(1);
-    expect(stepSets(item('a', { sets: 8 }), 1).sets).toBe(8);
+    expect(stepSets(item('a', { sets: 8 }), 1).sets).toBe(9); // D-042: 8 넘게 가능
+    expect(stepSets(item('a', { sets: 99 }), 1).sets).toBe(99);
     expect(stepReps(item('a', { reps: 1 }), -1).reps).toBe(1);
     expect(stepReps(item('a', { reps: 50 }), 1).reps).toBe(50);
   });

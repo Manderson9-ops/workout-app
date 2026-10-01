@@ -8,6 +8,10 @@ import { resolveGrade, eligibleParts, equipmentAvailable } from '../core/exercis
 import { matchesQuery } from '../core/search';
 import { GRADES } from '../core/version';
 import type { AppState } from './store';
+import { lsGet, lsSet, lsRemove } from './appName';
+
+/** D-044: 운동 추가에서 마지막으로 고른 부위 (이 기기만) */
+export const PICKER_PART_KEY = 'picker.part';
 
 export function GradeBadge({ g }: { g: Pick<ResolvedGrade, 'value' | 'source' | 'estimated'> }) {
   const cls = g.source === 'USER' ? 'user' : g.estimated ? 'est' : 'video';
@@ -100,7 +104,16 @@ export function ExercisePicker({ s, all, part, exclude, onPick, onClose, title }
   s: AppState; all: BuiltExercise[]; part?: Part; exclude?: string[]; onPick: (e: BuiltExercise) => void; onClose: () => void; title: string;
 }) {
   const [q, setQ] = useState('');
-  const [p, setP] = useState<Part | undefined>(part);
+  // D-044: 교체는 그 운동의 부위, 추가는 마지막으로 고른 부위로 시작
+  const [p, setPRaw] = useState<Part | undefined>(() => {
+    if (part) return part;
+    const last = lsGet(PICKER_PART_KEY) as Part | null;
+    return last && (PARTS as readonly string[]).includes(last) ? last : undefined;
+  });
+  const setP = (x: Part | undefined) => { setPRaw(x); if (x) lsSet(PICKER_PART_KEY, x); else lsRemove(PICKER_PART_KEY); };
+  // 지금 루틴·플랜·운동에 들어 있는 부위 (빼기 목록 = 이미 들어 있는 운동)
+  const byIdP = new Map(all.map((e) => [e.id, e.part]));
+  const ctxParts = PARTS.filter((x) => (exclude ?? []).some((id) => byIdP.get(id) === x));
   const level = s.settings.level;
   const list = all
     .filter((e) => !(exclude ?? []).includes(e.id) && !s.meta.get(e.id)?.excluded && equipmentAvailable(e, s.settings.equipment))
@@ -112,7 +125,11 @@ export function ExercisePicker({ s, all, part, exclude, onPick, onClose, title }
   return (
     <Sheet onClose={onClose} title={title}>
       <input placeholder="검색 (초성 가능: ㄹㅍㄷ)" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} aria-label="운동 검색" />
-      <div class="row wrap" style={{ margin: '8px 0' }}>
+      {ctxParts.length > 0 && <div class="row wrap" role="group" aria-label="지금 들어 있는 부위" style={{ margin: '8px 0 0' }}>
+        <span class="sub small">지금 들어 있는 부위</span>
+        {ctxParts.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} aria-pressed={p === x} onClick={() => setP(x)}>{x}</button>)}
+      </div>}
+      <div class="row wrap" role="group" aria-label="모든 부위" style={{ margin: '8px 0' }}>
         <button class={`chip ${!p ? 'on' : ''}`} onClick={() => setP(undefined)}>전체</button>
         {PARTS.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} onClick={() => setP(x)}>{x}</button>)}
       </div>

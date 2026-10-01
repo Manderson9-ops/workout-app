@@ -13,6 +13,8 @@ import { FeedbackList } from './FeedbackUi';
 import { DiagSection } from './DiagSection';
 import { go } from '../nav';
 import { IS_PREVIEW } from '../appName';
+import { audioMode, setAudioMode } from '../device';
+import type { AudioMode } from '../device';
 
 export function SettingsScreen({ s }: { s: AppState }) {
   const st = s.settings;
@@ -20,6 +22,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
   const all = catalog(s.custom);
   const excluded = [...s.meta.values()].filter((m) => m.excluded);
   const [pv, setPv] = useState(phoneView());
+  const [am, setAm] = useState<AudioMode>(audioMode());
   return (
     <main>
       <h1>설정</h1>
@@ -44,6 +47,12 @@ export function SettingsScreen({ s }: { s: AppState }) {
         <button class={`chip ${st.soundOn ? 'on' : ''}`} aria-pressed={st.soundOn} onClick={() => put({ soundOn: !st.soundOn })}>소리 {st.soundOn ? '켬' : '끔'}</button>
         <button class={`chip ${st.keepAwake ? 'on' : ''}`} aria-pressed={st.keepAwake} onClick={() => put({ keepAwake: !st.keepAwake })}>운동 중 화면 켜 두기 {st.keepAwake ? '켬' : '끔'}</button>
       </div>
+      <label for="audio-mode">다른 앱 음악과 같이 들을 때 (이 기기만)</label>
+      <select id="audio-mode" value={am} onChange={(e) => { const v = (e.target as HTMLSelectElement).value as AudioMode; setAudioMode(v); setAm(v); }}>
+        <option value="mix">음악 계속 · 알림음만 위에 (기본)</option>
+        <option value="solo">앱 소리 우선 · 음악이 멈춤</option>
+      </select>
+      <p class="sub small">{am === 'mix' ? '음악을 멈추지 않아요. 아이폰 무음 모드에서 휴식 끝 알림음이 울리는지는 한 번 확인해 주세요.' : '앱을 누르면 다른 앱 음악이 멈춰요 (0.8.4까지의 동작).'}</p>
       <p class="sub small">화면을 잠그거나 다른 앱으로 가면 휴식 끝 알림이 오지 않아요 (웹앱 한계). 앱으로 돌아오면 남은 시간은 정확해요.</p>
       <label>플랜에서 제외한 운동 ({excluded.length})</label>
       {!excluded.length && <p class="sub small">없음</p>}

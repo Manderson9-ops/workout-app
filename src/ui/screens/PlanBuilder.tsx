@@ -16,11 +16,11 @@ import { GradeBadge, ExercisePicker, Sheet, mmss } from '../components';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
 import { useDragSort } from '../dragSort';
+import { BodyMap } from '../bodyMap';
 import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
 import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
-const NEXT: Record<string, Priority | undefined> = { none: 'high', high: 'normal', normal: 'low', low: undefined };
 const KEY = 'planBuilder.v1';
 const PLAN_KEY = 'planBuilder.plan';
 const LOCK_KEY = 'planBuilder.locks';
@@ -72,13 +72,13 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const [tpl, setTpl] = useState('');
   const update = (p: Partial<Form>) => { const n = { ...f, ...p }; setF(n); lsSet(KEY, JSON.stringify(n)); };
 
-  const cyclePart = (p: Part) => {
-    const cur = f.parts[p];
-    const nx = NEXT[cur ?? 'none'];
-    const parts = { ...f.parts }; let order = f.order.filter((x) => x !== p);
-    if (nx) { parts[p] = nx; order = [...order, p]; } else delete parts[p];
-    update({ parts, order });
+  // D-043: 부위는 켜기/끄기만 (켜면 우선순위 '높음'), 우선순위는 고른 부위의 선택 상자로. 고른 순서(같은 우선순위의 앞뒤)는 유지
+  const togglePart = (p: Part) => {
+    const parts = { ...f.parts };
+    if (parts[p]) { delete parts[p]; update({ parts, order: f.order.filter((x) => x !== p) }); }
+    else { parts[p] = 'high'; update({ parts, order: [...f.order.filter((x) => x !== p), p] }); }
   };
+  const setPriority = (p: Part, pr: Priority) => update({ parts: { ...f.parts, [p]: pr } });
   const request = (form: Form = f): PlanRequest => ({
     parts: form.order.filter((p) => form.parts[p]).map((p) => ({ part: p, priority: form.parts[p]! })),
     level: s.settings.level, minGrade: form.minGrade, targetMinutes: form.minutes, groupings: form.groupings,
@@ -176,13 +176,24 @@ export function PlanBuilder({ s }: { s: AppState }) {
       <h1>플랜 만들기</h1>
       {/* PC 넓은 화면: 왼쪽 조건, 오른쪽 결과 (D-030) */}
       <div class="wide-2"><div>
-      <label>부위 (누를 때마다 우선순위 높음 → 보통 → 낮음 → 빼기)</label>
+      <label>부위 (그림이나 버튼을 눌러 고르기 · 다시 누르면 빼기)</label>
+      <BodyMap sel={f.parts} onToggle={togglePart} />
       <div class="row wrap">
         {PARTS.map((p) => {
           const pr = f.parts[p];
-          return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => cyclePart(p)} aria-pressed={!!pr} aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
+          return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => togglePart(p)} aria-pressed={!!pr} aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
         })}
       </div>
+      {nParts > 0 && <div class="prio-list" role="group" aria-label="고른 부위의 우선순위">
+        {f.order.filter((p) => f.parts[p]).map((p) => (
+          <div class="row between prio-row" key={p}>
+            <span>{p}</span>
+            <select aria-label={`${p} 우선순위`} value={f.parts[p]} onChange={(e) => setPriority(p, (e.target as HTMLSelectElement).value as Priority)}>
+              {(['high', 'normal', 'low'] as Priority[]).map((x) => <option key={x} value={x}>우선순위 {PR_LABEL[x]}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>}
       <label>분할 템플릿으로 채우기 (선택)</label>
       <div class="grid2">
         <select value={tpl} onChange={(e) => setTpl((e.target as HTMLSelectElement).value)} aria-label="분할 템플릿">

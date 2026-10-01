@@ -149,3 +149,17 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 .card[data-drop="before"] { box-shadow: 0 -4px 0 0 var(--acc); }
 .card[data-drop="after"] { box-shadow: 0 4px 0 0 var(--acc); }
 .card[data-drop][data-drop-grid] { box-shadow: 0 0 0 3px var(--acc); } /* PC 2단: 위·아래 선은 좌우 이동에서 헷갈려 칸 전체 테두리로 */
+
+/* D-043: 인체 그림 부위 선택 */
+.bodymap { display: flex; justify-content: center; gap: 12px; margin: 6px 0; }
+.bodymap-fig { margin: 0; text-align: center; width: 46%; max-width: 190px; }
+.bodymap-fig svg { width: 100%; height: auto; display: block; touch-action: manipulation; }
+.bm-head { fill: var(--card2); }
+.bm-part { fill: var(--card2); stroke: var(--line); stroke-width: 1; cursor: pointer; }
+.bm-part:hover { stroke: var(--acc); }
+.bm-part.p-high { fill: #1d4ed8; stroke: #93c5fd; }
+.bm-part.p-normal { fill: #2563eb88; stroke: #3b82f6; }
+.bm-part.p-low { fill: #1e3a8a55; stroke: #3b82f6; }
+.prio-list { margin-top: 8px; }
+.prio-row { margin: 4px 0; }
+.prio-row select { width: auto; min-width: 150px; }

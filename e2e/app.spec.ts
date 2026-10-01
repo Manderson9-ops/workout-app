@@ -48,7 +48,7 @@ async function checkScreen(page: Page, name: string) { await noHorizontalScroll(
 async function makeRoutine(page: Page, parts: string[], minutes: string) {
   await page.getByRole('link', { name: '플랜' }).click();
   for (const p of parts) await page.getByRole('button', { name: `${p} 선택 안 함` }).click();
-  if (parts.length > 1) await page.getByRole('button', { name: `${parts[1]} 높음` }).click();
+  if (parts.length > 1) await page.getByLabel(`${parts[1]} 우선순위`).selectOption('normal');
   await page.getByRole('button', { name: minutes }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   await page.getByRole('button', { name: '저장', exact: true }).click();
@@ -70,7 +70,7 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   await page.getByRole('link', { name: '플랜' }).click();
   await page.getByRole('button', { name: '등 선택 안 함' }).click();
   await page.getByRole('button', { name: '삼두 선택 안 함' }).click();
-  await page.getByRole('button', { name: '삼두 높음' }).click();
+  await page.getByLabel('삼두 우선순위').selectOption('normal');
   await page.getByRole('button', { name: '45분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
@@ -273,7 +273,7 @@ test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 →
   for (const n of ['스미스머신 스쿼트', '루마니안 데드리프트', '라잉 레그 컬', '바벨 힙 쓰러스트', '스탠딩 카프 레이즈']) await expect(page.getByRole('button', { name: `${n} 삭제` })).toBeVisible();
   await shot(page, '41-plan-legs-75');
   // 하체 빼고(높음→보통→낮음→빼기) 가슴만
-  for (const lbl of ['하체 높음', '하체 보통', '하체 낮음']) await page.getByRole('button', { name: lbl }).click();
+  await page.getByRole('button', { name: '하체 높음' }).click(); // 다시 누르면 빼기 (D-043)
   await page.getByRole('button', { name: '가슴 선택 안 함' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const note = page.getByRole('status', { name: '목표 시간보다 짧은 이유' });
@@ -296,6 +296,62 @@ test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 →
   expect(await rows.count()).toBeGreaterThanOrEqual(5);
   for (const t of await rows.allTextContents()) expect(t.startsWith('주 햄스트링')).toBe(true);
   await checkScreen(page, '43-exercises-muscle-filter');
+});
+
+test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선순위 선택 상자(기본 높음), 세트 8 넘게, 운동 추가 부위 기억·들어 있는 부위, 음악과 같이 듣기 설정', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  const map = page.getByTestId('bodymap');
+  // 앞 그림 가슴, 뒤 그림 등 → 기본 높음, 고른 순서대로 우선순위 상자
+  await map.locator('figure').nth(0).locator('path[data-part="가슴"]').click();
+  await map.locator('figure').nth(1).locator('path[data-part="등"]').click();
+  await expect(page.getByRole('button', { name: '가슴 높음' })).toBeVisible();
+  await expect(page.getByLabel('등 우선순위')).toHaveValue('high');
+  await page.getByLabel('등 우선순위').selectOption('low');
+  await expect(page.getByRole('button', { name: '등 낮음' })).toBeVisible();
+  expect(await page.getByRole('group', { name: '고른 부위의 우선순위' }).locator('select').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['가슴 우선순위', '등 우선순위']);
+  await expect(map.locator('path[data-part="등"].p-low')).toHaveCount(1);
+  await checkScreen(page, '46-plan-bodymap');
+  // 다시 누르면 빼기 (그림·버튼 같은 동작)
+  await map.locator('figure').nth(0).locator('path[data-part="가슴"]').click();
+  await page.getByRole('button', { name: '등 낮음' }).click();
+  await expect(page.getByRole('group', { name: '고른 부위의 우선순위' })).toHaveCount(0);
+  // 세트 8 넘게 (D-042)
+  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const first = (await planSec.locator('.card').nth(0).locator('strong').allTextContents())[0]!;
+  const plus = planSec.getByRole('button', { name: `${first} 세트 늘리기` });
+  for (let k = 0; k < 9; k++) await plus.click();
+  await expect(planSec.getByRole('group', { name: `${first} 세트` })).toContainText(/1[0-3]\s*세트/);
+  await expect(plus).toBeEnabled();
+  // 운동 추가: 들어 있는 부위 줄, 마지막으로 고른 부위 기억 (D-044)
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  const dlg = page.getByRole('dialog', { name: '운동 추가' });
+  await expect(dlg.getByRole('group', { name: '지금 들어 있는 부위' }).getByRole('button', { name: '이두' })).toBeVisible();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '전체' })).toHaveClass(/\bon\b/);
+  await dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '코어' }).click();
+  await checkScreen(page, '47-picker-parts');
+  await dlg.getByRole('button', { name: '닫기' }).click();
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '코어' })).toHaveClass(/\bon\b/);
+  await dlg.getByRole('group', { name: '지금 들어 있는 부위' }).getByRole('button', { name: '이두' }).click();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '이두' })).toHaveClass(/\bon\b/);
+  await dlg.getByRole('button', { name: '닫기' }).click();
+  // 음악과 같이 듣기 (D-045): 기본 mix(transient), 고르면 이 기기에 저장
+  await page.getByRole('link', { name: '설정' }).click();
+  const am = page.getByLabel('다른 앱 음악과 같이 들을 때 (이 기기만)');
+  await expect(am).toHaveValue('mix');
+  const sessionType = () => page.evaluate(() => (navigator as Navigator & { audioSession?: { type: string } }).audioSession?.type ?? 'none');
+  await page.locator('main h1').first().click();
+  expect(['transient', 'none']).toContain(await sessionType());
+  await am.selectOption('solo');
+  expect(['playback', 'none']).toContain(await sessionType());
+  await expect(page.getByText('앱을 누르면 다른 앱 음악이 멈춰요')).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel('다른 앱 음악과 같이 들을 때 (이 기기만)')).toHaveValue('solo');
+  await page.getByLabel('다른 앱 음악과 같이 들을 때 (이 기기만)').selectOption('mix');
+  expect(['transient', 'none']).toContain(await sessionType());
 });
 
 test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본 휴식', async ({ page }) => {
