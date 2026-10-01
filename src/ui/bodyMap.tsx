@@ -12,7 +12,7 @@ function rect(x: number, y: number, w: number, h: number, r: number): string {
   return `M${x + r},${y} h${w - 2 * r} a${r},${r} 0 0 1 ${r},${r} v${h - 2 * r} a${r},${r} 0 0 1 -${r},${r} h-${w - 2 * r} a${r},${r} 0 0 1 -${r},-${r} v-${h - 2 * r} a${r},${r} 0 0 1 ${r},-${r} z`;
 }
 const FRONT: Shape[] = [
-  { part: '어깨', d: sym(22, 34, 15, 14, 7) },
+  { part: '어깨', d: sym(19, 32, 18, 17, 8) },
   { part: '가슴', d: rect(37, 36, 26, 22, 5) },
   { part: '이두', d: sym(15, 50, 13, 28, 6) },
   { part: '전완·악력', d: sym(10, 80, 13, 32, 6) },
@@ -20,7 +20,7 @@ const FRONT: Shape[] = [
   { part: '하체', d: [sym(34, 98, 15, 54, 7), sym(36, 156, 12, 36, 6)].join(' ') },
 ];
 const BACK: Shape[] = [
-  { part: '어깨', d: sym(22, 34, 15, 14, 7) },
+  { part: '어깨', d: sym(19, 32, 18, 17, 8) },
   { part: '등', d: rect(37, 36, 26, 54, 6) },
   { part: '삼두', d: sym(15, 50, 13, 28, 6) },
   { part: '전완·악력', d: sym(10, 80, 13, 32, 6) },
@@ -35,7 +35,7 @@ function Figure({ label, shapes, sel, onToggle }: { label: string; shapes: Shape
         <rect x="45" y="26" width="10" height="9" class="bm-head" />
         {shapes.map((s) => (
           <path key={s.part} d={s.d} data-part={s.part} class={`bm-part ${sel[s.part] ? 'p-' + sel[s.part] : ''}`}
-            onClick={() => onToggle(s.part)} />
+            onClick={() => onToggle(s.part)}><title>{s.part}{sel[s.part] ? ' (선택됨)' : ''}</title></path>
         ))}
       </svg>
       <figcaption class="sub small">{label}</figcaption>
