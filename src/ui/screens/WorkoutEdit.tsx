@@ -10,6 +10,7 @@ import type { Workout } from '../../core/session';
 import { targetReps } from '../../core/time';
 import { toLocalInput, fromLocalInput, durationMin, setTimes, moveStart, patchSet, patchSetByKey, keyOf, withKeys, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, EDIT_LIMITS } from '../../core/workoutEdit';
 import { go } from '../nav';
+import { askConfirm } from '../confirm';
 
 /**
  * 끝낸 운동 고치기 (D-035): 이름·날짜·시작 시각·운동 시간, 세트별 무게·횟수(초)·RIR·완료·웜업, 세트·운동 추가/삭제, 메모.
@@ -46,7 +47,7 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
   if (!orig.endedAt) return <main><p>진행 중인 운동은 운동 화면에서 고쳐요.</p><button onClick={() => go('#/workout')}>운동 화면으로</button></main>;
   if (orig.pendingMerge) return <main><p>다른 기기에서 늦게 온 기록은 홈에서 합치기/지우기를 골라 주세요.</p><button onClick={() => go('#/')}>홈으로</button></main>;
 
-  const cancel = async () => { await flushPending(); if (!dirty() || confirm('고친 내용을 버릴까요?')) go(detail); };
+  const cancel = async () => { await flushPending(); if (!dirty() || await askConfirm({ title: '고친 내용을 버릴까요?', ok: '버리기', cancel: '계속 고치기', danger: true })) go(detail); };
   const save = async () => {
     if (busy) return;
     setBusy(true);
@@ -59,9 +60,20 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
       const timesSame = Date.parse(out.endedAt!) - Date.parse(out.startedAt) === Date.parse(orig.endedAt!) - Date.parse(orig.startedAt);
       const problem = editProblem(out, Date.now(), name, { allowShort: timesSame });
       if (problem) { setErr(problem); return; }
-      const now = await db.workouts.get(id); // 화면 값이 아니라 저장소의 지금 값
-      if (!now && !confirm('고치는 동안 다른 기기에서 이 기록이 지워졌어요.\n내 수정으로 되살려 저장할까요?')) return;
-      if (now && !sameWorkout(now, orig) && !confirm('고치는 동안 다른 기기에서 이 기록이 바뀌었어요.\n내 수정으로 덮어쓸까요? (취소하면 계속 고칠 수 있어요)')) return;
+      // 저장소의 지금 값과 비교. 앱 안 확인 창은 기다리는 동안 동기화가 계속 돌므로,
+      // 답한 뒤 다시 읽어 사용자가 동의한 그 상태 그대로일 때만 저장 (그새 또 바뀌면 다시 물음)
+      let agreed: string | null = null;
+      for (;;) {
+        const now = await db.workouts.get(id);
+        if (now && sameWorkout(now, orig)) break;
+        const k = now ? JSON.stringify(withoutStamp(now as never)) : '∅';
+        if (k === agreed) break;
+        const yes = now
+          ? await askConfirm({ title: '다른 기기에서 이 기록이 바뀌었어요', message: '고치는 동안 바뀌었어요. 내 수정으로 덮어쓸까요?', ok: '덮어쓰기', cancel: '계속 고치기', danger: true })
+          : await askConfirm({ title: '다른 기기에서 이 기록이 지워졌어요', message: '고치는 동안 지워졌어요. 내 수정으로 되살려 저장할까요?', ok: '되살려 저장', cancel: '계속 고치기' });
+        if (!yes) return;
+        agreed = k;
+      }
       await mutate((d) => d.workouts.put(withoutStamp(out as never) as unknown as Workout));
       go(detail);
     } finally { setBusy(false); }
@@ -95,7 +107,7 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
         let n = 0;
         return (
           <div class="card" key={`${bi}-${ii}-${it.exerciseId}`} role="group" aria-label={`${ex} 세트 고치기`}>
-            <div class="row between"><strong>{ex}</strong><button class="danger" aria-label={`${ex} 운동 지우기`} onClick={() => { if (confirm(`${ex}와(과) 그 세트를 이 기록에서 지울까요?`)) void act((d) => deleteItem(d, bi, ii)); }}>운동 지우기</button></div>
+            <div class="row between"><strong>{ex}</strong><button class="danger" aria-label={`${ex} 운동 지우기`} onClick={async () => { if (await askConfirm({ title: '운동을 지울까요?', message: `${ex}와(과) 그 세트를 이 기록에서 지워요.`, ok: '지우기', danger: true })) void act((d) => deleteItem(d, bi, ii)); }}>운동 지우기</button></div>
             <div class="edit-set sub small" aria-hidden="true"><span>세트</span><span>무게(kg)</span><span>{timeBased ? '시간(초)' : '횟수'}</span><span>RIR</span><span>완료</span><span /></div>
             {it.sets.map((x, k) => {
               const key = keyOf(x);
@@ -128,7 +140,7 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
         <button class="grow" onClick={() => void cancel()}>취소</button>
         <button class="primary grow" disabled={busy} onClick={() => void save()}>저장</button>
       </div>
-      <button class="danger" style={{ marginTop: '12px' }} onClick={async () => { if (confirm('이 운동 기록을 지울까요? 되돌릴 수 없어요.')) { await mutate((d) => softDelete(d, 'workouts', id)); go('#/stats'); } }}>이 기록 삭제</button>
+      <button class="danger" style={{ marginTop: '12px' }} onClick={async () => { if (await askConfirm({ title: '이 운동 기록을 지울까요?', message: '되돌릴 수 없어요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'workouts', id)); go('#/stats'); } }}>이 기록 삭제</button>
 
       {picker && (
         <ExercisePicker s={s} all={all} title="운동 추가" exclude={draft.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}

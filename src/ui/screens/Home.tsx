@@ -10,6 +10,7 @@ import { RemoteCards } from './RemoteCards';
 import { newId, softDelete } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
+import { askConfirm } from '../confirm';
 import { syncEnabled } from '../sync';
 
 export function Home({ s }: { s: AppState }) {
@@ -67,7 +68,7 @@ export function Home({ s }: { s: AppState }) {
           <div class="row" style={{ marginTop: '8px' }}>
             <button class="primary grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}>시작</button>
             <button onClick={() => go(`#/routine/${encodeURIComponent(r.id)}`)}>편집</button>
-            <button class="danger" onClick={async () => { if (confirm(`"${r.name}" 루틴을 지울까요? 운동 기록은 남아요.`)) await mutate((d) => softDelete(d, 'routines', r.id)); }} aria-label={`${r.name} 삭제`}>삭제</button>
+            <button class="danger" onClick={async () => { if (await askConfirm({ title: '루틴을 지울까요?', message: `"${r.name}" · 운동 기록은 남아요.`, ok: '지우기', danger: true })) await mutate((d) => softDelete(d, 'routines', r.id)); }} aria-label={`${r.name} 삭제`}>삭제</button>
           </div>
         </div>
       ))}
@@ -84,7 +85,7 @@ export function Home({ s }: { s: AppState }) {
             </a>
             <div class="row" style={{ marginTop: '6px', justifyContent: 'flex-end' }}>
               <button aria-label={`최근 운동 ${w.name} 수정`} onClick={() => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`)}>수정</button>
-              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={async () => { if (confirm(`"${w.name}" 운동 기록을 지울까요? 되돌릴 수 없어요.`)) await mutate((d) => softDelete(d, 'workouts', w.id)); }}>삭제</button>
+              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={async () => { if (await askConfirm({ title: '운동 기록을 지울까요?', message: `"${w.name}" · 되돌릴 수 없어요.`, ok: '지우기', danger: true })) await mutate((d) => softDelete(d, 'workouts', w.id)); }}>삭제</button>
             </div>
           </div>
         );

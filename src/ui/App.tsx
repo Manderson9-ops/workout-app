@@ -15,7 +15,7 @@ import { ToolsScreen } from './screens/Tools';
 import { mmss } from './components';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
 import { useUpdateAvailable } from './update';
-import { ConfirmHost } from './confirm';
+import { ConfirmHost, askConfirm } from './confirm';
 
 export function useHash(): string {
   const [h, set] = useState(location.hash || '#/');
@@ -61,7 +61,7 @@ export function App() {
     <>
       {update && !onWorkout && (
         <div class="card" role="status" style={{ position: 'sticky', top: 0, zIndex: 30, margin: 0, borderRadius: 0 }}>
-          <div class="row between"><span>새 버전이 있어요</span><button class="primary" onClick={() => { if (!active || confirm('운동 중이에요. 기록은 저장돼 있어요. 새 버전으로 바꿀까요?')) applyUpdate(); }}>적용</button></div>
+          <div class="row between"><span>새 버전이 있어요</span><button class="primary" onClick={async () => { if (!active || await askConfirm({ title: '운동 중이에요', message: '기록은 저장돼 있어요. 새 버전으로 바꿀까요?', ok: '바꾸기' })) applyUpdate(); }}>적용</button></div>
         </div>
       )}
       <SyncBadge />

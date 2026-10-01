@@ -12,6 +12,7 @@ import { startRoutine } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import type { Routine } from '../../core/session';
 import { go } from '../nav';
+import { askConfirm } from '../confirm';
 
 const WD = ['월', '화', '수', '목', '금', '토', '일'];
 const md = (d: string) => d.slice(5).replace('-', '/');
@@ -140,7 +141,7 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
             {[...sorted].reverse().slice(0, 30).map((b) => (
               <div class="row between small" key={b.date}>
                 <span>{b.date} · {b.kg}kg</span>
-                <button class="ghost" aria-label={`${b.date} 체중 지우기`} onClick={() => { if (confirm(`${b.date} 체중(${b.kg}kg)을 지울까요?`)) void mutate((d) => softDelete(d, 'bodyweight', b.date)); }}>지우기</button>
+                <button class="ghost" aria-label={`${b.date} 체중 지우기`} onClick={async () => { if (await askConfirm({ title: '체중 기록을 지울까요?', message: `${b.date} · ${b.kg}kg`, ok: '지우기', danger: true })) void mutate((d) => softDelete(d, 'bodyweight', b.date)); }}>지우기</button>
               </div>
             ))}
           </details>
@@ -199,7 +200,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       <div class="row" style={{ marginTop: '10px' }}>
         <button class="primary grow" onClick={async () => { const r = asRoutine(); await mutate((d) => d.routines.put(r)); await startRoutine(s, r); }}>이 운동 다시 하기</button>
         {w.endedAt && !w.pendingMerge && <button onClick={() => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`)}>수정</button>}
-        <button class="danger" onClick={async () => { if (confirm('이 운동 기록을 지울까요? 되돌릴 수 없어요.')) { await mutate((d) => softDelete(d, 'workouts', w.id)); go('#/stats'); } }}>삭제</button>
+        <button class="danger" onClick={async () => { if (await askConfirm({ title: '이 운동 기록을 지울까요?', message: '되돌릴 수 없어요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'workouts', w.id)); go('#/stats'); } }}>삭제</button>
       </div>
     </main>
   );

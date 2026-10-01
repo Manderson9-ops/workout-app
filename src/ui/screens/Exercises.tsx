@@ -16,6 +16,7 @@ import { GradeBadge, Sheet } from '../components';
 import { setMeta } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import { go } from '../nav';
+import { askConfirm } from '../confirm';
 
 const KEY = 'exerciseFilter.v1';
 
@@ -171,7 +172,7 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
             </div>
           ))}
         </div>
-      )}      {'custom' in e && <button class="danger" onClick={async () => { if (confirm('직접 추가한 운동을 지울까요? 운동 기록은 남아요.')) { await mutate((d) => softDelete(d, 'custom', e.id)); go('#/exercises'); } }}>이 운동 삭제</button>}
+      )}      {'custom' in e && <button class="danger" onClick={async () => { if (await askConfirm({ title: '직접 추가한 운동을 지울까요?', message: '운동 기록은 남아요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'custom', e.id)); go('#/exercises'); } }}>이 운동 삭제</button>}
     </main>
   );
 }

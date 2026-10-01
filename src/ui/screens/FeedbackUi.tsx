@@ -10,6 +10,7 @@ import type { Feedback } from '../../core/feedback';
 import { deviceId } from '../deviceId';
 import { APP_VERSION } from '../../core/version';
 import { softDelete } from '../../db/db';
+import { askConfirm } from '../confirm';
 
 const openers = new Set<() => void>();
 /** 메뉴의 "개선" 버튼 (메뉴는 backdrop-filter라 안에 고정 시트를 두면 위치가 틀어져서, 시트는 FeedbackButton이 메뉴 밖에서 띄움) */
@@ -69,7 +70,7 @@ export function FeedbackList({ s }: { s: AppState }) {
           <div class="row between small"><span class="sub">{new Date(f.createdAt).toLocaleDateString('ko-KR')} · {f.screen}</span><strong>{f.status}</strong></div>
           <p style={{ whiteSpace: 'pre-wrap', margin: '6px 0' }}>{f.text}</p>
           {f.note && <p class="small sub">{f.status === '보류' ? '보류 이유: ' : ''}{f.note}</p>}
-          {f.status === '접수' && <button class="ghost" aria-label={`${f.id} 지우기`} onClick={async () => { if (confirm('이 메모를 지울까요?')) await mutate((d) => softDelete(d, 'feedback', f.id)); }}>지우기</button>}
+          {f.status === '접수' && <button class="ghost" aria-label={`${f.id} 지우기`} onClick={async () => { if (await askConfirm({ title: '이 메모를 지울까요?', ok: '지우기', danger: true })) await mutate((d) => softDelete(d, 'feedback', f.id)); }}>지우기</button>}
         </div>
       ))}
     </>

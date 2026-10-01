@@ -3,6 +3,7 @@
  * 이유: 기본 확인 창은 브라우저·탭 상태에 따라 화면에 안 뜨고 바로 "취소"가 될 수 있어(에이전트가 붙은 탭 등),
  * "운동 끝내기"가 아무 표시 없이 안 되는 일이 생겼다. 앱 안 창은 항상 보이고, 닫으면 취소로 돌아간다.
  * App에 <ConfirmHost />를 한 번 두고, 어디서든 `await askConfirm({...})`로 묻는다.
+ * D-039: 앱 전체에서 기본 confirm/alert/prompt를 쓰지 않음 (두 갈래는 askChoice, 알림은 showNotice). tests/noNativeDialog.test.ts가 지킴.
  * 주의: 기본 confirm과 달리 기다리는 동안 앱이 계속 돈다(동기화 등) → 확인 뒤에는 최신 상태로 다시 읽을 것.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
@@ -10,7 +11,10 @@ import { Sheet } from './components';
 import { diag } from './diag';
 
 export interface ConfirmOpts { title: string; message?: string; ok: string; cancel?: string; danger?: boolean }
-interface Req extends ConfirmOpts { resolve: (v: boolean | null) => void }
+/** 내부 요청: alt = 세 번째 선택지(askChoice), notice = 취소 없이 확인만(showNotice) */
+interface Req extends ConfirmOpts { alt?: string; notice?: boolean; resolve: (v: Answer) => void }
+/** true = 확인, 'alt' = 두 번째 선택지, false = 취소·닫기·Esc, null = 다른 창이 대신함 */
+type Answer = boolean | 'alt' | null;
 
 let show: ((r: Req | null) => void) | null = null;
 let current: Req | null = null;
@@ -20,6 +24,24 @@ let current: Req | null = null;
  * 띄울 곳(ConfirmHost)이 없으면 false + 진단 기록 (App이 항상 그리므로 실제로는 생기지 않음).
  */
 export function askConfirm(o: ConfirmOpts): Promise<boolean | null> {
+  return open(o) as Promise<boolean | null>;
+}
+
+/**
+ * 두 가지 중 고르기 + 취소 (예: "서버까지 바꾸기" / "이 기기만"). 'ok' | 'alt' | false(취소·닫기·Esc) | null(대신됨).
+ * 기본 confirm의 [확인]/[취소]에 서로 다른 일을 맡기던 곳을 대신함: 닫기·Esc가 두 번째 일을 하지 않게.
+ */
+export async function askChoice(o: ConfirmOpts & { alt: string }): Promise<'ok' | 'alt' | false | null> {
+  const v = await open(o);
+  return v === true ? 'ok' : v;
+}
+
+/** 알림 (기본 alert 대신). 확인 버튼만 있고, 닫으면 끝남 */
+export async function showNotice(title: string, message?: string): Promise<void> {
+  await open({ title, message, ok: '확인', notice: true });
+}
+
+function open(o: Omit<Req, 'resolve'>): Promise<Answer> {
   return new Promise((resolve) => {
     if (!show) { diag('error', { m: '확인 창을 띄울 곳이 없음' }); resolve(false); return; }
     current?.resolve(null);
@@ -28,7 +50,7 @@ export function askConfirm(o: ConfirmOpts): Promise<boolean | null> {
   });
 }
 
-function answer(v: boolean) {
+function answer(v: boolean | 'alt') {
   const r = current; current = null;
   show?.(null);
   r?.resolve(v);
@@ -45,7 +67,7 @@ export function ConfirmHost() {
     if (!req) return;
     if (!backTo.current) backTo.current = document.activeElement as HTMLElement | null;
     // 위험한 확인(끝내기 등)은 "취소"에 초점: PC에서 Enter 한 번으로 끝나지 않게. 나머지는 확인에
-    (req.danger ? cancelRef : okRef).current?.focus();
+    (req.danger && !req.notice ? cancelRef : okRef).current?.focus();
     const k = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); answer(false); return; }
       if (e.key === 'Tab') { // 초점을 확인 창 안에 가둠
@@ -69,10 +91,19 @@ export function ConfirmHost() {
   return (
     <Sheet title={req.title} onClose={() => answer(false)} modal>
       {req.message && <p style={{ whiteSpace: 'pre-line', margin: '4px 0 12px' }}>{req.message}</p>}
-      <div class="row" style={{ marginTop: '10px' }}>
-        <button ref={cancelRef} class="big grow" onClick={() => answer(false)}>{req.cancel ?? '취소'}</button>
-        <button ref={okRef} class={`big grow ${req.danger ? 'danger-fill' : 'primary'}`} onClick={() => answer(true)}>{req.ok}</button>
-      </div>
+      {req.alt ? (
+        // 선택지가 셋이면 세로로 (폰에서 글자가 잘리지 않게). 취소는 맨 아래
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+          <button ref={okRef} class={`big ${req.danger ? 'danger-fill' : 'primary'}`} onClick={() => answer(true)}>{req.ok}</button>
+          <button class="big" onClick={() => answer('alt')}>{req.alt}</button>
+          <button ref={cancelRef} class="big" onClick={() => answer(false)}>{req.cancel ?? '취소'}</button>
+        </div>
+      ) : (
+        <div class="row" style={{ marginTop: '10px' }}>
+          {!req.notice && <button ref={cancelRef} class="big grow" onClick={() => answer(false)}>{req.cancel ?? '취소'}</button>}
+          <button ref={okRef} class={`big grow ${req.danger ? 'danger-fill' : 'primary'}`} onClick={() => answer(true)}>{req.ok}</button>
+        </div>
+      )}
     </Sheet>
   );
 }

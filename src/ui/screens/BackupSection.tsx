@@ -4,6 +4,7 @@ import type { AppState } from '../store';
 import { activeOf } from '../store';
 import { saveBackupFile, readBackupFile, restoreBackup, resetAll, prepareBackup, SAVE_MESSAGE } from '../backupActions';
 import { IS_PREVIEW } from '../appName';
+import { askConfirm, askChoice } from '../confirm';
 
 /** 데이터가 바뀌고 잠시(0.8초) 조용하면 백업 파일을 미리 만듦 (입력 중에는 만들지 않음) */
 function usePreparedBackup(s: AppState) {
@@ -29,14 +30,16 @@ export function BackupSection({ s }: { s: AppState }) {
     if (!r.ok) { setMsg({ text: `불러오지 못했어요: ${r.error}. 지금 데이터는 그대로예요`, ok: false }); return; }
     const c = r.file.counts;
     // 미리 보기 판에서 만든 백업을 본판에 넣으려 할 때 (D-031: 한 방향)
-    if (r.file.preview && !IS_PREVIEW && !confirm('미리 보기 판(β)에서 만든 백업이에요. 시험용 데이터일 수 있어요.\n그래도 본판 데이터를 이것으로 바꿀까요?')) return;
+    if (r.file.preview && !IS_PREVIEW && !(await askConfirm({ title: '미리 보기 판(β) 백업이에요', message: '시험용 데이터일 수 있어요.\n그래도 본판 데이터를 이것으로 바꿀까요?', ok: '계속', danger: true }))) return;
     const warnActive = active ? `\n\n⚠ 진행 중인 운동("${active.name}")도 사라져요.` : '';
-    if (!confirm(`${new Date(r.file.exportedAt).toLocaleString('ko-KR')} 백업으로 바꿀까요?\n운동 기록 ${c.workouts}개, 루틴 ${c.routines}개, 체중 ${c.bodyweight}개\n\n지금 이 폰의 데이터는 모두 이 백업으로 바뀌어요 (합치지 않음). 먼저 "백업 파일 저장"으로 지금 데이터를 저장해 두는 것을 권해요.${warnActive}`)) return;
+    if (!(await askConfirm({ title: '이 백업으로 바꿀까요?', ok: '바꾸기', danger: true, message: `${new Date(r.file.exportedAt).toLocaleString('ko-KR')} 백업\n운동 기록 ${c.workouts}개, 루틴 ${c.routines}개, 체중 ${c.bodyweight}개\n\n지금 이 폰의 데이터는 모두 이 백업으로 바뀌어요 (합치지 않음). 먼저 "백업 파일 저장"으로 지금 데이터를 저장해 두는 것을 권해요.${warnActive}` }))) return;
     // 동기화가 켜져 있으면 어디까지 바꿀지 고름 (D-032): 서버까지(다른 기기도 다시 받음) / 이 기기만(동기화 끔)
     let scope: 'server' | 'local' = 'local';
     if (syncEnabled()) {
-      if (confirm('동기화가 켜져 있어요.\n[확인] 서버와 다른 기기까지 이 백업으로 바꾸기 (서버는 바꾸기 전 상태를 따로 보관)\n[취소] 다른 방법 고르기')) scope = 'server';
-      else if (confirm('이 기기만 이 백업으로 바꾸고 동기화를 끌까요?')) { scope = 'local'; await disableSync(); }
+      // 닫기·Esc·취소는 아무것도 바꾸지 않음 (기본 confirm 때는 [취소]가 "다른 방법"이었음)
+      const pick = await askChoice({ title: '동기화가 켜져 있어요', message: '어디까지 이 백업으로 바꿀까요?\n· 서버·다른 기기까지: 서버는 바꾸기 전 상태를 따로 보관해요\n· 이 기기만: 동기화를 꺼요', ok: '서버·다른 기기까지', alt: '이 기기만 (동기화 끄기)', danger: true });
+      if (pick === 'ok') scope = 'server';
+      else if (pick === 'alt') { scope = 'local'; await disableSync(); }
       else return;
     }
     try {
@@ -64,11 +67,14 @@ export function BackupSection({ s }: { s: AppState }) {
         <summary class="small sub" style={{ minHeight: '44px', display: 'flex', alignItems: 'center' }}>모든 데이터 지우기 (초기화)</summary>
         <p class="small">운동 기록·루틴·체중·설정이 모두 지워지고 되돌릴 수 없어요. 먼저 백업 파일을 저장하세요.</p>
         <button class="danger" onClick={async () => {
-          if (!confirm('정말 모든 데이터를 지울까요? 되돌릴 수 없어요.')) return;
-          if (!confirm('마지막 확인: 백업 파일을 저장해 두셨나요? 지우기를 계속할까요?')) return;
+          if (!(await askConfirm({ title: '정말 모든 데이터를 지울까요?', message: '되돌릴 수 없어요.', ok: '지우기', danger: true }))) return;
+          if (!(await askConfirm({ title: '마지막 확인', message: '백업 파일을 저장해 두셨나요? 지우기를 계속할까요?', ok: '계속 지우기', danger: true }))) return;
           if (syncEnabled()) {
             // 동기화 중에 지우면 다른 기기 기록까지 지워지지 않게: 이 기기만 비우고 서버에서 다시 받거나, 동기화를 끔
-            if (confirm('동기화가 켜져 있어요.\n[확인] 이 기기만 비우고 서버에서 다시 받기\n[취소] 이 기기만 비우고 동기화 끄기')) { await resetAll(); await pullFresh(); setMsg({ text: '이 기기를 비우고 서버에서 다시 받았어요', ok: true }); return; }
+            // 닫기·Esc·취소는 지우지 않음 (기본 confirm 때는 [취소]가 "동기화 끄고 비우기"였음)
+            const pick = await askChoice({ title: '동기화가 켜져 있어요', message: '이 기기만 비워요. 다른 기기·서버 기록은 그대로예요.', ok: '비우고 서버에서 다시 받기', alt: '비우고 동기화 끄기', danger: true });
+            if (!pick) return;
+            if (pick === 'ok') { await resetAll(); await pullFresh(); setMsg({ text: '이 기기를 비우고 서버에서 다시 받았어요', ok: true }); return; }
             await disableSync();
           }
           await resetAll(); setMsg({ text: '모든 데이터를 지웠어요', ok: true });
