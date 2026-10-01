@@ -138,7 +138,7 @@ describe('짧을 때 원인이 사실과 맞음: 모든 부위 × 3수준 × 45~
       else expect(p.slack.suggest.length, `${part} ${level} ${t}`).toBeGreaterThan(0);
       expect(p.slack.level).toBe(level);
     }
-  });
+  }, 60_000);
   it('초보 등·어깨: 앞 순번 운동이 상한을 넘어도 뒤 후보로 채움 (이전: 시간과 상관없이 등 33분 33초, 어깨 46분 12초), 원인은 상한', () => {
     for (const [part, before] of [['등', 2013], ['어깨', 2772]] as [Part, number][]) {
       const p = generatePlan({ parts: [{ part, priority: 'high' }], level: '초보', minGrade: 'B-', targetMinutes: 90 }, real);
@@ -177,7 +177,7 @@ describe('짝 캐시는 실제로 고른 운동 기준 (D-041 검토 2차 필수
       expect(validatePlan(p, q, real), label).toEqual([]);
       if (p.slack?.cause.every((c) => c === 'time')) expect(t * 60 - p.estimatedSec, label).toBeLessThanOrEqual(12 * 60);
     }
-  });
+  }, 60_000); // CI(GitHub Actions) 커버리지 실행에서 약 6초
 });
 
 describe('초보 "최대 3세트" 안내는 실제로 모두 3세트일 때만 (D-041 검토 3차)', () => {
