@@ -15,6 +15,8 @@ import { flushDiag } from '../src/ui/diag';
  * 기본 창을 쓰는 곳을 찾음. 주석·문자열을 먼저 지운 뒤 이름 자체를 찾음 (부르기·담기·넘기기 모두).
  * 제외: 다른 객체의 같은 이름 메서드(x.confirm), 객체 키(confirm:), 더 긴 이름(askConfirm, confirmed).
  * 대괄호로 부르기(window['alert'])는 문자열을 지우기 전에 따로 찾음.
+ * 사각지대(알고 둠): 템플릿 문자열 안 ${confirm()},  ? confirm : b, 구조 분해 { confirm: c } = window, 따옴표가 섞인 JSX 글 뒤 같은 줄.
+ * 그래서 e2e도 기본 창이 하나라도 뜨면 실패하게 둠 (지나가는 화면만).
  */
 export function nativeDialogCalls(src: string): string[] {
   const bracket = [...src.matchAll(/(?:window|globalThis|self)\s*(?:\?\.)?\[\s*['"`](confirm|alert|prompt)['"`]\s*\]/g)].map((m) => m[0]);

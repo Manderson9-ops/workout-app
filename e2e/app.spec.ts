@@ -214,6 +214,15 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   await ask.getByRole('button', { name: '취소' }).click();
   await expect(page).toHaveURL(/#\/workout$/);
   await expect(doneBtn).toBeVisible();
+  // 창이 열린 채 뒤로 가기 → 창만 닫히고 가려던 화면으로 (취소처럼 운동 화면으로 끌고 가지 않음, D-039 검토)
+  await page.getByRole('link', { name: '기록' }).click();
+  await page.getByRole('link', { name: '홈' }).click();
+  await startBtn.click();
+  await expect(ask).toBeVisible();
+  await page.goBack();
+  await expect(ask).toHaveCount(0);
+  await page.waitForTimeout(300);
+  await expect(page).toHaveURL(/#\/stats$/);
   await page.getByRole('link', { name: '홈' }).click();
   await startBtn.click();
   await ask.getByRole('button', { name: '끝내고 새로 시작' }).click();

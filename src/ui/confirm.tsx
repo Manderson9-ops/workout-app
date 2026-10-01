@@ -50,7 +50,7 @@ function open(o: Omit<Req, 'resolve'>): Promise<Answer> {
   });
 }
 
-function answer(v: boolean | 'alt') {
+function answer(v: Answer) {
   const r = current; current = null;
   show?.(null);
   r?.resolve(v);
@@ -62,10 +62,10 @@ export function ConfirmHost() {
   const cancelRef = useRef<HTMLButtonElement>(null);
   const backTo = useRef<HTMLElement | null>(null);
   useEffect(() => { show = setReq; return () => { if (show === setReq) show = null; }; }, []);
-  // 화면이 바뀌면(뒤로 가기·스와이프·링크) 열린 확인은 취소: 떠난 화면의 일을 나중에 하지 않게.
+  // 화면이 바뀌면(뒤로 가기·스와이프·링크) 열린 확인을 닫음: 떠난 화면의 일을 나중에 하지 않게.
   // 기본 confirm은 페이지를 멈춰 이런 일이 없었지만 앱 안 창은 화면 전환 뒤에도 남을 수 있음 (D-039 검토)
   useEffect(() => {
-    const on = () => { if (current) answer(false); };
+    const on = () => { if (current) answer(null); }; // null = 사용자가 고른 것이 아님 (취소 때 하는 일도 하지 않음)
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);
   }, []);
