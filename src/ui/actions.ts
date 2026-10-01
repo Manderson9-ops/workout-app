@@ -119,6 +119,7 @@ export async function startRoutine(s: AppState, r: Routine) {
     const st = getState();
     const w = { ...startWorkout(newId('w'), r, new Date().toISOString(), historyOf(st), { betweenSec: st.settings.rest.between }), ownerDeviceId: deviceId(), ownerAt: new Date().toISOString(), ownerSeq: 1 };
     await mutate((d) => d.workouts.put(w));
+    setFinishError(null); // 지난 운동의 실패 문구가 새 운동 화면에 남지 않게 (검토 R1)
     go('#/workout');
   } finally { starting = false; }
 }
