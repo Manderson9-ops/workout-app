@@ -24,17 +24,17 @@ const pair = (b: Box, c: number): Box[] => [b, mirror(b, c)];
 /** 누르는 영역: 서로 겹치지 않게, 근육보다 넉넉히 */
 export const HITS: Record<Side, [Part, Box[]][]> = {
   front: [
-    ['어깨', pair([140, 288, 292, 398], 362)],
+    ['어깨', pair([140, 280, 292, 404], 362)],
     ['가슴', [[292, 300, 432, 435]]],
-    ['이두', pair([105, 398, 270, 520], 362)],
-    ['전완·악력', pair([40, 520, 270, 700], 362)],
+    ['이두', pair([105, 404, 270, 526], 362)],
+    ['전완·악력', pair([40, 526, 270, 705], 362)],
     ['코어', [[270, 435, 454, 660]]],
     ['하체', [[225, 660, 499, 1300]]],
   ],
   back: [
-    ['어깨', pair([862, 288, 1003, 398], 1086)],
+    ['어깨', pair([862, 280, 1003, 404], 1086)],
     ['등', [[1003, 270, 1169, 630]]],
-    ['삼두', pair([830, 398, 1003, 530], 1086)],
+    ['삼두', pair([830, 404, 1003, 530], 1086)],
     ['전완·악력', pair([760, 530, 1003, 705], 1086)],
     ['하체', [[945, 630, 1227, 1330]]],
   ],
@@ -71,6 +71,11 @@ export function BodyMap({ sel, onPart }: { sel: Partial<Record<Part, Priority>>;
         ))}
       </div>
       <Figure side={side} sel={sel} onPart={onPart} />
+      <div class="bm-legend sub small" aria-hidden="true">
+        <span><i class="bm-muscle p-high" style={{ background: '#3b82f6' }} />높음</span>
+        <span><i style={{ background: '#60a5fa', opacity: 0.8 }} />보통</span>
+        <span><i style={{ background: '#93c5fd', opacity: 0.5 }} />낮음</span>
+      </div>
       <p class="sub small bm-hint">{side === 'front' ? '어깨·가슴·이두·전완·코어·하체' : '어깨·등·삼두·전완·하체'}를 눌러 고르세요</p>
     </div>
   );

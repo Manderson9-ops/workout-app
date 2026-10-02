@@ -156,10 +156,10 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 .bodymap .seg button { min-height: 44px; min-width: 72px; border: 0; border-radius: 0; background: transparent; color: var(--sub); font-weight: 600; }
 .bodymap .seg button.on { background: var(--acc); color: #fff; }
 .bodymap-svg { width: min(260px, 72vw); height: auto; display: block; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
-.bm-outline { fill: #1b1f28; stroke: #3a4050; stroke-width: 3; stroke-linejoin: round; }
-.bm-deco { fill: #2a2f3a; }
-.bm-muscle { fill: #444b5a; transition: fill .15s ease; }
-.bm-muscle.p-high { fill: #3b82f6; }
+.bm-outline { fill: #12151c; stroke: #525a6b; stroke-width: 3; stroke-linejoin: round; }
+.bm-deco { fill: #3a414f; }
+.bm-muscle { fill: #5a6378; transition: fill .15s ease; }
+.bm-muscle.p-high { fill: #3b82f6; filter: drop-shadow(0 0 6px rgba(59,130,246,.55)); }
 .bm-muscle.p-normal { fill: #60a5fa; fill-opacity: .8; }
 .bm-muscle.p-low { fill: #93c5fd; fill-opacity: .5; }
 .bm-hit { fill: transparent; cursor: pointer; pointer-events: all; }
@@ -172,4 +172,6 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 .prio-opt.on.p-high { background: #1d4ed8; color: #fff; }
 .prio-opt.on.p-normal { background: #2563eb88; color: #fff; }
 .prio-opt.on.p-low { background: #1e3a8a55; color: #fff; }
-.prio-opt.on .sub { color: #dbe7ff; }
+.prio-opt.on .sub { color: #dbe7ff; }.bm-legend { display: flex; gap: 12px; justify-content: center; margin-top: 4px; }
+.bm-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.bm-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
