@@ -7,7 +7,7 @@ import { askConfirm } from './confirm';
 import { diag } from './diag';
 import { deviceId } from './deviceId';
 import type { AppState } from './store';
-import { newId, DEFAULT_SETTINGS } from '../db/db';
+import { newId, DEFAULT_SETTINGS, softDelete } from '../db/db';
 import { startWorkout, planToRoutine, decideFinish, withHidden, withoutHidden } from '../core/session';
 import type { FinishDecision } from '../core/session';
 import type { Routine, Workout } from '../core/session';
@@ -150,5 +150,24 @@ export async function setHomeHidden(id: string, hidden: boolean): Promise<void> 
     const next = hidden ? withHidden(st.homeHidden, id) : withoutHidden(st.homeHidden, id);
     if (next.length === (st.homeHidden ?? []).length) return; // 바뀐 게 없으면 저장·동기화하지 않음
     await d.settings.put({ ...st, key: 'main', homeHidden: next });
+  });
+}
+
+/** 내 루틴 목록에서만 숨기기·다시 보이기 (D-048). 홈 최근 운동과 같은 방식: 저장소의 지금 설정에서 이 ID만 바꿈 */
+export async function setRoutineHidden(id: string, hidden: boolean): Promise<void> {
+  await mutate(async (d) => {
+    const st = (await d.settings.get('main')) ?? DEFAULT_SETTINGS;
+    const next = hidden ? withHidden(st.routineHidden, id) : withoutHidden(st.routineHidden, id);
+    if (next.length === (st.routineHidden ?? []).length) return;
+    await d.settings.put({ ...st, key: 'main', routineHidden: next });
+  });
+}
+
+/** 루틴 완전 삭제 (지움 표시, 되돌릴 수 없음). 운동 기록은 남음. 숨긴 목록에서도 정리 */
+export async function deleteRoutineForever(id: string): Promise<void> {
+  await mutate(async (d) => {
+    await softDelete(d, 'routines', id);
+    const st = await d.settings.get('main');
+    if (st && (st.routineHidden ?? []).includes(id)) await d.settings.put({ ...st, routineHidden: withoutHidden(st.routineHidden, id) });
   });
 }

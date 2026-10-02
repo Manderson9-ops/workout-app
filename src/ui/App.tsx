@@ -7,6 +7,7 @@ import { Exercises, ExerciseDetail } from './screens/Exercises';
 import { WorkoutScreen } from './screens/Workout';
 import { SettingsScreen } from './screens/Settings';
 import { RoutineEditor } from './screens/RoutineEditor';
+import { RoutinesScreen } from './screens/RoutineList';
 import { Stats, WorkoutDetail } from './screens/Stats';
 import { SyncBadge } from './screens/SyncSection';
 import { FeedbackButton, FeedbackNavItem } from './screens/FeedbackUi';
@@ -49,6 +50,7 @@ export function App() {
   else if (path.startsWith('/stats/w/')) screen = <WorkoutDetail s={s} id={decodeURIComponent(path.slice(9))} />;
   else if (path.startsWith('/stats')) screen = <Stats s={s} />;
   else if (path.startsWith('/tools')) screen = <ToolsScreen />;
+  else if (path.startsWith('/routines')) screen = <RoutinesScreen s={s} />;
   else if (path.startsWith('/routine/')) screen = <RoutineEditor key={path} s={s} id={decodeURIComponent(path.slice(9))} />;
   else screen = <Home s={s} />;
 

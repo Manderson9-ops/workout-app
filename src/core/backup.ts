@@ -92,6 +92,7 @@ function settingsOk(s: unknown): boolean {
     && (s.equipment === undefined || (Array.isArray(s.equipment) && s.equipment.every((e) => EQUIPMENT.includes(e as never))))
     && (s.defaultParts === undefined || (Array.isArray(s.defaultParts) && s.defaultParts.every((p) => PARTS.includes(p as never))))
     && (s.homeHidden === undefined || (Array.isArray(s.homeHidden) && s.homeHidden.every((x) => typeof x === 'string')))
+    && (s.routineHidden === undefined || (Array.isArray(s.routineHidden) && s.routineHidden.every((x) => typeof x === 'string')))
     && optNum(s.defaultMinutes) && optBool(s.soundOn) && optBool(s.keepAwake) && optBool(s.storageNoticeSeen) && optIso(s.lastBackupAt)
     && (r === undefined || (isObj(r) && ['compound', 'isolation', 'round', 'between', 'transition'].every((k) => num(r[k]) && (r[k] as number) >= 0)));
 }

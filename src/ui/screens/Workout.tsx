@@ -15,6 +15,7 @@ import { updateWorkoutAfterInputs, finishActiveWorkout, useFinishError, setFinis
 import { askConfirm } from '../confirm';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
+import { RoutineList } from './RoutineList';
 import { softDelete } from '../../db/db';
 
 import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
@@ -99,8 +100,9 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         <h1>운동</h1>
         {remoteActiveOf(s) && <p role="status" class="card small">📱 운동 「{remoteActiveOf(s)!.name}」은 다른 기기에서 진행 중이에요 (다른 기기로 넘어갔어요). 홈에서 볼 수 있어요.</p>}
         {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" style={{ margin: 0 }}>⚠️ {finishErr}</p><button class="ghost" aria-label="알림 닫기" onClick={() => setFinishError(null)}>✕</button></div>}
-        <div class="empty"><p>진행 중인 운동이 없어요.</p><p class="small">홈에서 루틴을 시작하거나 플랜을 만들어 보세요.</p></div>
-        <button class="primary big" onClick={() => go('#/')}>루틴 고르기</button>
+        <p class="sub">진행 중인 운동이 없어요. 루틴을 골라 시작하세요.</p>
+        <div class="row between"><h2>루틴 고르기</h2><div class="row"><button onClick={() => go('#/routines')}>내 루틴 관리</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜</button></div></div>
+        <RoutineList s={s} mode="pick" />
       </main>
     );
   }
