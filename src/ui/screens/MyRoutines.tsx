@@ -15,7 +15,7 @@ import type { RoutineSort } from '../../core/routineList';
 import type { Part } from '../../core/types';
 import { newId } from '../../db/db';
 import { minutes } from '../components';
-import { go } from '../nav';
+import { go, setEditReturn } from '../nav';
 import { askChoice, askConfirm } from '../confirm';
 import { lsGet, lsSet } from '../appName';
 
@@ -25,13 +25,14 @@ const SORT_LABEL: Record<RoutineSort, string> = { recent: '최근 한 순', name
 export async function newRoutine(): Promise<void> {
   const r = emptyRoutine(newId('r'), '새 루틴', new Date().toISOString());
   await mutate((d) => d.routines.put(r));
+  setEditReturn('#/');
   go(`#/routine/${encodeURIComponent(r.id)}`);
 }
 
 type Toast = { text: string; undo?: () => Promise<void> } | null;
 
 /**
- * mode: 'home' = 최근 3개 + "모두 보기", 'all' = 전체(검색·정렬·숨긴 루틴), 'pick' = 운동 탭에서 고르기(시작 위주, 지우기 없음)
+ * mode: 'home' = 최근 3개 + "모두 보기", 'all' = 전체(검색·정렬·숨긴 루틴), 'pick' = 운동 탭에서 고르기(시작·편집, 지우기 없음)
  */
 export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | 'pick' }) {
   const all = catalog(s.custom);
@@ -100,11 +101,11 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
             <button class="danger" onClick={async () => { if (await askConfirm({ title: '루틴을 완전히 지울까요?', message: `「${r.name}」 · 되돌릴 수 없어요. 운동 기록은 남아요.`, ok: '완전 삭제', danger: true })) await removeForever(r); }} aria-label={`${r.name} 완전 삭제`}>완전 삭제</button>
           </> : items.length ? <>
             <button class="primary grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}>▶ 시작</button>
-            {mode !== 'pick' && <button onClick={() => go(`#/routine/${encodeURIComponent(r.id)}`)} aria-label={`${r.name} 편집`}>편집</button>}
+            <button onClick={() => { setEditReturn(mode === 'pick' ? '#/workout' : '#/'); go(`#/routine/${encodeURIComponent(r.id)}`); }} aria-label={`${r.name} 편집`}>편집</button>
             {mode !== 'pick' && <button class="ghost" onClick={() => void remove(r)} aria-label={`${r.name} 지우기`}>지우기</button>}
           </> : <>
             {/* 운동이 없는 루틴: 시작 대신 운동 넣기 */}
-            <button class="grow" onClick={() => go(`#/routine/${encodeURIComponent(r.id)}`)} aria-label={`${r.name} 운동 넣기`}>+ 운동 넣기</button>
+            <button class="grow" onClick={() => { setEditReturn(mode === 'pick' ? '#/workout' : '#/'); go(`#/routine/${encodeURIComponent(r.id)}`); }} aria-label={`${r.name} 운동 넣기`}>+ 운동 넣기</button>
             {mode !== 'pick' && <button class="ghost" onClick={() => void remove(r)} aria-label={`${r.name} 지우기`}>지우기</button>}
           </>}
         </div>

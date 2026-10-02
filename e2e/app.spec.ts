@@ -635,13 +635,24 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   if ((await list.getByRole('button', { name: /숨긴 루틴/ }).getAttribute('aria-expanded')) !== 'true') await list.getByRole('button', { name: /숨긴 루틴/ }).click();
   await list.getByRole('button', { name: '빈 A 완전 삭제' }).click();
   await answer(page, '완전 삭제');
-  // 운동 탭: 진행 중 운동이 없으면 바로 루틴 고르기 (편집·지우기 없이 시작만)
+  // 운동 탭: 진행 중 운동이 없으면 바로 루틴 고르기 (시작·편집, 지우기 없음 D-053)
   await page.getByRole('link', { name: '운동' }).click();
   await expect(page.getByRole('heading', { name: '루틴 고르기' })).toBeVisible();
   const pick = page.getByRole('region', { name: '내 루틴' });
   expect(await pick.locator('.routine-card').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['루틴 가슴 30분', '루틴 하체 45분']); // 정렬은 내 루틴 화면에서 고른 것(이름 순)을 따름
-  await expect(pick.getByRole('button', { name: /지우기|편집/ })).toHaveCount(0);
+  await expect(pick.getByRole('button', { name: /지우기/ })).toHaveCount(0);
+  await expect(pick.getByRole('button', { name: '가슴 30분 편집' })).toBeVisible();
+  await expect(pick.getByRole('button', { name: '하체 45분 편집' })).toBeVisible();
   await checkScreen(page, '57-workout-pick');
+  // 편집 → 루틴 편집 화면 → "← 운동"으로 운동 탭(루틴 고르기)에 돌아감
+  await pick.getByRole('button', { name: '하체 45분 편집' }).click();
+  await expect(page).toHaveURL(/#\/routine\//);
+  await expect(page.getByLabel('루틴 이름')).toHaveValue('하체 45분');
+  await expect(page.getByRole('button', { name: '← 운동' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '← 홈' })).toHaveCount(0);
+  await page.getByRole('button', { name: '← 운동' }).click();
+  await expect(page).toHaveURL(/#\/workout/);
+  await expect(page.getByRole('heading', { name: '루틴 고르기' })).toBeVisible();
   await pick.getByRole('button', { name: '가슴 30분 시작' }).click();
   await expect(page.getByRole('heading', { name: '가슴 30분' })).toBeVisible();
   await endWorkout(page);
@@ -755,6 +766,7 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
   // 저장 → 다시 편집: 값 유지
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await page.locator('main .card').filter({ has: page.getByRole('heading', { name: '부위 추가 루틴' }) }).getByRole('button', { name: '편집' }).click();
+  await expect(page.getByRole('button', { name: '← 홈' })).toBeVisible(); // 홈·내 루틴에서 연 편집은 홈으로
   const cards2 = page.locator('main .card');
   await expect(cards2).toHaveCount(2);
   expect(await sets(cards2.nth(0))).toEqual(finalG);
