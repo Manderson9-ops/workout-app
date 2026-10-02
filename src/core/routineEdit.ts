@@ -6,15 +6,17 @@ import type { Routine, RoutineItem } from './session';
 import type { Part } from './types';
 import { SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX, SECS_STEP } from './planEdit';
 
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-
+/** 버튼 방향을 거스르지 않는 한 칸 이동: 옛 루틴의 범위 밖 값(예: 60회)은 "+"에서 줄어들지 않고 그대로 둠 */
+function stepWithin(cur: number, d: number, lo: number, hi: number, unit = 1): number {
+  return d > 0 ? Math.max(cur, Math.min(hi, cur + d * unit)) : Math.min(cur, Math.max(lo, cur + d * unit));
+}
 export function stepItemSets(it: RoutineItem, d: number): RoutineItem {
-  return { ...it, sets: clamp(it.sets + d, SETS_MIN, SETS_MAX) };
+  return { ...it, sets: stepWithin(it.sets, d, SETS_MIN, SETS_MAX) };
 }
 /** 횟수 운동은 1회씩, 시간 운동은 5초씩 */
 export function stepItemReps(it: RoutineItem, d: number): RoutineItem {
-  if (it.seconds !== undefined) return { ...it, seconds: clamp(it.seconds + d * SECS_STEP, SECS_MIN, SECS_MAX) };
-  return { ...it, reps: clamp(it.reps + d, REPS_MIN, REPS_MAX) };
+  if (it.seconds !== undefined) return { ...it, seconds: stepWithin(it.seconds, d, SECS_MIN, SECS_MAX, SECS_STEP) };
+  return { ...it, reps: stepWithin(it.reps, d, REPS_MIN, REPS_MAX) };
 }
 
 function mapItems(r: Routine, bi: number | undefined, fn: (i: RoutineItem) => RoutineItem): Routine {

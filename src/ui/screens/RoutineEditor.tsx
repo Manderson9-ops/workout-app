@@ -55,7 +55,8 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
     const next = (kind === 'sets' ? bulkRoutineSets : bulkRoutineReps)(r, d, bi);
     if (next === r) return;
     setR(next);
-    say(`${bi === undefined ? '운동' : '묶음 운동'} ${routineChangedCount(r, next)}개 ${kind === 'sets' ? '세트' : '횟수'} ${sgn(d)}`);
+    const timed = r.blocks.some((b, x) => (bi === undefined || x === bi) && b.items.some((i) => i.seconds !== undefined));
+    say(`${bi === undefined ? '운동' : '묶음 운동'} ${routineChangedCount(r, next)}개 ${kind === 'sets' ? '세트' : timed ? '횟수·시간' : '횟수'} ${sgn(d)}`);
   };
   const bulkOff = (kind: 'sets' | 'reps', d: number, bi?: number) => (kind === 'sets' ? bulkRoutineSets : bulkRoutineReps)(r, d, bi) === r;
   const stepBtns = (aria: string, kind: 'sets' | 'reps', bi?: number): [StepBtn, StepBtn] => [
@@ -80,17 +81,20 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
       <label>루틴 이름</label>
       <input value={r.name} aria-label="루틴 이름" onInput={(e) => setR({ ...r, name: (e.target as HTMLInputElement).value })} />
       <p class="sub small">예상 {mmss(est)} {r.warmupSec ? `(웜업 ${Math.round(r.warmupSec / 60)}분 포함)` : ''}</p>
-      <label>부위를 눌러 운동 추가</label>
+      <p class="sub small" id="part-add-h" style={{ margin: '12px 0 6px' }}>부위를 눌러 운동 추가</p>
       <div class="row wrap part-add" role="group" aria-label="부위별 운동 추가">
         {PARTS.map((p) => {
           const n = partCount.get(p) ?? 0;
           return <button key={p} class={n ? 'chip on' : 'chip'} aria-label={n ? `${p} 운동 추가 (지금 ${n}개)` : `${p} 운동 추가`} onClick={() => setPicker({ add: p })}>{n ? `${p} · ${n}` : p}</button>;
         })}
       </div>
-      <div class="row wrap">
-        <span class="sub small grow">모든 블록 휴식 한 번에 (루틴 기본값)</span>
-        <button onClick={() => setR(applyRestToAll(r, rest.isolation, rest.round))}>짧게 {rest.isolation}초</button>
-        <button onClick={() => setR(applyRestToAll(r, rest.compound, rest.round))}>길게 {rest.compound}초</button>
+      <p class="sub small" style={{ margin: '0 0 4px' }}>파란색 = 이미 들어 있는 부위 · 누르면 그 부위 운동을 골라 추가</p>
+      <p class="sub small bulk-h" style={{ margin: '16px 0 0' }}>한 번에 바꾸기</p>
+      <div class="row wrap bulk-row">
+        <Labeled label="모든 블록 휴식">
+          <button onClick={() => setR(applyRestToAll(r, rest.isolation, rest.round))}>짧게 {rest.isolation}초</button>
+          <button onClick={() => setR(applyRestToAll(r, rest.compound, rest.round))}>길게 {rest.compound}초</button>
+        </Labeled>
       </div>
       {r.blocks.length > 0 && (
         <div class="row wrap bulk-row">
@@ -171,7 +175,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         <button class="primary grow" disabled={!r.blocks.length} onClick={async () => { await save(); await startRoutine(s, saved()); }}>저장하고 시작</button>
       </div>
       {picker && (
-        <ExercisePicker s={s} all={all} title={'add' in picker ? (picker.add ? `운동 추가 · ${picker.add}` : '운동 추가') : '운동 교체'}
+        <ExercisePicker s={s} all={all} title={'add' in picker ? '운동 추가' : '운동 교체'}
           part={'add' in picker ? undefined : byId.get(r.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part}
           startPart={'add' in picker ? picker.add : undefined}
           exclude={r.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
@@ -183,7 +187,12 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
               setR({ ...r, blocks: [...r.blocks, { kind: 'single', items: [{ exerciseId: e.id, sets: 3, reps, ...(seconds ? { seconds } : {}) }], restSec: restFor(e.id), roundRestSec: rest.round, transitionSec: rest.transition }] });
               pendingFocus.current = `${e.name_ko} 세트 늘리기`;
               say(`${e.name_ko}: 추가했어요`);
-            } else setItem(picker.b, picker.i, (y) => ({ exerciseId: e.id, sets: y.sets, reps, ...(seconds ? { seconds } : {}) }));
+            } else {
+              const oldName = nameOf(r.blocks[picker.b]!.items[picker.i]!);
+              setItem(picker.b, picker.i, (y) => ({ exerciseId: e.id, sets: y.sets, reps, ...(seconds ? { seconds } : {}) }));
+              pendingFocus.current = `${e.name_ko} 세트 늘리기`;
+              say(`${oldName} → ${e.name_ko}: 바꿨어요`);
+            }
             setPicker(null);
           }} />
       )}

@@ -133,6 +133,7 @@ html.editing main { padding-bottom: 40px; }
 @media (min-width: 1100px) {
   html:not(.phone-view) .wide-cards-lg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   html:not(.phone-view) .wide-cards-lg > .card { margin: 0; }
+  html:not(.phone-view) .group-bulk .lbl-step > .sub { min-width: 0; }
   html:not(.phone-view) .wide-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 }
 /* 폰 화면으로 보기: PC에서도 폰 폭으로 가운데 */
@@ -211,7 +212,7 @@ button.back { margin-bottom: 4px; }
 .group-settings .lbl-step > .sub, .group-bulk .lbl-step > .sub { min-width: 88px; }
 /* D-052: 묶음 세트·횟수는 항상 보이고, 루틴 편집의 부위 추가 줄 */
 .group-bulk { gap: 8px; margin: 6px 0 2px; align-items: center; }
-.part-add { gap: 6px; }
+.part-add { gap: 6px; margin: 4px 0 12px; }
 .mini-step .val { padding: 0 6px; }
 .group-settings > summary:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 8px; }
 .group-settings .row { gap: 8px; margin-top: 6px; align-items: center; }

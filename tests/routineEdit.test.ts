@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts } from '../src/core/routineEdit';
+import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts, stepItemReps } from '../src/core/routineEdit';
 import { rangeText } from '../src/core/planEdit';
 import type { Routine, RoutineBlock, RoutineItem } from '../src/core/session';
 import type { Part } from '../src/core/types';
@@ -47,6 +47,20 @@ describe('routineEdit (D-052)', () => {
     const hi = routine([blk([it_('a', { reps: 0, seconds: 300 })])]);
     expect(bulkRoutineReps(hi, 1)).toBe(hi);
     expect(bulkRoutineReps(routine([blk([it_('a', { reps: 0, seconds: 298 })])]), 1).blocks[0]!.items[0]!.seconds).toBe(300);
+  });
+
+  it('범위 밖 옛 값(60회·305초)은 버튼 방향을 거스르지 않음', () => {
+    const old = routine([blk([it_('a', { reps: 60 })])]);
+    expect(bulkRoutineReps(old, 1)).toBe(old);
+    expect(bulkRoutineReps(old, -1).blocks[0]!.items[0]!.reps).toBe(59);
+    const longT = routine([blk([it_('a', { reps: 0, seconds: 305 })])]);
+    expect(bulkRoutineReps(longT, 1)).toBe(longT);
+    expect(bulkRoutineReps(longT, -1).blocks[0]!.items[0]!.seconds).toBe(300);
+    expect(stepItemReps(it_('a', { reps: 60 }), 1).reps).toBe(60);
+    expect(stepItemReps(it_('a', { reps: 60 }), -1).reps).toBe(59);
+    const lowT = routine([blk([it_('a', { reps: 0, seconds: 3 })])]);
+    expect(bulkRoutineReps(lowT, -1)).toBe(lowT);
+    expect(bulkRoutineReps(lowT, 1).blocks[0]!.items[0]!.seconds).toBe(8);
   });
 
   it('routineChangedCount: 바뀐 운동 수', () => {

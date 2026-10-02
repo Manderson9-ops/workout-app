@@ -148,7 +148,9 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const bulkDo = (kind: 'sets' | 'reps', d: number, bi?: number) => {
     if (!plan) return;
     const next = (kind === 'sets' ? bulkSets : bulkReps)(plan, d, bi);
-    applyEdit(next, `${bi === undefined ? '운동' : '묶음 운동'} ${changedCount(plan, next)}개 ${kind === 'sets' ? '세트' : '횟수'} ${sgn(d)}`);
+    // 시간 운동이 섞여 있으면 "횟수·시간"으로 (N-3)
+    const timed = plan.blocks.some((b, x) => (bi === undefined || x === bi) && b.items.some((i) => i.seconds !== undefined));
+    applyEdit(next, `${bi === undefined ? '운동' : '묶음 운동'} ${changedCount(plan, next)}개 ${kind === 'sets' ? '세트' : timed ? '횟수·시간' : '횟수'} ${sgn(d)}`);
   };
   const bulkOff = (kind: 'sets' | 'reps', d: number, bi?: number) => !plan || (kind === 'sets' ? bulkSets : bulkReps)(plan, d, bi) === plan;
   // 라벨과 스테퍼를 한 덩어리로 (줄바꿈은 덩어리 단위로만)

@@ -711,7 +711,7 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
   await expect(chest).not.toHaveClass(/\bon\b/);
   // 가슴 누르기 → 가슴으로 열림 → 첫 운동 고르기
   await chest.click();
-  const dlg = page.getByRole('dialog', { name: '운동 추가 · 가슴' });
+  const dlg = page.getByRole('dialog', { name: '운동 추가', exact: true });
   await expect(dlg).toBeVisible();
   await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '가슴', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const first = dlg.locator('.list-item').first();
