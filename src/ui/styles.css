@@ -194,3 +194,9 @@ a.license-link { display: inline-block; min-height: 44px; line-height: 44px; }
 .toast { position: fixed; left: 10px; right: 10px; bottom: calc(var(--nav-h) + var(--safe-b) + 8px); z-index: 30; max-width: 620px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #1f2937; border: 1px solid var(--line); border-radius: 14px; padding: 6px 8px 6px 14px; box-shadow: 0 6px 20px #000a; }
 .toast .ghost { color: var(--acc); font-weight: 700; }
 button.back { margin-bottom: 4px; }
+.toast .ghost { white-space: nowrap; flex-shrink: 0; }
+.toast.above-banner { bottom: calc(var(--nav-h) + var(--safe-b) + 68px); }
+@media (min-width: 900px) {
+  html:not(.phone-view) .toast { left: 200px; right: 24px; bottom: 16px; }
+  html:not(.phone-view) .toast.above-banner { bottom: 76px; }
+}

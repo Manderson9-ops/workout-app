@@ -3,9 +3,9 @@
  * 카드: 이름, 부위, 마지막으로 한 날·총 횟수, 운동 수·예상 시간, 운동 이름 미리 보기, [시작] [편집] [지우기].
  * 지우기 = 목록에서만 숨기기(설정 routineHidden, 되돌림 가능, 아래 알림의 [되돌리기]) / 완전 삭제(되돌릴 수 없음). 운동 기록은 어느 쪽이든 남음.
  */
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
-import { mutate, historyOf } from '../store';
+import { mutate, historyOf, activeOf } from '../store';
 import { catalog } from '../catalog';
 import { startRoutine, setRoutineHidden, deleteRoutineForever } from '../actions';
 import type { Routine } from '../../core/session';
@@ -41,9 +41,13 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
   const [q, setQ] = useState('');
   const [sort, setSortRaw] = useState<RoutineSort>(() => (['recent', 'name', 'short'].includes(lsGet(SORT_KEY) ?? '') ? lsGet(SORT_KEY) as RoutineSort : 'recent'));
   const setSort = (x: RoutineSort) => { setSortRaw(x); lsSet(SORT_KEY, x); };
-  const [showHidden, setShowHidden] = useState(false);
+  // '숨긴 루틴 보기'로 오면(#/routines?hidden) 숨긴 구역을 펼친 채로
+  const [showHidden, setShowHidden] = useState(() => mode === 'all' && location.hash.includes('hidden'));
   const [toast, setToast] = useState<Toast>(null);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 7000); return () => clearTimeout(t); }, [toast]);
+  // 숨긴 카드가 사라져 초점이 갈 곳이 없으므로 [되돌리기]로 옮김 (키보드·화면 읽기)
+  const undoRef = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => { if (toast?.undo) undoRef.current?.focus(); }, [toast]);
   const use = routineUse(historyOf(s));
   const hiddenIds = new Set(s.settings.routineHidden ?? []);
   const partsOf = (r: Routine) => routineParts(r, partOf);
@@ -125,7 +129,7 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
         <div class="empty">
           <p>{hidden.length ? `보이는 루틴이 없어요 (숨긴 루틴 ${hidden.length}개)` : '아직 루틴이 없어요.'}</p>
           {!hidden.length && <p class="small">플랜 만들기에서 부위·시간을 고르면 자동으로 짜 드려요.</p>}
-          {hidden.length > 0 && mode !== 'all' && <button onClick={() => go('#/routines')}>숨긴 루틴 보기</button>}
+          {hidden.length > 0 && mode !== 'all' && <button onClick={() => go('#/routines?hidden')}>숨긴 루틴 보기</button>}
           {mode === 'all' && !hidden.length && <div class="row" style={{ justifyContent: 'center' }}><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button><button onClick={() => void newRoutine()}>+ 직접 만들기</button></div>}
         </div>
       )}
@@ -143,9 +147,9 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
       {/* 결과 알림: 화면 아래 고정, 숨기기는 [되돌리기] (7초 뒤 사라짐) */}
       <div class="sr-only" role="status" aria-live="polite">{toast?.text ?? ''}</div>
       {toast && (
-        <div class="toast">
+        <div class={`toast${activeOf(s) ? ' above-banner' : ''}`}>
           <span>{toast.text}</span>
-          {toast.undo && <button class="ghost" onClick={() => void toast.undo!()}>되돌리기</button>}
+          {toast.undo && <button ref={undoRef} class="ghost" onClick={() => void toast.undo!()}>되돌리기</button>}
         </div>
       )}
     </section>

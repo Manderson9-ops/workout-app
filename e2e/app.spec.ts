@@ -1273,6 +1273,8 @@ test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동�
   await page.keyboard.press('Enter'); // Enter 한 번 = 되돌릴 수 있는 숨기기 (완전 삭제 아님)
   await expect(sheet).toHaveCount(0);
   await expect(card).toHaveCount(0);
+  // 카드가 사라졌으니 초점은 아래 알림의 [되돌리기]로
+  await expect(page.locator('.toast').getByRole('button', { name: '되돌리기' })).toBeFocused();
   await page.locator('.toast').getByRole('button', { name: '되돌리기' }).click();
   await expect(card).toBeVisible();
   await expect(page.locator('.toast')).toContainText('다시 보이게 했어요');
