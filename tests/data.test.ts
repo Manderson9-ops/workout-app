@@ -34,8 +34,20 @@ describe('운동 데이터 검증', () => {
     expect(g('cable_rear_delt_fly')).toEqual(['S']); // M-29: 케이블 리버스 플라이 = 케이블 리어 델트 플라이
     expect(g('barbell_ohp')).toEqual(['B+']);
     expect(g('db_shoulder_press')).toEqual(['B+']);
-    // 등급 글자가 자막에서 빠진 11개는 등급을 만들지 않음 (영상에 없는 등급은 만들지 않는다)
-    for (const id of ['smith_shoulder_press', 'arnold_press', 'db_lateral_raise', 'cable_lateral_raise', 'machine_lateral_raise', 'reverse_pec_deck', 'face_pull']) expect(wk.grades[id]).toBeUndefined();
+    // 등급 글자가 자막에서 빠진 운동은 등급을 만들지 않음 (영상에 없는 등급은 만들지 않는다). 영상의 11개 중 앱에 있는 운동 + 등급 없는 어깨 운동
+    for (const id of ['smith_shoulder_press', 'arnold_press', 'db_lateral_raise', 'cable_lateral_raise', 'machine_lateral_raise', 'reverse_pec_deck', 'face_pull', 'db_rear_delt_fly', 'db_front_raise']) expect(wk.grades[id]).toBeUndefined();
+  });
+  it('바벨 전용 자세 포인트는 바벨 오버헤드 프레스에만 (머신·스미스·덤벨 프레스에 붙지 않음)', () => {
+    // CrMyjPTSbos@02:22(바벨 균형·B+·스미스로 바꾸면 등급 상승), ZqJ_OS7rTnY@07:04(바벨 불안정·전신 피로)는 WORK_OUT_K에서 "오버헤드 프레스 (바벨)"로 적혀 있음
+    const has = (id: string, vid: string, ts: string) => get(id).guide.some((g: { video_id: string; timestamp: string }) => g.video_id === vid && g.timestamp === ts);
+    for (const [vid, ts] of [['CrMyjPTSbos', '02:22'], ['ZqJ_OS7rTnY', '07:04']] as const) {
+      expect(has('barbell_ohp', vid, ts)).toBe(true);
+      for (const id of ['machine_shoulder_press', 'smith_shoulder_press', 'db_shoulder_press', 'arnold_press']) expect(has(id, vid, ts)).toBe(false);
+    }
+  });
+  it('e2e 전제: 벤트오버 리어 델트 플라이는 영상 등급·자세 포인트가 없는 "DB 없음" 운동 (바뀌면 e2e D-036 정보 버튼 테스트의 대상 운동을 바꿀 것)', () => {
+    expect(get('db_rear_delt_fly').guide.length).toBe(0);
+    expect(wk.grades['db_rear_delt_fly']).toBeUndefined();
   });
   it('분할 템플릿 8개, 추천 조합 1개', () => {
     expect(wk.templates.length).toBe(8);

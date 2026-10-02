@@ -154,6 +154,11 @@ describe('앱 기본 추천 순서 (M-14)', () => {
 describe('특수 상황', () => {
   const base: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }], level: '중급' };
   const shoulder: PlanRequest = { parts: [{ part: '어깨', priority: 'high' }], level: '중급' };
+  it('M-30 동작 기록: 어깨를 보통으로 두면 2개 = 숄더 프레스 머신 S + 케이블 리어 델트 플라이 S, 측면 레이즈는 3개부터 (M-32 대기, 바뀌면 이 테스트와 M-32를 함께 볼 것)', () => {
+    const p = generatePlan({ parts: [{ part: '가슴', priority: 'high' }, { part: '어깨', priority: 'normal' }], level: '중급' }, real);
+    const shoulderIds = new Set(real.filter((e) => e.part === '어깨').map((e) => e.id));
+    expect(p.blocks.flatMap((b) => b.items.map((i) => i.exerciseId)).filter((id) => shoulderIds.has(id))).toEqual(['machine_shoulder_press', 'cable_rear_delt_fly']);
+  });
   it('M-30: 어깨 최소 등급 S 이면 영상 S 2개만 들어가고 대체 없음', () => {
     const p = generatePlan({ ...shoulder, minGrade: 'S' }, real);
     expect(p.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(['machine_shoulder_press', 'cable_rear_delt_fly']);
