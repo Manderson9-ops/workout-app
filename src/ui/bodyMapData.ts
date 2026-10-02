@@ -1,4 +1,4 @@
-/**
+/*!
  * 인체 근육 그림 데이터 (D-047). 출처: react-native-body-highlighter (https://github.com/HichamELBSI/react-native-body-highlighter)
  * 남성 앞·뒤 경로를 그대로 옮김. 앞 viewBox "0 0 724 1448", 뒤 "724 0 724 1448".
  *

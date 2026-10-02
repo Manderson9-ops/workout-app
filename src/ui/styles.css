@@ -32,9 +32,9 @@ button.ghost { background: transparent; }
 button.big { min-height: 56px; font-size: 18px; width: 100%; }
 button.chip { min-height: 44px; border-radius: 22px; padding: 0 14px; font-weight: 500; }
 button.chip.on { background: var(--acc); border-color: var(--acc); color: #fff; }
-button.chip.p-high { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
-button.chip.p-normal { background: #2563eb88; border-color: #3b82f6; color: #fff; }
-button.chip.p-low { background: #1e3a8a55; border-color: #3b82f6; color: #cfe0ff; }
+button.chip.p-high { background: #b9dcff; border-color: #b9dcff; color: #0b1220; }
+button.chip.p-normal { background: #5b9cf6; border-color: #5b9cf6; color: #0b1220; }
+button.chip.p-low { background: #4a72b8; border-color: #4a72b8; color: #fff; }
 input, select, textarea { min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--card2); color: var(--text); font-size: 16px; padding: 0 10px; width: 100%; }
 textarea { padding: 10px; min-height: 80px; }
 label { display: block; font-size: 14px; color: var(--sub); margin: 12px 0 6px; }
@@ -155,13 +155,13 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 .bodymap .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 22px; overflow: hidden; margin-bottom: 6px; }
 .bodymap .seg button { min-height: 44px; min-width: 72px; border: 0; border-radius: 0; background: transparent; color: var(--sub); font-weight: 600; }
 .bodymap .seg button.on { background: var(--acc); color: #fff; }
-.bodymap-svg { width: min(260px, 72vw); height: auto; display: block; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
-.bm-outline { fill: #12151c; stroke: #525a6b; stroke-width: 3; stroke-linejoin: round; }
-.bm-deco { fill: #3a414f; }
-.bm-muscle { fill: #5a6378; transition: fill .15s ease; }
-.bm-muscle.p-high { fill: #3b82f6; filter: drop-shadow(0 0 6px rgba(59,130,246,.55)); }
-.bm-muscle.p-normal { fill: #60a5fa; fill-opacity: .8; }
-.bm-muscle.p-low { fill: #93c5fd; fill-opacity: .5; }
+.bodymap-svg { width: min(240px, 62vw); height: auto; display: block; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.bm-outline { fill: #12151c; stroke: #525a6b; stroke-width: 3; stroke-linejoin: round; pointer-events: none; }
+.bm-deco { fill: #3a414f; pointer-events: none; }
+.bm-muscle { fill: #383e4b; transition: fill .15s ease; cursor: pointer; }
+.bm-muscle.p-high { fill: #b9dcff; filter: drop-shadow(0 0 5px rgba(147,197,253,.6)); }
+.bm-muscle.p-normal { fill: #5b9cf6; }
+.bm-muscle.p-low { fill: #4a72b8; }
 .bm-hit { fill: transparent; cursor: pointer; pointer-events: all; }
 @media (hover: hover) { .bm-hit:hover { fill: rgba(255,255,255,.06); } }
 .bm-hint { margin: 2px 0 0; text-align: center; }
@@ -169,9 +169,10 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 .prio-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; min-height: 56px; padding: 10px 14px; border-radius: 12px; }
 .prio-opt-label { font-weight: 700; font-size: 16px; }
 .prio-opt.on { border-color: var(--acc); }
-.prio-opt.on.p-high { background: #1d4ed8; color: #fff; }
-.prio-opt.on.p-normal { background: #2563eb88; color: #fff; }
-.prio-opt.on.p-low { background: #1e3a8a55; color: #fff; }
-.prio-opt.on .sub { color: #dbe7ff; }.bm-legend { display: flex; gap: 12px; justify-content: center; margin-top: 4px; }
+.prio-opt.on.p-high { background: #b9dcff; color: #0b1220; }
+.prio-opt.on.p-normal { background: #5b9cf6; color: #0b1220; }
+.prio-opt.on.p-low { background: #4a72b8; color: #fff; }
+.prio-opt.on.p-low .sub { color: #e6eeff; } .prio-opt.on.p-high .sub, .prio-opt.on.p-normal .sub { color: #1e293b; }.bm-legend { display: flex; gap: 12px; justify-content: center; margin-top: 4px; }
 .bm-legend span { display: inline-flex; align-items: center; gap: 4px; }
 .bm-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.bm-legend .lg-none { background: #383e4b; } .bm-legend .lg-low { background: #4a72b8; } .bm-legend .lg-normal { background: #5b9cf6; } .bm-legend .lg-high { background: #b9dcff; }

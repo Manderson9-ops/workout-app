@@ -75,6 +75,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
       <p class="sub small">PC 키보드: 숫자 입력 뒤 Enter = 다음 칸, 운동 중 Ctrl+Enter = 현재 세트 완료</p>
       <h2>도구</h2>
       <button onClick={() => go('#/tools')}>원판 계산기 · 1RM 계산기</button>
+      <p class="sub small"><a href={`${import.meta.env.BASE_URL}THIRD_PARTY_LICENSES.txt`} target="_blank" rel="noopener">오픈소스 고지</a> (인체 근육 그림: react-native-body-highlighter, MIT)</p>
       <p class="sub small">앱 버전 {APP_VERSION}{IS_PREVIEW ? ' · 미리 보기 판 (본판과 데이터 분리)' : ''}</p>
     </main>
   );

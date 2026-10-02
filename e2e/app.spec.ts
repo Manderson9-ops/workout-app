@@ -49,7 +49,7 @@ async function checkScreen(page: Page, name: string) { await noHorizontalScroll(
 async function pickPart(p: Page, part: string, pr?: '높음' | '보통' | '낮음') {
   await p.getByRole('button', { name: `${part} 선택 안 함` }).click();
   const dlg = p.getByRole('dialog', { name: `${part} 우선순위` });
-  if (pr) await dlg.getByRole('radio', { name: new RegExp('^. ' + pr) }).click();
+  if (pr) await dlg.getByRole('radio', { name: new RegExp('^' + pr + ':') }).click();
   await dlg.getByRole('button', { name: '완료' }).click();
 }
 async function makeRoutine(page: Page, parts: string[], minutes: string) {
@@ -310,15 +310,21 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   // D-047: 앞 그림 가슴을 누르면 '높음'으로 골라지고 우선순위 창이 열림
   await map.locator('rect[data-part="가슴"]').click();
   const dlgC = page.getByRole('dialog', { name: '가슴 우선순위' });
-  await expect(dlgC.getByRole('radio', { name: /^● 높음/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(dlgC.getByRole('radio', { name: /^높음:/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(dlgC.getByRole('radio', { name: /^높음:/ })).toBeFocused(); // 열리면 고른 단계에 초점
   await expect(page.getByRole('button', { name: '가슴 높음' })).toBeVisible();
   await dlgC.getByRole('button', { name: '완료' }).click();
   // 뒤 그림으로 바꿔 등 → 창에서 낮음
   await map.getByRole('button', { name: '뒤' }).click();
   await map.locator('rect[data-part="등"]').click();
   const dlgB = page.getByRole('dialog', { name: '등 우선순위' });
-  await dlgB.getByRole('radio', { name: /낮음/ }).click();
-  await expect(dlgB.getByRole('radio', { name: /^● 낮음/ })).toHaveAttribute('aria-checked', 'true');
+  await dlgB.getByRole('radio', { name: /^낮음:/ }).click();
+  await expect(dlgB.getByRole('radio', { name: /^낮음:/ })).toHaveAttribute('aria-checked', 'true');
+  // 화살표로 보통 → 다시 낮음
+  await dlgB.getByRole('radio', { name: /^낮음:/ }).press('ArrowUp');
+  await expect(dlgB.getByRole('radio', { name: /^보통:/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('button', { name: '등 보통' })).toBeVisible();
+  await dlgB.getByRole('radio', { name: /^보통:/ }).press('ArrowDown');
   await expect(page.getByRole('button', { name: '등 낮음' })).toBeVisible(); // 고르자마자 반영
   await checkScreen(page, '46-plan-part-sheet');
   await dlgB.getByRole('button', { name: '완료' }).click();
@@ -333,14 +339,43 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   await expect(page.getByRole('button', { name: '삼두 선택 안 함' })).toBeVisible();
   const sizes = await map.locator('rect.bm-hit').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [e.getAttribute('data-part'), Math.round(r.width), Math.round(r.height)]; }));
   for (const [part, w, h] of sizes as [string, number, number][]) expect(Math.min(w, h), `${part} 누르는 영역`).toBeGreaterThanOrEqual(44);
+  // 보이는 근육 가운데를 실제로 누르면 그 근육의 부위 창이 열림 (누르는 사각형이 근육을 가리지 않음, 아이폰 탭 보정 포함)
+  const tapMuscle = async (side: '앞' | '뒤', part: string, nth = 0) => {
+    await map.getByRole('button', { name: side }).click();
+    // 근육 모양 안쪽에서 가장 가운데에 가까운 점 (bbox 가운데가 모양 밖일 수 있음)
+    // nth < 0 이면 그 부위에서 가장 큰 조각 (아주 가는 조각은 손가락 크기보다 작아 어느 쪽인지 정의하기 어려움)
+    const pieces = map.locator(`path[data-vis="${part}"]`);
+    const areas = await pieces.evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return r.width * r.height; }));
+    const idx = nth >= 0 ? nth : areas.indexOf(Math.max(...areas));
+    const pt = await pieces.nth(idx).evaluate((el) => {
+      const r = el.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; let best: [number, number] | null = null, bd = 1e9;
+      for (let i = 1; i < 12; i++) for (let j = 1; j < 12; j++) { const x = r.x + (r.width * i) / 12, y = r.y + (r.height * j) / 12; const d = (x - cx) ** 2 + (y - cy) ** 2;
+        if (document.elementFromPoint(x, y) === el && d < bd) { bd = d; best = [x, y]; } }
+      return best;
+    });
+    expect(pt, `${side} ${part} ${nth}번째 근육이 보임`).not.toBeNull();
+    await page.mouse.click(pt![0], pt![1]);
+    const dlg = page.getByRole('dialog', { name: /우선순위$/ });
+    await expect(dlg, `${side} ${part} ${nth}번째 근육`).toHaveAccessibleName(`${part} 우선순위`);
+    await dlg.getByRole('button', { name: '이 부위 빼기' }).click();
+  };
+  for (const [side, part, n] of [['앞', '가슴', -1], ['앞', '어깨', -1], ['앞', '이두', -1], ['앞', '전완·악력', -1], ['앞', '코어', -1], ['앞', '코어', 6], ['앞', '하체', -1],
+    ['뒤', '어깨', -1], ['뒤', '등', -1], ['뒤', '등', 3], ['뒤', '삼두', -1], ['뒤', '전완·악력', -1], ['뒤', '하체', -1]] as ['앞' | '뒤', string, number][]) await tapMuscle(side, part, n);
+  // 앞의 가는 삼두·승모근은 장식 (뒤 그림에서 고름)
   await map.getByRole('button', { name: '앞' }).click();
+  await expect(map.locator('path[data-vis="삼두"], path[data-vis="등"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /(높음|보통|낮음)$/ })).toHaveCount(0); // 고른 가슴·등도 그림에서 열어 뺐음
+  // 버튼으로 연 창은 Esc로 닫으면 그 버튼으로 초점이 돌아옴
+  await page.getByRole('button', { name: '코어 선택 안 함' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: '코어 우선순위' })).toHaveCount(0);
+  // WebKit은 버튼을 눌러도 초점을 주지 않아(실제 사파리와 같음) 돌아올 초점이 없음 → Chromium에서만 확인
+  if (test.info().project.name.includes('chromium')) await expect(page.getByRole('button', { name: '코어 높음' })).toBeFocused();
+  await page.getByRole('button', { name: '코어 높음' }).click();
+  await page.getByRole('dialog', { name: '코어 우선순위' }).getByRole('button', { name: '이 부위 빼기' }).click();
+  // 그림 저작권 고지(MIT)가 배포본에 남아 있음
+  expect(await (await page.request.get('./THIRD_PARTY_LICENSES.txt')).text()).toContain('Copyright (c) 2022 ELABBASSI Hicham');
   await checkScreen(page, '46-plan-bodymap');
-  // 버튼으로도 같은 창, 창에서 빼기
-  await page.getByRole('button', { name: '가슴 높음' }).click();
-  await page.getByRole('dialog', { name: '가슴 우선순위' }).getByRole('button', { name: '이 부위 빼기' }).click();
-  await page.getByRole('button', { name: '등 낮음' }).click();
-  await page.getByRole('dialog', { name: '등 우선순위' }).getByRole('button', { name: '이 부위 빼기' }).click();
-  await expect(page.getByRole('button', { name: /(높음|보통|낮음)$/ })).toHaveCount(0);
   // 세트 8 넘게 (D-042)
   await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();

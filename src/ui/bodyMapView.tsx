@@ -12,8 +12,9 @@ import type { BodyShape } from './bodyMapData';
 export type Side = 'front' | 'back';
 /** 그림 조각(slug) → 앱 부위. 없는 조각(머리·손·발·무릎 등)은 장식 */
 export const SLUG_PART: Record<Side, Record<string, Part>> = {
-  front: { chest: '가슴', abs: '코어', obliques: '코어', biceps: '이두', triceps: '삼두', deltoids: '어깨', forearm: '전완·악력',
-    trapezius: '등', quadriceps: '하체', adductors: '하체', tibialis: '하체', calves: '하체' },
+  // 앞에서 보이는 삼두·승모근은 가늘어서 손가락으로 정확히 누르기 어렵고(아이폰은 가까운 큰 요소로 탭을 보정) 이두·어깨로 눌림 → 장식으로 두고 뒤 그림에서 고름
+  front: { chest: '가슴', abs: '코어', obliques: '코어', biceps: '이두', deltoids: '어깨', forearm: '전완·악력',
+    quadriceps: '하체', adductors: '하체', tibialis: '하체', calves: '하체' },
   back: { trapezius: '등', 'upper-back': '등', 'lower-back': '등', deltoids: '어깨', triceps: '삼두', forearm: '전완·악력',
     gluteal: '하체', adductors: '하체', hamstring: '하체', calves: '하체' },
 };
@@ -24,29 +25,54 @@ const pair = (b: Box, c: number): Box[] => [b, mirror(b, c)];
 /** 누르는 영역: 서로 겹치지 않게, 근육보다 넉넉히 */
 export const HITS: Record<Side, [Part, Box[]][]> = {
   front: [
-    ['어깨', pair([140, 280, 292, 404], 362)],
+    ['어깨', pair([140, 280, 292, 414], 362)],
     ['가슴', [[292, 300, 432, 435]]],
-    ['이두', pair([105, 404, 270, 526], 362)],
-    ['전완·악력', pair([40, 526, 270, 705], 362)],
+    ['이두', pair([105, 414, 270, 548], 362)],
+    ['전완·악력', pair([40, 548, 270, 705], 362)],
     ['코어', [[270, 435, 454, 660]]],
     ['하체', [[225, 660, 499, 1300]]],
   ],
   back: [
-    ['어깨', pair([862, 280, 1003, 404], 1086)],
+    ['어깨', pair([862, 280, 1003, 414], 1086)],
     ['등', [[1003, 270, 1169, 630]]],
-    ['삼두', pair([830, 404, 1003, 530], 1086)],
-    ['전완·악력', pair([760, 530, 1003, 705], 1086)],
+    ['삼두', pair([830, 414, 1003, 548], 1086)],
+    ['전완·악력', pair([760, 548, 1003, 705], 1086)],
     ['하체', [[945, 630, 1227, 1330]]],
   ],
 };
+/** 화면 좌표의 부위: 위에서부터 근육(data-vis) → 누르는 영역(data-part) */
+export function partAt(x: number, y: number): Part | null {
+  const at = (px: number, py: number): Part | null => {
+    for (const el of document.elementsFromPoint(px, py)) {
+      const p = el.getAttribute('data-vis') ?? el.getAttribute('data-part');
+      if (p) return p as Part;
+    }
+    return null;
+  };
+  const hit = at(x, y);
+  if (hit) return hit;
+  // 근육 사이 틈(1~2px)을 눌렀으면 손가락 크기만큼 주변에서 가장 가까운 부위
+  for (const r of [3, 6, 10, 14]) for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4;
+    const p = at(x + r * Math.cos(a), y + r * Math.sin(a));
+    if (p) return p;
+  }
+  return null;
+}
 const VIEW: Record<Side, string> = { front: '0 80 724 1290', back: '724 80 724 1290' };
 
 function Figure({ side, sel, onPart }: { side: Side; sel: Partial<Record<Part, Priority>>; onPart: (p: Part) => void }) {
   const shapes: BodyShape[] = side === 'front' ? BODY_FRONT : BODY_BACK;
   const map = SLUG_PART[side];
   return (
-    <svg viewBox={VIEW[side]} class="bodymap-svg" aria-hidden="true" focusable="false" data-side={side}>
+    // 누른 점 아래 요소를 직접 찾음: 아이폰(WebKit)은 작은 모양을 눌러도 클릭 대상을 svg 자체로 주는 경우가 있어 요소별 onClick에 기대지 않음
+    <svg viewBox={VIEW[side]} class="bodymap-svg" aria-hidden="true" focusable="false" data-side={side}
+      onClick={(e) => { const p = partAt(e.clientX, e.clientY); if (p) onPart(p); }}>
       <path d={side === 'front' ? OUTLINE_FRONT : OUTLINE_BACK} class="bm-outline" />
+      {/* 누르는 영역(투명)은 근육 아래: 근육을 누르면 그 근육의 부위, 근육 사이 빈 곳을 누르면 영역의 부위 */}
+      {HITS[side].map(([part, boxes]) => boxes.map((b, k) => (
+        <rect key={part + k} x={b[0]} y={b[1]} width={b[2] - b[0]} height={b[3] - b[1]} class="bm-hit" data-part={part} />
+      )))}
       {shapes.map((s) => {
         const part = map[s.slug];
         const pr = part ? sel[part] : undefined;
@@ -54,9 +80,6 @@ function Figure({ side, sel, onPart }: { side: Side; sel: Partial<Record<Part, P
           <path key={s.slug + k} d={d} data-vis={part} class={part ? `bm-muscle${pr ? ' p-' + pr : ''}` : 'bm-deco'} />
         ));
       })}
-      {HITS[side].map(([part, boxes]) => boxes.map((b, k) => (
-        <rect key={part + k} x={b[0]} y={b[1]} width={b[2] - b[0]} height={b[3] - b[1]} class="bm-hit" data-part={part} onClick={() => onPart(part)} />
-      )))}
     </svg>
   );
 }
@@ -72,9 +95,10 @@ export function BodyMap({ sel, onPart }: { sel: Partial<Record<Part, Priority>>;
       </div>
       <Figure side={side} sel={sel} onPart={onPart} />
       <div class="bm-legend sub small" aria-hidden="true">
-        <span><i class="bm-muscle p-high" style={{ background: '#3b82f6' }} />높음</span>
-        <span><i style={{ background: '#60a5fa', opacity: 0.8 }} />보통</span>
-        <span><i style={{ background: '#93c5fd', opacity: 0.5 }} />낮음</span>
+        <span><i class="lg-none" />안 고름</span>
+        <span><i class="lg-low" />낮음</span>
+        <span><i class="lg-normal" />보통</span>
+        <span><i class="lg-high" />높음</span>
       </div>
       <p class="sub small bm-hint">{side === 'front' ? '어깨·가슴·이두·전완·코어·하체' : '어깨·등·삼두·전완·하체'}를 눌러 고르세요</p>
     </div>
