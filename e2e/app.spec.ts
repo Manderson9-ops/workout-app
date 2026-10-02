@@ -402,18 +402,24 @@ test('플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 �
   const n0 = await cards.count();
   // 1·2번째(둘 다 이두) → 컴파운드 세트
   const e0 = await est();
-  await cards.nth(0).getByRole('button', { name: /컴파운드 세트로 묶기$/ }).click();
+  await cards.nth(0).getByRole('button', { name: /^다음과 묶기 · 컴파운드 세트: / }).click();
   await expect(cards).toHaveCount(n0 - 1);
   await expect(cards.nth(0).locator('.badge.kind')).toHaveText('컴파운드 세트');
   expect(await est(), '묶으면 예상 시간이 줄어듦').toBeLessThan(e0);
   // 끝에서 두 번째(이두) + 마지막(플랭크, 코어) → 슈퍼세트
   const last = await cards.count();
-  await cards.nth(last - 2).getByRole('button', { name: /다음 운동 플랭크: 슈퍼세트로 묶기$/ }).click();
+  await cards.nth(last - 2).getByRole('button', { name: /^다음과 슈퍼세트로 묶기: .* \+ 플랭크$/ }).click();
   await expect(cards.nth(last - 2).locator('.badge.kind')).toHaveText('슈퍼세트');
   await expect(cards.nth(last - 2)).toContainText('플랭크');
   await checkScreen(page, '49-plan-superset');
+  // 묶은 뒤 키보드로 순서를 옮기면 옮김 안내가 읽힘 (묶기 안내가 가리지 않음)
+  const live = planSec.locator('p.sr-only[aria-live="polite"]');
+  await expect(live).toContainText('묶었어요');
+  await cards.nth(0).getByRole('button', { name: /순서 옮기기, 지금 1번째/ }).press('ArrowDown');
+  await expect(live).toContainText('2번째로 옮김');
+  await cards.nth(1).getByRole('button', { name: /순서 옮기기, 지금 2번째/ }).press('ArrowUp');
   // 풀기 → 다시 단일
-  await cards.nth(0).getByRole('button', { name: /묶음 풀기$/ }).click();
+  await cards.nth(0).getByRole('button', { name: /^묶음 풀기: / }).click();
   await expect(cards.nth(0).locator('.badge.kind')).toHaveCount(0);
   // 저장하고 시작 → 운동 화면에도 슈퍼세트
   await page.getByRole('button', { name: '저장', exact: true }).click();

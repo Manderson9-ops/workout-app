@@ -67,7 +67,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const dnd = useDragSort(plan?.blocks.length ?? 0, (from, to) => {
     if (!plan) return;
     const next = moveBlockTo(plan, from, to);
-    if (next !== plan) { setMoved(null); setPlan(recompute(next, all)); }
+    if (next !== plan) { setMoved(null); setGroupMsg(''); setPlan(recompute(next, all)); }
   }, (i) => plan?.blocks[i]?.items.map((it) => it.name).join(' + ') ?? '');
   const [name, setName] = useState('');
   const [showReasons, setShowReasons] = useState(true);
@@ -88,6 +88,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   });
   const generate = (keepLocks = false, form: Form = f) => {
     const req = request(form);
+    setGroupMsg('');
     const t0 = performance.now();
     let p: Plan;
     if (keepLocks && plan) {
@@ -117,6 +118,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   };
   const editItem = (bi: number, ii: number, fn: (i: PlanItem) => PlanItem | null) => {
     if (!plan) return;
+    setGroupMsg('');
     const old = plan.blocks[bi]!.items[ii]!;
     const blocks = plan.blocks.map((b, x) => x !== bi ? b : { ...b, items: b.items.map((it, y) => (y === ii ? fn(it) : it)).filter((it): it is PlanItem => !!it) });
     const next = recompute({ ...plan, blocks }, all);
@@ -133,6 +135,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
     const next = moveBlock(plan, bi, d);
     if (next === plan) return;
     setPlan(recompute(next, all));
+    setGroupMsg('');
     setMoved({ key: blockKey(b), d, msg: `${blockName(b)}: ${bi + 1 + d}번째로 옮김` });
   };
   const addExercise = (e: BuiltExercise) => {
@@ -287,14 +290,16 @@ export function PlanBuilder({ s }: { s: AppState }) {
                 // D-046: 다음 운동과 슈퍼세트(같은 부위면 컴파운드 세트)로 묶기 / 묶음 풀기
                 const kind = groupKindWithNext(plan, bi);
                 const label = kind === 'compound' ? '컴파운드 세트' : '슈퍼세트';
+                // 같은 한 부위끼리 묶으면 앱 용어로 컴파운드 세트 (글자에 바로 보이게)
+                const text = kind === 'compound' ? '다음과 묶기 · 컴파운드 세트' : '다음과 슈퍼세트로 묶기';
                 const next = plan.blocks[bi + 1];
                 if (!kind && b.items.length < 2) return null;
                 return (
                   <div class="row wrap group-actions" style={{ marginTop: '8px' }}>
-                    {kind && next && <button aria-label={`${blockName(b)} + 다음 운동 ${blockName(next)}: ${label}로 묶기`}
-                      onClick={() => { setMoved(null); setPlan(recompute(mergeWithNextBlock(plan, bi), all)); setGroupMsg(`${blockName(b)} + ${blockName(next)}: ${label}로 묶음`); }}>⤓ 다음 운동과 {label}로 묶기</button>}
-                    {b.items.length > 1 && <button aria-label={`${blockName(b)} 묶음 풀기`}
-                      onClick={() => { setMoved(null); setPlan(recompute(splitPlanBlock(plan, bi), all)); setGroupMsg(`${blockName(b)}: 묶음 풀음`); }}>묶음 풀기</button>}
+                    {kind && next && <button aria-label={`${text}: ${blockName(b)} + ${blockName(next)}`}
+                      onClick={() => { setMoved(null); setPlan(recompute(mergeWithNextBlock(plan, bi), all)); setGroupMsg(`${blockName(b)} + ${blockName(next)}: ${label}로 묶었어요`); }}>⤓ {text}</button>}
+                    {b.items.length > 1 && <button aria-label={`묶음 풀기: ${blockName(b)}`}
+                      onClick={() => { setMoved(null); setPlan(recompute(splitPlanBlock(plan, bi), all)); setGroupMsg(`${blockName(b)}: 묶음을 풀었어요`); }}>묶음 풀기</button>}
                   </div>
                 );
               })()}
