@@ -9,7 +9,7 @@ import { targetReps } from '../../core/time';
 import { ExercisePicker, mmss } from '../components';
 import { startRoutine } from '../actions';
 import { go } from '../nav';
-import { SETS_MIN, SETS_MAX } from '../../core/planEdit';
+import { SETS_MIN, SETS_MAX, ROUND_REST_MIN, ROUND_REST_MAX, ROUND_REST_STEP, TRANSITION_MIN, TRANSITION_MAX, TRANSITION_STEP } from '../../core/planEdit';
 
 const KIND_LABEL: Record<RoutineBlock['kind'], string> = { single: '일반', superset: '슈퍼세트', compound: '컴파운드 세트' };
 
@@ -86,16 +86,17 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
             ))}
             <div class="row" style={{ marginTop: '8px' }}>
               <span class="sub small grow">{b.kind === 'single' ? '세트 간 휴식' : '라운드 후 휴식'}</span>
-              <button aria-label="휴식 15초 줄이기" onClick={() => setBlock(bi, (x) => (x.kind === 'single' ? { ...x, restSec: Math.max(15, x.restSec - 15) } : { ...x, roundRestSec: Math.max(15, x.roundRestSec - 15) }))}>−15</button>
+              {/* 묶음의 라운드 후 휴식은 플랜 화면과 같은 범위·단위 (0~600초, 15초씩) */}
+              <button aria-label="휴식 15초 줄이기" disabled={b.kind !== 'single' && b.roundRestSec <= ROUND_REST_MIN} onClick={() => setBlock(bi, (x) => (x.kind === 'single' ? { ...x, restSec: Math.max(15, x.restSec - 15) } : { ...x, roundRestSec: Math.max(ROUND_REST_MIN, x.roundRestSec - ROUND_REST_STEP) }))}>−15</button>
               <span>{b.kind === 'single' ? b.restSec : b.roundRestSec}초</span>
-              <button aria-label="휴식 15초 늘리기" onClick={() => setBlock(bi, (x) => (x.kind === 'single' ? { ...x, restSec: x.restSec + 15 } : { ...x, roundRestSec: x.roundRestSec + 15 }))}>+15</button>
+              <button aria-label="휴식 15초 늘리기" disabled={b.kind !== 'single' && b.roundRestSec >= ROUND_REST_MAX} onClick={() => setBlock(bi, (x) => (x.kind === 'single' ? { ...x, restSec: x.restSec + 15 } : { ...x, roundRestSec: Math.min(ROUND_REST_MAX, x.roundRestSec + ROUND_REST_STEP) }))}>+15</button>
             </div>
             {b.kind !== 'single' && (
               <div class="row" style={{ marginTop: '4px' }}>
                 <span class="sub small grow">묶음 안 전환</span>
-                <button aria-label="전환 5초 줄이기" onClick={() => setBlock(bi, (x) => ({ ...x, transitionSec: Math.max(0, x.transitionSec - 5) }))}>−5</button>
+                <button aria-label="전환 5초 줄이기" disabled={b.transitionSec <= TRANSITION_MIN} onClick={() => setBlock(bi, (x) => ({ ...x, transitionSec: Math.max(TRANSITION_MIN, x.transitionSec - TRANSITION_STEP) }))}>−5</button>
                 <span>{b.transitionSec}초</span>
-                <button aria-label="전환 5초 늘리기" onClick={() => setBlock(bi, (x) => ({ ...x, transitionSec: x.transitionSec + 5 }))}>+5</button>
+                <button aria-label="전환 5초 늘리기" disabled={b.transitionSec >= TRANSITION_MAX} onClick={() => setBlock(bi, (x) => ({ ...x, transitionSec: Math.min(TRANSITION_MAX, x.transitionSec + TRANSITION_STEP) }))}>+5</button>
               </div>
             )}
             <div class="row wrap" style={{ marginTop: '6px' }}>

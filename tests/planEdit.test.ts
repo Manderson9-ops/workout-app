@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bulkSets, bulkReps, addToGroup, stepRoundRest, stepTransition, stepSets, stepReps, moveBlock, addBlock, hasDbInfo, regenerateWithLocks } from '../src/core/planEdit';
+import { bulkSets, bulkReps, addToGroup, stepRoundRest, stepTransition, stepSets, stepReps, moveBlock, addBlock, hasDbInfo, regenerateWithLocks, rangeText, changedCount } from '../src/core/planEdit';
 import type { Plan, PlanBlock, PlanItem, PlanRequest } from '../src/core/planner';
 import { setTime, blockTime, warmupFor } from '../src/core/time';
 import { routineEstimate } from '../src/core/session';
@@ -212,5 +212,30 @@ describe('D-051 일괄·묶음 고치기', () => {
     // 라운드 2번 × 전환 1번씩: 전환 10초 늘리면 20초 늘어남
     expect(blockTime({ kind: 'group', items, roundRest: 60, transition: 20 })).toBe(base + 20);
     expect(blockTime({ kind: 'group', items, roundRest: 60, transition: 0 })).toBe(base - 20);
+  });
+});
+describe('D-051 후속: rangeText·addToGroup 세트·twoStations', () => {
+  const it0 = (o: Partial<PlanItem>): PlanItem => ({ exerciseId: 'x', name: 'x', part: '이두', sets: 3, reps: 10, grade: 'B', gradeSource: 'estimated', estimated: true, substituted: false, locked: false, why: '', rank: 1, ...o } as PlanItem);
+  it('rangeText: 세트·횟수·시간·섞임', () => {
+    expect(rangeText([it0({ sets: 3 }), it0({ sets: 3 })], 'sets')).toBe('3세트');
+    expect(rangeText([it0({ sets: 3 }), it0({ sets: 4 })], 'sets')).toBe('3~4세트');
+    expect(rangeText([it0({ reps: 10 }), it0({ reps: 10 })], 'reps')).toBe('10회');
+    expect(rangeText([it0({ reps: 12 }), it0({ reps: 8 })], 'reps')).toBe('8~12회');
+    expect(rangeText([it0({ reps: 0, seconds: 30 })], 'reps')).toBe('30초');
+    expect(rangeText([it0({ reps: 0, seconds: 30 }), it0({ reps: 0, seconds: 45 })], 'reps')).toBe('30~45초');
+    expect(rangeText([it0({ reps: 8 }), it0({ reps: 12 }), it0({ reps: 0, seconds: 30 })], 'reps')).toBe('8~12회 · 30초');
+    expect(rangeText([], 'sets')).toBe('');
+  });
+  it('changedCount: 바뀐 운동 수', () => {
+    const b = (s: number[]): Plan => ({ blocks: [{ kind: 'superset', items: s.map((n) => it0({ sets: n })), timeSec: 0 }] } as unknown as Plan);
+    expect(changedCount(b([3, 3, 99]), b([4, 4, 99]))).toBe(2);
+    expect(changedCount(b([3]), b([3]))).toBe(0);
+  });
+  it('addToGroup: 새 운동 세트는 묶음 최대 세트, twoStations 삭제', () => {
+    const p = { ...plan('a', 'b'), blocks: [{ kind: 'superset', twoStations: true, items: [it0({ exerciseId: 'a', sets: 3 }), it0({ exerciseId: 'b', sets: 5 })], roundRestSec: 120, transitionSec: 10, timeSec: 0 } as PlanBlock] };
+    const q = addToGroup(p, 0, it0({ exerciseId: 'z', sets: 3 }));
+    expect(q.blocks[0]!.items[2]!.sets).toBe(5);
+    expect('twoStations' in q.blocks[0]!).toBe(false);
+    expect(p.blocks[0]!.twoStations).toBe(true); // 원본은 그대로
   });
 });

@@ -505,17 +505,26 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   const grp = cards.nth(0);
   const nCards = await cards.count();
   expect(nCards).toBeGreaterThanOrEqual(2);
-  const setVals = async (loc: Locator = planSec) => (await loc.getByText(/^\d+세트$/).allTextContents()).map((x) => parseInt(x, 10));
-  const repVals = async (loc: Locator = planSec) => (await loc.getByText(/^\d+회$/).allTextContents()).map((x) => parseInt(x, 10));
+  const setVals = async (loc: Locator = planSec) => (await loc.locator('.plan-steps').getByText(/^\d+세트$/).allTextContents()).map((x) => parseInt(x, 10));
+  const repVals = async (loc: Locator = planSec) => (await loc.locator('.plan-steps').getByText(/^\d+회$/).allTextContents()).map((x) => parseInt(x, 10));
   const live = planSec.locator('p.sr-only[aria-live="polite"]');
   // 모든 운동 세트 +1 / 횟수 -1
   const s0 = await setVals(), r0 = await repVals();
   await planSec.getByRole('button', { name: '모든 운동 세트 늘리기' }).click();
   expect(await setVals()).toEqual(s0.map((x) => x + 1));
-  await expect(live).toContainText('모든 운동 세트 +1');
+  await expect(live).toContainText(/운동 \d+개 세트 \+1/);
+  // 일괄 버튼 가운데에는 지금 값(범위)이 보임
+  await expect(planSec.getByRole('group', { name: '모든 운동 세트', exact: true }).locator('.val')).toHaveText(/^\d+(~\d+)?세트$/);
+  await expect(planSec.getByRole('group', { name: '모든 운동 횟수', exact: true }).locator('.val')).toHaveText(/^\d+(~\d+)?(회|초)( · \d+(~\d+)?초)?$/);
   await planSec.getByRole('button', { name: '모든 운동 횟수 줄이기' }).click();
   expect(await repVals()).toEqual(r0.map((x) => x - 1));
-  // 묶음 설정: 라운드 후 휴식 -15
+  // 묶음 설정은 기본으로 접혀 있고, 요약에 지금 값이 보임. 열고 나서 라운드 후 휴식 -15
+  const det = grp.locator('details.group-settings');
+  await expect(det).not.toHaveAttribute('open', '');
+  await expect(det.locator('summary')).toContainText(/묶음 설정 · 라운드 후 \d+초 · 전환 \d+초/);
+  expect((await det.locator('summary').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await det.locator('summary').click();
+  await expect(det).toHaveAttribute('open', '');
   const pill = grp.locator('.pill', { hasText: '라운드 후 휴식' });
   const rr0 = Number((await pill.textContent())!.match(/라운드 후 휴식 (\d+)초/)![1]);
   const e1 = await est();
@@ -523,6 +532,7 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   await expect(pill).toContainText(`라운드 후 휴식 ${rr0 - 15}초`);
   await expect(grp.getByText(`${rr0 - 15}초`, { exact: true })).toBeVisible();
   expect(await est(), '라운드 휴식을 줄이면 예상 시간이 줄어듦').toBeLessThan(e1);
+  await expect(det.locator('summary')).toContainText(`라운드 후 ${rr0 - 15}초`);
   // 전환 +5 (기본 10 → 15)
   const e2 = await est();
   await grp.getByRole('button', { name: /운동 사이 전환 늘리기$/ }).click();
@@ -533,6 +543,11 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   await grp.getByRole('button', { name: /세트 모두 늘리기$/ }).click();
   expect(await setVals(grp)).toEqual(gs.map((x) => x + 1));
   expect(await setVals(cards.nth(nCards - 1))).toEqual(os);
+  // 일괄 버튼은 더 줄일 수 없으면 꺼짐 (모든 운동 세트를 1까지 줄이면)
+  const allDec = planSec.getByRole('button', { name: '모든 운동 세트 줄이기' });
+  for (let k = 0; k < 120 && await allDec.isEnabled(); k++) await allDec.click();
+  await expect(allDec).toBeDisabled();
+  await expect(planSec.getByRole('button', { name: '모든 운동 세트 늘리기' })).toBeEnabled();
   // 묶음에 운동 추가
   await grp.getByRole('button', { name: /^\+ 묶음에 운동 추가/ }).click();
   const dlg = page.getByRole('dialog', { name: '묶음에 운동 추가' });
@@ -540,11 +555,15 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   await dlg.getByRole('button', { name: '플랭크', exact: true }).click();
   await expect(planSec.locator('.card').nth(0)).toContainText('플랭크');
   await expect(planSec.locator('.card').nth(0).locator('.badge.kind')).toBeVisible();
+  // 초점은 새로 추가한 운동의 '세트 늘리기'로 (카드가 다시 만들어져도)
+  await expect(planSec.getByRole('button', { name: '플랭크 세트 늘리기', exact: true })).toBeFocused();
   await checkScreen(page, '62-plan-bulk-group');
   // 저장하고 시작 → 운동 화면에 추가한 운동
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await expect(page.getByText('플랭크').first()).toBeVisible();
+  // 바꾼 라운드 후 휴식이 운동 화면에 그대로
+  await expect(page.getByText(`라운드 후 휴식 ${rr0 - 15}초`).first()).toBeVisible();
   await endWorkout(page);
 });
 test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 부위·마지막 날짜·횟수, 목록에서만 숨기기 ↔ 다시 보이기, 완전 삭제, 운동 탭에서 바로 고르기', async ({ page }) => {

@@ -5,6 +5,7 @@
 import type { Plan, PlanBlock, PlanItem, PlanRequest } from './planner';
 import type { BuiltExercise } from './types';
 import { moveItem } from './reorder';
+import { DEFAULT_TIME } from './time';
 
 /** 직접 고치는 세트 범위 (D-042: 사실상 제한 없음. 이전 D-036은 1~8, 앱 판단). 자동 생성 기준(수준별 3·4, 근육별 상한)과는 별개 */
 export const SETS_MIN = 1, SETS_MAX = 99;
@@ -93,7 +94,7 @@ export function mergeWithNextBlock(plan: Plan, bi: number): Plan {
   const kind = groupKindWithNext(plan, bi);
   if (!kind) return plan;
   const a = plan.blocks[bi]!, b = plan.blocks[bi + 1]!;
-  const merged: PlanBlock = { kind, items: [...a.items, ...b.items], roundRestSec: a.kind === 'single' ? plan.rest.round : (a.roundRestSec ?? plan.rest.round), transitionSec: a.transitionSec ?? 10, timeSec: 0 };
+  const merged: PlanBlock = { kind, items: [...a.items, ...b.items], roundRestSec: a.kind === 'single' ? plan.rest.round : (a.roundRestSec ?? plan.rest.round), transitionSec: a.transitionSec ?? DEFAULT_TIME.transitionSec, timeSec: 0 };
   return { ...plan, blocks: [...plan.blocks.slice(0, bi), merged, ...plan.blocks.slice(bi + 2)] };
 }
 /** 묶음 풀기: 운동마다 단일 블록으로 (세트 간 휴식은 recompute가 다관절·단관절 기본값으로) */
@@ -129,9 +130,14 @@ export function addToGroup(plan: Plan, bi: number, item: PlanItem): Plan {
   if (!b || b.kind === 'single' || b.items.length >= GROUP_MAX) return plan;
   if (plan.blocks.some((x) => x.items.some((i) => i.exerciseId === item.exerciseId))) return plan;
   // 다른 부위 운동이 들어오면 컴파운드 세트(같은 부위) → 슈퍼세트 (묶기 규칙 D-046과 같은 용어)
-  const items = [...b.items, item];
+  // 새 운동의 세트는 묶음 안 최대 세트에 맞춤 (라운드가 어긋나지 않게)
+  const maxSets = Math.max(...b.items.map((i) => i.sets));
+  const items = [...b.items, { ...item, sets: maxSets }];
   const kind: PlanBlock['kind'] = new Set(items.map((i) => i.part)).size === 1 ? 'compound' : 'superset';
-  return { ...plan, blocks: plan.blocks.map((x, y) => (y === bi ? { ...x, kind, items } : x)) };
+  // 구성이 바뀌었으니 '기구 두 개' 표시는 더 이상 맞지 않음
+  const nb: PlanBlock = { ...b, kind, items };
+  delete nb.twoStations;
+  return { ...plan, blocks: plan.blocks.map((x, y) => (y === bi ? nb : x)) };
 }
 
 function setGroupField(plan: Plan, bi: number, key: 'roundRestSec' | 'transitionSec', cur: number, v: number): Plan {
@@ -148,6 +154,29 @@ export function stepRoundRest(plan: Plan, bi: number, d: -1 | 1): Plan {
 export function stepTransition(plan: Plan, bi: number, d: -1 | 1): Plan {
   const b = plan.blocks[bi];
   if (!b) return plan;
-  const cur = b.transitionSec ?? 10;
+  const cur = b.transitionSec ?? DEFAULT_TIME.transitionSec;
   return setGroupField(plan, bi, 'transitionSec', cur, clamp(cur + d * TRANSITION_STEP, TRANSITION_MIN, TRANSITION_MAX));
+}
+
+/** 일괄 버튼 가운데 글자: 세트는 "3세트"/"3~4세트", 횟수는 "10회"/"8~12회", 시간 운동은 "30초"/"30~45초", 섞이면 "8~12회 · 30초" */
+export function rangeText(items: readonly PlanItem[], kind: 'sets' | 'reps'): string {
+  const rng = (v: number[], unit: string) => {
+    if (!v.length) return '';
+    const lo = Math.min(...v), hi = Math.max(...v);
+    return (lo === hi ? `${lo}` : `${lo}~${hi}`) + unit;
+  };
+  if (kind === 'sets') return rng(items.map((i) => i.sets), '세트');
+  const reps = rng(items.filter((i) => i.seconds === undefined).map((i) => i.reps), '회');
+  const secs = rng(items.filter((i) => i.seconds !== undefined).map((i) => i.seconds!), '초');
+  return [reps, secs].filter(Boolean).join(' · ');
+}
+
+/** 일괄 고치기로 값이 바뀐 운동 수 (같은 자리끼리 비교) */
+export function changedCount(before: Plan, after: Plan): number {
+  let n = 0;
+  before.blocks.forEach((b, x) => b.items.forEach((it, y) => {
+    const o = after.blocks[x]?.items[y];
+    if (o && (o.sets !== it.sets || o.reps !== it.reps || o.seconds !== it.seconds)) n++;
+  }));
+  return n;
 }
