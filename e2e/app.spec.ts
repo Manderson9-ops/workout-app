@@ -45,10 +45,16 @@ async function touchTargets(page: Page) {
 async function checkScreen(page: Page, name: string) { await noHorizontalScroll(page); await touchTargets(page); await shot(page, name); }
 
 /** 플랜을 만들어 루틴으로 저장만 (홈으로) */
+/** D-047: 부위 버튼 → 우선순위 창(기본 높음) → (원하면 고르기) → 완료 */
+async function pickPart(p: Page, part: string, pr?: '높음' | '보통' | '낮음') {
+  await p.getByRole('button', { name: `${part} 선택 안 함` }).click();
+  const dlg = p.getByRole('dialog', { name: `${part} 우선순위` });
+  if (pr) await dlg.getByRole('radio', { name: new RegExp('^' + pr + ':') }).click();
+  await dlg.getByRole('button', { name: '완료' }).click();
+}
 async function makeRoutine(page: Page, parts: string[], minutes: string) {
   await page.getByRole('link', { name: '플랜' }).click();
-  for (const p of parts) await page.getByRole('button', { name: `${p} 선택 안 함` }).click();
-  if (parts.length > 1) await page.getByRole('button', { name: `${parts[1]} 높음` }).click();
+  for (const [k, p] of parts.entries()) await pickPart(page, p, k === 1 ? '보통' : undefined);
   await page.getByRole('button', { name: minutes }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   await page.getByRole('button', { name: '저장', exact: true }).click();
@@ -68,9 +74,8 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   const tap = async (l: Locator) => { taps++; await l.click(); };
 
   await page.getByRole('link', { name: '플랜' }).click();
-  await page.getByRole('button', { name: '등 선택 안 함' }).click();
-  await page.getByRole('button', { name: '삼두 선택 안 함' }).click();
-  await page.getByRole('button', { name: '삼두 높음' }).click();
+  await pickPart(page, '등');
+  await pickPart(page, '삼두', '보통');
   await page.getByRole('button', { name: '45분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
@@ -153,7 +158,7 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   let native = 0;
   page.on('dialog', (d) => { native++; void d.dismiss(); });
   await page.getByRole('link', { name: '플랜' }).click();
-  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   await page.getByRole('button', { name: '저장', exact: true }).click();
@@ -263,7 +268,7 @@ test('운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링�
 test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 → 짧은 이유·삼두 더해서 다시 만들기, 종목 탭 주/보조 근육·근육 필터', async ({ page }) => {
   await page.getByRole('link', { name: '플랜' }).click();
   await expect(page.getByTestId('level-rule')).toHaveText('중급: 운동당 최대 4세트(앱 기준) · 한 근육은 한 번에 11세트까지(연구 근거, 보조로 쓰이면 0.5세트로 셈)');
-  await page.getByRole('button', { name: '하체 선택 안 함' }).click();
+  await pickPart(page, '하체');
   await page.getByRole('button', { name: '75분' }).click();
   await page.getByLabel('최소 등급').selectOption('B-');
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
@@ -273,8 +278,9 @@ test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 →
   for (const n of ['스미스머신 스쿼트', '루마니안 데드리프트', '라잉 레그 컬', '바벨 힙 쓰러스트', '스탠딩 카프 레이즈']) await expect(page.getByRole('button', { name: `${n} 삭제` })).toBeVisible();
   await shot(page, '41-plan-legs-75');
   // 하체 빼고(높음→보통→낮음→빼기) 가슴만
-  for (const lbl of ['하체 높음', '하체 보통', '하체 낮음']) await page.getByRole('button', { name: lbl }).click();
-  await page.getByRole('button', { name: '가슴 선택 안 함' }).click();
+  await page.getByRole('button', { name: '하체 높음' }).click(); // 창에서 빼기 (D-047)
+  await page.getByRole('dialog', { name: '하체 우선순위' }).getByRole('button', { name: '이 부위 빼기' }).click();
+  await pickPart(page, '가슴');
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const note = page.getByRole('status', { name: '목표 시간보다 짧은 이유' });
   await expect(note).toContainText(/목표보다 약 \d+분 짧아요/);
@@ -298,6 +304,267 @@ test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 →
   await checkScreen(page, '43-exercises-muscle-filter');
 });
 
+test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선순위 선택 상자(기본 높음), 세트 8 넘게, 운동 추가 부위 기억·들어 있는 부위, 음악과 같이 듣기 설정', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  const map = page.getByTestId('bodymap');
+  // D-047: 앞 그림 가슴을 누르면 '높음'으로 골라지고 우선순위 창이 열림
+  await map.locator('rect[data-part="가슴"]').click();
+  const dlgC = page.getByRole('dialog', { name: '가슴 우선순위' });
+  await expect(dlgC.getByRole('radio', { name: /^높음:/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(dlgC.getByRole('radio', { name: /^높음:/ })).toBeFocused(); // 열리면 고른 단계에 초점
+  await expect(page.getByRole('button', { name: '가슴 높음' })).toBeVisible();
+  await dlgC.getByRole('button', { name: '완료' }).click();
+  // 뒤 그림으로 바꿔 등 → 창에서 낮음
+  await map.getByRole('button', { name: '뒤' }).click();
+  await map.locator('rect[data-part="등"]').click();
+  const dlgB = page.getByRole('dialog', { name: '등 우선순위' });
+  await dlgB.getByRole('radio', { name: /^낮음:/ }).click();
+  await expect(dlgB.getByRole('radio', { name: /^낮음:/ })).toHaveAttribute('aria-checked', 'true');
+  // 화살표로 보통 → 다시 낮음
+  await dlgB.getByRole('radio', { name: /^낮음:/ }).press('ArrowUp');
+  await expect(dlgB.getByRole('radio', { name: /^보통:/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('button', { name: '등 보통' })).toBeVisible();
+  await dlgB.getByRole('radio', { name: /^보통:/ }).press('ArrowDown');
+  await expect(page.getByRole('button', { name: '등 낮음' })).toBeVisible(); // 고르자마자 반영
+  await checkScreen(page, '46-plan-part-sheet');
+  await dlgB.getByRole('button', { name: '완료' }).click();
+  await expect(map.locator('path[data-vis="등"].p-low').first()).toBeVisible();
+  // 뒤 그림 삼두: 보이는 근육 위 실제 위치로 눌러도 켜짐, 누르는 영역은 44px 이상
+  const svg = map.locator('svg');
+  const fb = (await svg.boundingBox())!;
+  const sx = fb.width / 724, sy = fb.height / 1290;
+  await page.mouse.click(fb.x + (930 - 724) * sx, fb.y + (460 - 80) * sy);
+  await expect(page.getByRole('dialog', { name: '삼두 우선순위' })).toBeVisible();
+  await page.getByRole('dialog', { name: '삼두 우선순위' }).getByRole('button', { name: '이 부위 빼기' }).click();
+  await expect(page.getByRole('button', { name: '삼두 선택 안 함' })).toBeVisible();
+  const sizes = await map.locator('rect.bm-hit').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [e.getAttribute('data-part'), Math.round(r.width), Math.round(r.height)]; }));
+  for (const [part, w, h] of sizes as [string, number, number][]) expect(Math.min(w, h), `${part} 누르는 영역`).toBeGreaterThanOrEqual(44);
+  // 보이는 근육 가운데를 실제로 누르면 그 근육의 부위 창이 열림 (누르는 사각형이 근육을 가리지 않음, 아이폰 탭 보정 포함)
+  const tapMuscle = async (side: '앞' | '뒤', part: string, nth = 0) => {
+    await map.getByRole('button', { name: side }).click();
+    // 근육 모양 안쪽에서 가장 가운데에 가까운 점 (bbox 가운데가 모양 밖일 수 있음)
+    // nth < 0 이면 그 부위에서 가장 큰 조각 (아주 가는 조각은 손가락 크기보다 작아 어느 쪽인지 정의하기 어려움)
+    const pieces = map.locator(`path[data-vis="${part}"]`);
+    const areas = await pieces.evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return r.width * r.height; }));
+    const idx = nth >= 0 ? nth : areas.indexOf(Math.max(...areas));
+    const pt = await pieces.nth(idx).evaluate((el) => {
+      const r = el.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; let best: [number, number] | null = null, bd = 1e9;
+      for (let i = 1; i < 12; i++) for (let j = 1; j < 12; j++) { const x = r.x + (r.width * i) / 12, y = r.y + (r.height * j) / 12; const d = (x - cx) ** 2 + (y - cy) ** 2;
+        if (document.elementFromPoint(x, y) === el && d < bd) { bd = d; best = [x, y]; } }
+      return best;
+    });
+    expect(pt, `${side} ${part} ${nth}번째 근육이 보임`).not.toBeNull();
+    await page.mouse.click(pt![0], pt![1]);
+    const dlg = page.getByRole('dialog', { name: /우선순위$/ });
+    await expect(dlg, `${side} ${part} ${nth}번째 근육`).toHaveAccessibleName(`${part} 우선순위`);
+    await dlg.getByRole('button', { name: '이 부위 빼기' }).click();
+  };
+  for (const [side, part, n] of [['앞', '가슴', -1], ['앞', '어깨', -1], ['앞', '이두', -1], ['앞', '전완·악력', -1], ['앞', '코어', -1], ['앞', '코어', 6], ['앞', '하체', -1],
+    ['뒤', '어깨', -1], ['뒤', '등', -1], ['뒤', '등', 3], ['뒤', '삼두', -1], ['뒤', '전완·악력', -1], ['뒤', '하체', -1]] as ['앞' | '뒤', string, number][]) await tapMuscle(side, part, n);
+  // 앞의 가는 삼두·승모근은 장식 (뒤 그림에서 고름)
+  await map.getByRole('button', { name: '앞' }).click();
+  await expect(map.locator('path[data-vis="삼두"], path[data-vis="등"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /(높음|보통|낮음)$/ })).toHaveCount(0); // 고른 가슴·등도 그림에서 열어 뺐음
+  // 버튼으로 연 창은 Esc로 닫으면 그 버튼으로 초점이 돌아옴
+  await page.getByRole('button', { name: '코어 선택 안 함' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: '코어 우선순위' })).toHaveCount(0);
+  // WebKit은 버튼을 눌러도 초점을 주지 않아(실제 사파리와 같음) 돌아올 초점이 없음 → Chromium에서만 확인
+  if (test.info().project.name.includes('chromium')) await expect(page.getByRole('button', { name: '코어 높음' })).toBeFocused();
+  await page.getByRole('button', { name: '코어 높음' }).click();
+  await page.getByRole('dialog', { name: '코어 우선순위' }).getByRole('button', { name: '이 부위 빼기' }).click();
+  // 부위를 많이 골라 버튼 글자가 길어져도 그림 위치는 그대로 (연속으로 눌러도 빗나가지 않게)
+  const y0 = (await map.locator('svg').boundingBox())!.y;
+  for (const p of ['가슴', '등', '어깨', '이두', '삼두', '전완·악력', '하체', '코어']) await pickPart(page, p);
+  expect((await map.locator('svg').boundingBox())!.y).toBe(y0);
+  for (const p of ['가슴', '등', '어깨', '이두', '삼두', '전완·악력', '하체', '코어']) { await page.getByRole('button', { name: `${p} 높음` }).click(); await page.getByRole('dialog', { name: `${p} 우선순위` }).getByRole('button', { name: '이 부위 빼기' }).click(); }
+  // 그림 저작권 고지(MIT)가 배포본에 남아 있음
+  expect(await (await page.request.get('./THIRD_PARTY_LICENSES.txt')).text()).toContain('Copyright (c) 2022 ELABBASSI Hicham');
+  await checkScreen(page, '46-plan-bodymap');
+  // 세트 8 넘게 (D-042)
+  await pickPart(page, '이두');
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const first = (await planSec.locator('.card').nth(0).locator('strong').allTextContents())[0]!;
+  const plus = planSec.getByRole('button', { name: `${first} 세트 늘리기` });
+  for (let k = 0; k < 9; k++) await plus.click();
+  await expect(planSec.getByRole('group', { name: `${first} 세트` })).toContainText(/1[0-3]\s*세트/);
+  await expect(plus).toBeEnabled();
+  // 운동 추가: 들어 있는 부위 줄, 마지막으로 고른 부위 기억 (D-044)
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  const dlg = page.getByRole('dialog', { name: '운동 추가' });
+  await expect(dlg.getByRole('group', { name: '지금 들어 있는 부위' }).getByRole('button', { name: '이두' })).toBeVisible();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '전체' })).toHaveClass(/\bon\b/);
+  await dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '코어' }).click();
+  await checkScreen(page, '47-picker-parts');
+  await dlg.getByRole('button', { name: '닫기' }).click();
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '코어' })).toHaveClass(/\bon\b/);
+  await dlg.getByRole('group', { name: '지금 들어 있는 부위' }).getByRole('button', { name: '이두' }).click();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '이두' })).toHaveClass(/\bon\b/);
+  // 기억된 부위(이두)에 없는 운동을 검색하면 모든 부위에서 찾아 줌
+  await dlg.getByLabel('운동 검색').fill('플랭크');
+  await expect(dlg.getByRole('status')).toContainText('이두에는 "플랭크" 운동이 없어 모든 부위에서 찾았어요');
+  await expect(dlg.getByRole('button', { name: '플랭크', exact: true })).toBeVisible();
+  await dlg.getByRole('button', { name: '닫기' }).click();
+  // 교체 창에서 부위를 바꿔도 추가 창의 기억은 그대로 (이두)
+  await planSec.getByRole('button', { name: '교체' }).first().click();
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '가슴' }).click();
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: '닫기' }).click();
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '이두' })).toHaveAttribute('aria-pressed', 'true');
+  await dlg.getByRole('button', { name: '닫기' }).click();
+  // 음악과 같이 듣기 (D-045): 두 엔진 모두 navigator.audioSession이 없어 가짜 객체로 실제 값을 검사
+  await page.addInitScript(() => { Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto' }, configurable: true }); });
+  await page.goto('./#/settings');
+  await page.reload(); // 해시만 바뀌면 문서가 그대로라 초기 스크립트가 안 들어감
+  const am = page.getByLabel('다른 앱 음악과 같이 들을 때 (이 기기만)');
+  await expect(am).toHaveValue('mix');
+  const sessionType = () => page.evaluate(() => (navigator as Navigator & { audioSession?: { type: string } }).audioSession?.type ?? 'none');
+  expect(await sessionType()).toBe('auto'); // 누르기 전에는 바꾸지 않음
+  await page.locator('main h1').first().click();
+  expect(await sessionType()).toBe('transient');
+  await am.selectOption('solo');
+  expect(await sessionType()).toBe('playback');
+  await expect(page.getByText('앱을 누르면 다른 앱 음악이 멈춰요')).toBeVisible();
+  await page.reload();
+  await expect(am).toHaveValue('solo');
+  await page.locator('main h1').first().click();
+  expect(await sessionType()).toBe('playback');
+  await am.selectOption('mix');
+  expect(await sessionType()).toBe('transient');
+  await expect(page.getByText('무음 모드(무음 스위치)에서는 휴식 끝 알림음이 안 나요')).toBeVisible();
+  // 소리 끔이면 눌러도 세션을 잡지 않음
+  await page.getByRole('button', { name: '소리 켬' }).click();
+  await expect(page.getByRole('button', { name: '소리 끔' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '소리 끔' })).toBeVisible();
+  await page.locator('main h1').first().click();
+  expect(await sessionType()).toBe('auto');
+  await page.getByRole('button', { name: '소리 끔' }).click();
+});
+
+test('플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 세트, 다른 부위 슈퍼세트, 예상 시간 줄어듦, 풀기, 저장하고 시작하면 운동 화면도 묶음', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await pickPart(page, '이두');
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const est = async () => { const t = (await planSec.getByText(/예상 \d+:\d{2}/).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
+  // 다른 부위(코어) 운동을 뒤에 추가
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  const dlg = page.getByRole('dialog', { name: '운동 추가' });
+  await dlg.getByLabel('운동 검색').fill('플랭크');
+  await dlg.getByRole('button', { name: '플랭크', exact: true }).click();
+  const cards = planSec.locator('.card');
+  const n0 = await cards.count();
+  // 1·2번째(둘 다 이두) → 컴파운드 세트
+  const e0 = await est();
+  await cards.nth(0).getByRole('button', { name: /^다음과 묶기 · 컴파운드 세트: / }).click();
+  await expect(cards).toHaveCount(n0 - 1);
+  await expect(cards.nth(0).locator('.badge.kind')).toHaveText('컴파운드 세트');
+  expect(await est(), '묶으면 예상 시간이 줄어듦').toBeLessThan(e0);
+  // 끝에서 두 번째(이두) + 마지막(플랭크, 코어) → 슈퍼세트
+  const last = await cards.count();
+  await cards.nth(last - 2).getByRole('button', { name: /^다음과 슈퍼세트로 묶기: .* \+ 플랭크$/ }).click();
+  await expect(cards.nth(last - 2).locator('.badge.kind')).toHaveText('슈퍼세트');
+  await expect(cards.nth(last - 2)).toContainText('플랭크');
+  await checkScreen(page, '49-plan-superset');
+  // 묶은 뒤 키보드로 순서를 옮기면 옮김 안내가 읽힘 (묶기 안내가 가리지 않음)
+  const live = planSec.locator('p.sr-only[aria-live="polite"]');
+  await expect(live).toContainText('묶었어요');
+  await cards.nth(0).getByRole('button', { name: /순서 옮기기, 지금 1번째/ }).press('ArrowDown');
+  await expect(live).toContainText('2번째로 옮김');
+  await cards.nth(1).getByRole('button', { name: /순서 옮기기, 지금 2번째/ }).press('ArrowUp');
+  // 풀기 → 다시 단일
+  await cards.nth(0).getByRole('button', { name: /^묶음 풀기: / }).click();
+  await expect(cards.nth(0).locator('.badge.kind')).toHaveCount(0);
+  // 저장하고 시작 → 운동 화면에도 슈퍼세트
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '저장하고 시작' }).click();
+  await expect(page.getByText('슈퍼세트').first()).toBeVisible();
+  await endWorkout(page);
+});
+
+test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 부위·마지막 날짜·횟수, 목록에서만 숨기기 ↔ 다시 보이기, 완전 삭제, 운동 탭에서 바로 고르기', async ({ page }) => {
+  for (const [p, m] of [['등', '30분'], ['가슴', '30분'], ['하체', '45분'], ['이두', '30분']] as [string, string][]) {
+    await makeRoutine(page, [p], m);
+    // 플랜 만들기는 고른 부위를 기억하므로 다음 루틴 전에 뺌
+    await page.getByRole('link', { name: '플랜' }).click();
+    await page.getByRole('button', { name: `${p} 높음` }).click();
+    await page.getByRole('dialog', { name: `${p} 우선순위` }).getByRole('button', { name: '이 부위 빼기' }).click();
+  }
+  // 하체 루틴으로 한 번 운동 → 최근 한 순 맨 앞, "오늘 · 1회"
+  await page.getByRole('link', { name: '홈' }).click();
+  await page.getByRole('button', { name: '하체 45분 시작' }).click();
+  await endWorkout(page);
+  await page.getByRole('link', { name: '홈' }).click();
+  const home = page.getByRole('region', { name: '내 루틴' });
+  await expect(home.locator('.routine-card')).toHaveCount(3);
+  await expect(home.locator('.routine-card').first()).toHaveAttribute('aria-label', '루틴 하체 45분');
+  await expect(home.locator('.routine-card').first()).toContainText('오늘');
+  await expect(home.locator('.routine-card').first()).toContainText('1회');
+  await expect(home.locator('.routine-card').first().locator('.tag')).toHaveText(['하체']);
+  await checkScreen(page, '55-home-routines');
+  // 모두 보기 → 4개, 정렬 바꾸기(이름 순)
+  await page.getByRole('button', { name: '내 루틴 모두 보기 (4개)' }).click();
+  await expect(page).toHaveURL(/#\/routines/);
+  const list = page.getByRole('region', { name: '내 루틴' });
+  await expect(list.locator('.routine-card')).toHaveCount(4);
+  await list.getByRole('button', { name: '이름 순' }).click();
+  expect(await list.locator('.routine-card').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['루틴 가슴 30분', '루틴 등 30분', '루틴 이두 30분', '루틴 하체 45분']);
+  // 목록에서만 숨기기 → 숨긴 루틴에 있음 → 다시 보이기
+  await list.getByRole('button', { name: '가슴 30분 지우기' }).click();
+  await answer(page, '목록에서만 숨기기');
+  await expect(page.getByRole('status').filter({ hasText: '「가슴 30분」 루틴을 목록에서 숨겼어요' })).toHaveCount(1);
+  await expect(page.locator('.toast').getByRole('button', { name: '되돌리기' })).toBeVisible();
+  await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(3);
+  await list.getByRole('button', { name: /숨긴 루틴 1개/ }).click();
+  await expect(list.locator('.routine-card.is-hidden')).toHaveAttribute('aria-label', '루틴 가슴 30분');
+  await checkScreen(page, '56-routines-hidden');
+  await list.getByRole('button', { name: '가슴 30분 다시 보이기' }).click();
+  await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(4);
+  // 숨긴 루틴은 운동 탭 고르기에도 안 나옴 / 완전 삭제는 되돌릴 수 없음 (확인 창)
+  await list.getByRole('button', { name: '이두 30분 지우기' }).click();
+  await answer(page, '목록에서만 숨기기');
+  await list.getByRole('button', { name: '등 30분 지우기' }).click();
+  await answer(page, '완전 삭제');
+  await expect(list.getByRole('group', { name: '루틴 등 30분' })).toHaveCount(0);
+  await expect(list.getByRole('button', { name: /숨긴 루틴 1개/ })).toHaveAttribute('aria-expanded', 'true'); // 아까 펼친 그대로
+  await list.getByRole('button', { name: '이두 30분 완전 삭제' }).click();
+  await answer(page, '완전 삭제');
+  await expect(list.getByRole('button', { name: /숨긴 루틴/ })).toHaveCount(0);
+  // 검색어가 남은 채 개수가 줄어도 검색창·지우기 버튼은 남음 (루틴 5개 → 검색 → 숨겨 4개)
+  for (const n of ['A', 'B', 'C']) { await page.getByRole('button', { name: '+ 직접' }).click(); await page.getByLabel('루틴 이름').fill('빈 ' + n); await page.getByRole('button', { name: '저장', exact: true }).click(); }
+  await page.getByRole('button', { name: /^내 루틴 모두 보기/ }).click();
+  await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(5);
+  await expect(list.getByRole('group', { name: '루틴 빈 A' }).getByRole('button', { name: '빈 A 운동 넣기' })).toBeVisible(); // 운동 없는 루틴은 시작 대신 운동 넣기
+  await list.getByLabel('루틴 검색').fill('빈');
+  await expect(list.locator('.routine-card')).toHaveCount(3);
+  await list.getByRole('button', { name: '빈 A 지우기' }).click();
+  await answer(page, '목록에서만 숨기기');
+  await expect(list.getByLabel('루틴 검색')).toHaveValue('빈');
+  await list.getByRole('button', { name: '검색어 지우기' }).click();
+  await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(4);
+  for (const n of ['B', 'C']) { await list.getByRole('button', { name: `빈 ${n} 지우기` }).click(); await answer(page, '완전 삭제'); }
+  if ((await list.getByRole('button', { name: /숨긴 루틴/ }).getAttribute('aria-expanded')) !== 'true') await list.getByRole('button', { name: /숨긴 루틴/ }).click();
+  await list.getByRole('button', { name: '빈 A 완전 삭제' }).click();
+  await answer(page, '완전 삭제');
+  // 운동 탭: 진행 중 운동이 없으면 바로 루틴 고르기 (편집·지우기 없이 시작만)
+  await page.getByRole('link', { name: '운동' }).click();
+  await expect(page.getByRole('heading', { name: '루틴 고르기' })).toBeVisible();
+  const pick = page.getByRole('region', { name: '내 루틴' });
+  expect(await pick.locator('.routine-card').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['루틴 가슴 30분', '루틴 하체 45분']); // 정렬은 내 루틴 화면에서 고른 것(이름 순)을 따름
+  await expect(pick.getByRole('button', { name: /지우기|편집/ })).toHaveCount(0);
+  await checkScreen(page, '57-workout-pick');
+  await pick.getByRole('button', { name: '가슴 30분 시작' }).click();
+  await expect(page.getByRole('heading', { name: '가슴 30분' })).toBeVisible();
+  await endWorkout(page);
+  // 기록은 남음: 지운 루틴으로 한 운동도 기록 탭에 그대로
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByText('하체 45분').first()).toBeVisible();
+});
 test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본 휴식', async ({ page }) => {
   await page.getByRole('link', { name: '종목' }).click();
   await page.getByRole('button', { name: '+ 직접 추가' }).click();
@@ -307,7 +574,7 @@ test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본
   await touchTargets(page);
   await page.getByRole('button', { name: '추가', exact: true }).click();
   await page.getByRole('link', { name: '플랜' }).click();
-  await page.getByRole('button', { name: '등 선택 안 함' }).click();
+  await pickPart(page, '등');
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   await page.getByRole('region', { name: '생성된 플랜' }).getByRole('button', { name: '교체' }).first().click();
   await page.getByLabel('운동 검색').last().fill('우리 헬스장');
@@ -343,7 +610,7 @@ test('루틴 직접 만들기·편집: 운동 추가, 목표 횟수, 슈퍼세�
 test('시간이 너무 짧으면 이유를 보여줌, 부위 없이 만들 수 없음', async ({ page }) => {
   await page.getByRole('link', { name: '플랜' }).click();
   await expect(page.getByRole('button', { name: '부위를 먼저 고르세요' })).toBeDisabled();
-  for (const p of ['하체', '등', '가슴']) await page.getByRole('button', { name: `${p} 선택 안 함` }).click();
+  for (const p of ['하체', '등', '가슴']) await pickPart(page, p);
   await page.getByRole('button', { name: '30분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   await expect(page.getByText(/이렇게 짠 이유/)).toBeVisible();
@@ -671,8 +938,8 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
   expect(info).toEqual({ ver: 50, stamped: true });
   // 지우면 기록은 없어지고 지움 표시가 남음
   await page.getByRole('link', { name: '홈' }).click();
-  await page.getByRole('button', { name: '예전 루틴 삭제' }).click();
-  await answer(page, '지우기');
+  await page.getByRole('button', { name: '예전 루틴 지우기' }).click();
+  await answer(page, '완전 삭제');
   await expect(page.getByRole('heading', { name: '예전 루틴' })).toHaveCount(0);
   const tomb = await page.evaluate(async () => new Promise<boolean>((res) => {
     const o = indexedDB.open('workout-app');
@@ -768,8 +1035,8 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await syncNowOn(page); await syncNowOn(pc);
   // PC에서 루틴 지움 → 폰에서도 사라짐
   await pc.getByRole('link', { name: '홈' }).click();
-  await pc.getByRole('button', { name: 'PC에서 짠 루틴 삭제', exact: true }).click();
-  await answer(pc, '지우기');
+  await pc.getByRole('button', { name: 'PC에서 짠 루틴 지우기', exact: true }).click();
+  await answer(pc, '완전 삭제');
   await syncNowOn(pc); await syncNowOn(page);
   await page.getByRole('link', { name: '홈' }).click();
   await expect(page.getByRole('heading', { name: 'PC에서 짠 루틴' })).toHaveCount(0);
@@ -790,7 +1057,7 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   expect(nav!.height).toBeGreaterThan(nav!.width);
   // 플랜: 왼쪽 조건, 오른쪽 결과
   await pc.getByRole('link', { name: '플랜' }).click();
-  await pc.getByRole('button', { name: '등 선택 안 함' }).click();
+  await pickPart(pc, '등');
   await pc.getByRole('button', { name: '45분' }).click();
   await pc.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const form = await pc.getByRole('button', { name: '플랜 만들기', exact: true }).boundingBox();
@@ -994,20 +1261,23 @@ void makeRoutine;
 test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동이면 그대로 / 동기화 중 초기화·불러오기 두 갈래: 닫으면 아무것도 안 바꿈, "이 기기만"은 동기화 끄고 진행', async ({ page }) => {
   await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
   await makeRoutine(page, ['등'], '30분');
-  const del = page.getByRole('button', { name: '등 30분 삭제', exact: true });
+  const del = page.getByRole('button', { name: '등 30분 지우기', exact: true });
   const card = page.getByRole('heading', { name: '등 30분', exact: true });
   const sheet = page.locator('.sheet[aria-modal="true"]');
   const syncOn = () => page.evaluate(() => localStorage.getItem('sync.on'));
 
-  // 1) 삭제 확인: 취소(위험한 확인은 취소에 초점, Enter 한 번으로 안 지워짐)·Esc·✕·화면 이동은 그대로
+  // 1) 지우기 (D-048): 처음 초점은 되돌릴 수 있는 "목록에서만 숨기기"(Enter 한 번으로 완전 삭제되지 않음)·Esc·✕·화면 이동은 그대로
   await del.click();
-  await expect(sheet.getByRole('heading', { name: '루틴을 지울까요?' })).toBeVisible();
-  await expect(sheet.getByRole('button', { name: '취소', exact: true })).toBeFocused();
-  await page.keyboard.press('Enter');
+  await expect(sheet.getByRole('heading', { name: '이 루틴을 어떻게 할까요?' })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: '목록에서만 숨기기', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter'); // Enter 한 번 = 되돌릴 수 있는 숨기기 (완전 삭제 아님)
   await expect(sheet).toHaveCount(0);
+  await expect(card).toHaveCount(0);
+  // 카드가 사라졌으니 초점은 아래 알림의 [되돌리기]로
+  await expect(page.locator('.toast').getByRole('button', { name: '되돌리기' })).toBeFocused();
+  await page.locator('.toast').getByRole('button', { name: '되돌리기' }).click();
   await expect(card).toBeVisible();
-  // 연 버튼으로 초점이 돌아옴 (WebKit은 버튼을 눌러도 초점을 주지 않아 Chromium에서만 봄)
-  if (test.info().project.name.includes('chromium')) await expect(del).toBeFocused();
+  await expect(page.locator('.toast')).toContainText('다시 보이게 했어요');
   await del.click(); await expect(sheet).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
@@ -1081,7 +1351,7 @@ test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동�
   await page.getByRole('link', { name: '홈' }).click();
   await expect(card).toBeVisible();
   await del.click();
-  await answer(page, '지우기');
+  await answer(page, '완전 삭제');
   await expect(card).toHaveCount(0);
 });
 
@@ -1142,7 +1412,7 @@ test('기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바�
 
 test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바꾸기, 운동 추가 → 저장하고 시작, 내 운동 DB 정보 버튼', async ({ page }) => {
   await page.getByRole('link', { name: '플랜' }).click();
-  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
@@ -1228,7 +1498,7 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
 
 test('플랜 바로 고치기 (D-036): 시간 운동 초 −/+ 가 예상 시간에 반영, 잠금 다시 생성해도 바꾼 횟수·다른 부위 추가 운동 유지', async ({ page }) => {
   await page.getByRole('link', { name: '플랜' }).click();
-  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
@@ -1288,7 +1558,7 @@ const namesOf = async (cards: Locator) => { const n = await cards.count(); const
 test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 유지, 현재 세트 따라감, 키보드) → 루틴 편집', async ({ page }, info) => {
   const touch = info.project.name.includes('chromium');
   await page.getByRole('link', { name: '플랜' }).click();
-  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });

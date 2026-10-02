@@ -16,11 +16,13 @@ import { GradeBadge, ExercisePicker, Sheet, mmss } from '../components';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
 import { useDragSort } from '../dragSort';
+import { BodyMap } from '../bodyMapView';
+import { PartSheet } from '../prioritySheet';
+import { togglePart as togglePartForm, setPartPriority } from '../../core/planForm';
 import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
-import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
+import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, groupKindWithNext, mergeWithNextBlock, splitPlanBlock, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
-const NEXT: Record<string, Priority | undefined> = { none: 'high', high: 'normal', normal: 'low', low: undefined };
 const KEY = 'planBuilder.v1';
 const PLAN_KEY = 'planBuilder.plan';
 const LOCK_KEY = 'planBuilder.locks';
@@ -61,24 +63,24 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const [adding, setAdding] = useState(false);
   const [moved, setMoved] = useState<{ key: string; d: -1 | 1; msg: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [groupMsg, setGroupMsg] = useState('');
   // 블록 끌어서 순서 바꾸기 (D-037). ↑↓ 버튼과 같은 결과
   const dnd = useDragSort(plan?.blocks.length ?? 0, (from, to) => {
     if (!plan) return;
     const next = moveBlockTo(plan, from, to);
-    if (next !== plan) { setMoved(null); setPlan(recompute(next, all)); }
+    if (next !== plan) { setMoved(null); setGroupMsg(''); setPlan(recompute(next, all)); }
   }, (i) => plan?.blocks[i]?.items.map((it) => it.name).join(' + ') ?? '');
   const [name, setName] = useState('');
   const [showReasons, setShowReasons] = useState(true);
   const [tpl, setTpl] = useState('');
   const update = (p: Partial<Form>) => { const n = { ...f, ...p }; setF(n); lsSet(KEY, JSON.stringify(n)); };
 
-  const cyclePart = (p: Part) => {
-    const cur = f.parts[p];
-    const nx = NEXT[cur ?? 'none'];
-    const parts = { ...f.parts }; let order = f.order.filter((x) => x !== p);
-    if (nx) { parts[p] = nx; order = [...order, p]; } else delete parts[p];
-    update({ parts, order });
-  };
+  // D-043: 부위는 켜기/끄기만 (켜면 우선순위 '높음'), 우선순위는 고른 부위의 선택 상자로. 고른 순서(같은 우선순위의 앞뒤)는 유지
+  const togglePart = (p: Part) => { const n = togglePartForm(f, p); update({ parts: n.parts, order: n.order }); };
+  const setPriority = (p: Part, pr: Priority) => update({ parts: setPartPriority(f, p, pr).parts });
+  // D-047: 부위를 누르면 (처음이면 '높음'으로 고르고) 우선순위 창을 연다. 빼기는 창에서
+  const [partSheet, setPartSheet] = useState<Part | null>(null);
+  const openPart = (p: Part) => { if (!f.parts[p]) togglePart(p); setPartSheet(p); };
   const request = (form: Form = f): PlanRequest => ({
     parts: form.order.filter((p) => form.parts[p]).map((p) => ({ part: p, priority: form.parts[p]! })),
     level: s.settings.level, minGrade: form.minGrade, targetMinutes: form.minutes, groupings: form.groupings,
@@ -90,6 +92,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   });
   const generate = (keepLocks = false, form: Form = f) => {
     const req = request(form);
+    setGroupMsg('');
     const t0 = performance.now();
     let p: Plan;
     if (keepLocks && plan) {
@@ -119,6 +122,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   };
   const editItem = (bi: number, ii: number, fn: (i: PlanItem) => PlanItem | null) => {
     if (!plan) return;
+    setGroupMsg('');
     const old = plan.blocks[bi]!.items[ii]!;
     const blocks = plan.blocks.map((b, x) => x !== bi ? b : { ...b, items: b.items.map((it, y) => (y === ii ? fn(it) : it)).filter((it): it is PlanItem => !!it) });
     const next = recompute({ ...plan, blocks }, all);
@@ -135,6 +139,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
     const next = moveBlock(plan, bi, d);
     if (next === plan) return;
     setPlan(recompute(next, all));
+    setGroupMsg('');
     setMoved({ key: blockKey(b), d, msg: `${blockName(b)}: ${bi + 1 + d}번째로 옮김` });
   };
   const addExercise = (e: BuiltExercise) => {
@@ -176,13 +181,17 @@ export function PlanBuilder({ s }: { s: AppState }) {
       <h1>플랜 만들기</h1>
       {/* PC 넓은 화면: 왼쪽 조건, 오른쪽 결과 (D-030) */}
       <div class="wide-2"><div>
-      <label>부위 (누를 때마다 우선순위 높음 → 보통 → 낮음 → 빼기)</label>
-      <div class="row wrap">
+      <label>부위 (그림이나 버튼을 누르면 우선순위를 고르는 창이 열려요 · 기본 높음)</label>
+      {/* 그림 먼저, 버튼은 아래: 버튼 글자가 길어져도 그림 위치가 바뀌지 않게 (연속으로 누를 때 빗나가지 않게) */}
+      <BodyMap sel={f.parts} onPart={openPart} />
+      <div class="row wrap" role="group" aria-label="부위">
         {PARTS.map((p) => {
           const pr = f.parts[p];
-          return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => cyclePart(p)} aria-pressed={!!pr} aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
+          return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => openPart(p)} aria-pressed={!!pr} aria-haspopup="dialog" aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
         })}
       </div>
+      {partSheet && <PartSheet part={partSheet} pr={f.parts[partSheet]} onPick={(x) => setPriority(partSheet, x)}
+        onRemove={() => { if (f.parts[partSheet]) togglePart(partSheet); setPartSheet(null); }} onClose={() => setPartSheet(null)} />}
       <label>분할 템플릿으로 채우기 (선택)</label>
       <div class="grid2">
         <select value={tpl} onChange={(e) => setTpl((e.target as HTMLSelectElement).value)} aria-label="분할 템플릿">
@@ -226,7 +235,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
             <h2>{plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : plan.status === 'reduced' ? '플랜 (일부 부위만)' : '플랜'}</h2>
             {plan.blocks.length > 0 && <span class="sub">예상 {mmss(plan.estimatedSec)}{plan.targetSec ? ` / ${Math.round(plan.targetSec / 60)}분` : ''}</span>}
           </div>
-          <p class="sr-only" aria-live="polite">{moved?.msg ?? dnd.msg}</p>
+          <p class="sr-only" aria-live="polite">{moved?.msg ?? (groupMsg || dnd.msg)}</p>
           {plan.blocks.length > 0 && plan.targetSec !== undefined && plan.estimatedSec > plan.targetSec && <p class="pill warn-text" role="status">목표 시간보다 약 {Math.ceil((plan.estimatedSec - plan.targetSec) / 60)}분 길어요 (직접 바꾼 내용은 그대로 둠)</p>}
           {plan.blocks.length > 0 && plan.slack && plan.targetSec !== undefined && plan.estimatedSec < plan.targetSec - 300 && (
             <div class="slack-note" role="status" aria-label="목표 시간보다 짧은 이유">
@@ -274,6 +283,23 @@ export function PlanBuilder({ s }: { s: AppState }) {
                   </div>
                 </div>
               ))}
+              {(() => {
+                // D-046: 다음 운동과 슈퍼세트(같은 부위면 컴파운드 세트)로 묶기 / 묶음 풀기
+                const kind = groupKindWithNext(plan, bi);
+                const label = kind === 'compound' ? '컴파운드 세트' : '슈퍼세트';
+                // 같은 한 부위끼리 묶으면 앱 용어로 컴파운드 세트 (글자에 바로 보이게)
+                const text = kind === 'compound' ? '다음과 묶기 · 컴파운드 세트' : '다음과 슈퍼세트로 묶기';
+                const next = plan.blocks[bi + 1];
+                if (!kind && b.items.length < 2) return null;
+                return (
+                  <div class="row wrap group-actions" style={{ marginTop: '8px' }}>
+                    {kind && next && <button aria-label={`${text}: ${blockName(b)} + ${blockName(next)}`}
+                      onClick={() => { setMoved(null); setPlan(recompute(mergeWithNextBlock(plan, bi), all)); setGroupMsg(`${blockName(b)} + ${blockName(next)}: ${label}로 묶었어요`); }}>⤓ {text}</button>}
+                    {b.items.length > 1 && <button aria-label={`묶음 풀기: ${blockName(b)}`}
+                      onClick={() => { setMoved(null); setPlan(recompute(splitPlanBlock(plan, bi), all)); setGroupMsg(`${blockName(b)}: 묶음을 풀었어요`); }}>묶음 풀기</button>}
+                  </div>
+                );
+              })()}
             </div>
           ))}
           <button class="big" style={{ margin: '4px 0 10px' }} onClick={() => setAdding(true)}>+ 운동 추가</button>
@@ -300,7 +326,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
           }} />
       )}
       {adding && plan && (
-        <ExercisePicker s={s} all={all} title="운동 추가"
+        <ExercisePicker s={s} all={all} title="운동 추가" ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setAdding(false)}
           onPick={(e) => { addExercise(e); setAdding(false); }} />

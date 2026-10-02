@@ -1,18 +1,18 @@
 import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, activeOf, historyOf } from '../store';
-import { catalog } from '../catalog';
-import { startRoutine, setHomeHidden } from '../actions';
-import { emptyRoutine, homeRecent } from '../../core/session';
+import { setHomeHidden } from '../actions';
+import { homeRecent } from '../../core/session';
 import type { Workout } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { BackupBanner } from './BackupSection';
 import { SendStatus } from './AutoSendSection';
+import { RoutineList, newRoutine } from './MyRoutines';
 import { RemoteCards } from './RemoteCards';
-import { newId, softDelete } from '../../db/db';
+import { softDelete } from '../../db/db';
 import { minutes, mmss } from '../components';
 import { go } from '../nav';
-import { askConfirm, askChoice } from '../confirm';
+import { askChoice } from '../confirm';
 import { syncEnabled } from '../sync';
 
 /**
@@ -35,8 +35,6 @@ async function removeRecent(w: Workout): Promise<'ok' | 'alt' | false | null> {
 }
 
 export function Home({ s }: { s: AppState }) {
-  const all = catalog(s.custom);
-  const name = (id: string) => all.find((e) => e.id === id)?.name_ko ?? id;
   const active = activeOf(s);
   // 빼기·완전 삭제 뒤 카드가 사라지므로 결과를 글로 알림 (화면 읽기 프로그램도 읽음)
   const [done, setDone] = useState<string | null>(null);
@@ -71,31 +69,8 @@ export function Home({ s }: { s: AppState }) {
       {backupDue(s.settings.lastBackupAt, historyOf(s).length, Date.now()) && (
         <BackupBanner s={s} />
       )}
-      <div class="row between"><h2>내 루틴</h2><div class="row"><button onClick={async () => { const r = emptyRoutine(newId('r'), '새 루틴', new Date().toISOString()); await mutate((d) => d.routines.put(r)); go(`#/routine/${encodeURIComponent(r.id)}`); }}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
-      {!s.routines.length && (
-        <div class="empty">
-          <p>아직 루틴이 없어요.</p>
-          <p class="small">플랜 만들기에서 부위·등급·시간을 고르면 자동으로 짜 드려요.</p>
-        </div>
-      )}
-      <div class="wide-cards">
-      {s.routines.map((r) => (
-        <div class="card" key={r.id}>
-          <div class="row between">
-            <div class="grow">
-              <h3>{r.name}</h3>
-              <div class="sub small">{r.blocks.length}블록 · 운동 {r.blocks.reduce((n, b) => n + b.items.length, 0)}개{r.estimatedSec ? ` · 약 ${minutes(r.estimatedSec)}` : ''}</div>
-              <div class="pill">{r.blocks.flatMap((b) => b.items.map((i) => name(i.exerciseId))).slice(0, 4).join(', ')}{r.blocks.flatMap((b) => b.items).length > 4 ? ' …' : ''}</div>
-            </div>
-          </div>
-          <div class="row" style={{ marginTop: '8px' }}>
-            <button class="primary grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}>시작</button>
-            <button onClick={() => go(`#/routine/${encodeURIComponent(r.id)}`)}>편집</button>
-            <button class="danger" onClick={async () => { if (await askConfirm({ title: '루틴을 지울까요?', message: `"${r.name}" · 운동 기록은 남아요.`, ok: '지우기', danger: true })) await mutate((d) => softDelete(d, 'routines', r.id)); }} aria-label={`${r.name} 삭제`}>삭제</button>
-          </div>
-        </div>
-      ))}
-      </div>
+      <div class="row between"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
+      <RoutineList s={s} mode="home" />
       {recent.length > 0 && <h2>최근 운동</h2>}
       <div class="wide-cards">
       {recent.map((w) => {

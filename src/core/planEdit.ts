@@ -6,7 +6,8 @@ import type { Plan, PlanBlock, PlanItem, PlanRequest } from './planner';
 import type { BuiltExercise } from './types';
 import { moveItem } from './reorder';
 
-export const SETS_MIN = 1, SETS_MAX = 8;
+/** 직접 고치는 세트 범위 (D-042: 사실상 제한 없음. 이전 D-036은 1~8, 앱 판단). 자동 생성 기준(수준별 3·4, 근육별 상한)과는 별개 */
+export const SETS_MIN = 1, SETS_MAX = 99;
 export const REPS_MIN = 1, REPS_MAX = 50;
 export const SECS_MIN = 5, SECS_MAX = 300, SECS_STEP = 5;
 
@@ -75,4 +76,30 @@ export function regenerateWithLocks(old: Plan, locks: ReadonlySet<string>, req: 
 export function hasDbInfo(e: Pick<BuiltExercise, 'grades' | 'guide'> | undefined): boolean {
   if (!e) return false;
   return e.grades.some((g) => g.source === 'VIDEO') || e.guide.length > 0;
+}
+
+/**
+ * D-046: 플랜에서 다음 운동과 묶기 (루틴 편집과 같은 규칙). 두 블록 모두 한 부위이고 같은 부위면 컴파운드 세트, 아니면 슈퍼세트.
+ * 묶음은 최대 4개 운동. 라운드 후 휴식은 플랜 휴식값, 전환 10초. 시간은 부르는 쪽(recompute)이 다시 계산한다.
+ */
+export const GROUP_MAX = 4;
+export function groupKindWithNext(plan: Plan, bi: number): 'superset' | 'compound' | null {
+  const a = plan.blocks[bi], b = plan.blocks[bi + 1];
+  if (!a || !b || a.items.length + b.items.length > GROUP_MAX) return null;
+  const pa = new Set(a.items.map((i) => i.part)), pb = new Set(b.items.map((i) => i.part));
+  return pa.size === 1 && pb.size === 1 && [...pa][0] === [...pb][0] ? 'compound' : 'superset';
+}
+export function mergeWithNextBlock(plan: Plan, bi: number): Plan {
+  const kind = groupKindWithNext(plan, bi);
+  if (!kind) return plan;
+  const a = plan.blocks[bi]!, b = plan.blocks[bi + 1]!;
+  const merged: PlanBlock = { kind, items: [...a.items, ...b.items], roundRestSec: a.kind === 'single' ? plan.rest.round : (a.roundRestSec ?? plan.rest.round), transitionSec: a.transitionSec ?? 10, timeSec: 0 };
+  return { ...plan, blocks: [...plan.blocks.slice(0, bi), merged, ...plan.blocks.slice(bi + 2)] };
+}
+/** 묶음 풀기: 운동마다 단일 블록으로 (세트 간 휴식은 recompute가 다관절·단관절 기본값으로) */
+export function splitPlanBlock(plan: Plan, bi: number): Plan {
+  const b = plan.blocks[bi];
+  if (!b || b.items.length < 2) return plan;
+  const singles: PlanBlock[] = b.items.map((i) => ({ kind: 'single', items: [i], timeSec: 0 }));
+  return { ...plan, blocks: [...plan.blocks.slice(0, bi), ...singles, ...plan.blocks.slice(bi + 1)] };
 }

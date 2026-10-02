@@ -94,5 +94,5 @@ export function diagTimerEnd(endsAt: number, soundOn: boolean, audio: string, sc
   const now = Date.now();
   const kind = classifyTimerEnd({ endsAt, now, screenShownAt, lastHiddenAt, lastVisibleAt, hiddenNow: document.visibilityState === 'hidden' });
   diag('timer', { v: now - endsAt, m: kind });
-  if (soundOn) diag('audio', { m: audio, ok: audio === 'running' });
+  if (soundOn) diag('audio', { m: audio, ok: audio.startsWith('running') });
 }

@@ -32,6 +32,8 @@ export interface Settings {
   lastBackupAt?: string;
   /** 홈 "최근 운동"에서만 뺀 운동 ID (D-040). 기록·통계에는 그대로. 기기 사이 동기화 */
   homeHidden?: string[];
+  /** 내 루틴 목록에서만 숨긴 루틴 ID (D-048). 루틴은 그대로. 기기 사이 동기화 */
+  routineHidden?: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {

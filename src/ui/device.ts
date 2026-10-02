@@ -8,18 +8,44 @@ import { diag } from './diag';
 
 let ctx: AudioContext | undefined;
 
-/** 사용자 탭 안에서 오디오를 깨움. 무음 스위치를 넘기려고 audioSession을 playback으로 (Safari 17+) */
+/**
+ * D-045: 오디오 세션 종류 (이 기기만, localStorage).
+ * 'mix'(기본) = W3C Audio Session 'transient': 알림음 용도, 다른 앱 음악 위에 울림(음악을 멈추지 않음).
+ * 'solo' = 'playback': 독점 유형이라 다른 앱 음악을 멈춤. 이전(0.8.4까지)의 동작, 무음 스위치를 넘기려던 설정.
+ * 아이폰 무음 스위치에서 'transient'가 울리는지는 실기기 확인 항목.
+ */
+export type AudioMode = 'mix' | 'solo';
+export const AUDIO_MODE_KEY = 'audio.mode';
+export const audioMode = (): AudioMode => (lsGet(AUDIO_MODE_KEY) === 'solo' ? 'solo' : 'mix');
+export const sessionTypeFor = (m: AudioMode): string => (m === 'solo' ? 'playback' : 'transient');
+function applySessionType(): void {
+  const nav = navigator as Navigator & { audioSession?: { type: string } };
+  if (nav.audioSession) nav.audioSession.type = sessionTypeFor(audioMode());
+}
+export function setAudioMode(m: AudioMode): void {
+  if (m === 'solo') lsSet(AUDIO_MODE_KEY, 'solo'); else lsRemove(AUDIO_MODE_KEY);
+  try { applySessionType(); } catch { /* 지원 안 함 */ }
+}
+
+/** 설정의 "소리 끔"이면 오디오를 아예 깨우지 않음 (세션을 잡지 않아 다른 앱 음악에 영향 없음) */
+let soundEnabled = true;
+export function setSoundEnabled(on: boolean): void {
+  if (soundEnabled && !on && ctx && ctx.state === 'running') void ctx.suspend().catch(() => undefined); // 끄면 잡고 있던 소리 장치도 멈춤
+  soundEnabled = on;
+}
+
+/** 사용자 탭 안에서 오디오를 깨움. 세션 종류는 설정(D-045) */
 export function unlockAudio(): void {
+  if (!soundEnabled) return;
   try {
-    const nav = navigator as Navigator & { audioSession?: { type: string } };
-    if (nav.audioSession) nav.audioSession.type = 'playback';
+    applySessionType();
     ctx ??= new AudioContext();
     if (ctx.state !== 'running') void ctx.resume();
   } catch { /* 소리 불가 */ }
 }
 
 /** 소리 장치 상태 (running이 아니면 소리가 안 남). 진단용 대리 지표 */
-export const audioState = () => (ctx ? ctx.state : 'none');
+export const audioState = () => `${ctx ? ctx.state : 'none'} · ${sessionTypeFor(audioMode())}`;
 
 export function beep(freq: number, ms: number, when = 0): void {
   if (!ctx || ctx.state !== 'running') return;
@@ -31,7 +57,8 @@ export function beep(freq: number, ms: number, when = 0): void {
 }
 
 /** 앱 전체에서 한 번: 여러 종류의 탭으로 오디오를 깨우고, 앱으로 돌아오면 다시 깨움 */
-export function useAudioUnlock(): void {
+export function useAudioUnlock(soundOn = true): void {
+  setSoundEnabled(soundOn);
   useEffect(() => {
     const evs = ['pointerdown', 'touchend', 'click'] as const;
     evs.forEach((e) => document.addEventListener(e, unlockAudio, { passive: true }));
