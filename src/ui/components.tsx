@@ -100,8 +100,10 @@ export function Sheet({ onClose, title, children, modal }: { onClose: () => void
 }
 
 /** 운동 고르기 (교체·추가). part가 있으면 그 부위 후보를 등급 순으로 먼저 */
-export function ExercisePicker({ s, all, part, exclude, ctxParts: ctxIn, onPick, onClose, title }: {
+export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctxIn, onPick, onClose, title }: {
   s: AppState; all: BuiltExercise[]; part?: Part; exclude?: string[];
+  /** D-052: 추가 모드에서 이 부위로 시작 (기억된 부위는 건드리지 않음. 칩을 누르면 평소처럼 기억) */
+  startPart?: Part;
   /** 지금 들어 있는 부위 (플랜은 항목의 실제 부위를 넘김). 없으면 빼기 목록 운동의 기본 부위 */
   ctxParts?: Part[];
   onPick: (e: BuiltExercise) => void; onClose: () => void; title: string;
@@ -111,6 +113,7 @@ export function ExercisePicker({ s, all, part, exclude, ctxParts: ctxIn, onPick,
   const swap = part !== undefined;
   const [p, setPRaw] = useState<Part | undefined>(() => {
     if (part) return part;
+    if (startPart) return startPart;
     const last = lsGet(PICKER_PART_KEY) as Part | null;
     return last && (PARTS as readonly string[]).includes(last) ? last : undefined;
   });
@@ -153,6 +156,21 @@ export function ExercisePicker({ s, all, part, exclude, ctxParts: ctxIn, onPick,
       ))}
       {!list.length && <div class="empty">조건에 맞는 운동이 없어요</div>}
     </Sheet>
+  );
+}
+/** 라벨과 스테퍼를 한 덩어리로 (줄바꿈은 덩어리 단위로만) */
+export function Labeled({ label, children }: { label: string; children: ComponentChildren }) {
+  return <span class="lbl-step"><span class="sub small">{label}</span>{children}</span>;
+}
+export interface StepBtn { aria: string; off: boolean; on: () => void }
+/** 일괄 −/+ 스테퍼 (가운데에 지금 값) */
+export function MiniStepper({ label, mid, dec, inc }: { label: string; mid: string; dec: StepBtn; inc: StepBtn }) {
+  return (
+    <span class="mini-step" role="group" aria-label={label}>
+      <button aria-label={dec.aria} disabled={dec.off} onClick={dec.on}>−</button>
+      <span class="val">{mid}</span>
+      <button aria-label={inc.aria} disabled={inc.off} onClick={inc.on}>+</button>
+    </span>
   );
 }
 export const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.max(0, Math.round(sec)) % 60).padStart(2, '0')}`;

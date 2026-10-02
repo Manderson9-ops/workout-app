@@ -159,7 +159,7 @@ export function stepTransition(plan: Plan, bi: number, d: -1 | 1): Plan {
 }
 
 /** 일괄 버튼 가운데 글자: 세트는 "3세트"/"3~4세트", 횟수는 "10회"/"8~12회", 시간 운동은 "30초"/"30~45초", 섞이면 "8~12회 · 30초" */
-export function rangeText(items: readonly PlanItem[], kind: 'sets' | 'reps'): string {
+export function rangeText(items: readonly { sets: number; reps: number; seconds?: number }[], kind: 'sets' | 'reps'): string {
   const rng = (v: number[], unit: string) => {
     if (!v.length) return '';
     const lo = Math.min(...v), hi = Math.max(...v);

@@ -13,7 +13,8 @@ import type { Grade } from '../../core/version';
 import { resolveGrade } from '../../core/exercises';
 import { DEFAULT_TIME, blockTime, targetReps, warmupFor } from '../../core/time';
 import type { TimedBlock } from '../../core/time';
-import { GradeBadge, ExercisePicker, Sheet, mmss } from '../components';
+import { GradeBadge, ExercisePicker, Sheet, mmss, Labeled, MiniStepper } from '../components';
+import type { StepBtn } from '../components';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
 import { useDragSort } from '../dragSort';
@@ -151,15 +152,9 @@ export function PlanBuilder({ s }: { s: AppState }) {
   };
   const bulkOff = (kind: 'sets' | 'reps', d: number, bi?: number) => !plan || (kind === 'sets' ? bulkSets : bulkReps)(plan, d, bi) === plan;
   // 라벨과 스테퍼를 한 덩어리로 (줄바꿈은 덩어리 단위로만)
-  const labeled = (label: string, node: ComponentChildren) => <span class="lbl-step"><span class="sub small">{label}</span>{node}</span>;
+  const labeled = (label: string, node: ComponentChildren) => <Labeled label={label}>{node}</Labeled>;
   const sgn = (d: number) => (d > 0 ? '+1' : '-1');
-  const stepper = (label: string, mid: string, dec: { aria: string; off: boolean; on: () => void }, inc: { aria: string; off: boolean; on: () => void }) => (
-    <span class="mini-step" role="group" aria-label={label}>
-      <button aria-label={dec.aria} disabled={dec.off} onClick={dec.on}>−</button>
-      <span class="val">{mid}</span>
-      <button aria-label={inc.aria} disabled={inc.off} onClick={inc.on}>+</button>
-    </span>
-  );
+  const stepper = (label: string, mid: string, dec: StepBtn, inc: StepBtn) => <MiniStepper label={label} mid={mid} dec={dec} inc={inc} />;
   const addToGroupExercise = (bi: number, e: BuiltExercise) => {
     if (!plan) return;
     const g = resolveGrade(e, e.part, s.settings.level, undefined, s.meta.get(e.id)?.userGrade);
@@ -309,6 +304,20 @@ export function PlanBuilder({ s }: { s: AppState }) {
             <div class="card" key={blockKey(b)} {...dnd.itemAttrs(bi)}>
               {plan.blocks.length > 1 && <div class="row between">{moveBtns(bi)}{b.kind === 'single' && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}</div>}
               {b.kind !== 'single' && <div class="row between"><span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span><span class="pill">라운드 후 휴식 {b.roundRestSec}초 · {mmss(b.timeSec)}</span></div>}
+              {b.kind !== 'single' && (() => {
+                // D-052: 이 묶음 세트·횟수는 접지 않고 항상 보임
+                const nm = blockName(b);
+                return (
+                  <div class="row wrap group-bulk">
+                    {labeled('이 묶음 세트', stepper(`${nm} 세트 모두`, rangeText(b.items, 'sets'),
+                      { aria: `${nm} 세트 모두 줄이기`, off: bulkOff('sets', -1, bi), on: () => bulkDo('sets', -1, bi) },
+                      { aria: `${nm} 세트 모두 늘리기`, off: bulkOff('sets', 1, bi), on: () => bulkDo('sets', 1, bi) }))}
+                    {labeled('이 묶음 횟수', stepper(`${nm} 횟수 모두`, rangeText(b.items, 'reps'),
+                      { aria: `${nm} 횟수 모두 줄이기`, off: bulkOff('reps', -1, bi), on: () => bulkDo('reps', -1, bi) },
+                      { aria: `${nm} 횟수 모두 늘리기`, off: bulkOff('reps', 1, bi), on: () => bulkDo('reps', 1, bi) }))}
+                  </div>
+                );
+              })()}
               {b.items.map((it, ii) => (
                 <div key={it.exerciseId} style={{ marginTop: ii ? '10px' : '4px' }}>
                   <div class="row between">
@@ -357,14 +366,6 @@ export function PlanBuilder({ s }: { s: AppState }) {
                           {labeled('운동 사이 전환', stepper(`${nm} 운동 사이 전환`, `${tr}초`,
                             { aria: `${nm} 운동 사이 전환 줄이기`, off: tr <= TRANSITION_MIN, on: () => applyEdit(stepTransition(plan, bi, -1), `${nm} 운동 사이 전환 ${Math.max(TRANSITION_MIN, tr - TRANSITION_STEP)}초`) },
                             { aria: `${nm} 운동 사이 전환 늘리기`, off: tr >= TRANSITION_MAX, on: () => applyEdit(stepTransition(plan, bi, 1), `${nm} 운동 사이 전환 ${Math.min(TRANSITION_MAX, tr + TRANSITION_STEP)}초`) }))}
-                        </div>
-                        <div class="row wrap">
-                          {labeled('이 묶음 세트', stepper(`${nm} 세트 모두`, rangeText(b.items, 'sets'),
-                            { aria: `${nm} 세트 모두 줄이기`, off: bulkOff('sets', -1, bi), on: () => bulkDo('sets', -1, bi) },
-                            { aria: `${nm} 세트 모두 늘리기`, off: bulkOff('sets', 1, bi), on: () => bulkDo('sets', 1, bi) }))}
-                          {labeled('이 묶음 횟수', stepper(`${nm} 횟수 모두`, rangeText(b.items, 'reps'),
-                            { aria: `${nm} 횟수 모두 줄이기`, off: bulkOff('reps', -1, bi), on: () => bulkDo('reps', -1, bi) },
-                            { aria: `${nm} 횟수 모두 늘리기`, off: bulkOff('reps', 1, bi), on: () => bulkDo('reps', 1, bi) }))}
                         </div>
                       </div>
                     </details>
