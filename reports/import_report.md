@@ -2,9 +2,9 @@
 
 - 원본: `G:\내 드라이브\WORK_OUT_K` (읽기만 함). 이번 실행 전후 해시 **동일 (이 스크립트는 원본을 바꾸지 않음)**
 - 지난 실행 이후 원본 변화: 바뀜 0개, 새 파일 0개, 없어진 파일 0개. WORK_OUT_K에 영상이 추가·수정되면 여기에 나타난다
-- 영상 48개, 기본 종목 166개, 운동 묶음(family) 69개
-- 티어 항목 91개 → 연결 87개 + 반영 안 함·결정 대기로 미적용 6개
-- 영상 등급이 붙은 운동 78개 (등급 87개), 자세 포인트가 붙은 운동 119개
+- 영상 53개, 기본 종목 166개, 운동 묶음(family) 69개
+- 티어 항목 95개 → 연결 91개 + 반영 안 함·결정 대기로 미적용 6개
+- 영상 등급이 붙은 운동 82개 (등급 91개), 자세 포인트가 붙은 운동 121개
 - 연결 실패: **0건**
 
 ## 사용자 결정
@@ -39,11 +39,16 @@
 | M-26 | APPROVED | 자세 포인트에만 나오고 앱에 없는 운동·근력 운동이 아닌 이름 (목·회전근개·전거근·드래그 컬 등 27개) | 이번엔 추가하지 않고 grade_rules.json skip_names에 목록만 남김 | 제안대로 적용 |
 | M-27 | APPROVED | 대퇴사두 영상의 S 3개(스미스 스쿼트·레그 익스텐션·시시 스쿼트) 때문에 하체 플랜이 대퇴사두 운동만으로 채워짐 | 하체 플랜에서 주 근육이 대퇴사두인 운동은 2개까지 (planner MUSCLE_CAP). 나머지는 햄스트링·둔근 (예: 스미스 스쿼트 + 레그 익스텐션 + 루마니안 데드리프트) | 제안대로 적용 |
 | M-28 | APPROVED | 리스트 컬(굽히기)과 리스트 익스텐션(펴기)이 같은 묶음이라 전완 플랜에 시티드 바벨 리스트 익스텐션(A+)이 못 들어감 | 펴는 운동(시티드 바벨 리스트 익스텐션, 리버스 리스트 컬)을 새 묶음 wrist_ext로 | 제안대로 적용 |
+| M-29 | APPROVED | 영상의 "케이블 리버스 플라이"를 앱의 "케이블 리어 델트 플라이"와 같은 운동으로 볼까 | 같게 본다. 둘 다 케이블로 후면 삼각근을 당기는 운동이고, 영상의 특이점(X자·몇 발 다가가기)은 자세 포인트로 붙임 | 제안대로 적용 |
+| M-30 | APPROVED | 어깨 영상(CrMyjPTSbos) 등급 4개를 플랜 선택에 반영할까 (머신 숄더 프레스 S, 케이블 리버스 플라이 S, 바벨 OHP B+, 덤벨 숄더 프레스 B+) | 반영한다. 영상에서 등급을 확정한 4개만. 나머지 11개는 자막에 등급 글자가 빠져 등급 없음(앱 기본값 B 추정), 영상 화면 확인 후 WORK_OUT_K를 고쳐 반영 | 제안대로 적용 |
+| M-31 | APPROVED | 영상에서 낮게 평가했거나 앱에 없는 어깨 운동 5종(벤트오버 바벨 후면 레이즈, 비하인드 넥 프레스, 원판 운전기사 레이즈, 원판 풀 가동범위 레이즈, 엎드려 어깨 회전)을 앱에 추가할까 | 추가하지 않는다 (M-24·M-26과 같은 방식, skip_names) | 제안대로 적용 |
 
 ## 미적용 항목
 
 - 스쿼트·데드리프트 (복근 운동으로 볼 때) F (1hAa4juMtwc): 반영 안 함: 복근 운동 관점의 평가라 스쿼트·데드에 등급을 만들지 않음
 - 스미스 머신 핵스쿼트 (5lghYZl_Qt4): 반영 안 함: 앱에 없는 운동 (나중에 추가 가능)
+- 원판 풀 가동범위 레이즈(루 레이즈) (CrMyjPTSbos): 반영 안 함: 영상이 덤벨 버전보다 열등하다고 평가
+- 원판 운전기사 레이즈(트위스트) (CrMyjPTSbos): 반영 안 함: 영상이 "정말 별로"라고 평가한 운동
 - 목 신전 운동(원판) (IHT1v-QdYF8): 반영 안 함: 앱에 목 부위 없음
 - 목 굴곡 운동(원판) (IHT1v-QdYF8): 반영 안 함: 앱에 목 부위 없음
 - 목 측굴 운동(원판) (IHT1v-QdYF8): 반영 안 함: 앱에 목 부위 없음
@@ -66,6 +71,7 @@
 - 해머 드래그 컬 (YNfWQvjIpPs): 반영 안 함: 앱에 없는 운동 (나중에 추가 가능)
 - 해머 프리처 컬 (YNfWQvjIpPs): 반영 안 함: 앱에 없는 운동 (나중에 추가 가능)
 - 해머 드래그 컬 (YNfWQvjIpPs): 반영 안 함: 앱에 없는 운동 (나중에 추가 가능)
+- 비하인드 넥 프레스 (ZqJ_OS7rTnY): 반영 안 함: 앱에 없는 운동
 - 덤벨 트위스트 (iG_ZpeVaVKw): 반영 안 함: 앱에 없는 운동 (나중에 추가 가능)
 - 덤벨 사이드 벤드 (iG_ZpeVaVKw): 반영 안 함: 앱에 없는 운동 (나중에 추가 가능)
 - 이상한 컬 종류 (웨이터 컬 등) F (q7mJz1CnJUQ): 반영 안 함: F 등급뿐이라 앱에 추가하지 않음
@@ -77,6 +83,11 @@
 - 근육 활성화·깨우기 드릴 (qBvrMqyOb3I): 반영 안 함: 쓸모없다는 예시
 - 덤벨 외회전 (qBvrMqyOb3I): 반영 안 함: 회전근개 운동: 앱에 없음
 - 중량 어깨 푸시업 (qBvrMqyOb3I): 반영 안 함: 전거근 운동: 앱에 없음
+- 벤트오버 바벨 레이즈(후면) (s4JnoTa6I0M): 반영 안 함: 앱에 없는 운동
+- 벤트오버 바벨 레이즈(후면) (s4JnoTa6I0M): 반영 안 함: 앱에 없는 운동
+- 원판 운전기사 레이즈(트위스트) (s4JnoTa6I0M): 반영 안 함: 영상이 "정말 별로"라고 평가한 운동
+- 원판 운전기사 레이즈(트위스트) (s4JnoTa6I0M): 반영 안 함: 영상이 "정말 별로"라고 평가한 운동
+- 인클라인 벤치 엎드려 어깨 회전 운동 (s4JnoTa6I0M): 반영 안 함: 회전근개 운동, 앱에 없음
 - 스미스 머신 벤치프레스 (네거티브가 빠른 '단두대'형) A+ (wjiQa0qyFdo): 반영 안 함: 스미스 벤치는 대표 등급 S 하나로 (기계 종류 차이는 설명)
 - 스미스 머신 벤치프레스 (안전장치로 천천히 내려가는 일반형) A (wjiQa0qyFdo): 반영 안 함: 스미스 벤치는 대표 등급 S 하나로 (기계 종류 차이는 설명)
 - 케이블 플라이 (헬스장이 붐빌 때) A- (wjiQa0qyFdo): 반영 안 함: 케이블 플라이는 A 하나로 (붐빌 때 대안 설명)
@@ -126,6 +137,10 @@
 | 전완근 | 악력기 | D | 전체 | hand_gripper | 이름 일치; 목적 전완·악력 |
 | 전완근 | 데드리프트·랙풀·매달리기 (수축 상태 아이소메트릭) | D | 전체 | dead_hang | 별칭(CONFIRMED); 목적 전완·악력(아이소메트릭 버티기) |
 | 등 | 체스트 서포티드 머신 로우 (특히 T바로우) | S | 전체 | chest_supported_tbar_row | 별칭(CONFIRMED); 목적 등(등 상부·능형근) [세부목표 전용] |
+| 어깨 | 머신 숄더 프레스 (레버식) | S | 전체 | machine_shoulder_press | 별칭(CONFIRMED); 목적 어깨 |
+| 어깨 | 케이블 리버스 플라이 | S | 전체 | cable_rear_delt_fly | 별칭(CONFIRMED); 목적 어깨 |
+| 어깨 | 오버헤드 프레스 (바벨) | B+ | 전체 | barbell_ohp | 별칭(CONFIRMED); 목적 어깨 |
+| 어깨 | 덤벨 숄더 프레스 | B+ | 전체 | db_shoulder_press | 이름 일치; 목적 어깨 |
 | 분할 | 몸통-말단-하체 3분할 (팔·어깨가 약한 거미형) | S | 전체 | torso_limbs_legs | 템플릿 이름 일치 |
 | 분할 | 무분할 (전신, 주 3~5회) | S | 초보 | full_body | 템플릿 이름 일치 |
 | 분할 | 몸통-말단-하체 3분할 ("급진적 과부하 분할") | A+ | 전체 | torso_limbs_legs | 템플릿 이름 일치 |
@@ -302,7 +317,9 @@
 - 6s6zHMOKYLQ.json: `b0d92d264a475e110eb158baf0e9a7031f402540682dd425d12fbcfb4b473d79`
 - A0WwJrT58aA.json: `5f027a815603460b2af869c96215d684fe0875be1eca84577f61b1322ad0707e`
 - AK_cWZlcpv0.json: `6e958c7844027ad8200b58965c48a263a9c3b1ce69426c58e18c00be2cf33246`
+- Bc27jDy5dsk.json: `861a58f2fed8fdc25c36003ae89f8beac271587daa7adfbcb200ea4c83bb48b2`
 - Bp54BnDbUeE.json: `65ee8cc55623d3f20d67b3b94ea9d5961c335050a00fc6935e5f70ba18e6ae67`
+- CrMyjPTSbos.json: `04b3184ec94cb14f750efcfa8dada5d2204d5813304c07a21f3efd76c9868af4`
 - CxWZGilcUu4.json: `9d3e0cb23a537cd66d67405374d2f02d753fa79e9800ec938a8872a499be0e5e`
 - DtTX0QcwhRw.json: `be1d8635b82c88911f34f40484781f524f86700ab361f629b55933c034572640`
 - EA9UidlsYyY.json: `a30e33295a6271560254b9b5e221cca59ae570caf4f4f8527544a6719e677cbc`
@@ -318,7 +335,9 @@
 - SEfPzpFkzQo.json: `56069cbace10295c28a733fb7f130ab73cafc31ba7e79a504602d275e71c55b7`
 - XG6ziyIBXz0.json: `34e96dc69e831716fd6de5ed8bac46235ee5417ed6fb14127bdb7edb0d55b128`
 - YNfWQvjIpPs.json: `78f1286136aca5898218796d4f0cbc96020edcc1588fe0a03574d4f6f02f8eea`
+- ZSeZPxJi6qU.json: `2c354ba3c0bf93c76ff6d44f733c7d949ae282e50d871584eb4256b7baee3f14`
 - ZmL_npUrwnk.json: `27248524056571f1b4c3c772f50f7cfda987c6d3ada9047aee2d225e3d6bd179`
+- ZqJ_OS7rTnY.json: `1f131480fa73c93c0350c6825ec561fb6c49b92230f9af1b55fcf5787e37d1a9`
 - _EyS30r10Ng.json: `edc9f561be1c4e007e9ce4ead1ef48ce594efd4b76e0d83e11e0c6f8d36900d5`
 - fRrg8JxnX6w.json: `037b97470a1f571b56c29853969aa567e6ac6c7b4ae7674587c848c7cabdac72`
 - g9msHUDvfIk.json: `7952fe8fcb86181395bf690fd260af3980fa2700bfe8e5d8531257a5dd3c04f5`
@@ -336,6 +355,7 @@
 - qRkXdARG-Ng.json: `2595dde2a1e465e6a54dde7b7e352dc440efdd9f0a66e52e8bb4d7d72fd2b1b6`
 - qwEoLSAKN2c.json: `d3f8f41a778c3c85b8ad94a1edf3893de9963fa9e021c2a7eef8b0f632e6371d`
 - rFbzTszaRto.json: `530565ec83f986dfb894e27f78ef16d4bc1695d8c27acf0514324d7322b7c68e`
+- s4JnoTa6I0M.json: `a38dda4f4696bb6a985f56b4fc6c02783b815b8a15c9c499a9e682e89210ebe5`
 - uFat30EPPqs.json: `226aefd73386303aea5c89bbb6a8205f9db2973e7a5b1d8f305d3c20a1c9daaa`
 - w4EOl3Ui6t4.json: `ca732f20ed55735cc959dfa25806db4fca13a085bd2e84d87661205b41b16720`
 - wjiQa0qyFdo.json: `a56a717af594a20a6fabdeacabe388927b9482f0b24d4f97fbf179c445dbe077`

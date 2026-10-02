@@ -21,12 +21,21 @@ describe('운동 데이터 검증', () => {
     expect(base.length).toBeLessThanOrEqual(200);
     expect(new Set(base.map((e) => e.part)).size).toBe(8);
   });
-  it('WORK_OUT_K 영상 등급 87개가 78개 운동에 연결, 미적용은 결정으로 뺀 것만 (M-15·16·22·24·26)', () => {
-    expect(Object.keys(wk.grades).length).toBe(78);
-    expect(Object.values(wk.grades).flat().length).toBe(87);
+  it('WORK_OUT_K 영상 등급 91개가 82개 운동에 연결, 미적용은 결정으로 뺀 것만 (M-15·16·22·24·26·31)', () => {
+    expect(Object.keys(wk.grades).length).toBe(82);
+    expect(Object.values(wk.grades).flat().length).toBe(91);
     const un = (wkFile as { unapplied: { reason: string }[] }).unapplied;
-    expect(un.length).toBe(40);
+    expect(un.length).toBe(48);
     expect(un.every((u) => u.reason.startsWith('반영 안 함'))).toBe(true);
+  });
+  it('어깨 영상 등급 4개 (M-29·M-30): 영상에서 확정한 것만, 이름 연결은 별칭', () => {
+    const g = (id: string) => wk.grades[id]!.map((x: { value: string }) => x.value);
+    expect(g('machine_shoulder_press')).toEqual(['S']);
+    expect(g('cable_rear_delt_fly')).toEqual(['S']); // M-29: 케이블 리버스 플라이 = 케이블 리어 델트 플라이
+    expect(g('barbell_ohp')).toEqual(['B+']);
+    expect(g('db_shoulder_press')).toEqual(['B+']);
+    // 등급 글자가 자막에서 빠진 11개는 등급을 만들지 않음 (영상에 없는 등급은 만들지 않는다)
+    for (const id of ['smith_shoulder_press', 'arnold_press', 'db_lateral_raise', 'cable_lateral_raise', 'machine_lateral_raise', 'reverse_pec_deck', 'face_pull']) expect(wk.grades[id]).toBeUndefined();
   });
   it('분할 템플릿 8개, 추천 조합 1개', () => {
     expect(wk.templates.length).toBe(8);
@@ -122,7 +131,7 @@ describe('등급 고르기 (BLUEPRINT 3.3)', () => {
   it('자세 포인트 연결: 고블릿 스쿼트, 스쿼트 계열(M-05), 체스트 서포티드 로우 계열(M-06)', () => {
     expect(get('goblet_squat').guide.length).toBeGreaterThan(10);
     expect(get('back_squat').guide.length).toBe(16); // 초보 스쿼트 3 + 새 영상의 스쿼트·하프·풀 스쿼트 자세 포인트
-    expect(get('lever_row_machine').guide.length).toBe(7); // 등 영상 1 + 새 영상의 로우 공통·서포티드 로우 자세 포인트
+    expect(get('lever_row_machine').guide.length).toBe(9); // 등 영상 1 + 새 영상의 로우 공통·서포티드 로우 자세 포인트 + 어깨 영상 2개의 '로우' 언급(Bc27jDy5dsk 풀다운/로우 비교, ZqJ_OS7rTnY 후면 삼각근 로우)
   });
   it('무거운 운동·한쪽씩 표시 (묶음 제외, 시간 계산에 사용)', () => {
     for (const id of ['bench_press', 'back_squat', 'deadlift', 'romanian_deadlift', 'barbell_row', 'close_grip_bench', 'good_morning', 'rack_pull', 'trap_bar_deadlift']) expect(get(id).heavy).toBe(true);

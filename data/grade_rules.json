@@ -1,7 +1,7 @@
 {
   "_note": "WORK_OUT_K 티어 항목별 예외 규칙. 기본값: purpose_part = 영상 주제 부위(tri→삼두, back·pull→등), primary_topic = true. 여기 적힌 항목만 덮어쓴다. 항목 키 = video_id + exercise(영상 원래 이름) + grade",
   "_note_skip": "ignore_topics: 운동이 아닌 티어 주제(M-25). skip_items: 반영하지 않는 티어 항목(M-15·16·22·24). skip_names: 앱에 없는 운동·근력 운동이 아닌 이름(M-26)",
-  "topic_parts": {"tri":"삼두","back":"등","pull":"등","chest":"가슴","abs":"코어","biceps":"이두","forearm":"전완·악력","quads":"하체"},
+  "topic_parts": {"tri":"삼두","back":"등","pull":"등","chest":"가슴","abs":"코어","biceps":"이두","forearm":"전완·악력","quads":"하체","shoulder":"어깨"},
   "ignore_topics": ["genes","muscle","manhood","fashion"],
   "rules": [
     {"video_id":"GclQVc4k4gU","exercise":"타월 풀업","grade":"A","purpose_part":"전완·악력","purpose_note":"악력"},
@@ -55,6 +55,11 @@
     {"name":"근육 활성화·깨우기 드릴","reason":"쓸모없다는 예시","decision":"M-26"},
     {"name":"케이블 스쿼트","reason":"쓸모없다는 예시","decision":"M-26"},
     {"name":"원판 컬(웨이터 컬)","reason":"F 등급 운동 (M-24)","decision":"M-26"},
-    {"name":"덤벨 윗가슴 레이즈","reason":"F 등급 운동 (M-24)","decision":"M-26"}
+    {"name":"덤벨 윗가슴 레이즈","reason":"F 등급 운동 (M-24)","decision":"M-26"},
+    {"name":"벤트오버 바벨 레이즈(후면)","reason":"앱에 없는 운동","decision":"M-31"},
+    {"name":"비하인드 넥 프레스","reason":"앱에 없는 운동","decision":"M-31"},
+    {"name":"원판 운전기사 레이즈(트위스트)","reason":"영상이 \"정말 별로\"라고 평가한 운동","decision":"M-31"},
+    {"name":"원판 풀 가동범위 레이즈(루 레이즈)","reason":"영상이 덤벨 버전보다 열등하다고 평가","decision":"M-31"},
+    {"name":"인클라인 벤치 엎드려 어깨 회전 운동","reason":"회전근개 운동, 앱에 없음","decision":"M-31"}
   ]
 }

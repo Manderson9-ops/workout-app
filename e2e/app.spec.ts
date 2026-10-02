@@ -1651,12 +1651,12 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   const biDb = page.getByRole('link', { name: `${first} 정보 (내 운동 DB: 영상 등급·자세 포인트)` });
   await expect(biDb).toBeVisible();
   await expect(biDb).toHaveClass(/info-db/);
-  // 내 운동 DB가 없는 운동(프론트 레이즈는 영상 등급·자세 포인트 없음) → 흐린 기본 "정보": 운동 추가로 넣어 확인
+  // 내 운동 DB가 없는 운동(벤트오버 리어 델트 플라이는 영상 등급·자세 포인트 없음. 프론트 레이즈는 M-30 어깨 영상 반영 때 자세 포인트가 생겨 바꿈) → 흐린 기본 "정보": 운동 추가로 넣어 확인
   await page.getByRole('button', { name: /운동 추가/ }).first().click();
-  await page.getByRole('dialog').getByLabel('운동 검색').fill('프론트 레이즈');
-  await page.getByRole('dialog').getByRole('button', { name: /덤벨 프론트 레이즈/ }).first().click();
-  await page.getByRole('button', { name: /^덤벨 프론트 레이즈 (세트 간|라운드 후) 휴식/ }).first().click();
-  const plain = page.getByRole('link', { name: '덤벨 프론트 레이즈 정보 (DB 없음)' });
+  await page.getByRole('dialog').getByLabel('운동 검색').fill('벤트오버');
+  await page.getByRole('dialog').getByRole('button', { name: /벤트오버 리어 델트 플라이/ }).first().click();
+  await page.getByRole('button', { name: /^벤트오버 리어 델트 플라이 (세트 간|라운드 후) 휴식/ }).first().click();
+  const plain = page.getByRole('link', { name: '벤트오버 리어 델트 플라이 정보 (DB 없음)' });
   await expect(plain).toBeVisible();
   await expect(plain).not.toHaveClass(/info-db/);
   await plain.locator('xpath=..').screenshot({ path: `reports/screens/${test.info().project.name}-23-info-plain.png` });

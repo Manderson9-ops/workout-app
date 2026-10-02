@@ -16,6 +16,10 @@ import type { Grade } from '../src/core/version';
 /** 커버리지 계측 중이면 시간 관문 판정은 건너뜀 (npm run test:plans 에서 판정) */
 const timed = (ms: number) => (process.env.COVERAGE_RUN ? 0 : ms);
 const real = buildExercises(baseFile.exercises as Exercise[], wkFile as unknown as WorkoutKData, stapleFile.order as Partial<Record<Part, string[]>>);
+/** 어깨 영상 등급(M-30, 4개)을 뺀 데이터: 영상 등급 없는 부위의 동작(M-09·M-14, 등급 미달 대체)을 계속 검증 */
+const SHOULDER_GRADED = ['machine_shoulder_press', 'cable_rear_delt_fly', 'barbell_ohp', 'db_shoulder_press'];
+const wkNoShoulder = { ...(wkFile as unknown as WorkoutKData), grades: Object.fromEntries(Object.entries((wkFile as unknown as WorkoutKData).grades).filter(([id]) => !SHOULDER_GRADED.includes(id))) } as WorkoutKData;
+const realNoShoulder = buildExercises(baseFile.exercises as Exercise[], wkNoShoulder, stapleFile.order as Partial<Record<Part, string[]>>);
 /** 5.7.1 예시 가정: 다관절 8회, 단관절 12회 */
 const ex571 = real.map((e) => ({ ...e, default_reps: (e.mechanics === 'compound' ? [8, 8] : [12, 12]) as [number, number] }));
 const names = (p: ReturnType<typeof generatePlan>) => p.blocks.map((b) => b.items.map((i) => i.exerciseId).join('+'));
@@ -101,8 +105,12 @@ describe('BLUEPRINT 5.7.1 계산 예시 (고정 사례)', () => {
 
 describe('앱 기본 추천 순서 (M-14)', () => {
   it('영상 등급 없는 부위는 대표 운동부터 (어깨), 영상 등급이 있으면 영상 먼저·빈 자리는 대표 운동 (가슴: 스미스 벤치 S, 펙덱 A+, 인클라인은 추천 순서)', () => {
-    const sh = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, real);
+    const sh = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, realNoShoulder);
     expect(sh.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(expect.arrayContaining(['db_shoulder_press', 'db_lateral_raise', 'reverse_pec_deck']));
+    // M-30: 어깨 영상 등급 S 2개(숄더 프레스 머신, 케이블 리어 델트 플라이)가 먼저, 빈 자리는 대표 운동(측면)
+    const sh2 = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, real);
+    expect(sh2.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(['machine_shoulder_press', 'cable_rear_delt_fly', 'db_lateral_raise']);
+    expect(sh2.blocks.flatMap((b) => b.items.map((i) => i.gradeSource))).toEqual(['VIDEO', 'VIDEO', 'APP_DEFAULT']);
     const chest = generatePlan({ parts: [{ part: '가슴', priority: 'high' }], level: '중급' }, real);
     expect(chest.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(expect.arrayContaining(['smith_bench_press', 'pec_deck', 'incline_db_press']));
   });
@@ -146,11 +154,17 @@ describe('앱 기본 추천 순서 (M-14)', () => {
 describe('특수 상황', () => {
   const base: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }], level: '중급' };
   const shoulder: PlanRequest = { parts: [{ part: '어깨', priority: 'high' }], level: '중급' };
-  it('등급 미달 대체: 어깨는 영상 등급이 없어 S 이상이 없음 → 최고 등급 1개로 대체', () => {
+  it('M-30: 어깨 최소 등급 S 이면 영상 S 2개만 들어가고 대체 없음', () => {
     const p = generatePlan({ ...shoulder, minGrade: 'S' }, real);
+    expect(p.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))).toEqual(['machine_shoulder_press', 'cable_rear_delt_fly']);
+    expect(p.blocks.flatMap((b) => b.items).some((i) => i.substituted)).toBe(false);
+    expect(validatePlan(p, { ...shoulder, minGrade: 'S' }, real)).toEqual([]);
+  });
+  it('등급 미달 대체: 영상 등급이 없는 부위(어깨, M-30 이전 데이터)는 S 이상이 없음 → 최고 등급 1개로 대체', () => {
+    const p = generatePlan({ ...shoulder, minGrade: 'S' }, realNoShoulder);
     expect(p.blocks.flatMap((b) => b.items).every((i) => i.substituted)).toBe(true);
     expect(p.reasons.some((r) => r.includes('등급 미달 대체'))).toBe(true);
-    expect(validatePlan(p, { ...shoulder, minGrade: 'S' }, real)).toEqual([]);
+    expect(validatePlan(p, { ...shoulder, minGrade: 'S' }, realNoShoulder)).toEqual([]);
   });
   it('장비가 없으면 부위가 빠지고 이유 표시', () => {
     const r: PlanRequest = { ...base, parts: [{ part: '가슴', priority: 'high' }, { part: '등', priority: 'normal' }], equipment: ['band'] };
@@ -418,8 +432,10 @@ describe('검토 지적 회귀 테스트', () => {
     expect(r60.reasons.some((x) => x.includes('남는 시간에') && x.includes('T바로우'))).toBe(true);
     const r45 = generatePlan(req571(45), ex571);
     expect(r45.reasons.some((x) => /약 \d+분 절약/.test(x))).toBe(true);
-    const sh = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, real);
+    const sh = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, realNoShoulder);
     expect(sh.reasons.some((x) => x.includes('추정 등급 운동 3개') && x.includes('M-14'))).toBe(true);
+    const sh2 = generatePlan({ parts: [{ part: '어깨', priority: 'high' }], level: '중급' }, real);
+    expect(sh2.reasons.some((x) => x.includes('추정 등급 운동 1개 포함') && x.includes('M-14'))).toBe(true);
     const legs = generatePlan({ parts: [{ part: '하체', priority: 'high' }], level: '중급' }, real);
     expect(legs.reasons.some((x) => x.includes('M-12'))).toBe(true);
     // 여유가 없으면 상한 문구 없음
