@@ -50,6 +50,8 @@ export interface TimedBlock {
   rest?: number;
   /** group: 라운드 후 휴식 */
   roundRest?: number;
+  /** group: 묶음 안 운동 전환 (없으면 p.transitionSec) */
+  transition?: number;
 }
 
 function itemSetTime(it: TimedItem, setIndex: number, p: TimeParams): number {
@@ -72,7 +74,7 @@ export function blockTime(b: TimedBlock, p: TimeParams = DEFAULT_TIME): number {
   let t = 0;
   for (let r = 0; r < rounds; r++) {
     const active = b.items.filter((i) => i.sets > r);
-    t += active.reduce((s, i) => s + itemSetTime(i, r, p), 0) + (active.length - 1) * p.transitionSec;
+    t += active.reduce((s, i) => s + itemSetTime(i, r, p), 0) + (active.length - 1) * (b.transition ?? p.transitionSec);
   }
   return t + (rounds - 1) * (b.roundRest ?? 0);
 }

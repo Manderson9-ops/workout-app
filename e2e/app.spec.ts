@@ -487,6 +487,90 @@ test('플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 �
   await endWorkout(page);
 });
 
+test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶음 휴식·전환·세트, 묶음에 운동 추가, 저장하고 시작', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await pickPart(page, '이두');
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const est = async () => { const t = (await planSec.getByText(/예상 \d+:\d{2}/).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
+  // 묶음 밖의 단일 카드를 하나 두려고 코어 운동을 뒤에 추가
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  const dlg0 = page.getByRole('dialog', { name: '운동 추가' });
+  await dlg0.getByLabel('운동 검색').fill('사이드 플랭크');
+  await dlg0.getByRole('button', { name: '사이드 플랭크', exact: true }).click();
+  const cards = planSec.locator('.card');
+  await cards.nth(0).getByRole('button', { name: /^다음과 묶기 · 컴파운드 세트: / }).click();
+  await expect(cards.nth(0).locator('.badge.kind')).toHaveText('컴파운드 세트');
+  const grp = cards.nth(0);
+  const nCards = await cards.count();
+  expect(nCards).toBeGreaterThanOrEqual(2);
+  const setVals = async (loc: Locator = planSec) => (await loc.locator('.plan-steps').getByText(/^\d+세트$/).allTextContents()).map((x) => parseInt(x, 10));
+  const repVals = async (loc: Locator = planSec) => (await loc.locator('.plan-steps').getByText(/^\d+회$/).allTextContents()).map((x) => parseInt(x, 10));
+  const live = planSec.locator('p.sr-only[aria-live="polite"]');
+  // 모든 운동 세트 +1 / 횟수 -1
+  const s0 = await setVals(), r0 = await repVals();
+  await planSec.getByRole('button', { name: '모든 운동 세트 늘리기' }).click();
+  expect(await setVals()).toEqual(s0.map((x) => x + 1));
+  await expect(live).toContainText(/운동 \d+개 세트 \+1/);
+  // 일괄 버튼 가운데에는 지금 값(범위)이 보임
+  await expect(planSec.getByRole('group', { name: '모든 운동 세트', exact: true }).locator('.val')).toHaveText(/^\d+(~\d+)?세트$/);
+  await expect(planSec.getByRole('group', { name: '모든 운동 횟수', exact: true }).locator('.val')).toHaveText(/^\d+(~\d+)?(회|초)( · \d+(~\d+)?초)?$/);
+  await planSec.getByRole('button', { name: '모든 운동 횟수 줄이기' }).click();
+  expect(await repVals()).toEqual(r0.map((x) => x - 1));
+  // D-052: 이 묶음 세트·횟수는 묶음 설정을 열지 않아도 보임 (접힌 <details> 밖)
+  await expect(grp.getByText('이 묶음 세트', { exact: true })).toBeVisible();
+  await expect(grp.getByText('이 묶음 횟수', { exact: true })).toBeVisible();
+  await expect(grp.getByRole('button', { name: /세트 모두 늘리기$/ })).toBeVisible();
+  expect(await grp.locator('details.group-settings').getByText('이 묶음 세트').count()).toBe(0);
+  // 묶음 설정은 기본으로 접혀 있고, 요약에 지금 값이 보임. 열고 나서 라운드 후 휴식 -15
+  const det = grp.locator('details.group-settings');
+  await expect(det).not.toHaveAttribute('open', '');
+  await expect(det.locator('summary')).toContainText(/묶음 설정 · 라운드 후 \d+초 · 전환 \d+초/);
+  expect((await det.locator('summary').boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await det.locator('summary').click();
+  await expect(det).toHaveAttribute('open', '');
+  const pill = grp.locator('.pill', { hasText: '라운드 후 휴식' });
+  const rr0 = Number((await pill.textContent())!.match(/라운드 후 휴식 (\d+)초/)![1]);
+  const e1 = await est();
+  await grp.getByRole('button', { name: /라운드 후 휴식 줄이기$/ }).click();
+  await expect(pill).toContainText(`라운드 후 휴식 ${rr0 - 15}초`);
+  await expect(grp.getByText(`${rr0 - 15}초`, { exact: true })).toBeVisible();
+  expect(await est(), '라운드 휴식을 줄이면 예상 시간이 줄어듦').toBeLessThan(e1);
+  await expect(det.locator('summary')).toContainText(`라운드 후 ${rr0 - 15}초`);
+  // 전환 +5 (기본 10 → 15)
+  const e2 = await est();
+  await grp.getByRole('button', { name: /운동 사이 전환 늘리기$/ }).click();
+  await expect(grp.getByText('15초', { exact: true })).toBeVisible();
+  expect(await est(), '전환을 늘리면 예상 시간이 늘어남').toBeGreaterThan(e2);
+  // 이 묶음 세트 +1: 묶음만 바뀜
+  const gs = await setVals(grp), os = await setVals(cards.nth(nCards - 1));
+  await grp.getByRole('button', { name: /세트 모두 늘리기$/ }).click();
+  expect(await setVals(grp)).toEqual(gs.map((x) => x + 1));
+  expect(await setVals(cards.nth(nCards - 1))).toEqual(os);
+  // 일괄 버튼은 더 줄일 수 없으면 꺼짐 (모든 운동 세트를 1까지 줄이면)
+  const allDec = planSec.getByRole('button', { name: '모든 운동 세트 줄이기' });
+  for (let k = 0; k < 120 && await allDec.isEnabled(); k++) await allDec.click();
+  await expect(allDec).toBeDisabled();
+  await expect(planSec.getByRole('button', { name: '모든 운동 세트 늘리기' })).toBeEnabled();
+  // 묶음에 운동 추가
+  await grp.getByRole('button', { name: /^\+ 묶음에 운동 추가/ }).click();
+  const dlg = page.getByRole('dialog', { name: '묶음에 운동 추가' });
+  await dlg.getByLabel('운동 검색').fill('플랭크');
+  await dlg.getByRole('button', { name: '플랭크', exact: true }).click();
+  await expect(planSec.locator('.card').nth(0)).toContainText('플랭크');
+  await expect(planSec.locator('.card').nth(0).locator('.badge.kind')).toBeVisible();
+  // 초점은 새로 추가한 운동의 '세트 늘리기'로 (카드가 다시 만들어져도)
+  await expect(planSec.getByRole('button', { name: '플랭크 세트 늘리기', exact: true })).toBeFocused();
+  await checkScreen(page, '62-plan-bulk-group');
+  // 저장하고 시작 → 운동 화면에 추가한 운동
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '저장하고 시작' }).click();
+  await expect(page.getByText('플랭크').first()).toBeVisible();
+  // 바꾼 라운드 후 휴식이 운동 화면에 그대로
+  await expect(page.getByText(`라운드 후 휴식 ${rr0 - 15}초`).first()).toBeVisible();
+  await endWorkout(page);
+});
 test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 부위·마지막 날짜·횟수, 목록에서만 숨기기 ↔ 다시 보이기, 완전 삭제, 운동 탭에서 바로 고르기', async ({ page }) => {
   for (const [p, m] of [['등', '30분'], ['가슴', '30분'], ['하체', '45분'], ['이두', '30분']] as [string, string][]) {
     await makeRoutine(page, [p], m);
@@ -551,13 +635,24 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   if ((await list.getByRole('button', { name: /숨긴 루틴/ }).getAttribute('aria-expanded')) !== 'true') await list.getByRole('button', { name: /숨긴 루틴/ }).click();
   await list.getByRole('button', { name: '빈 A 완전 삭제' }).click();
   await answer(page, '완전 삭제');
-  // 운동 탭: 진행 중 운동이 없으면 바로 루틴 고르기 (편집·지우기 없이 시작만)
+  // 운동 탭: 진행 중 운동이 없으면 바로 루틴 고르기 (시작·편집, 지우기 없음 D-053)
   await page.getByRole('link', { name: '운동' }).click();
   await expect(page.getByRole('heading', { name: '루틴 고르기' })).toBeVisible();
   const pick = page.getByRole('region', { name: '내 루틴' });
   expect(await pick.locator('.routine-card').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['루틴 가슴 30분', '루틴 하체 45분']); // 정렬은 내 루틴 화면에서 고른 것(이름 순)을 따름
-  await expect(pick.getByRole('button', { name: /지우기|편집/ })).toHaveCount(0);
+  await expect(pick.getByRole('button', { name: /지우기/ })).toHaveCount(0);
+  await expect(pick.getByRole('button', { name: '가슴 30분 편집' })).toBeVisible();
+  await expect(pick.getByRole('button', { name: '하체 45분 편집' })).toBeVisible();
   await checkScreen(page, '57-workout-pick');
+  // 편집 → 루틴 편집 화면 → "← 운동"으로 운동 탭(루틴 고르기)에 돌아감
+  await pick.getByRole('button', { name: '하체 45분 편집' }).click();
+  await expect(page).toHaveURL(/#\/routine\//);
+  await expect(page.getByLabel('루틴 이름')).toHaveValue('하체 45분');
+  await expect(page.getByRole('button', { name: '← 운동' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '← 홈' })).toHaveCount(0);
+  await page.getByRole('button', { name: '← 운동' }).click();
+  await expect(page).toHaveURL(/#\/workout/);
+  await expect(page.getByRole('heading', { name: '루틴 고르기' })).toBeVisible();
   await pick.getByRole('button', { name: '가슴 30분 시작' }).click();
   await expect(page.getByRole('heading', { name: '가슴 30분' })).toBeVisible();
   await endWorkout(page);
@@ -596,8 +691,8 @@ test('루틴 직접 만들기·편집: 운동 추가, 목표 횟수, 슈퍼세�
     await page.getByLabel('운동 검색').fill(q);
     await page.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
   }
-  await page.getByRole('button', { name: '목표 횟수 늘리기' }).first().click();
-  await expect(page.getByText('13회')).toBeVisible();
+  await page.getByRole('button', { name: '해머 컬 목표 횟수 늘리기', exact: true }).click();
+  await expect(page.getByText('13회', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /다음 운동과 슈퍼세트로 묶기/ }).click();
   await expect(page.getByText('슈퍼세트', { exact: true })).toBeVisible();
   await expect(page.getByText('묶음 안 전환')).toBeVisible();
@@ -605,6 +700,78 @@ test('루틴 직접 만들기·편집: 운동 추가, 목표 횟수, 슈퍼세�
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await expect(page.getByRole('heading', { name: '팔 루틴' })).toBeVisible();
   await expect(page.getByText(/약 \d+분/).first()).toBeVisible();
+});
+
+test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세트·횟수', async ({ page }) => {
+  await page.getByRole('button', { name: '+ 직접' }).click();
+  await page.getByLabel('루틴 이름').fill('부위 추가 루틴');
+  for (const q of ['해머 컬', '로프 푸시다운']) {
+    await page.getByRole('button', { name: '+ 운동 추가', exact: true }).click();
+    await page.getByLabel('운동 검색').fill(q);
+    await page.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
+  }
+  const parts = page.getByRole('group', { name: '부위별 운동 추가' });
+  // 들어 있는 부위는 켜지고 운동 수가 보임, 없는 부위는 그냥 이름
+  const biceps = parts.getByRole('button', { name: /^이두 운동 추가/ });
+  await expect(biceps).toHaveClass(/\bon\b/);
+  await expect(biceps).toHaveText('이두 · 1');
+  await expect(biceps).toHaveAttribute('aria-label', '이두 운동 추가 (지금 1개)');
+  await expect(biceps).not.toHaveAttribute('aria-pressed', /.*/);
+  const chest = parts.getByRole('button', { name: /^가슴 운동 추가/ });
+  await expect(chest).toHaveText('가슴');
+  await expect(chest).not.toHaveClass(/\bon\b/);
+  // 가슴 누르기 → 가슴으로 열림 → 첫 운동 고르기
+  await chest.click();
+  const dlg = page.getByRole('dialog', { name: '운동 추가', exact: true });
+  await expect(dlg).toBeVisible();
+  await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '가슴', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  const first = dlg.locator('.list-item').first();
+  await expect(first).toContainText('가슴');
+  const nm = (await first.getAttribute('aria-label'))!;
+  await first.click();
+  await expect(page.getByRole('button', { name: `${nm} 세트 늘리기`, exact: true })).toBeFocused();
+  await expect(page.locator('p.sr-only[aria-live="polite"]')).toContainText(`${nm}: 추가했어요`);
+  await expect(parts.getByRole('button', { name: /^가슴 운동 추가/ })).toHaveText('가슴 · 1');
+  // 기억된 부위(마지막으로 고른 부위)는 부위 버튼으로는 바뀌지 않음
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.endsWith('picker.part')).length)).toBe(0);
+  // 앞의 두 운동 묶기
+  await page.getByRole('button', { name: /다음 운동과 슈퍼세트로 묶기/ }).first().click();
+  const cards = page.locator('main .card');
+  await expect(cards).toHaveCount(2);
+  const sets = async (c: Locator) => (await c.locator('span:not(.val)').filter({ hasText: /^\d+세트$/ }).allTextContents()).map((x) => parseInt(x, 10));
+  const g0 = await sets(cards.nth(0)), o0 = await sets(cards.nth(1));
+  // 묶음 카드에는 이 묶음 세트·횟수가 항상 보이고, 단일 카드에는 없음
+  await expect(cards.nth(0).getByText('이 묶음 세트', { exact: true })).toBeVisible();
+  await expect(cards.nth(1).getByText('이 묶음 세트', { exact: true })).toHaveCount(0);
+  await cards.nth(0).getByRole('button', { name: /세트 모두 늘리기$/ }).click();
+  expect(await sets(cards.nth(0))).toEqual(g0.map((x) => x + 1));
+  expect(await sets(cards.nth(1))).toEqual(o0);
+  await expect(page.locator('p.sr-only[aria-live="polite"]')).toContainText('묶음 운동 2개 세트 +1');
+  // 이 묶음 횟수 -1
+  const reps = async (c: Locator) => (await c.locator('span:not(.val)').filter({ hasText: /^\d+회$/ }).allTextContents()).map((x) => parseInt(x, 10));
+  const gr0 = await reps(cards.nth(0)), or0 = await reps(cards.nth(1));
+  await cards.nth(0).getByRole('button', { name: /횟수 모두 줄이기$/ }).click();
+  expect(await reps(cards.nth(0))).toEqual(gr0.map((x) => x - 1));
+  expect(await reps(cards.nth(1))).toEqual(or0);
+  // 모든 운동 세트 +1: 전부 바뀜
+  const g1 = await sets(cards.nth(0)), o1 = await sets(cards.nth(1));
+  await page.getByRole('button', { name: '모든 운동 세트 늘리기' }).click();
+  expect(await sets(cards.nth(0))).toEqual(g1.map((x) => x + 1));
+  expect(await sets(cards.nth(1))).toEqual(o1.map((x) => x + 1));
+  await expect(page.locator('p.sr-only[aria-live="polite"]')).toContainText('운동 3개 세트 +1');
+  await expect(page.getByRole('group', { name: '모든 운동 세트', exact: true }).locator('.val')).toHaveText(/^\d+(~\d+)?세트$/);
+  const finalG = await sets(cards.nth(0)), finalO = await sets(cards.nth(1));
+  const finalGr = await reps(cards.nth(0));
+  await checkScreen(page, '63-routine-part-add');
+  // 저장 → 다시 편집: 값 유지
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.locator('main .card').filter({ has: page.getByRole('heading', { name: '부위 추가 루틴' }) }).getByRole('button', { name: '편집' }).click();
+  await expect(page.getByRole('button', { name: '← 홈' })).toBeVisible(); // 홈·내 루틴에서 연 편집은 홈으로
+  const cards2 = page.locator('main .card');
+  await expect(cards2).toHaveCount(2);
+  expect(await sets(cards2.nth(0))).toEqual(finalG);
+  expect(await sets(cards2.nth(1))).toEqual(finalO);
+  expect(await reps(cards2.nth(0))).toEqual(finalGr);
 });
 
 test('시간이 너무 짧으면 이유를 보여줌, 부위 없이 만들 수 없음', async ({ page }) => {
@@ -629,7 +796,7 @@ test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 �
     await page.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
   }
   await expect(page.getByText('75초').first()).toBeVisible(); // 새로 추가한 단관절 블록 = 설정값
-  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '세트 줄이기' }).first().click(); // 해머 컬 1세트
+  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '해머 컬 세트 줄이기', exact: true }).click(); // 해머 컬 1세트
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await expect(page).toHaveURL(/#\/workout/);
   // 입력 직후(포커스 유지) + 버튼: 입력값 12.5에 2.5를 더해 15
@@ -654,7 +821,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await page.getByRole('button', { name: '+ 운동 추가' }).click();
   await page.getByLabel('운동 검색').fill('바벨 컬');
   await page.getByRole('dialog').getByRole('button').filter({ hasText: '바벨 컬' }).first().click();
-  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '세트 줄이기' }).first().click();
+  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '바벨 컬 세트 줄이기', exact: true }).click();
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await page.getByLabel('바벨 컬 1세트 무게', { exact: true }).fill('30');
   // 운동 중 원판 계산 시트 (바벨·스미스 운동에만 버튼)

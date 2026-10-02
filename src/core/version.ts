@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.8.8-preview';
+export const APP_VERSION = '0.8.11-preview';
 
 /** 등급 순서 (높을수록 앞). BLUEPRINT 3.2 */
 export const GRADES = ['S', 'A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F'] as const;

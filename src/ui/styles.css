@@ -133,6 +133,7 @@ html.editing main { padding-bottom: 40px; }
 @media (min-width: 1100px) {
   html:not(.phone-view) .wide-cards-lg { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   html:not(.phone-view) .wide-cards-lg > .card { margin: 0; }
+  html:not(.phone-view) .group-bulk .lbl-step > .sub { min-width: 0; }
   html:not(.phone-view) .wide-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 }
 /* 폰 화면으로 보기: PC에서도 폰 폭으로 가운데 */
@@ -200,3 +201,20 @@ button.back { margin-bottom: 4px; }
   html:not(.phone-view) .toast { left: 200px; right: 24px; bottom: 16px; }
   html:not(.phone-view) .toast.above-banner { bottom: 76px; }
 }
+
+/* D-051: 일괄 변경 줄·묶음 설정 */
+.bulk-row { gap: 8px; margin: 8px 0; align-items: center; }
+.group-settings { margin-top: 10px; padding-top: 4px; border-top: 1px dashed var(--line, #333); }
+.group-settings > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 4px; padding: 0 12px; cursor: pointer; list-style: none; color: var(--text); font-size: 14px; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; }
+.group-settings > summary::-webkit-details-marker { display: none; }
+.group-settings > summary::before { content: '▸'; content: '▸' / ''; color: var(--acc); font-weight: 700; }
+.group-settings[open] > summary::before { content: '▾'; content: '▾' / ''; }
+.group-settings .lbl-step > .sub, .group-bulk .lbl-step > .sub { min-width: 88px; }
+/* D-052: 묶음 세트·횟수는 항상 보이고, 루틴 편집의 부위 추가 줄 */
+.group-bulk { gap: 8px; margin: 6px 0 2px; align-items: center; }
+.part-add { gap: 6px; margin: 4px 0 12px; }
+.mini-step .val { padding: 0 6px; }
+.group-settings > summary:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 8px; }
+.group-settings .row { gap: 8px; margin-top: 6px; align-items: center; }
+/* 라벨과 스테퍼는 한 덩어리로 줄바꿈 (390px에서 라벨만 떨어지지 않게) */
+.lbl-step { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 6px; white-space: nowrap; }

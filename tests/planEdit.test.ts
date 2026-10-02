@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stepSets, stepReps, moveBlock, addBlock, hasDbInfo, regenerateWithLocks } from '../src/core/planEdit';
+import { bulkSets, bulkReps, addToGroup, stepRoundRest, stepTransition, stepSets, stepReps, moveBlock, addBlock, hasDbInfo, regenerateWithLocks, rangeText, changedCount } from '../src/core/planEdit';
 import type { Plan, PlanBlock, PlanItem, PlanRequest } from '../src/core/planner';
 import { setTime, blockTime, warmupFor } from '../src/core/time';
 import { routineEstimate } from '../src/core/session';
@@ -127,5 +127,115 @@ describe('플랜에서 다음 운동과 묶기 (D-046)', () => {
     expect(m.blocks.map((b) => b.kind)).toEqual(['single', 'single', 'single', 'single', 'single']);
     expect(m.blocks.map((b) => b.items[0]!.exerciseId)).toEqual(['a', 'b', 'c', 'd', 'e']);
     expect(splitPlanBlock(plan, 0)).toBe(plan);
+  });
+});
+
+describe('D-051 일괄·묶음 고치기', () => {
+  const grp = (...ids: string[]): PlanBlock => ({ kind: 'superset', items: ids.map((i) => item(i)), roundRestSec: 120, transitionSec: 10, timeSec: 0 });
+  const withGroup = (): Plan => { const p = plan('a', 'b', 'c'); return { ...p, blocks: [grp('a', 'b'), p.blocks[2]!] }; };
+  const sets = (p: Plan) => p.blocks.flatMap((b) => b.items.map((i) => i.sets));
+
+  it('bulkSets/bulkReps: 전체와 블록 하나', () => {
+    const p = withGroup();
+    expect(sets(bulkSets(p, 1))).toEqual([4, 4, 4]);
+    expect(sets(bulkSets(p, 1, 0))).toEqual([4, 4, 3]);
+    expect(sets(bulkSets(p, -1, 1))).toEqual([3, 3, 2]);
+    expect(bulkReps(p, -1).blocks.flatMap((b) => b.items.map((i) => i.reps))).toEqual([9, 9, 9]);
+    expect(bulkReps(p, 1, 1).blocks.flatMap((b) => b.items.map((i) => i.reps))).toEqual([10, 10, 11]);
+  });
+  it('bulk: 범위 끝에서 막히고, 바뀐 게 없으면 같은 객체', () => {
+    const lo = { ...plan('a'), blocks: [{ kind: 'single', items: [item('a', { sets: 1, reps: 1 })], timeSec: 0 } as PlanBlock] };
+    expect(bulkSets(lo, -1)).toBe(lo);
+    expect(bulkReps(lo, -1)).toBe(lo);
+    const hi = { ...lo, blocks: [{ kind: 'single', items: [item('a', { sets: 99, reps: 50 })], timeSec: 0 } as PlanBlock] };
+    expect(bulkSets(hi, 1)).toBe(hi);
+    expect(bulkReps(hi, 1)).toBe(hi);
+    expect(bulkSets(plan('a'), 1, 5).blocks[0]!.items[0]!.sets).toBe(3); // 없는 블록
+    expect(bulkSets(plan('a'), 1, 5)).toBeTruthy();
+  });
+  it('bulk: 일부만 끝이면 나머지는 바뀜 (클램프)', () => {
+    const p = { ...plan('a', 'b'), blocks: [{ kind: 'single', items: [item('a', { sets: 99 })], timeSec: 0 } as PlanBlock, { kind: 'single', items: [item('b')], timeSec: 0 } as PlanBlock] };
+    expect(sets(bulkSets(p, 1))).toEqual([99, 4]);
+  });
+  it('bulkReps: 시간 운동은 5초씩', () => {
+    const p = { ...plan('a'), blocks: [{ kind: 'single', items: [item('plank', { reps: 0, seconds: 30 })], timeSec: 0 } as PlanBlock, { kind: 'single', items: [item('b')], timeSec: 0 } as PlanBlock] };
+    const n = bulkReps(p, 1);
+    expect(n.blocks[0]!.items[0]).toMatchObject({ seconds: 35, reps: 0 });
+    expect(n.blocks[1]!.items[0]!.reps).toBe(11);
+    expect(bulkReps({ ...p, blocks: [{ kind: 'single', items: [item('p', { reps: 0, seconds: 5 })], timeSec: 0 } as PlanBlock] }, -1).blocks[0]!.items[0]!.seconds).toBe(5);
+  });
+  it('addToGroup: 단일 거부, 최대 4, 중복 거부', () => {
+    const p = withGroup();
+    expect(addToGroup(p, 1, item('z'))).toBe(p);
+    expect(addToGroup(p, 0, item('c'))).toBe(p);
+    expect(addToGroup(p, 9, item('z'))).toBe(p);
+    const q = addToGroup(p, 0, item('z'));
+    expect(q.blocks[0]!.items.map((i) => i.exerciseId)).toEqual(['a', 'b', 'z']);
+    const r = addToGroup(q, 0, item('y'));
+    expect(r.blocks[0]!.items).toHaveLength(4);
+    expect(addToGroup(r, 0, item('x'))).toBe(r);
+    // 같은 부위 묶음(컴파운드)에 다른 부위가 들어오면 슈퍼세트, 같은 부위만이면 컴파운드
+    const same = { ...p, blocks: [{ ...p.blocks[0]!, kind: 'compound', items: [item('a', { part: '이두' }), item('b', { part: '이두' })] } as PlanBlock, p.blocks[1]!] };
+    expect(addToGroup(same, 0, item('z', { part: '이두' })).blocks[0]!.kind).toBe('compound');
+    expect(addToGroup(same, 0, item('z', { part: '코어' })).blocks[0]!.kind).toBe('superset');
+  });
+  it('stepRoundRest: 15초씩, 0~600, 단일은 그대로', () => {
+    const p = withGroup();
+    expect(stepRoundRest(p, 0, -1).blocks[0]!.roundRestSec).toBe(105);
+    expect(stepRoundRest(p, 0, 1).blocks[0]!.roundRestSec).toBe(135);
+    expect(stepRoundRest(p, 1, 1)).toBe(p);
+    const lo = { ...p, blocks: [{ ...p.blocks[0]!, roundRestSec: 0 }, p.blocks[1]!] };
+    expect(stepRoundRest(lo, 0, -1)).toBe(lo);
+    const hi = { ...p, blocks: [{ ...p.blocks[0]!, roundRestSec: 595 }, p.blocks[1]!] };
+    expect(stepRoundRest(hi, 0, 1).blocks[0]!.roundRestSec).toBe(600);
+    expect(stepRoundRest({ ...hi, blocks: [{ ...hi.blocks[0]!, roundRestSec: 600 }, hi.blocks[1]!] }, 0, 1).blocks[0]!.roundRestSec).toBe(600);
+    const none = { ...p, blocks: [{ ...p.blocks[0]!, roundRestSec: undefined }, p.blocks[1]!] };
+    expect(stepRoundRest(none, 0, -1).blocks[0]!.roundRestSec).toBe(105); // 값 없으면 플랜 휴식값
+  });
+  it('stepTransition: 5초씩, 0~120, 단일은 그대로', () => {
+    const p = withGroup();
+    expect(stepTransition(p, 0, 1).blocks[0]!.transitionSec).toBe(15);
+    expect(stepTransition(p, 0, -1).blocks[0]!.transitionSec).toBe(5);
+    expect(stepTransition(p, 1, 1)).toBe(p);
+    const lo = { ...p, blocks: [{ ...p.blocks[0]!, transitionSec: 0 }, p.blocks[1]!] };
+    expect(stepTransition(lo, 0, -1)).toBe(lo);
+    const hi = { ...p, blocks: [{ ...p.blocks[0]!, transitionSec: 120 }, p.blocks[1]!] };
+    expect(stepTransition(hi, 0, 1)).toBe(hi);
+    const none = { ...p, blocks: [{ ...p.blocks[0]!, transitionSec: undefined }, p.blocks[1]!] };
+    expect(stepTransition(none, 0, 1).blocks[0]!.transitionSec).toBe(15);
+  });
+  it('blockTime: 블록 전환 시간을 따르고, 없으면 전체 값', () => {
+    const e = { id: 'x', measure: 'reps', mechanics: 'isolation' } as unknown as Exercise;
+    const items = [{ exercise: e, sets: 2, reps: 10 }, { exercise: e, sets: 2, reps: 10 }];
+    const base = blockTime({ kind: 'group', items, roundRest: 60 });
+    expect(blockTime({ kind: 'group', items, roundRest: 60, transition: undefined })).toBe(base);
+    // 라운드 2번 × 전환 1번씩: 전환 10초 늘리면 20초 늘어남
+    expect(blockTime({ kind: 'group', items, roundRest: 60, transition: 20 })).toBe(base + 20);
+    expect(blockTime({ kind: 'group', items, roundRest: 60, transition: 0 })).toBe(base - 20);
+  });
+});
+describe('D-051 후속: rangeText·addToGroup 세트·twoStations', () => {
+  const it0 = (o: Partial<PlanItem>): PlanItem => ({ exerciseId: 'x', name: 'x', part: '이두', sets: 3, reps: 10, grade: 'B', gradeSource: 'estimated', estimated: true, substituted: false, locked: false, why: '', rank: 1, ...o } as PlanItem);
+  it('rangeText: 세트·횟수·시간·섞임', () => {
+    expect(rangeText([it0({ sets: 3 }), it0({ sets: 3 })], 'sets')).toBe('3세트');
+    expect(rangeText([it0({ sets: 3 }), it0({ sets: 4 })], 'sets')).toBe('3~4세트');
+    expect(rangeText([it0({ reps: 10 }), it0({ reps: 10 })], 'reps')).toBe('10회');
+    expect(rangeText([it0({ reps: 12 }), it0({ reps: 8 })], 'reps')).toBe('8~12회');
+    expect(rangeText([it0({ reps: 0, seconds: 30 })], 'reps')).toBe('30초');
+    expect(rangeText([it0({ reps: 0, seconds: 30 }), it0({ reps: 0, seconds: 45 })], 'reps')).toBe('30~45초');
+    expect(rangeText([it0({ reps: 8 }), it0({ reps: 12 }), it0({ reps: 0, seconds: 30 })], 'reps')).toBe('8~12회 · 30초');
+    expect(rangeText([], 'sets')).toBe('');
+  });
+  it('changedCount: 바뀐 운동 수', () => {
+    const b = (s: number[]): Plan => ({ blocks: [{ kind: 'superset', items: s.map((n) => it0({ sets: n })), timeSec: 0 }] } as unknown as Plan);
+    expect(changedCount(b([3, 3, 99]), b([4, 4, 99]))).toBe(2);
+    expect(changedCount(b([3]), b([3]))).toBe(0);
+  });
+  it('addToGroup: 새 운동 세트는 묶음 최대 세트, twoStations 삭제', () => {
+    const p = { ...plan('a', 'b'), blocks: [{ kind: 'superset', twoStations: true, items: [it0({ exerciseId: 'a', sets: 3 }), it0({ exerciseId: 'b', sets: 5 })], roundRestSec: 120, transitionSec: 10, timeSec: 0 } as PlanBlock] };
+    const q = addToGroup(p, 0, it0({ exerciseId: 'z', sets: 3 }));
+    expect(q.blocks[0]!.items[2]!.sets).toBe(5);
+    expect('twoStations' in q.blocks[0]!).toBe(false);
+    expect(p.blocks[0]!.twoStations).toBe(true); // 원본은 그대로
   });
 });
