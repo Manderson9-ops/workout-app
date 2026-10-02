@@ -204,7 +204,12 @@ button.back { margin-bottom: 4px; }
 /* D-051: 일괄 변경 줄·묶음 설정 */
 .bulk-row { gap: 8px; margin: 8px 0; align-items: center; }
 .group-settings { margin-top: 10px; padding-top: 4px; border-top: 1px dashed var(--line, #333); }
-.group-settings > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--sub); font-size: 14px; }
+.group-settings > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 4px; padding: 0 12px; cursor: pointer; list-style: none; color: var(--text); font-size: 14px; background: var(--card2); border: 1px solid var(--line); border-radius: 12px; }
+.group-settings > summary::-webkit-details-marker { display: none; }
+.group-settings > summary::before { content: '▸'; color: var(--acc); font-weight: 700; speak: never; }
+.group-settings[open] > summary::before { content: '▾'; }
+.group-settings .lbl-step > .sub { min-width: 88px; }
+.mini-step .val { padding: 0 6px; }
 .group-settings > summary:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; border-radius: 8px; }
 .group-settings .row { gap: 8px; margin-top: 6px; align-items: center; }
 /* 라벨과 스테퍼는 한 덩어리로 줄바꿈 (390px에서 라벨만 떨어지지 않게) */
