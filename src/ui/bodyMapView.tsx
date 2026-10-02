@@ -52,10 +52,15 @@ export function partAt(x: number, y: number): Part | null {
   const hit = at(x, y);
   if (hit) return hit;
   // 근육 사이 틈(1~2px)을 눌렀으면 손가락 크기만큼 주변에서 가장 가까운 부위
-  for (const r of [3, 6, 10, 14]) for (let k = 0; k < 8; k++) {
-    const a = (k * Math.PI) / 4;
-    const p = at(x + r * Math.cos(a), y + r * Math.sin(a));
-    if (p) return p;
+  // 같은 거리에서는 8방향 중 가장 많이 걸린 부위 (한 방향으로 치우치지 않게), 동률이면 먼저 나온 것
+  for (const r of [3, 6, 10, 14]) {
+    const votes = new Map<Part, number>();
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4;
+      const p = at(x + r * Math.cos(a), y + r * Math.sin(a));
+      if (p) votes.set(p, (votes.get(p) ?? 0) + 1);
+    }
+    if (votes.size) return [...votes.entries()].sort((m, n) => n[1] - m[1])[0]![0];
   }
   return null;
 }

@@ -373,6 +373,11 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   if (test.info().project.name.includes('chromium')) await expect(page.getByRole('button', { name: '코어 높음' })).toBeFocused();
   await page.getByRole('button', { name: '코어 높음' }).click();
   await page.getByRole('dialog', { name: '코어 우선순위' }).getByRole('button', { name: '이 부위 빼기' }).click();
+  // 부위를 많이 골라 버튼 글자가 길어져도 그림 위치는 그대로 (연속으로 눌러도 빗나가지 않게)
+  const y0 = (await map.locator('svg').boundingBox())!.y;
+  for (const p of ['가슴', '등', '어깨', '이두', '삼두', '전완·악력', '하체', '코어']) await pickPart(page, p);
+  expect((await map.locator('svg').boundingBox())!.y).toBe(y0);
+  for (const p of ['가슴', '등', '어깨', '이두', '삼두', '전완·악력', '하체', '코어']) { await page.getByRole('button', { name: `${p} 높음` }).click(); await page.getByRole('dialog', { name: `${p} 우선순위` }).getByRole('button', { name: '이 부위 빼기' }).click(); }
   // 그림 저작권 고지(MIT)가 배포본에 남아 있음
   expect(await (await page.request.get('./THIRD_PARTY_LICENSES.txt')).text()).toContain('Copyright (c) 2022 ELABBASSI Hicham');
   await checkScreen(page, '46-plan-bodymap');

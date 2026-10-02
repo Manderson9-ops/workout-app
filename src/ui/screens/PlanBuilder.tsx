@@ -182,13 +182,14 @@ export function PlanBuilder({ s }: { s: AppState }) {
       {/* PC 넓은 화면: 왼쪽 조건, 오른쪽 결과 (D-030) */}
       <div class="wide-2"><div>
       <label>부위 (그림이나 버튼을 누르면 우선순위를 고르는 창이 열려요 · 기본 높음)</label>
+      {/* 그림 먼저, 버튼은 아래: 버튼 글자가 길어져도 그림 위치가 바뀌지 않게 (연속으로 누를 때 빗나가지 않게) */}
+      <BodyMap sel={f.parts} onPart={openPart} />
       <div class="row wrap" role="group" aria-label="부위">
         {PARTS.map((p) => {
           const pr = f.parts[p];
           return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => openPart(p)} aria-pressed={!!pr} aria-haspopup="dialog" aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
         })}
       </div>
-      <BodyMap sel={f.parts} onPart={openPart} />
       {partSheet && <PartSheet part={partSheet} pr={f.parts[partSheet]} onPick={(x) => setPriority(partSheet, x)}
         onRemove={() => { if (f.parts[partSheet]) togglePart(partSheet); setPartSheet(null); }} onClose={() => setPartSheet(null)} />}
       <label>분할 템플릿으로 채우기 (선택)</label>
