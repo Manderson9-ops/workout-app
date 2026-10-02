@@ -52,6 +52,7 @@ describe('내 루틴 목록 (D-048)', () => {
     expect(sinceText(new Date(2026, 8, 20).toISOString(), now)).toBe('13일 전');
     expect(sinceText(new Date(2026, 8, 19).toISOString(), now)).toBe('2주 전');
     expect(sinceText(new Date(2026, 6, 1).toISOString(), now)).toBe('7월 1일');
+    expect(sinceText(new Date(2025, 11, 30).toISOString(), now)).toBe('2025년 12월 30일');
   });
   it('백업: routineHidden은 문자열 목록만', () => {
     const backup = (settings: unknown[]) => JSON.stringify(makeBackup({ routines: [], workouts: [], meta: [], custom: [], settings: settings as never, bodyweight: [], diag: [], feedback: [] }, '0.8.8', '2026-10-03T00:00:00.000Z'));

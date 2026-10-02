@@ -7,7 +7,7 @@ import type { Workout } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { BackupBanner } from './BackupSection';
 import { SendStatus } from './AutoSendSection';
-import { RoutineList, newRoutine } from './RoutineList';
+import { RoutineList, newRoutine } from './MyRoutines';
 import { RemoteCards } from './RemoteCards';
 import { softDelete } from '../../db/db';
 import { minutes, mmss } from '../components';
@@ -69,7 +69,7 @@ export function Home({ s }: { s: AppState }) {
       {backupDue(s.settings.lastBackupAt, historyOf(s).length, Date.now()) && (
         <BackupBanner s={s} />
       )}
-      <div class="row between"><h2><a href="#/routines" class="h-link">내 루틴</a></h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
+      <div class="row between"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
       <RoutineList s={s} mode="home" />
       {recent.length > 0 && <h2>최근 운동</h2>}
       <div class="wide-cards">

@@ -517,7 +517,8 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   // 목록에서만 숨기기 → 숨긴 루틴에 있음 → 다시 보이기
   await list.getByRole('button', { name: '가슴 30분 지우기' }).click();
   await answer(page, '목록에서만 숨기기');
-  await expect(page.getByRole('status').filter({ hasText: '목록에서 숨겼어요' })).toHaveCount(1);
+  await expect(page.getByRole('status').filter({ hasText: '「가슴 30분」 루틴을 목록에서 숨겼어요' })).toHaveCount(1);
+  await expect(page.locator('.toast').getByRole('button', { name: '되돌리기' })).toBeVisible();
   await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(3);
   await list.getByRole('button', { name: /숨긴 루틴 1개/ }).click();
   await expect(list.locator('.routine-card.is-hidden')).toHaveAttribute('aria-label', '루틴 가슴 30분');
@@ -534,6 +535,22 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   await list.getByRole('button', { name: '이두 30분 완전 삭제' }).click();
   await answer(page, '완전 삭제');
   await expect(list.getByRole('button', { name: /숨긴 루틴/ })).toHaveCount(0);
+  // 검색어가 남은 채 개수가 줄어도 검색창·지우기 버튼은 남음 (루틴 5개 → 검색 → 숨겨 4개)
+  for (const n of ['A', 'B', 'C']) { await page.getByRole('button', { name: '+ 직접' }).click(); await page.getByLabel('루틴 이름').fill('빈 ' + n); await page.getByRole('button', { name: '저장', exact: true }).click(); }
+  await page.getByRole('button', { name: /^내 루틴 모두 보기/ }).click();
+  await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(5);
+  await expect(list.getByRole('group', { name: '루틴 빈 A' }).getByRole('button', { name: '빈 A 운동 넣기' })).toBeVisible(); // 운동 없는 루틴은 시작 대신 운동 넣기
+  await list.getByLabel('루틴 검색').fill('빈');
+  await expect(list.locator('.routine-card')).toHaveCount(3);
+  await list.getByRole('button', { name: '빈 A 지우기' }).click();
+  await answer(page, '목록에서만 숨기기');
+  await expect(list.getByLabel('루틴 검색')).toHaveValue('빈');
+  await list.getByRole('button', { name: '검색어 지우기' }).click();
+  await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(4);
+  for (const n of ['B', 'C']) { await list.getByRole('button', { name: `빈 ${n} 지우기` }).click(); await answer(page, '완전 삭제'); }
+  if ((await list.getByRole('button', { name: /숨긴 루틴/ }).getAttribute('aria-expanded')) !== 'true') await list.getByRole('button', { name: /숨긴 루틴/ }).click();
+  await list.getByRole('button', { name: '빈 A 완전 삭제' }).click();
+  await answer(page, '완전 삭제');
   // 운동 탭: 진행 중 운동이 없으면 바로 루틴 고르기 (편집·지우기 없이 시작만)
   await page.getByRole('link', { name: '운동' }).click();
   await expect(page.getByRole('heading', { name: '루틴 고르기' })).toBeVisible();
@@ -1253,11 +1270,12 @@ test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동�
   await del.click();
   await expect(sheet.getByRole('heading', { name: '이 루틴을 어떻게 할까요?' })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '목록에서만 숨기기', exact: true })).toBeFocused();
-  await sheet.getByRole('button', { name: '취소', exact: true }).click();
+  await page.keyboard.press('Enter'); // Enter 한 번 = 되돌릴 수 있는 숨기기 (완전 삭제 아님)
   await expect(sheet).toHaveCount(0);
+  await expect(card).toHaveCount(0);
+  await page.locator('.toast').getByRole('button', { name: '되돌리기' }).click();
   await expect(card).toBeVisible();
-  // 연 버튼으로 초점이 돌아옴 (WebKit은 버튼을 눌러도 초점을 주지 않아 Chromium에서만 봄)
-  if (test.info().project.name.includes('chromium')) await expect(del).toBeFocused();
+  await expect(page.locator('.toast')).toContainText('다시 보이게 했어요');
   await del.click(); await expect(sheet).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);

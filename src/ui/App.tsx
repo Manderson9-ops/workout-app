@@ -7,7 +7,7 @@ import { Exercises, ExerciseDetail } from './screens/Exercises';
 import { WorkoutScreen } from './screens/Workout';
 import { SettingsScreen } from './screens/Settings';
 import { RoutineEditor } from './screens/RoutineEditor';
-import { RoutinesScreen } from './screens/RoutineList';
+import { RoutinesScreen } from './screens/MyRoutines';
 import { Stats, WorkoutDetail } from './screens/Stats';
 import { SyncBadge } from './screens/SyncSection';
 import { FeedbackButton, FeedbackNavItem } from './screens/FeedbackUi';

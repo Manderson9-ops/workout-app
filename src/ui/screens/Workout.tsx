@@ -15,7 +15,7 @@ import { updateWorkoutAfterInputs, finishActiveWorkout, useFinishError, setFinis
 import { askConfirm } from '../confirm';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
-import { RoutineList } from './RoutineList';
+import { RoutineList } from './MyRoutines';
 import { softDelete } from '../../db/db';
 
 import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
