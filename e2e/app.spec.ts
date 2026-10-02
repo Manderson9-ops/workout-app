@@ -386,6 +386,42 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   await page.getByRole('button', { name: '소리 끔' }).click();
 });
 
+test('플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 세트, 다른 부위 슈퍼세트, 예상 시간 줄어듦, 풀기, 저장하고 시작하면 운동 화면도 묶음', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await page.getByRole('button', { name: '이두 선택 안 함' }).click();
+  await page.getByRole('button', { name: '60분' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const planSec = page.getByRole('region', { name: '생성된 플랜' });
+  const est = async () => { const t = (await planSec.getByText(/예상 \d+:\d{2}/).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
+  // 다른 부위(코어) 운동을 뒤에 추가
+  await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
+  const dlg = page.getByRole('dialog', { name: '운동 추가' });
+  await dlg.getByLabel('운동 검색').fill('플랭크');
+  await dlg.getByRole('button', { name: '플랭크', exact: true }).click();
+  const cards = planSec.locator('.card');
+  const n0 = await cards.count();
+  // 1·2번째(둘 다 이두) → 컴파운드 세트
+  const e0 = await est();
+  await cards.nth(0).getByRole('button', { name: /컴파운드 세트로 묶기$/ }).click();
+  await expect(cards).toHaveCount(n0 - 1);
+  await expect(cards.nth(0).locator('.badge.kind')).toHaveText('컴파운드 세트');
+  expect(await est(), '묶으면 예상 시간이 줄어듦').toBeLessThan(e0);
+  // 끝에서 두 번째(이두) + 마지막(플랭크, 코어) → 슈퍼세트
+  const last = await cards.count();
+  await cards.nth(last - 2).getByRole('button', { name: /다음 운동 플랭크: 슈퍼세트로 묶기$/ }).click();
+  await expect(cards.nth(last - 2).locator('.badge.kind')).toHaveText('슈퍼세트');
+  await expect(cards.nth(last - 2)).toContainText('플랭크');
+  await checkScreen(page, '49-plan-superset');
+  // 풀기 → 다시 단일
+  await cards.nth(0).getByRole('button', { name: /묶음 풀기$/ }).click();
+  await expect(cards.nth(0).locator('.badge.kind')).toHaveCount(0);
+  // 저장하고 시작 → 운동 화면에도 슈퍼세트
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '저장하고 시작' }).click();
+  await expect(page.getByText('슈퍼세트').first()).toBeVisible();
+  await endWorkout(page);
+});
+
 test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본 휴식', async ({ page }) => {
   await page.getByRole('link', { name: '종목' }).click();
   await page.getByRole('button', { name: '+ 직접 추가' }).click();

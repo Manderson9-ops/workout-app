@@ -77,3 +77,29 @@ export function hasDbInfo(e: Pick<BuiltExercise, 'grades' | 'guide'> | undefined
   if (!e) return false;
   return e.grades.some((g) => g.source === 'VIDEO') || e.guide.length > 0;
 }
+
+/**
+ * D-046: 플랜에서 다음 운동과 묶기 (루틴 편집과 같은 규칙). 두 블록 모두 한 부위이고 같은 부위면 컴파운드 세트, 아니면 슈퍼세트.
+ * 묶음은 최대 4개 운동. 라운드 후 휴식은 플랜 휴식값, 전환 10초. 시간은 부르는 쪽(recompute)이 다시 계산한다.
+ */
+export const GROUP_MAX = 4;
+export function groupKindWithNext(plan: Plan, bi: number): 'superset' | 'compound' | null {
+  const a = plan.blocks[bi], b = plan.blocks[bi + 1];
+  if (!a || !b || a.items.length + b.items.length > GROUP_MAX) return null;
+  const pa = new Set(a.items.map((i) => i.part)), pb = new Set(b.items.map((i) => i.part));
+  return pa.size === 1 && pb.size === 1 && [...pa][0] === [...pb][0] ? 'compound' : 'superset';
+}
+export function mergeWithNextBlock(plan: Plan, bi: number): Plan {
+  const kind = groupKindWithNext(plan, bi);
+  if (!kind) return plan;
+  const a = plan.blocks[bi]!, b = plan.blocks[bi + 1]!;
+  const merged: PlanBlock = { kind, items: [...a.items, ...b.items], roundRestSec: a.kind === 'single' ? plan.rest.round : (a.roundRestSec ?? plan.rest.round), transitionSec: a.transitionSec ?? 10, timeSec: 0 };
+  return { ...plan, blocks: [...plan.blocks.slice(0, bi), merged, ...plan.blocks.slice(bi + 2)] };
+}
+/** 묶음 풀기: 운동마다 단일 블록으로 (세트 간 휴식은 recompute가 다관절·단관절 기본값으로) */
+export function splitPlanBlock(plan: Plan, bi: number): Plan {
+  const b = plan.blocks[bi];
+  if (!b || b.items.length < 2) return plan;
+  const singles: PlanBlock[] = b.items.map((i) => ({ kind: 'single', items: [i], timeSec: 0 }));
+  return { ...plan, blocks: [...plan.blocks.slice(0, bi), ...singles, ...plan.blocks.slice(bi + 1)] };
+}

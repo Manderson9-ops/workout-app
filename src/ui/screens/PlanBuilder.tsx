@@ -19,7 +19,7 @@ import { useDragSort } from '../dragSort';
 import { BodyMap } from '../bodyMap';
 import { togglePart as togglePartForm, setPartPriority } from '../../core/planForm';
 import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
-import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
+import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, groupKindWithNext, mergeWithNextBlock, splitPlanBlock, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
 const KEY = 'planBuilder.v1';
@@ -62,6 +62,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const [adding, setAdding] = useState(false);
   const [moved, setMoved] = useState<{ key: string; d: -1 | 1; msg: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [groupMsg, setGroupMsg] = useState('');
   // 블록 끌어서 순서 바꾸기 (D-037). ↑↓ 버튼과 같은 결과
   const dnd = useDragSort(plan?.blocks.length ?? 0, (from, to) => {
     if (!plan) return;
@@ -234,7 +235,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
             <h2>{plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : plan.status === 'reduced' ? '플랜 (일부 부위만)' : '플랜'}</h2>
             {plan.blocks.length > 0 && <span class="sub">예상 {mmss(plan.estimatedSec)}{plan.targetSec ? ` / ${Math.round(plan.targetSec / 60)}분` : ''}</span>}
           </div>
-          <p class="sr-only" aria-live="polite">{moved?.msg ?? dnd.msg}</p>
+          <p class="sr-only" aria-live="polite">{moved?.msg ?? (groupMsg || dnd.msg)}</p>
           {plan.blocks.length > 0 && plan.targetSec !== undefined && plan.estimatedSec > plan.targetSec && <p class="pill warn-text" role="status">목표 시간보다 약 {Math.ceil((plan.estimatedSec - plan.targetSec) / 60)}분 길어요 (직접 바꾼 내용은 그대로 둠)</p>}
           {plan.blocks.length > 0 && plan.slack && plan.targetSec !== undefined && plan.estimatedSec < plan.targetSec - 300 && (
             <div class="slack-note" role="status" aria-label="목표 시간보다 짧은 이유">
@@ -282,6 +283,21 @@ export function PlanBuilder({ s }: { s: AppState }) {
                   </div>
                 </div>
               ))}
+              {(() => {
+                // D-046: 다음 운동과 슈퍼세트(같은 부위면 컴파운드 세트)로 묶기 / 묶음 풀기
+                const kind = groupKindWithNext(plan, bi);
+                const label = kind === 'compound' ? '컴파운드 세트' : '슈퍼세트';
+                const next = plan.blocks[bi + 1];
+                if (!kind && b.items.length < 2) return null;
+                return (
+                  <div class="row wrap group-actions" style={{ marginTop: '8px' }}>
+                    {kind && next && <button aria-label={`${blockName(b)} + 다음 운동 ${blockName(next)}: ${label}로 묶기`}
+                      onClick={() => { setMoved(null); setPlan(recompute(mergeWithNextBlock(plan, bi), all)); setGroupMsg(`${blockName(b)} + ${blockName(next)}: ${label}로 묶음`); }}>⤓ 다음 운동과 {label}로 묶기</button>}
+                    {b.items.length > 1 && <button aria-label={`${blockName(b)} 묶음 풀기`}
+                      onClick={() => { setMoved(null); setPlan(recompute(splitPlanBlock(plan, bi), all)); setGroupMsg(`${blockName(b)}: 묶음 풀음`); }}>묶음 풀기</button>}
+                  </div>
+                );
+              })()}
             </div>
           ))}
           <button class="big" style={{ margin: '4px 0 10px' }} onClick={() => setAdding(true)}>+ 운동 추가</button>

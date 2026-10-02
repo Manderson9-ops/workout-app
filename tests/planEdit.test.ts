@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { stepSets, stepReps, moveBlock, addBlock, hasDbInfo, regenerateWithLocks } from '../src/core/planEdit';
-import type { Plan, PlanItem, PlanRequest } from '../src/core/planner';
+import type { Plan, PlanBlock, PlanItem, PlanRequest } from '../src/core/planner';
 import { setTime, blockTime, warmupFor } from '../src/core/time';
 import { routineEstimate } from '../src/core/session';
 import type { Routine } from '../src/core/session';
-import { KEEP_ALL, ONLY_LOCKED } from '../src/core/planEdit';
+import { KEEP_ALL, ONLY_LOCKED, groupKindWithNext, mergeWithNextBlock, splitPlanBlock } from '../src/core/planEdit';
 import type { Exercise } from '../src/core/types';
 
 const item = (id: string, o: Partial<PlanItem> = {}): PlanItem => ({
@@ -100,5 +100,32 @@ describe('D-036 플랜 바로 고치기', () => {
     expect(hasDbInfo({ grades: [{ source: 'APP_DEFAULT' } as never], guide: [] })).toBe(false);
     expect(hasDbInfo({ grades: [{ source: 'VIDEO' } as never], guide: [] })).toBe(true);
     expect(hasDbInfo({ grades: [], guide: [{ type: 'x', text: 't', video_id: 'v', timestamp: '0:01' }] })).toBe(true);
+  });
+});
+
+describe('플랜에서 다음 운동과 묶기 (D-046)', () => {
+  const it2 = (id: string, part: PlanItem['part']): PlanItem => ({ exerciseId: id, name: id, part, sets: 3, reps: 10, grade: 'B', gradeSource: 'APP_DEFAULT', estimated: true, substituted: false, locked: false, why: '', rank: 0 });
+  const single = (i: PlanItem): PlanBlock => ({ kind: 'single', items: [i], timeSec: 0 });
+  const base = { status: 'ok', warmup: { kind: 'none', seconds: 0, label: '' }, estimatedSec: 0, rest: { compound: 150, isolation: 90, round: 105 }, reasons: [], missingParts: [], candidateCount: 0 } as unknown as Plan;
+  const plan = { ...base, blocks: [single(it2('a', '가슴')), single(it2('b', '등')), single(it2('c', '등')), single(it2('d', '삼두')), single(it2('e', '이두'))] } as Plan;
+  it('다른 부위는 슈퍼세트, 같은 부위는 컴파운드 세트, 라운드 휴식은 플랜 값', () => {
+    expect(groupKindWithNext(plan, 0)).toBe('superset');
+    expect(groupKindWithNext(plan, 1)).toBe('compound');
+    const m = mergeWithNextBlock(plan, 0);
+    expect(m.blocks).toHaveLength(4);
+    expect(m.blocks[0]).toMatchObject({ kind: 'superset', roundRestSec: 105, transitionSec: 10 });
+    expect(m.blocks[0]!.items.map((i) => i.exerciseId)).toEqual(['a', 'b']);
+    expect(plan.blocks).toHaveLength(5); // 원본은 그대로
+  });
+  it('마지막 블록·4개 넘는 묶음은 묶지 않음, 풀면 운동마다 단일 블록', () => {
+    expect(groupKindWithNext(plan, 4)).toBeNull();
+    expect(mergeWithNextBlock(plan, 4)).toBe(plan);
+    let m = mergeWithNextBlock(mergeWithNextBlock(mergeWithNextBlock(plan, 0), 0), 0); // a+b+c+d
+    expect(m.blocks[0]!.items).toHaveLength(4);
+    expect(groupKindWithNext(m, 0)).toBeNull();
+    m = splitPlanBlock(m, 0);
+    expect(m.blocks.map((b) => b.kind)).toEqual(['single', 'single', 'single', 'single', 'single']);
+    expect(m.blocks.map((b) => b.items[0]!.exerciseId)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(splitPlanBlock(plan, 0)).toBe(plan);
   });
 });
