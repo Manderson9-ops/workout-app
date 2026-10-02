@@ -103,3 +103,51 @@ export function splitPlanBlock(plan: Plan, bi: number): Plan {
   const singles: PlanBlock[] = b.items.map((i) => ({ kind: 'single', items: [i], timeSec: 0 }));
   return { ...plan, blocks: [...plan.blocks.slice(0, bi), ...singles, ...plan.blocks.slice(bi + 1)] };
 }
+
+/**
+ * D-051: 일괄·묶음 고치기. 모두 순수 함수이고 시간은 부르는 쪽(recompute)이 다시 계산한다.
+ * bi를 주면 그 블록만, 아니면 플랜 전체. 바뀐 게 없으면 같은 plan 객체를 돌려줌.
+ */
+export const ROUND_REST_MIN = 0, ROUND_REST_MAX = 600, ROUND_REST_STEP = 15;
+export const TRANSITION_MIN = 0, TRANSITION_MAX = 120, TRANSITION_STEP = 5;
+
+function mapItems(plan: Plan, bi: number | undefined, fn: (i: PlanItem) => PlanItem): Plan {
+  let changed = false;
+  const blocks = plan.blocks.map((b, x) => {
+    if (bi !== undefined && x !== bi) return b;
+    const items = b.items.map((it) => { const n = fn(it); if (n.sets !== it.sets || n.reps !== it.reps || n.seconds !== it.seconds) changed = true; return n; });
+    return { ...b, items };
+  });
+  return changed ? { ...plan, blocks } : plan;
+}
+export function bulkSets(plan: Plan, d: number, bi?: number): Plan { return mapItems(plan, bi, (i) => stepSets(i, d)); }
+export function bulkReps(plan: Plan, d: number, bi?: number): Plan { return mapItems(plan, bi, (i) => stepReps(i, d)); }
+
+/** 묶음에 운동 추가 (묶음만, 최대 GROUP_MAX개, 플랜에 없는 운동만) */
+export function addToGroup(plan: Plan, bi: number, item: PlanItem): Plan {
+  const b = plan.blocks[bi];
+  if (!b || b.kind === 'single' || b.items.length >= GROUP_MAX) return plan;
+  if (plan.blocks.some((x) => x.items.some((i) => i.exerciseId === item.exerciseId))) return plan;
+  // 다른 부위 운동이 들어오면 컴파운드 세트(같은 부위) → 슈퍼세트 (묶기 규칙 D-046과 같은 용어)
+  const items = [...b.items, item];
+  const kind: PlanBlock['kind'] = new Set(items.map((i) => i.part)).size === 1 ? 'compound' : 'superset';
+  return { ...plan, blocks: plan.blocks.map((x, y) => (y === bi ? { ...x, kind, items } : x)) };
+}
+
+function setGroupField(plan: Plan, bi: number, key: 'roundRestSec' | 'transitionSec', cur: number, v: number): Plan {
+  const b = plan.blocks[bi];
+  if (!b || b.kind === 'single' || v === cur) return plan;
+  return { ...plan, blocks: plan.blocks.map((x, y) => (y === bi ? { ...x, [key]: v } : x)) };
+}
+export function stepRoundRest(plan: Plan, bi: number, d: -1 | 1): Plan {
+  const b = plan.blocks[bi];
+  if (!b) return plan;
+  const cur = b.roundRestSec ?? plan.rest.round;
+  return setGroupField(plan, bi, 'roundRestSec', cur, clamp(cur + d * ROUND_REST_STEP, ROUND_REST_MIN, ROUND_REST_MAX));
+}
+export function stepTransition(plan: Plan, bi: number, d: -1 | 1): Plan {
+  const b = plan.blocks[bi];
+  if (!b) return plan;
+  const cur = b.transitionSec ?? 10;
+  return setGroupField(plan, bi, 'transitionSec', cur, clamp(cur + d * TRANSITION_STEP, TRANSITION_MIN, TRANSITION_MAX));
+}

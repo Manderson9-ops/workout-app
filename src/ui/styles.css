@@ -200,3 +200,8 @@ button.back { margin-bottom: 4px; }
   html:not(.phone-view) .toast { left: 200px; right: 24px; bottom: 16px; }
   html:not(.phone-view) .toast.above-banner { bottom: 76px; }
 }
+
+/* D-051: 일괄 변경 줄·묶음 설정 */
+.bulk-row { gap: 8px; margin: 8px 0; align-items: center; }
+.group-settings { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line, #333); }
+.group-settings .row { gap: 8px; margin-top: 6px; align-items: center; }
