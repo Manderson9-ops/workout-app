@@ -16,7 +16,8 @@ import { GradeBadge, ExercisePicker, Sheet, mmss } from '../components';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
 import { useDragSort } from '../dragSort';
-import { BodyMap } from '../bodyMap';
+import { BodyMap } from '../bodyMapView';
+import { PartSheet } from '../partSheet';
 import { togglePart as togglePartForm, setPartPriority } from '../../core/planForm';
 import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
 import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, groupKindWithNext, mergeWithNextBlock, splitPlanBlock, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
@@ -77,6 +78,9 @@ export function PlanBuilder({ s }: { s: AppState }) {
   // D-043: 부위는 켜기/끄기만 (켜면 우선순위 '높음'), 우선순위는 고른 부위의 선택 상자로. 고른 순서(같은 우선순위의 앞뒤)는 유지
   const togglePart = (p: Part) => { const n = togglePartForm(f, p); update({ parts: n.parts, order: n.order }); };
   const setPriority = (p: Part, pr: Priority) => update({ parts: setPartPriority(f, p, pr).parts });
+  // D-047: 부위를 누르면 (처음이면 '높음'으로 고르고) 우선순위 창을 연다. 빼기는 창에서
+  const [partSheet, setPartSheet] = useState<Part | null>(null);
+  const openPart = (p: Part) => { if (!f.parts[p]) togglePart(p); setPartSheet(p); };
   const request = (form: Form = f): PlanRequest => ({
     parts: form.order.filter((p) => form.parts[p]).map((p) => ({ part: p, priority: form.parts[p]! })),
     level: s.settings.level, minGrade: form.minGrade, targetMinutes: form.minutes, groupings: form.groupings,
@@ -177,24 +181,16 @@ export function PlanBuilder({ s }: { s: AppState }) {
       <h1>플랜 만들기</h1>
       {/* PC 넓은 화면: 왼쪽 조건, 오른쪽 결과 (D-030) */}
       <div class="wide-2"><div>
-      <label>부위 (그림이나 버튼을 눌러 고르기 · 다시 누르면 빼기)</label>
-      <BodyMap sel={f.parts} onToggle={togglePart} />
-      <div class="row wrap">
+      <label>부위 (그림이나 버튼을 누르면 우선순위를 고르는 창이 열려요 · 기본 높음)</label>
+      <BodyMap sel={f.parts} onPart={openPart} />
+      <div class="row wrap" role="group" aria-label="부위">
         {PARTS.map((p) => {
           const pr = f.parts[p];
-          return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => togglePart(p)} aria-pressed={!!pr} aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
+          return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => openPart(p)} aria-pressed={!!pr} aria-haspopup="dialog" aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
         })}
       </div>
-      {nParts > 0 && <div class="prio-list" role="group" aria-label="고른 부위의 우선순위">
-        {f.order.filter((p) => f.parts[p]).map((p) => (
-          <div class="row between prio-row" key={p}>
-            <span>{p}</span>
-            <select aria-label={`${p} 우선순위`} value={f.parts[p]} onChange={(e) => setPriority(p, (e.target as HTMLSelectElement).value as Priority)}>
-              {(['high', 'normal', 'low'] as Priority[]).map((x) => <option key={x} value={x}>우선순위 {PR_LABEL[x]}</option>)}
-            </select>
-          </div>
-        ))}
-      </div>}
+      {partSheet && <PartSheet part={partSheet} pr={f.parts[partSheet]} onPick={(x) => setPriority(partSheet, x)}
+        onRemove={() => { if (f.parts[partSheet]) togglePart(partSheet); setPartSheet(null); }} onClose={() => setPartSheet(null)} />}
       <label>분할 템플릿으로 채우기 (선택)</label>
       <div class="grid2">
         <select value={tpl} onChange={(e) => setTpl((e.target as HTMLSelectElement).value)} aria-label="분할 템플릿">

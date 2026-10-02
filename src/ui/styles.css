@@ -150,18 +150,26 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 .card[data-drop="after"] { box-shadow: 0 4px 0 0 var(--acc); }
 .card[data-drop][data-drop-grid] { box-shadow: 0 0 0 3px var(--acc); } /* PC 2단: 위·아래 선은 좌우 이동에서 헷갈려 칸 전체 테두리로 */
 
-/* D-043: 인체 그림 부위 선택 */
-.bodymap { display: flex; justify-content: center; gap: 12px; margin: 6px 0; }
-.bodymap-fig { margin: 0; text-align: center; width: 46%; max-width: 190px; }
-.bodymap-fig svg { width: 100%; height: auto; display: block; touch-action: manipulation; }
-.bm-head { fill: var(--card2); }
-.bm-part { fill: var(--card2); stroke: var(--line); stroke-width: 1; pointer-events: none; }
+/* D-047: 인체 근육 그림 (react-native-body-highlighter, MIT) + 우선순위 창 */
+.bodymap { display: flex; flex-direction: column; align-items: center; margin: 6px 0 4px; }
+.bodymap .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 22px; overflow: hidden; margin-bottom: 6px; }
+.bodymap .seg button { min-height: 44px; min-width: 72px; border: 0; border-radius: 0; background: transparent; color: var(--sub); font-weight: 600; }
+.bodymap .seg button.on { background: var(--acc); color: #fff; }
+.bodymap-svg { width: min(260px, 72vw); height: auto; display: block; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.bm-outline { fill: #1b1f28; stroke: #3a4050; stroke-width: 3; stroke-linejoin: round; }
+.bm-deco { fill: #2a2f3a; }
+.bm-muscle { fill: #444b5a; transition: fill .15s ease; }
+.bm-muscle.p-high { fill: #3b82f6; }
+.bm-muscle.p-normal { fill: #60a5fa; fill-opacity: .8; }
+.bm-muscle.p-low { fill: #93c5fd; fill-opacity: .5; }
 .bm-hit { fill: transparent; cursor: pointer; pointer-events: all; }
-.bm-part.p-high { fill: #1d4ed8; stroke: #93c5fd; }
-.bm-part.p-normal { fill: #2563eb88; stroke: #3b82f6; }
-.bm-part.p-low { fill: #1e3a8a55; stroke: #3b82f6; }
-.prio-list { margin-top: 8px; }
-.prio-row { margin: 4px 0; }
-.prio-row select { width: auto; min-width: 150px; }
-.bm-label { font-size: 5.5px; fill: var(--sub); pointer-events: none; user-select: none; font-weight: 600; }
-.bm-label.on { fill: #fff; }
+@media (hover: hover) { .bm-hit:hover { fill: rgba(255,255,255,.06); } }
+.bm-hint { margin: 2px 0 0; text-align: center; }
+.prio-options { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.prio-opt { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; min-height: 56px; padding: 10px 14px; border-radius: 12px; }
+.prio-opt-label { font-weight: 700; font-size: 16px; }
+.prio-opt.on { border-color: var(--acc); }
+.prio-opt.on.p-high { background: #1d4ed8; color: #fff; }
+.prio-opt.on.p-normal { background: #2563eb88; color: #fff; }
+.prio-opt.on.p-low { background: #1e3a8a55; color: #fff; }
+.prio-opt.on .sub { color: #dbe7ff; }
