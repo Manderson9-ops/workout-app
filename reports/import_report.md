@@ -1,7 +1,7 @@
 # WORK_OUT_K 가져오기 리포트
 
 - 원본: `G:\내 드라이브\WORK_OUT_K` (읽기만 함). 이번 실행 전후 해시 **동일 (이 스크립트는 원본을 바꾸지 않음)**
-- 지난 실행 이후 원본 변화: 바뀜 2개 (CrMyjPTSbos.json, ZqJ_OS7rTnY.json), 새 파일 0개, 없어진 파일 0개. WORK_OUT_K에 영상이 추가·수정되면 여기에 나타난다
+- 지난 실행 이후 원본 변화: 바뀜 0개, 새 파일 0개, 없어진 파일 0개. WORK_OUT_K에 영상이 추가·수정되면 여기에 나타난다
 - 영상 53개, 기본 종목 166개, 운동 묶음(family) 69개
 - 티어 항목 95개 → 운동 연결 91개, 반영 안 함·결정 대기로 미적용 6개 (분할 템플릿은 별도, 한 항목이 두 곳에 걸릴 수 있어 합계는 다를 수 있음)
 - 영상 등급이 붙은 운동 82개 (등급 91개), 자세 포인트가 붙은 운동 121개
@@ -320,7 +320,7 @@
 - AK_cWZlcpv0.json: `6e958c7844027ad8200b58965c48a263a9c3b1ce69426c58e18c00be2cf33246`
 - Bc27jDy5dsk.json: `861a58f2fed8fdc25c36003ae89f8beac271587daa7adfbcb200ea4c83bb48b2`
 - Bp54BnDbUeE.json: `65ee8cc55623d3f20d67b3b94ea9d5961c335050a00fc6935e5f70ba18e6ae67`
-- CrMyjPTSbos.json: `016310b4ecc2a921bb4e3164567539d2270506cfbb3f5d51fc9052660c2f5db9`
+- CrMyjPTSbos.json: `04b3184ec94cb14f750efcfa8dada5d2204d5813304c07a21f3efd76c9868af4`
 - CxWZGilcUu4.json: `9d3e0cb23a537cd66d67405374d2f02d753fa79e9800ec938a8872a499be0e5e`
 - DtTX0QcwhRw.json: `be1d8635b82c88911f34f40484781f524f86700ab361f629b55933c034572640`
 - EA9UidlsYyY.json: `a30e33295a6271560254b9b5e221cca59ae570caf4f4f8527544a6719e677cbc`
@@ -338,7 +338,7 @@
 - YNfWQvjIpPs.json: `78f1286136aca5898218796d4f0cbc96020edcc1588fe0a03574d4f6f02f8eea`
 - ZSeZPxJi6qU.json: `2c354ba3c0bf93c76ff6d44f733c7d949ae282e50d871584eb4256b7baee3f14`
 - ZmL_npUrwnk.json: `27248524056571f1b4c3c772f50f7cfda987c6d3ada9047aee2d225e3d6bd179`
-- ZqJ_OS7rTnY.json: `2092e822937cd4fe97ada2105444e10e1ddbac74ea041ea00790264b45fa4315`
+- ZqJ_OS7rTnY.json: `5cc9d0de02743625091189403eaa77830af48230489181a8583e582d6d8fd746`
 - _EyS30r10Ng.json: `edc9f561be1c4e007e9ce4ead1ef48ce594efd4b76e0d83e11e0c6f8d36900d5`
 - fRrg8JxnX6w.json: `037b97470a1f571b56c29853969aa567e6ac6c7b4ae7674587c848c7cabdac72`
 - g9msHUDvfIk.json: `7952fe8fcb86181395bf690fd260af3980fa2700bfe8e5d8531257a5dd3c04f5`

@@ -38,7 +38,7 @@ describe('운동 데이터 검증', () => {
     for (const id of ['smith_shoulder_press', 'arnold_press', 'db_lateral_raise', 'cable_lateral_raise', 'machine_lateral_raise', 'reverse_pec_deck', 'face_pull', 'db_rear_delt_fly', 'db_front_raise']) expect(wk.grades[id]).toBeUndefined();
   });
   it('바벨 전용 자세 포인트는 바벨 오버헤드 프레스에만 (머신·스미스·덤벨 프레스에 붙지 않음)', () => {
-    // CrMyjPTSbos@02:22(바벨 균형·B+·스미스로 바꾸면 등급 상승), ZqJ_OS7rTnY@07:04(바벨 불안정·전신 피로)는 WORK_OUT_K에서 "오버헤드 프레스 (바벨)"로 적혀 있음
+    // CrMyjPTSbos@02:22(바벨 균형·B+·스미스로 바꾸면 등급 상승), ZqJ_OS7rTnY@07:04(바벨 불안정·전신 피로)는 WORK_OUT_K에 일반 이름 "오버헤드 프레스"로 적혀 있어 별칭 묶음으로 풀리지만 grade_rules.json guide_rules(M-30)로 바벨 OHP에만 붙임
     const has = (id: string, vid: string, ts: string) => get(id).guide.some((g: { video_id: string; timestamp: string }) => g.video_id === vid && g.timestamp === ts);
     for (const [vid, ts] of [['CrMyjPTSbos', '02:22'], ['ZqJ_OS7rTnY', '07:04']] as const) {
       expect(has('barbell_ohp', vid, ts)).toBe(true);

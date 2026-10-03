@@ -27,7 +27,7 @@ const records = files.map((f) => readJson(join(recDir, f)));
 
 const res = runImport({
   base, families, aliases: readJson(join(ROOT, 'data/aliases.json')).aliases,
-  topicParts: ruleFile.topic_parts, ignoreTopics: ruleFile.ignore_topics, skipItems: ruleFile.skip_items, skipNames: ruleFile.skip_names, rules: ruleFile.rules, decisions: decisionFile.decisions,
+  topicParts: ruleFile.topic_parts, ignoreTopics: ruleFile.ignore_topics, skipItems: ruleFile.skip_items, skipNames: ruleFile.skip_names, guideRules: ruleFile.guide_rules, rules: ruleFile.rules, decisions: decisionFile.decisions,
   templates: templateFile.templates, subGoalRules: templateFile.sub_goal_rules,
   combos: readJson(join(ROOT, 'data/combos.json')).combos, records,
 });
