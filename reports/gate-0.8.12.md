@@ -17,6 +17,8 @@
 
 - 2차 (Opus): **9.40 미달**. 막는 문제 1: WORK_OUT_K 원본 직접 수정(AGENTS 규칙 6) → 원본 되돌림 + 앱 쪽 규칙(위 반영). 문서 일관성 항목의 게이트 문구 불일치도 함께 정정
 
+- 3차 (Opus): **9.55 통과**, 막는 문제 없음. 병합 전 권장 반영: WORK_OUT_K ZqJ_OS7rTnY.json 파일 끝 줄바꿈 1개 원복(바이트까지 원래대로, 해시 일치), guide_rules의 only 가 연결 결과 밖 운동을 가리키면 오류로 알림, PENDING 결정 규칙 테스트 추가
+
 ## 바뀐 데이터
 - `aliases.json` +12 (별칭 11, 삼두 익스텐션 묶음 1), `grade_rules.json`: `topic_parts.shoulder = 어깨`, `skip_names` +5 (M-31)
 - `grade_rules.json`: `guide_rules` 2개 (CrMyjPTSbos@02:22, ZqJ_OS7rTnY@07:04 → barbell_ohp 에만)

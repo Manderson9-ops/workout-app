@@ -170,6 +170,8 @@ export function runImport(inp: ImportInput): ImportResult {
         usedGuideRules.add(gr);
         const missing = gr.only.filter((x) => !byId.has(x));
         if (missing.length) unresolved.push(`[자세 포인트 규칙] ${gr.video_id}@${gr.timestamp}: 앱에 없는 운동 ${missing.join(', ')}`);
+        const outside = gr.only.filter((x) => byId.has(x) && !ids.includes(x));
+        if (outside.length) unresolved.push(`[자세 포인트 규칙] ${gr.video_id}@${gr.timestamp}: only 의 ${outside.join(', ')} 은(는) 이 항목의 연결 결과(${ids.join(', ')})에 없음`);
         ids = ids.filter((x) => gr.only.includes(x));
         if (!ids.length) { unresolved.push(`[자세 포인트 규칙] ${gr.video_id}@${gr.timestamp}: 연결된 운동(${res.ids.join(', ')})과 only(${gr.only.join(', ')})가 겹치지 않음`); continue; }
       }
