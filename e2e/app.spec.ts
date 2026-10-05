@@ -857,12 +857,14 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   // 부위별 세트: 이두 줄에 1세트, 열 지도, 운동 기록 카드에 종목 줄(최고)
   await expect(page.getByTestId('part-row').filter({ hasText: '이두' })).toContainText('1세트');
   await expect(page.getByTestId('bodyheat')).toBeVisible();
+  await expect(page.getByTestId('bodyheat').locator('svg')).toHaveCount(2); // 앞·뒤 나란히
+  await expect(page.getByRole('button', { name: /^팔 테스트,.*세트 1,.*바벨 컬 1세트 최고 30kg × 10회/ }).first()).toBeVisible(); // 카드 요약 이름
   await expect(page.getByRole('group', { name: /부위별 세트 열 지도: .*이두 1세트/ })).toBeVisible();
   const wcard = page.getByRole('button', { name: /팔 테스트/ }).first();
   await expect(wcard).toContainText('바벨 컬 · 1세트 · 최고 30kg × 10회');
   // 빈 주: 이전 주로 가면 안내 문구, 다시 이번 주로
   await page.getByRole('button', { name: '이전 주' }).click();
-  await expect(page.getByText('이 주에는 아직 운동이 없어요')).toBeVisible();
+  await expect(page.getByText('이 주에는 운동 기록이 없어요')).toBeVisible();
   await expect(page.getByTestId('part-row')).toHaveCount(0);
   await page.getByRole('button', { name: '다음 주' }).click();
   await expect(page.getByTestId('part-row').first()).toBeVisible();
@@ -1353,7 +1355,7 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await expect(page.getByText(/에 고침$/)).toBeVisible();
   await expect(page.getByText(/42\.5kg × \d+회 · RIR 2/)).toBeVisible();
   await expect(page.getByText(/작업 세트 2/)).toBeVisible();
-  await expect(page.getByText(/45:00/)).toBeVisible();
+  await expect(page.getByText(/45분/)).toBeVisible();
   // 홈 카드에도 반영, 그리고 삭제
   await page.getByRole('link', { name: '홈' }).click();
   const card2 = page.getByLabel('최근 운동 등 (고침)', { exact: true });
@@ -1376,7 +1378,7 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await expect(page.getByRole('status').filter({ hasText: '홈에서 뺐어요' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '최근 운동' })).toHaveCount(0);
   await page.getByRole('link', { name: '기록' }).click();
-  const row = page.getByRole('button', { name: /등 \(고침\) \(홈에서 뺌\)$/ });
+  const row = page.getByRole('button', { name: /^등 \(고침\),.*\(홈에서 뺌\)$/ });
   await expect(row).toBeVisible();
   await expect(row).toContainText('홈에서 뺌');
   await expect(page.getByText('아직 끝낸 운동이 없어요')).toHaveCount(0);

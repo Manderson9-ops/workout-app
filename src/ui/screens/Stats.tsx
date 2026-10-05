@@ -2,7 +2,7 @@ import { useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
-import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart, addDays, weekSummary, exerciseLines } from '../../core/stats';
+import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart, addDays, weekSummary, exerciseLines, durText } from '../../core/stats';
 import type { WorkoutSummary } from '../../core/stats';
 import { BW_MIN, BW_MAX } from '../../core/backup';
 import { PARTS } from '../../core/types';
@@ -10,7 +10,7 @@ import type { Exercise } from '../../core/types';
 import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
 import { LineChart, BarChart } from '../charts';
-import { NumInput, mmss } from '../components';
+import { NumInput } from '../components';
 import { startRoutine, setHomeHidden } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import type { Routine } from '../../core/session';
@@ -24,8 +24,6 @@ const shortPart = (p: string) => (p === '전완·악력' ? '전완' : p);
 const wdClass = (i: number) => (i === 0 ? 'sun' : i === 6 ? 'sat' : '');
 const ymd = (d: string) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y!, m! - 1, dd!); };
 const weekRange = (ws: string) => `${md(ws)}~${md(addDays(ws, 6))}`;
-/** 운동 시간: 1시간 미만은 N분, 이상은 h:mm */
-const fmtDur = (sec: number) => (sec < 3600 ? `${Math.round(sec / 60)}분` : `${Math.floor(sec / 3600)}:${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`);
 const timeLabel = (iso: string) => {
   const d = new Date(iso); const h = d.getHours();
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]}) ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -33,25 +31,26 @@ const timeLabel = (iso: string) => {
 const MAX_WEEKS_BACK = 11; // 이번 주 포함 12주
 const MARK = 10; // 연구 참고선 (부위당 주 10세트)
 
+/** 지난주 같은 요일까지와의 차이. 화면에는 기호, 화면 읽기에는 문장 (기호는 aria-hidden) */
 function Delta({ cur, prev, unit = '', conv = (n: number) => n }: { cur: number; prev: number; unit?: string; conv?: (n: number) => number }) {
   const d = conv(Math.abs(cur - prev));
-  if (cur === prev || d === 0) return <span class="delta" aria-label="지난주와 같음">–</span>;
+  if (cur === prev || d === 0) return <span class="delta"><span aria-hidden="true">–</span><span class="sr-only">지난주와 같음</span></span>;
   const txt = `${d.toLocaleString()}${unit}`;
   return cur > prev
-    ? <span class="delta up" aria-label={`지난주보다 ${txt} 많음`}>▲{txt}</span>
-    : <span class="delta" aria-label={`지난주보다 ${txt} 적음`}>▼{txt}</span>;
+    ? <span class="delta up"><span aria-hidden="true">▲{txt}</span><span class="sr-only">지난주보다 {txt} 많음</span></span>
+    : <span class="delta"><span aria-hidden="true">▼{txt}</span><span class="sr-only">지난주보다 {txt} 적음</span></span>;
 }
 
 function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string, Exercise>; today: string; bw: AppState['bodyweight'] }) {
   const ws = weekStart(today);
   const cur = weekSummary(done, byId, ws, bw);
-  const prev = weekSummary(done, byId, addDays(ws, -7), bw);
+  const prev = weekSummary(done, byId, addDays(ws, -7), bw, addDays(today, -7)); // 지난주 일요일 ~ 오늘과 같은 요일까지
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
   const tiles: { k: string; v: string; d: preact.JSX.Element }[] = [
     { k: '운동', v: `${cur.count}회`, d: <Delta cur={cur.count} prev={prev.count} /> },
     { k: '작업 세트', v: String(cur.sets), d: <Delta cur={cur.sets} prev={prev.sets} /> },
     { k: '볼륨', v: `${cur.volume.toLocaleString()}kg`, d: <Delta cur={cur.volume} prev={prev.volume} unit="kg" /> },
-    { k: '시간', v: fmtDur(cur.durationSec), d: <Delta cur={cur.durationSec} prev={prev.durationSec} unit="분" conv={(n) => Math.round(n / 60)} /> },
+    { k: '시간', v: durText(cur.durationSec), d: <Delta cur={cur.durationSec} prev={prev.durationSec} unit="분" conv={(n) => Math.round(n / 60)} /> },
   ];
   return (
     <>
@@ -74,7 +73,7 @@ function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string
             <div class="tile" key={t.k}>
               <div class="sub small">{t.k}</div>
               <div class="tv">{t.v}</div>
-              <div class="small sub">지난주 대비 {t.d}</div>
+              <div class="small sub">지난주 같은 요일까지 대비 {t.d}</div>
             </div>
           ))}
         </div>
@@ -109,12 +108,12 @@ function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Ex
         </div>
         {total === 0 ? (
           <div class="empty-week">
-            <p>이 주에는 아직 운동이 없어요</p>
-            {prevTotal > 0 && <p class="sub small">지난주: {prevTop.map((p) => `${shortPart(p)} ${prevParts[p]}`).join(' · ')}</p>}
+            <p>{off === 0 ? '이번 주는 아직 운동이 없어요' : '이 주에는 운동 기록이 없어요'}</p>
+            {off === 0 && prevTotal > 0 && <p class="sub small">지난주: {prevTop.map((p) => `${shortPart(p)} ${prevParts[p]}세트`).join(' · ')}</p>}
+            {off === 0 && <button class="primary" onClick={() => go('#/workout')}>운동 시작</button>}
           </div>
         ) : (
           <div class="part-grid">
-            <BodyHeat sets={parts} />
             <div class="part-bars" role="list" aria-label={`${label} 부위별 작업 세트`}>
               <div class="part-row axis" aria-hidden="true"><span /><span class="track"><i class="mark-label" style={{ left: `${(MARK / scale) * 100}%` }}>{MARK}</i></span><span /></div>
               {rows.map((p) => (
@@ -125,9 +124,10 @@ function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Ex
                 </div>
               ))}
             </div>
+            <BodyHeat sets={parts} />
           </div>
         )}
-        <p class="sub small part-note">막대의 10 = 연구 참고: 부위당 주 10세트 이상에서 근육 증가가 더 컸어요 (Schoenfeld 외 2017 메타분석). 그보다 많은 양의 효과는 근거가 적어요. 세트는 그 운동의 주 부위만 세요(웜업 제외).</p>
+        <p class="sub small part-note">막대의 10 = 연구 참고선이에요(목표·상한 아님): 부위당 주 10세트 이상에서 근육 증가가 더 컸어요 (Schoenfeld 외 2017 메타분석). 그보다 많은 양의 효과는 근거가 적어요. 색 구간(1~4·5~9·10+)과 '주 부위만 세기(웜업 제외)'는 앱 기준이에요.</p>
         {activeParts.length > 0 && (
           <>
             <div class="sub small" style={{ marginTop: '8px' }}>최근 4주</div>
@@ -150,7 +150,7 @@ export function Stats({ s }: { s: AppState }) {
   const today = localDate(Date.now());
   const [ym, setYm] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; });
   const [day, setDay] = useState<number | null>(null);
-  const sums = done.map((w) => summarize(w, byId, s.bodyweight));
+  const sums = [...done].sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0)).map((w) => summarize(w, byId, s.bodyweight)); // 최신순 (저장소 순서에 기대지 않음)
   const hiddenSet = new Set(s.settings.homeHidden ?? []); // 홈에서 뺀 기록 표시 (D-040)
   const totals = weeklyTotals(done, byId, today, 8, s.bodyweight);
   const pva = plannedVsActual(sums);
@@ -160,7 +160,7 @@ export function Stats({ s }: { s: AppState }) {
   const lead = first.getDay(); // 일=0
   const nDays = new Date(ym.y, ym.m, 0).getDate();
   const dateOf = (n: number) => `${ym.y}-${String(ym.m).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
-  const dayList = day ? sums.filter((x) => x.date === dateOf(day)) : [];
+  const dayList = day ? sums.filter((x) => x.date === dateOf(day) && x.workSets > 0) : [];
   const move = (d: number) => { setDay(null); setYm(({ y, m }) => { const n = new Date(y, m - 1 + d, 1); return { y: n.getFullYear(), m: n.getMonth() + 1 }; }); };
   const card = (x: WorkoutSummary) => <WorkoutCard key={x.id} x={x} w={wById.get(x.id)} byId={byId} hidden={hiddenSet.has(x.id)} />;
   // 최근 30개를 주별로 묶음
@@ -285,13 +285,15 @@ function WorkoutCard({ x, w, byId, hidden }: { x: WorkoutSummary; w: Workout | u
   const lines = w ? exerciseLines(w, byId) : [];
   const parts = PARTS.filter((p) => (x.parts[p] ?? 0) > 0);
   const empty = x.workSets === 0;
+  // 화면 읽기용 전체 요약 (본문이 가려지지 않게). 홈에서 뺌 표시는 맨 끝
+  const label = `${x.name}, ${w ? timeLabel(w.startedAt) : x.date}, ${durText(x.durationSec)}, 세트 ${x.workSets}, 볼륨 ${x.volume.toLocaleString()}kg${empty ? ', 완료 세트 0' : ''}${lines.slice(0, 3).map((l) => `, ${l.name} ${l.sets}세트${l.best ? ` 최고 ${l.best}` : ''}`).join('')}${lines.length > 3 ? `, 외 ${lines.length - 3}개 운동` : ''}${hidden ? ` (${HOME_HIDDEN_LABEL})` : ''}`;
   return (
-    <button class={`wcard${empty ? ' dim' : ''}`} aria-label={`${x.date} ${x.name}${hidden ? ` (${HOME_HIDDEN_LABEL})` : ''}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
+    <button class={`wcard${empty ? ' dim' : ''}`} aria-label={label} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
       <div class="wc-main">
         <div class="wc-title">{x.name}{hidden && <span class="pill hid">{HOME_HIDDEN_LABEL}</span>}{empty && <span class="pill tag">완료 세트 0</span>}</div>
         <div class="wc-meta">{w ? timeLabel(w.startedAt) : x.date}</div>
         <div class="wc-chips">
-          <span class="chip2">⏱ {fmtDur(x.durationSec)}</span>
+          <span class="chip2">⏱ {durText(x.durationSec)}</span>
           <span class="chip2">세트 {x.workSets}</span>
           <span class="chip2">볼륨 {x.volume.toLocaleString()}kg</span>
           {diff !== undefined && Math.abs(diff) >= 60 && <span class="chip2 hint">예상보다 {Math.round(Math.abs(diff) / 60)}분 {diff > 0 ? '김' : '짧음'}</span>}
@@ -322,7 +324,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
     <main>
       <button class="ghost" onClick={() => go('#/stats')}>← 기록</button>
       <h1>{w.name}</h1>
-      <p class="sub">{new Date(w.startedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {mmss(sum.durationSec)}{sum.plannedSec ? ` (예상 ${mmss(sum.plannedSec)})` : ''}</p>
+      <p class="sub">{new Date(w.startedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {durText(sum.durationSec)}{sum.plannedSec ? ` (예상 ${durText(sum.plannedSec)})` : ''}</p>
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
       {w.editedAt && <p class="sub small">{new Date(w.editedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}에 고침</p>}
       {w.memo && <p>📝 {w.memo}</p>}

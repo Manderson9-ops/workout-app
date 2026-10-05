@@ -113,18 +113,19 @@ export function BodyMap({ sel, onPart }: { sel: Partial<Record<Part, Priority>>;
   );
 }
 
-/** 읽기 전용 열 지도 (D-054): 부위별 세트 수를 색 단계로. 앞/뒤 전환만 누를 수 있음 */
+/** 읽기 전용 열 지도 (D-054): 부위별 세트 수를 색 단계로. 앞·뒤 그림을 나란히 (누르는 동작 없음) */
 export function BodyHeat({ sets }: { sets: Record<Part, number> }) {
-  const [side, setSide] = useState<Side>('front');
   const summary = (Object.keys(sets) as Part[]).filter((p) => sets[p] > 0).map((p) => `${p} ${sets[p]}세트`).join(', ') || '세트 없음';
   return (
-    <div class="bodymap bodyheat" data-testid="bodyheat" role="group" aria-label={`부위별 세트 열 지도: ${summary}`}>
-      <div class="seg" role="group" aria-label="그림 방향">
+    <div class="bodyheat" data-testid="bodyheat" role="group" aria-label={`부위별 세트 열 지도: ${summary}`}>
+      <div class="heat-pair">
         {(['front', 'back'] as Side[]).map((x) => (
-          <button key={x} class={side === x ? 'on' : ''} aria-pressed={side === x} onClick={() => setSide(x)}>{x === 'front' ? '앞' : '뒤'}</button>
+          <figure key={x} class="heat-fig">
+            <Figure side={x} sel={{}} heat={sets} />
+            <figcaption class="sub small" aria-hidden="true">{x === 'front' ? '앞' : '뒤'}</figcaption>
+          </figure>
         ))}
       </div>
-      <Figure side={side} sel={{}} heat={sets} />
       <div class="bm-legend sub small" aria-hidden="true">
         <span><i class="lg-h0" />0</span><span><i class="lg-h1" />1~4</span><span><i class="lg-h2" />5~9</span><span><i class="lg-h3" />10+</span><span>세트</span>
       </div>

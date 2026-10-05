@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines } from '../src/core/stats';
+import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, isCountedWorkout } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
 import { heatBucket } from '../src/ui/bodyMapView';
@@ -85,8 +85,8 @@ describe('운동 요약·주간·달력·연속', () => {
     expect(monthDays([w0], 2026, 10).size).toBe(0);
   });
   it('연속 운동 주: 이번 주를 아직 안 했어도 끊긴 것 아님', () => {
-    expect(weekStreak([w0, w1, w2], '2026-09-30')).toBe(1); // 9/21 주가 비어 끊김
-    const w3 = wk('w3', at(2026, 9, 22), []);
+    expect(weekStreak([w0, w1, w2], '2026-09-30')).toBe(1); // 9/20 주가 비어 끊김 (일요일 시작 주)
+    const w3 = wk('w3', at(2026, 9, 22), [{ id: 'bench', sets: [s(40, 8)] }]);
     expect(weekStreak([w0, w1, w2, w3], '2026-09-30')).toBe(3);
     expect(weekStreak([w0, w3], '2026-09-30')).toBe(2); // 이번 주 아직
     expect(weekStreak([], '2026-09-30')).toBe(0);
@@ -218,5 +218,56 @@ describe('이번 주 요약·최고 세트·종목 줄 (D-054)', () => {
   });
   it('heatBucket 경계: 0 / 1~4 / 5~9 / 10+', () => {
     expect([0, 1, 4, 5, 9, 10, 25].map(heatBucket)).toEqual([0, 1, 1, 2, 2, 3, 3]);
+  });
+});
+
+describe('D-054 2차: 시간 문구·0세트 제외·지난주 같은 요일까지·일요일 경계', () => {
+  it('durText: 초/분/시간 경계, 올림 carry 없음', () => {
+    expect(durText(0)).toBe('0초');
+    expect(durText(59)).toBe('59초');
+    expect(durText(60)).toBe('1분');
+    expect(durText(3599)).toBe('1시간'); // 59분 59초 → 반올림 60분 = 1시간 (60분 표기 없음)
+    expect(durText(3570)).toBe('1시간'); // 59분 30초도 같은 규칙
+    expect(durText(3600)).toBe('1시간');
+    expect(durText(3720)).toBe('1시간 2분');
+    expect(durText(7170)).toBe('2시간'); // 1시간 59분 30초 → 120분, "1:60" 아님
+    expect(durText(7200)).toBe('2시간');
+    expect(durText(3000)).toBe('50분');
+  });
+  const none = wk('none', at(2026, 9, 29), [{ id: 'bench', sets: [s(60, 8, { done: false }), s(40, 8, { warmup: true })] }], 15);
+  const some = wk('some', at(2026, 9, 29, 12), [{ id: 'bench', sets: [s(60, 8)] }], 30);
+  it('isCountedWorkout: 끝났고 완료 작업 세트 1개 이상', () => {
+    expect(isCountedWorkout(none)).toBe(false);
+    expect(isCountedWorkout(some)).toBe(true);
+    expect(isCountedWorkout({ ...some, endedAt: undefined })).toBe(false);
+  });
+  it('0세트 운동은 주 요약·요일 점·달력·연속 주·주간 합계 횟수에서 제외', () => {
+    expect(weekSummary([none, some], byId, '2026-09-27')).toMatchObject({ count: 1, sets: 1 });
+    expect(weekSummary([none], byId, '2026-09-27')).toMatchObject({ count: 0, durationSec: 0 });
+    expect([...weekSummary([none], byId, '2026-09-27').days]).toEqual([]);
+    expect(monthDays([none], 2026, 9).size).toBe(0);
+    expect([...monthDays([none, some], 2026, 9).entries()]).toEqual([[29, 1]]);
+    expect(weekStreak([none], '2026-09-30')).toBe(0);
+    expect(weeklyTotals([none, some], byId, '2026-09-30', 1)[0]).toMatchObject({ count: 1, sets: 1 });
+  });
+  it('지난주 같은 요일까지 비교: throughDate 이후는 뺌', () => {
+    const sun = wk('a', at(2026, 9, 20), [{ id: 'bench', sets: [s(50, 10)] }]);   // 지난주 일
+    const tue = wk('b', at(2026, 9, 22), [{ id: 'bench', sets: [s(50, 10)] }]);   // 지난주 화
+    const fri = wk('c', at(2026, 9, 25), [{ id: 'bench', sets: [s(50, 10)] }]);   // 지난주 금
+    // 오늘 화요일(9/29) → 지난주 화(9/22)까지
+    expect(weekSummary([sun, tue, fri], byId, '2026-09-20', [], '2026-09-22').count).toBe(2);
+    expect(weekSummary([sun, tue, fri], byId, '2026-09-20').count).toBe(3); // 전체 주
+    expect(weekSummary([sun, tue, fri], byId, '2026-09-20', [], addDays('2026-09-27', -7)).count).toBe(1); // 오늘이 일요일이면 지난주 일요일까지
+  });
+  it('토→일 경계: 토 23:30 + 일 00:10 운동은 서로 다른 주 → 연속 2주, 요약도 분리', () => {
+    const sat = wk('sat', new Date(2026, 8, 26, 23, 30).toISOString(), [{ id: 'bench', sets: [s(60, 5)] }], 20);
+    const sun = wk('sun', new Date(2026, 8, 27, 0, 10).toISOString(), [{ id: 'bench', sets: [s(60, 5)] }], 20);
+    expect(weekStreak([sat, sun], '2026-09-27')).toBe(2);
+    expect(weekSummary([sat, sun], byId, '2026-09-20').count).toBe(1);
+    expect(weekSummary([sat, sun], byId, '2026-09-27').count).toBe(1);
+  });
+  it('bestSetLabel: 무게 있는 맨몸 운동은 kg 표시, 시간+무게 혼합은 초 우선', () => {
+    expect(bestSetLabel([s(10, 8), s(10, 6)])).toBe('10kg × 8회');
+    expect(bestSetLabel([{ weight: 20, seconds: 60, warmup: false, done: true }])).toBe('60초');
   });
 });

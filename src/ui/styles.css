@@ -235,7 +235,11 @@ button.back { margin-bottom: 4px; }
 .delta { font-weight: 700; } .delta.up { color: var(--ok); }
 .empty-week { text-align: center; padding: 18px 8px; }
 .part-grid { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 6px; }
-.bodyheat .bodymap-svg { width: min(200px, 52vw); }
+.bodyheat { display: flex; flex-direction: column; align-items: center; margin: 4px 0 0; }
+.heat-pair { display: flex; justify-content: center; gap: 12px; width: 100%; }
+.heat-fig { margin: 0; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.heat-fig figcaption { margin-top: 2px; }
+.bodyheat .bodymap-svg { width: min(150px, 38vw); }
 .part-bars { min-width: 0; }
 .part-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 52px; align-items: center; gap: 8px; min-height: 28px; font-size: 14px; }
 .part-row.zero { opacity: .45; }
@@ -275,6 +279,7 @@ button.wcard.dim { opacity: .6; }
 @media (min-width: 900px) {
   html:not(.phone-view) .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   html:not(.phone-view) .part-grid { flex-direction: row; align-items: center; gap: 24px; }
-  html:not(.phone-view) .part-grid .bodyheat { flex: 0 0 260px; }
+  html:not(.phone-view) .part-grid .bodyheat { flex: 0 0 340px; order: -1; }
+  html:not(.phone-view) .bodyheat .bodymap-svg { width: 150px; }
   html:not(.phone-view) .part-grid .part-bars { flex: 1; }
 }
