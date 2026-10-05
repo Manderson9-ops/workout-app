@@ -838,13 +838,34 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
 
   // 기록 탭: 이번 주 1회, 오늘 달력 표시 → 상세
   await page.getByRole('link', { name: '기록' }).click();
-  await expect(page.getByText('1회', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('this-week')).toContainText('1회');
+  // D-054: 일요일 시작 달력, 이번 주 요일 띠(7칸, 운동한 날 표시), 월 회수
+  await expect(page.locator('.cal-wd').first()).toHaveText('일');
+  await expect(page.locator('.cal-wd').nth(6)).toHaveText('토');
+  const dayStrip = page.getByRole('list', { name: '이번 주 운동한 날' }).getByRole('listitem');
+  await expect(dayStrip).toHaveCount(7);
+  await expect(dayStrip.first()).toContainText('일');
+  await expect(dayStrip.last()).toContainText('토');
+  await expect(page.locator('.daydot.did')).toHaveCount(1);
+  await expect(page.locator('.daydot.did')).toHaveAttribute('aria-label', /운동함/);
+  await expect(page.getByText(/이번 달 1회/)).toBeVisible();
   const d = new Date();
   const todayBtn = page.getByRole('button', { name: `${d.getMonth() + 1}월 ${d.getDate()}일 운동 1회` });
   await expect(todayBtn).toBeEnabled();
   await todayBtn.click();
   await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
-  await expect(page.getByRole('img', { name: /이번 주 부위별 작업 세트: .*이두 1세트/ })).toBeVisible();
+  // 부위별 세트: 이두 줄에 1세트, 열 지도, 운동 기록 카드에 종목 줄(최고)
+  await expect(page.getByTestId('part-row').filter({ hasText: '이두' })).toContainText('1세트');
+  await expect(page.getByTestId('bodyheat')).toBeVisible();
+  await expect(page.getByRole('group', { name: /부위별 세트 열 지도: .*이두 1세트/ })).toBeVisible();
+  const wcard = page.getByRole('button', { name: /팔 테스트/ }).first();
+  await expect(wcard).toContainText('바벨 컬 · 1세트 · 최고 30kg × 10회');
+  // 빈 주: 이전 주로 가면 안내 문구, 다시 이번 주로
+  await page.getByRole('button', { name: '이전 주' }).click();
+  await expect(page.getByText('이 주에는 아직 운동이 없어요')).toBeVisible();
+  await expect(page.getByTestId('part-row')).toHaveCount(0);
+  await page.getByRole('button', { name: '다음 주' }).click();
+  await expect(page.getByTestId('part-row').first()).toBeVisible();
   await expect(page.getByRole('table', { name: '최근 4주 부위별 작업 세트' })).toContainText('이두');
   await expect(page.getByRole('img', { name: /최근 8주 주간 볼륨: .*300kg/ })).toBeVisible();
   // 체중: 범위 밖은 거절, 정상 값 기록

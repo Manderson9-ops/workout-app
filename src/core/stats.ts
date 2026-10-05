@@ -78,13 +78,63 @@ export function summarize(w: Workout, byId: Map<string, Exercise>, bw: Bodyweigh
   return { id: w.id, name: w.name, date, durationSec: Math.max(0, Math.round((Date.parse(end) - Date.parse(w.startedAt)) / 1000)), ...(w.plannedSec ? { plannedSec: w.plannedSec } : {}), workSets: n, volume: Math.round(volume), parts };
 }
 
-/** 주의 시작(월요일) 날짜 */
+/** 주의 시작(일요일) 날짜. 앱 전체가 일~토 주 기준 (D-054) */
 export function weekStart(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
   const dt = new Date(y!, m! - 1, d!);
-  const dow = (dt.getDay() + 6) % 7; // 월=0
-  dt.setDate(dt.getDate() - dow);
+  dt.setDate(dt.getDate() - dt.getDay()); // 일=0
   return localDate(dt);
+}
+
+/** 날짜 'YYYY-MM-DD'에 n일을 더한 날짜 (음수 가능) */
+export function addDays(date: string, n: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return localDate(new Date(y!, m! - 1, d! + n));
+}
+
+export interface WeekSummary { count: number; sets: number; volume: number; durationSec: number; days: Set<string> }
+
+/** 그 주(weekStartDate = 일요일)의 끝난 운동 합계: 운동 수, 작업 세트, 볼륨, 운동 시간(초), 운동한 날짜들 */
+export function weekSummary(workouts: Workout[], byId: Map<string, Exercise>, weekStartDate: string, bw: BodyweightEntry[] = []): WeekSummary {
+  const out: WeekSummary = { count: 0, sets: 0, volume: 0, durationSec: 0, days: new Set() };
+  const ws = weekStart(weekStartDate);
+  for (const w of workouts) {
+    if (!w.endedAt) continue;
+    const date = localDate(w.startedAt);
+    if (weekStart(date) !== ws) continue;
+    const s = summarize(w, byId, bw);
+    out.count++; out.sets += s.workSets; out.volume += s.volume; out.durationSec += s.durationSec; out.days.add(date);
+  }
+  return out;
+}
+
+export interface ExerciseLine { exerciseId: string; name: string; sets: number; best?: string }
+
+/** 한 운동 항목의 "최고" 세트 문구: 무게가 있으면 가장 무거운 세트 (같으면 횟수 많은 쪽) "12kg × 2회", 무게 없으면 "12회", 시간 운동은 "60초". 완료 작업 세트가 없으면 undefined */
+export function bestSetLabel(sets: SetLog[]): string | undefined {
+  const ws = workSets(sets);
+  if (!ws.length) return undefined;
+  const timed = ws.filter((s) => s.seconds);
+  if (timed.length) return `${Math.max(...timed.map((s) => s.seconds!))}초`;
+  const weighted = ws.filter((s) => s.weight !== undefined && s.weight > 0);
+  if (weighted.length) {
+    const b = weighted.reduce((a, s) => (s.weight! > a.weight! || (s.weight === a.weight && (s.reps ?? 0) > (a.reps ?? 0)) ? s : a));
+    return b.reps ? `${b.weight}kg × ${b.reps}회` : `${b.weight}kg`;
+  }
+  const reps = Math.max(...ws.map((s) => s.reps ?? 0));
+  return reps > 0 ? `${reps}회` : undefined;
+}
+
+/** 운동 기록의 종목별 줄 (완료한 작업 세트가 있는 종목만, 기록 순서) */
+export function exerciseLines(w: Workout, byId: Map<string, Exercise>): ExerciseLine[] {
+  const out: ExerciseLine[] = [];
+  for (const b of w.blocks) for (const it of b.items) {
+    const n = workSets(it.sets).length;
+    if (!n) continue;
+    const best = bestSetLabel(it.sets);
+    out.push({ exerciseId: it.exerciseId, name: byId.get(it.exerciseId)?.name_ko ?? it.exerciseId, sets: n, ...(best ? { best } : {}) });
+  }
+  return out;
 }
 
 /** 부위별 주간 작업 세트 수 (끝난 운동, 운동의 기본 부위 기준). 최근 weeks 주, 오래된 순 */

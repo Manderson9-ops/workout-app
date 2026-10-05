@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable } from '../src/core/stats';
+import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
+import { heatBucket } from '../src/ui/bodyMapView';
 
 const ex = (id: string, part: Exercise['part'], equipment: Exercise['equipment'] = ['barbell']): Exercise => ({ id, name_ko: id, family: id, part, muscles: ['m'], pattern: 'H_PUSH', mechanics: 'compound', equipment });
 const byId = new Map([['bench', ex('bench', '가슴')], ['pull', ex('pull', '등', ['bodyweight'])], ['curl', ex('curl', '이두', ['dumbbell'])]]);
@@ -21,10 +22,18 @@ describe('날짜·체중', () => {
     expect(bodyweightOn(bw, '2026-09-20')).toBe(72);
     expect(bodyweightOn(bw, '2026-08-01')).toBeUndefined();
   });
-  it('주 시작은 월요일', () => {
-    expect(weekStart('2026-09-30')).toBe('2026-09-28'); // 수 → 월
-    expect(weekStart('2026-09-28')).toBe('2026-09-28');
-    expect(weekStart('2026-10-04')).toBe('2026-09-28'); // 일 → 그 주 월
+  it('주 시작은 일요일 (D-054)', () => {
+    expect(weekStart('2026-09-30')).toBe('2026-09-27'); // 수 → 일
+    expect(weekStart('2026-09-27')).toBe('2026-09-27'); // 일은 자기 자신
+    expect(weekStart('2026-10-03')).toBe('2026-09-27'); // 토 → 그 주 일
+    expect(weekStart('2026-10-04')).toBe('2026-10-04'); // 다음 일요일은 새 주
+    expect(weekStart('2026-09-28')).toBe('2026-09-27'); // 월 → 일
+    expect(weekStart('2026-01-01')).toBe('2025-12-28'); // 해를 넘어감
+  });
+  it('addDays: 월·해 경계', () => {
+    expect(addDays('2026-09-30', 1)).toBe('2026-10-01');
+    expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
+    expect(addDays('2026-09-27', -7)).toBe('2026-09-20');
   });
 });
 
@@ -64,7 +73,7 @@ describe('운동 요약·주간·달력·연속', () => {
   });
   it('부위별 주간 세트 (최근 4주, 오래된 순)', () => {
     const r = weeklyPartSets([w0, w1, w2], byId, '2026-09-30');
-    expect(r.map((x) => x.week)).toEqual(['2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28']);
+    expect(r.map((x) => x.week)).toEqual(['2026-09-06', '2026-09-13', '2026-09-20', '2026-09-27']);
     expect(r[3]!.parts).toMatchObject({ 가슴: 2, 이두: 1, 등: 1, 하체: 0 });
     expect(r[3]!.total).toBe(4);
     expect(r[1]!.parts.가슴).toBe(1);
@@ -140,7 +149,7 @@ describe('주간 합계·예상 대비 실제', () => {
   it('주별 볼륨·세트·운동 수 (8주, 범위 밖 제외)', () => {
     const t = weeklyTotals([a, b, old], byId, '2026-09-30', 8);
     expect(t).toHaveLength(8);
-    expect(t[7]).toEqual({ week: '2026-09-28', volume: 1700, sets: 3, count: 2 });
+    expect(t[7]).toEqual({ week: '2026-09-27', volume: 1700, sets: 3, count: 2 });
     expect(t.slice(0, 7).every((x) => x.count === 0)).toBe(true);
   });
   it('예상이 있는 운동만 평균 (최신순 입력)', () => {
@@ -156,14 +165,58 @@ describe('다른 시간대에서도 날짜가 같음 (검토: 시간대)', () =>
     it(tz, () => {
       process.env.TZ = tz;
       try {
-        // 현지 밤 11시 운동은 그 현지 날짜, 월요일 시작, 달력 날짜 일치
+        // 현지 밤 11시 운동은 그 현지 날짜, 일요일 시작, 달력 날짜 일치
         const late = at(2026, 9, 27, 23); // 일요일 밤
         expect(localDate(late)).toBe('2026-09-27');
-        expect(weekStart('2026-09-27')).toBe('2026-09-21');
+        expect(weekStart('2026-09-27')).toBe('2026-09-27');
         const x = wk('tz', late, [{ id: 'bench', sets: [s(60, 5)] }], 30);
         expect([...monthDays([x], 2026, 9).keys()]).toEqual([27]);
-        expect(weeklyPartSets([x], byId, '2026-09-30', 2)[0]!.parts.가슴).toBe(1);
+        expect(weeklyPartSets([x], byId, '2026-09-30', 2)[1]!.parts.가슴).toBe(1); // 일요일 운동은 그 일요일에 시작하는 주
       } finally { process.env.TZ = orig; }
     });
   }
+});
+
+describe('이번 주 요약·최고 세트·종목 줄 (D-054)', () => {
+  const sun = wk('sun', at(2026, 9, 27, 9), [{ id: 'bench', sets: [s(60, 8), s(60, 8)] }], 30);        // 일요일 = 새 주 시작
+  const sat = wk('sat', at(2026, 10, 3, 9), [{ id: 'curl', sets: [s(12, 10)] }], 20);                   // 토요일 = 같은 주 끝
+  const prevSat = wk('ps', at(2026, 9, 26, 22), [{ id: 'bench', sets: [s(50, 10)] }], 45);              // 전 주 토요일 밤
+  const open = { ...wk('open', at(2026, 9, 28), [{ id: 'bench', sets: [s(99, 9)] }]), endedAt: undefined };
+  it('weekSummary: 일~토 합계 (진행 중 제외), 날짜 집합', () => {
+    const r = weekSummary([sun, sat, prevSat, open], byId, '2026-09-27');
+    expect(r.count).toBe(2);
+    expect(r.sets).toBe(3);
+    expect(r.volume).toBe(960 + 120);
+    expect(r.durationSec).toBe((30 + 20) * 60);
+    expect([...r.days].sort()).toEqual(['2026-09-27', '2026-10-03']);
+    const p = weekSummary([sun, sat, prevSat], byId, '2026-09-20');
+    expect(p).toMatchObject({ count: 1, sets: 1, volume: 500, durationSec: 45 * 60 });
+    expect(weekSummary([], byId, '2026-09-27')).toMatchObject({ count: 0, sets: 0, volume: 0, durationSec: 0 });
+    expect(weekSummary([sun], byId, '2026-09-30').count).toBe(1); // 주 중간 날짜를 줘도 그 주
+  });
+  it('bestSetLabel: 가장 무거운 세트, 같으면 횟수 많은 쪽', () => {
+    expect(bestSetLabel([s(10, 12), s(12, 2), s(12, 5), s(15, 3, { done: false }), s(20, 1, { warmup: true })])).toBe('12kg × 5회');
+    expect(bestSetLabel([s(12, 2)])).toBe('12kg × 2회');
+  });
+  it('bestSetLabel: 맨몸·시간·없음', () => {
+    expect(bestSetLabel([s(undefined, 8), s(undefined, 12), s(undefined, 10)])).toBe('12회');
+    expect(bestSetLabel([{ seconds: 45, warmup: false, done: true }, { seconds: 60, warmup: false, done: true }])).toBe('60초');
+    expect(bestSetLabel([s(30, 5, { done: false })])).toBeUndefined();
+    expect(bestSetLabel([])).toBeUndefined();
+  });
+  it('exerciseLines: 완료 세트가 있는 종목만, 이름·세트 수·최고', () => {
+    const w = wk('x', at(2026, 10, 3), [
+      { id: 'curl', sets: [s(12, 10), s(12, 12), s(10, 12, { done: false })] },
+      { id: 'bench', sets: [s(60, 5, { done: false })] },
+      { id: 'ghost', sets: [s(5, 5)] },
+    ]);
+    expect(exerciseLines(w, byId)).toEqual([
+      { exerciseId: 'curl', name: 'curl', sets: 2, best: '12kg × 12회' },
+      { exerciseId: 'ghost', name: 'ghost', sets: 1, best: '5kg × 5회' },
+    ]);
+    expect(exerciseLines(wk('e', at(2026, 10, 3), []), byId)).toEqual([]);
+  });
+  it('heatBucket 경계: 0 / 1~4 / 5~9 / 10+', () => {
+    expect([0, 1, 4, 5, 9, 10, 25].map(heatBucket)).toEqual([0, 1, 1, 2, 2, 3, 3]);
+  });
 });
