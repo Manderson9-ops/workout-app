@@ -32,10 +32,10 @@ const MAX_WEEKS_BACK = 11; // 이번 주 포함 12주
 const MARK = 10; // 연구 참고선 (부위당 주 10세트)
 
 /** 지난주 같은 요일까지와의 차이. 화면에는 기호, 화면 읽기에는 문장 (기호는 aria-hidden) */
-function Delta({ cur, prev, unit = '', conv = (n: number) => n }: { cur: number; prev: number; unit?: string; conv?: (n: number) => number }) {
-  const d = conv(Math.abs(cur - prev));
-  if (cur === prev || d === 0) return <span class="delta"><span aria-hidden="true">–</span><span class="sr-only">지난주와 같음</span></span>;
-  const txt = `${d.toLocaleString()}${unit}`;
+function Delta({ cur, prev, unit = '', fmt }: { cur: number; prev: number; unit?: string; fmt?: (absDiff: number) => string }) {
+  const abs = Math.abs(cur - prev);
+  if (cur === prev) return <span class="delta"><span aria-hidden="true">–</span><span class="sr-only">지난주와 같음</span></span>;
+  const txt = fmt ? fmt(abs) : `${abs.toLocaleString()}${unit}`;
   return cur > prev
     ? <span class="delta up"><span aria-hidden="true">▲{txt}</span><span class="sr-only">지난주보다 {txt} 많음</span></span>
     : <span class="delta"><span aria-hidden="true">▼{txt}</span><span class="sr-only">지난주보다 {txt} 적음</span></span>;
@@ -50,7 +50,7 @@ function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string
     { k: '운동', v: `${cur.count}회`, d: <Delta cur={cur.count} prev={prev.count} /> },
     { k: '작업 세트', v: String(cur.sets), d: <Delta cur={cur.sets} prev={prev.sets} /> },
     { k: '볼륨', v: `${cur.volume.toLocaleString()}kg`, d: <Delta cur={cur.volume} prev={prev.volume} unit="kg" /> },
-    { k: '시간', v: durText(cur.durationSec), d: <Delta cur={cur.durationSec} prev={prev.durationSec} unit="분" conv={(n) => Math.round(n / 60)} /> },
+    { k: '시간', v: durText(cur.durationSec), d: <Delta cur={cur.durationSec} prev={prev.durationSec} fmt={durText} /> },
   ];
   return (
     <>
@@ -73,11 +73,11 @@ function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string
             <div class="tile" key={t.k}>
               <div class="sub small">{t.k}</div>
               <div class="tv">{t.v}</div>
-              <div class="small sub">지난주 같은 요일까지 대비 {t.d}</div>
+              <div class="small sub tile-delta">{t.d}</div>
             </div>
           ))}
         </div>
-        <p class="sub small" style={{ margin: '8px 0 0' }}>연속 {weekStreak(done, today)}주 · 일요일~토요일 기준</p>
+        <p class="sub small" style={{ margin: '8px 0 0' }}>▲▼ = 지난주 같은 요일({WD[0]}{ymd(today).getDay() > 0 ? `~${WD[ymd(today).getDay()]}` : ''})까지와 비교 · 연속 {weekStreak(done, today)}주 · 일요일~토요일 기준</p>
       </div>
     </>
   );
@@ -224,7 +224,7 @@ export function Stats({ s }: { s: AppState }) {
           <h2>예상 시간 대비 실제</h2>
           <div class="card" aria-label="예상 시간 대비 실제">
             <p>최근 {pva.n}회 평균: {Math.abs(pva.avgDiffSec) < 60 ? '예상과 거의 같아요' : `예상보다 ${Math.round(Math.abs(pva.avgDiffSec) / 60)}분 ${pva.avgDiffSec > 0 ? '더 걸려요' : '덜 걸려요'}`} <span class="sub small">(실제 ÷ 예상 = {pva.avgRatio})</span></p>
-            <BarChart label="최근 운동 실제 시간(분)" unit="분" points={sums.filter((x) => x.plannedSec).slice(0, 8).reverse().map((x) => ({ label: md(x.date), value: Math.round(x.durationSec / 60) }))} />
+            <BarChart label="최근 운동 실제 시간(분)" unit="분" points={sums.filter((x) => x.plannedSec && x.workSets > 0).slice(0, 8).reverse().map((x) => ({ label: md(x.date), value: Math.round(x.durationSec / 60) }))} />
             <p class="sub small">플랜의 예상 시간과 비교해요. 차이가 계속 크면 알려 주세요 (시간 계산을 고칠 수 있어요).</p>
           </div>
         </>

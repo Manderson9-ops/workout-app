@@ -95,6 +95,7 @@ export function addDays(date: string, n: number): string {
 /** 운동 시간 문구 (기록 탭 전체 공통): 60초 미만 "N초", 1시간 미만 "N분", 이상 "N시간 M분" (M이 0이면 "N시간"). 분을 먼저 반올림한 뒤 나눠서 "1:60" 같은 올림 오류가 없음 */
 export function durText(sec: number): string {
   const s = Math.max(0, Math.round(sec));
+  if (s === 0) return '0분';
   if (s < 60) return `${s}초`;
   const m = Math.round(s / 60);
   if (m < 60) return `${m}분`;
@@ -275,7 +276,7 @@ export function weeklyTotals(workouts: Workout[], byId: Map<string, Exercise>, t
 
 /** 예상 대비 실제 시간: 예상이 있는 끝난 운동들의 평균 차이(초, +면 더 오래 걸림)와 개수 */
 export function plannedVsActual(sums: WorkoutSummary[], last = 10): { n: number; avgDiffSec: number; avgRatio: number } | undefined {
-  const xs = sums.filter((x) => x.plannedSec && x.durationSec > 0).slice(0, last);
+  const xs = sums.filter((x) => x.plannedSec && x.durationSec > 0 && x.workSets > 0).slice(0, last); // 완료 세트 0 운동은 제외 (D-054)
   if (!xs.length) return undefined;
   const avgDiffSec = Math.round(xs.reduce((s, x) => s + (x.durationSec - x.plannedSec!), 0) / xs.length);
   const avgRatio = Math.round((xs.reduce((s, x) => s + x.durationSec / x.plannedSec!, 0) / xs.length) * 100) / 100;

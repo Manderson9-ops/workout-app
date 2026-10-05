@@ -1858,3 +1858,26 @@ test('끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으�
   await pc.mouse.up();
   await ctx.close();
 });
+
+test('기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안내·지난주 요약·"운동 시작" → 운동 화면, 타일 증감 한 줄', async ({ page }) => {
+  // 지난주 일요일 10시에 끝난 운동 하나를 저장소에 직접 넣음 (이번 주 일~토와 겹치지 않음)
+  await page.evaluate(async () => {
+    const d = new Date(); const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay() - 7, 10, 0);
+    const w = { id: 'w-lastweek', name: '지난주 팔', startedAt: start.toISOString(), endedAt: new Date(start.getTime() + 30 * 60000).toISOString(), timer: null,
+      blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: 'barbell_curl', target: { sets: 1, reps: 10 }, sets: [{ weight: 30, reps: 10, warmup: false, done: true }] }] }] };
+    await new Promise<void>((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => { const db = r.result; const tx = db.transaction('workouts', 'readwrite'); tx.objectStore('workouts').put(w); tx.oncomplete = () => { db.close(); res(); }; tx.onerror = () => rej(tx.error); }; r.onerror = () => rej(r.error); });
+  });
+  await page.reload();
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByText('이번 주는 아직 운동이 없어요')).toBeVisible();
+  await expect(page.getByText('지난주: 이두 1세트')).toBeVisible();
+  await expect(page.getByTestId('part-row')).toHaveCount(0);
+  await expect(page.getByTestId('this-week')).toContainText('지난주 같은 요일');
+  // 타일 증감은 한 줄 (390px)
+  const hs = await page.locator('.tile-delta').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+  expect(hs).toHaveLength(4);
+  for (const h of hs) expect(h, '타일 증감 줄 높이(한 줄)').toBeLessThan(24);
+  await checkScreen(page, '10b-stats-empty-week');
+  await page.getByRole('button', { name: '운동 시작' }).click();
+  await expect(page).toHaveURL(/#\/workout/);
+});

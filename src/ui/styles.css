@@ -283,3 +283,4 @@ button.wcard.dim { opacity: .6; }
   html:not(.phone-view) .bodyheat .bodymap-svg { width: 150px; }
   html:not(.phone-view) .part-grid .part-bars { flex: 1; }
 }
+.tile-delta { white-space: nowrap; min-height: 18px; }

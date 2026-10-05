@@ -156,6 +156,10 @@ describe('주간 합계·예상 대비 실제', () => {
     const sums = [b, a, old].map((x) => summarize(x, byId));
     expect(plannedVsActual(sums)).toEqual({ n: 2, avgDiffSec: 600, avgRatio: 1.2 }); // +20분, -10분 → 평균 +10분
     expect(plannedVsActual([summarize(old, byId)])).toBeUndefined();
+    // 완료 세트 0 운동(예상 시간이 있어도)은 평균에서 제외
+    const zero = wk('z', at(2026, 9, 30, 15), [{ id: 'bench', sets: [s(50, 10, { done: false })] }], 5, { plannedSec: 3000 });
+    expect(plannedVsActual([summarize(zero, byId), ...sums])).toEqual({ n: 2, avgDiffSec: 600, avgRatio: 1.2 });
+    expect(plannedVsActual([summarize(zero, byId)])).toBeUndefined();
   });
 });
 
@@ -223,7 +227,9 @@ describe('이번 주 요약·최고 세트·종목 줄 (D-054)', () => {
 
 describe('D-054 2차: 시간 문구·0세트 제외·지난주 같은 요일까지·일요일 경계', () => {
   it('durText: 초/분/시간 경계, 올림 carry 없음', () => {
-    expect(durText(0)).toBe('0초');
+    expect(durText(0)).toBe('0분');
+    expect(durText(1)).toBe('1초');
+    expect(durText(9360)).toBe('2시간 36분'); // 시간 타일 증감 문구
     expect(durText(59)).toBe('59초');
     expect(durText(60)).toBe('1분');
     expect(durText(3599)).toBe('1시간'); // 59분 59초 → 반올림 60분 = 1시간 (60분 표기 없음)
