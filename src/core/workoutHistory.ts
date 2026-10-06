@@ -100,3 +100,12 @@ export function workoutPRs(w: Workout, history: readonly Workout[]): Map<string,
 export function prExerciseCount(w: Workout, history: readonly Workout[]): number {
   return new Set([...workoutPRs(w, history).keys()].map((k) => k.split('-').slice(0, 2).join('-'))).size;
 }
+
+/**
+ * 휴식 고리 (D-055 2단계): 남은 비율만큼 칠해진 고리 → 휴식이 흐를수록 줄어듦.
+ * stroke-dasharray = 둘레, stroke-dashoffset = 둘레 × (1 − 남은 비율). total 이 0 이하이거나 값이 이상하면 빈 고리
+ */
+export function ringDash(remainingSec: number, totalSec: number, circumference: number): { dasharray: number; dashoffset: number; fraction: number } {
+  const f = totalSec > 0 && Number.isFinite(remainingSec) ? Math.min(1, Math.max(0, remainingSec / totalSec)) : 0;
+  return { dasharray: circumference, dashoffset: circumference * (1 - f), fraction: f };
+}

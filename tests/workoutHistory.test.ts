@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { previousSetsFor, prevFor, prevText, isPR, bestsFrom, workoutPRs, prExerciseCount } from '../src/core/workoutHistory';
+import { ringDash, previousSetsFor, prevFor, prevText, isPR, bestsFrom, workoutPRs, prExerciseCount } from '../src/core/workoutHistory';
 import type { Workout, SetLog } from '../src/core/session';
 
 const S = (weight: number | undefined, reps: number | undefined, o: Partial<SetLog> = {}): SetLog => ({ weight, reps, warmup: false, done: true, ...o });
@@ -58,5 +58,21 @@ describe('D-055 2단계: 기록 갱신 (isPR, 앱 기준)', () => {
     expect([...m.keys()]).toEqual(['0-0-0', '0-0-2']);
     expect(prExerciseCount(cur, h)).toBe(1);
     expect(workoutPRs(cur, []).size).toBe(0); // 지난 기록이 없으면 없음
+  });
+});
+
+describe('D-055 2단계: 휴식 고리는 남은 비율 (줄어듦)', () => {
+  const C = 100;
+  it('시작 = 꽉 참, 절반 = 반, 10/120초 = 거의 빔, 끝 = 빔', () => {
+    expect(ringDash(120, 120, C)).toEqual({ dasharray: 100, dashoffset: 0, fraction: 1 });
+    expect(ringDash(60, 120, C).dashoffset).toBeCloseTo(50);
+    expect(ringDash(10, 120, C).fraction).toBeCloseTo(10 / 120);
+    expect(ringDash(10, 120, C).dashoffset).toBeCloseTo(100 - 100 / 12);
+    expect(ringDash(0, 120, C).dashoffset).toBe(100);
+  });
+  it('이상한 값은 빈 고리, 남은 시간이 더 길면 꽉 참', () => {
+    expect(ringDash(5, 0, C).fraction).toBe(0);
+    expect(ringDash(Number.NaN, 60, C).fraction).toBe(0);
+    expect(ringDash(200, 120, C).fraction).toBe(1);
   });
 });

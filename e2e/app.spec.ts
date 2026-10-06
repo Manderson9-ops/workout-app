@@ -2099,7 +2099,9 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   // 다음 운동 (앱 판단): 하나뿐인 루틴을 오늘 했으면 그대로 보이고 이유 줄 "오늘 이미 했어요"
   await expect(next).toContainText('오늘 이미 했어요');
   // 390×844 첫 화면: 백업 알림은 다음 운동 아래, [▶ 시작]은 탭 바 위에 다 보임 (검토 A3)
-  await page.evaluate(() => window.scrollTo(0, 0));
+  // 재기 전에 초점·스크롤이 가라앉게 (Chromium 모바일 흉내에서 한 번 탭 바 위치가 흔들린 적 있음)
+  await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur(); window.scrollTo(0, 0); });
+  await page.waitForTimeout(300);
   const backup = page.getByRole('note', { name: '백업 알림' });
   await expect(backup).toBeVisible();
   const startBox = (await next.getByRole('button', { name: /^다음 운동으로 시작/ }).boundingBox())!;
@@ -2211,6 +2213,25 @@ test('D-055 2단계 운동 화면: 숫자 3개·세트 표(지난번)·완료 �
   // 알약은 아래 메뉴 위에 뜸 (겹치지 않음)
   const pb = (await pill.boundingBox())!; const nb = (await page.locator('nav.nav').boundingBox())!;
   expect(pb.y + pb.height).toBeLessThanOrEqual(nb.y);
+  // 도크 하나: 휴식 중에는 알약 안에 둥근 ✓(현재 세트 완료), 도크+메뉴 ≤ 화면 높이 22% (844 → 185px)
+  await expect(pill.getByRole('button', { name: '현재 세트 완료' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '현재 세트 완료' })).toHaveCount(1);
+  const vh = page.viewportSize()!.height;
+  const dock = (await page.locator('.timer').boundingBox())!;
+  expect(vh - dock.y, '도크+메뉴 높이').toBeLessThanOrEqual(vh * 0.22);
+  // 맨 아래까지 내리면 마지막 내용(운동 끝내기 버튼)이 도크 위로 올라옴 (가려지지 않음)
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const lastBtn = (await page.getByRole('button', { name: '운동 끝내기', exact: true }).boundingBox())!;
+  expect(lastBtn.y + lastBtn.height, '마지막 버튼 아래 끝 ≤ 도크 위 끝').toBeLessThanOrEqual((await page.locator('.timer').boundingBox())!.y);
+  // 고리 = 남은 비율 (휴식 도중: 시계를 앞당겨 흉내)
+  const total = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
+  const ringEl = pill.locator('svg.ring');
+  expect(Number(await ringEl.getAttribute('data-fraction'))).toBeGreaterThan(0.9);
+  await page.evaluate((ms) => { const o = Date.now.bind(Date); (window as Window & { __dn?: () => number }).__dn = o; Date.now = () => o() + ms; }, Math.round(total * 500));
+  await expect.poll(async () => Number(await ringEl.getAttribute('data-fraction'))).toBeLessThan(0.6);
+  const remMid = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
+  expect(Math.abs(Number(await ringEl.getAttribute('data-fraction')) - remMid / total)).toBeLessThan(0.06);
+  await page.evaluate(() => { const w = window as Window & { __dn?: () => number }; if (w.__dn) Date.now = w.__dn; });
   await checkScreen(page, '73-workout-rest-pill');
   await expect(metrics.getByText(/^1\/\d+세트$/)).toBeVisible();
   await expect(metrics).toContainText('200kg'); // 볼륨 20 × 10

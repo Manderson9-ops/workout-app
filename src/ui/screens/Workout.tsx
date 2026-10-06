@@ -12,7 +12,7 @@ import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, MenuSheet, Me
 import type { MenuItem } from '../components';
 import { Icon } from '../icons';
 import { summarize } from '../../core/stats';
-import { previousSetsFor, prevFor, prevText, workoutPRs, prExerciseCount } from '../../core/workoutHistory';
+import { previousSetsFor, prevFor, prevText, workoutPRs, prExerciseCount, ringDash } from '../../core/workoutHistory';
 import { showToast } from '../toast';
 import { ScreenHeader } from '../header';
 import { resolveGrade } from '../../core/exercises';
@@ -143,11 +143,19 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     return (
       <div class="set-detail">
         {isCur && (
-          <div class="grid2">
-            <Stepper pendingKey={`${b}-${i}-${k}-w2`} label={`${label} 무게 조절`} value={x.weight} step={2.5} suffix="kg" onStep={(d) => void upd((cw) => stepSet(cw, st, 'weight', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
-            {timeEx
-              ? <Stepper integer pendingKey={`${b}-${i}-${k}-s2`} label={`${label} 초 조절`} value={x.seconds} step={5} suffix="초" onStep={(d) => void upd((cw) => stepSet(cw, st, 'seconds', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
-              : <Stepper integer pendingKey={`${b}-${i}-${k}-r2`} label={`${label} 횟수 조절`} value={x.reps} step={1} suffix="회" onStep={(d) => void upd((cw) => stepSet(cw, st, 'reps', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
+          /* 값은 위 줄 칸에만 (되풀이하지 않음). 버튼만: kg −2.5 +2.5 · 회 −1 +1 (시간 운동은 초 −5 +5) */
+          <div class="row nudge" role="group" aria-label={`${label} 빠른 조절`}>
+            <span class="nudge-k" aria-hidden="true">kg</span>
+            <button class="tonal nudge-b" aria-label={`${label} 무게 조절 줄이기`} title="2.5kg 줄이기" onClick={() => void upd((cw) => stepSet(cw, st, 'weight', -2.5))}>−2.5</button>
+            <button class="tonal nudge-b" aria-label={`${label} 무게 조절 늘리기`} title="2.5kg 늘리기" onClick={() => void upd((cw) => stepSet(cw, st, 'weight', 2.5))}>+2.5</button>
+            <span class="nudge-k" aria-hidden="true">{timeEx ? '초' : '회'}</span>
+            {timeEx ? <>
+              <button class="tonal nudge-b" aria-label={`${label} 초 조절 줄이기`} title="5초 줄이기" onClick={() => void upd((cw) => stepSet(cw, st, 'seconds', -5))}>−5</button>
+              <button class="tonal nudge-b" aria-label={`${label} 초 조절 늘리기`} title="5초 늘리기" onClick={() => void upd((cw) => stepSet(cw, st, 'seconds', 5))}>+5</button>
+            </> : <>
+              <button class="tonal nudge-b" aria-label={`${label} 횟수 조절 줄이기`} title="1회 줄이기" onClick={() => void upd((cw) => stepSet(cw, st, 'reps', -1))}>−1</button>
+              <button class="tonal nudge-b" aria-label={`${label} 횟수 조절 늘리기`} title="1회 늘리기" onClick={() => void upd((cw) => stepSet(cw, st, 'reps', 1))}>+1</button>
+            </>}
           </div>
         )}
         <div class="row wrap small set-tools">
@@ -217,8 +225,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const infoLink = (exId: string) => {
     const ex = byId.get(exId);
     return hasDbInfo(ex)
-      ? <a class="btn info-db icon-btn round" href={`#/exercises/${encodeURIComponent(exId)}`} aria-label={`${nameOf(exId)} 정보 (내 운동 DB: 영상 등급·자세 포인트)`} title="내 운동 DB 있음 (영상 등급·자세 포인트)"><Icon name="exercises" size={20} /></a>
-      : <a class="btn ghost icon-btn round" href={`#/exercises/${encodeURIComponent(exId)}`} aria-label={`${nameOf(exId)} 정보 (DB 없음)`} title="정보 (내 운동 DB 없음)"><Icon name="info" size={20} /></a>;
+      ? <a class="btn info-btn info-db" href={`#/exercises/${encodeURIComponent(exId)}`} aria-label={`${nameOf(exId)} 정보 (내 운동 DB: 영상 등급·자세 포인트)`} title="내 운동 DB 있음 (영상 등급·자세 포인트)"><span class="ib-dot"><Icon name="exercises" size={18} /></span></a>
+      : <a class="btn info-btn" href={`#/exercises/${encodeURIComponent(exId)}`} aria-label={`${nameOf(exId)} 정보 (DB 없음)`} title="정보 (내 운동 DB 없음)"><span class="ib-dot"><Icon name="info" size={18} /></span></a>;
   };
 
   // 브라우저 기본 confirm()은 조용히 취소될 수 있어 앱 안 확인 창을 씀 (D-038)
@@ -231,8 +239,11 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const delta = prog.deltaSec;
   const timerOn = !!w.timer && (rem > 0 || ended);
   const total = w.timer ? Math.max(1, Math.round((w.timer.endsAt - w.timer.startedAt) / 1000)) : 1;
-  const frac = Math.min(1, Math.max(0, rem / total));
-  const R = 18; const C = 2 * Math.PI * R;
+  const R = 18; const ring = ringDash(rem, total, 2 * Math.PI * R); // 남은 비율만큼 칠함 → 줄어듦
+  // 다음 세트 요약 (도크 한 줄, 캡션)
+  const curSetLabel = cur && curItem ? (curItem.sets[cur.set]!.warmup ? '웜업' : `${curItem.sets.slice(0, cur.set + 1).filter((z) => !z.warmup).length}세트`) : '';
+  const curLetter = cur && w.blocks[cur.block]!.kind !== 'single' ? `${String.fromCharCode(65 + cur.item)}. ` : '';
+  const nextText = cur && curItem ? `${curLetter}${nameOf(curItem.exerciseId)} ${curSetLabel}` : '';
   const menuItem = menu ? w.blocks[menu.b]?.items[menu.i] : undefined;
 
   return (
@@ -311,31 +322,37 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       <button class="big" onClick={() => setPicker({ mode: 'add' })}>+ 운동 추가</button>
       <button class="big danger" style={{ marginTop: '8px' }} onClick={finish}>운동 끝내기</button>
 
-      {/* 휴식 타이머 알약 (D-055 2단계) + 현재 세트 완료. 아래 메뉴 바로 위에 뜸 */}
-      <div class={`timer ${w.timer && rem === 0 ? 'end flash' : ''}`} role="timer" aria-live="polite">
+      {/* 아래 도크 하나 (D-055 2단계): 휴식 중 = [고리·남은 시간·다음] [−15] [+15] [건너뛰기] [✓ 현재 세트 완료], 아닐 때 = 넓은 완료 버튼 한 줄 */}
+      <div class={`timer dock${w.timer && rem === 0 ? ' end flash' : ''}`} role="timer" aria-live="polite">
         {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" style={{ margin: 0 }}>⚠️ {finishErr}</p><button class="ghost" aria-label="알림 닫기" onClick={() => setFinishError(null)}>✕</button></div>}
         {timerOn && w.timer ? (
           <div class={`rest-pill${rem === 0 ? ' end' : ''}`}>
-            <svg class="ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+            <svg class="ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" data-fraction={ring.fraction.toFixed(3)}>
               <circle cx="22" cy="22" r={R} class="ring-bg" />
-              <circle cx="22" cy="22" r={R} class="ring-fg" stroke-dasharray={`${C}`} stroke-dashoffset={`${C * (1 - frac)}`} transform="rotate(-90 22 22)" />
+              <circle cx="22" cy="22" r={R} class="ring-fg" stroke-dasharray={`${ring.dasharray}`} stroke-dashoffset={`${ring.dashoffset}`} transform="rotate(-90 22 22)" />
             </svg>
             <div class="rp-mid grow">
-              <div class="rp-label">{rem > 0 ? w.timer.label : '휴식 끝! 다음 세트'}</div>
               <div class="rp-num" aria-label={`휴식 남은 시간 ${rem}초`}>{mmss(rem)}</div>
+              {/* 화면에는 짧게 "다음: …", 화면 읽기·시험에는 휴식 이름 전체 */}
+              <div class="rp-label" aria-hidden="true">{rem > 0 ? (curSetLabel ? `다음 ${curLetter.replace('. ', ' ')}${curSetLabel}` : '휴식') : '휴식 끝!'}</div>
+              <span class="sr-only">{rem > 0 ? w.timer.label : '휴식 끝! 다음 세트'}{nextText ? ` · 다음 ${nextText}` : ''}</span>
             </div>
             <button class="rp-btn" aria-label="15초 줄이기" onClick={() => upd((cw) => adjustTimer(cw, -15, Date.now()))}>−15</button>
             <button class="rp-btn" aria-label="15초 늘리기" onClick={() => upd((cw) => adjustTimer(cw, 15, Date.now()))}>+15</button>
             <button class="rp-btn" aria-label="휴식 건너뛰기" onClick={() => { setEnded(false); void upd((cw) => clearTimer(cw)); }}><Icon name="skip" size={20} /></button>
+            {cur && curItem && (
+              <button class="rp-done" onClick={() => complete(cur)} aria-label="현재 세트 완료" title={`${nextText} 완료`}>
+                <Icon name="check" size={22} /><span class="sr-only">{nextText} 완료</span>
+              </button>
+            )}
           </div>
-        ) : null}
-        {cur && curItem ? (
-          <button class="ok big wk-done" onClick={() => complete(cur)} aria-label="현재 세트 완료">
-            <Icon name="check" size={20} /><span class="wd-text">{nameOf(curItem.exerciseId)} {curItem.sets[cur.set]!.warmup ? '웜업' : `${curItem.sets.slice(0, cur.set + 1).filter((z) => !z.warmup).length}세트`} 완료</span>
-            {nextRest ? <span class="small wd-rest"> → 휴식 {nextRest.sec}초</span> : null}
+        ) : cur && curItem ? (
+          <button class="ok wk-done" onClick={() => complete(cur)} aria-label="현재 세트 완료">
+            <Icon name="check" size={20} /><span class="wd-text">{nextText} 완료</span>
+            {nextRest ? <span class="small wd-rest">→ 휴식 {nextRest.sec}초</span> : null}
           </button>
         ) : (
-          <button class="primary big" onClick={() => void doFinish(w.id)}>모든 세트 완료 · 운동 끝내기</button>
+          <button class="primary wk-done" onClick={() => void doFinish(w.id)}>모든 세트 완료 · 운동 끝내기</button>
         )}
       </div>
 

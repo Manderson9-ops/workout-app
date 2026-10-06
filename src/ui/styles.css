@@ -149,7 +149,7 @@ html.editing main { padding-bottom: 40px; }
   html:not(.phone-view) .timer { left: 200px; right: 0; bottom: 0; padding: 0 24px 16px; max-width: none; }
   html:not(.phone-view) .timer > * { width: 100%; max-width: 640px; margin-left: auto; margin-right: auto; }
   html:not(.phone-view) .set-table, html:not(.phone-view) .set-detail { max-width: 560px; }
-  html:not(.phone-view) .wk-main { padding-bottom: 200px; }
+  html:not(.phone-view) .wk-main { padding-bottom: calc(var(--dock-h) + 56px); }
   html:not(.phone-view) .sheet { left: 200px; right: 0; max-width: 640px; margin: 0 auto; border-radius: var(--r-sheet) var(--r-sheet) 0 0; }
   html:not(.phone-view) .wide-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   html:not(.phone-view) .wide-cards > .card, html:not(.phone-view) .wide-cards > .wcard-wrap > .wcard { margin: 0; }
@@ -440,7 +440,7 @@ html.editing .nav-scrim { display: none; }
 .delta .d-cap { color: var(--sub); font-weight: 500; font-size: 12px; }
 
 /* ===== D-055 2단계: 운동 중 화면 ===== */
-.wk-main { padding-bottom: calc(var(--nav-space) + 200px); }
+.wk-main { --dock-h: 60px; padding-bottom: calc(var(--nav-space) + var(--dock-h) + 40px); } /* 도크 높이만큼 비워 마지막 카드가 도크 위로 올라옴 */
 .wk-actions { justify-content: flex-end; }
 .wk-finish { min-width: 88px; }
 .wk-metrics { padding: 14px 16px 12px; margin: 12px 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); } /* .card 가 아님: 운동 카드 목록(.card)과 구분 */
@@ -502,13 +502,30 @@ button.tonal { background: var(--acc-soft); border-color: transparent; color: va
 .rp-label { font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rest-pill.end .rp-label { color: var(--on-ok); }
 .rp-num { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.rp-btn { min-width: 48px; border-radius: var(--r-pill); padding: 0 10px; background: var(--card2); font-variant-numeric: tabular-nums; }
+.rp-btn { min-width: 44px; height: 44px; border-radius: var(--r-pill); padding: 0 10px; background: var(--card2); font-variant-numeric: tabular-nums; }
 .rest-pill.end .rp-btn { background: transparent; border-color: var(--on-ok); color: var(--on-ok); }
 .wk-done { box-shadow: var(--shadow-float); }
 .app-toast { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-space) + 72px); z-index: 44; max-width: 520px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; border-radius: var(--r-btn); background: var(--card3); border: 1px solid var(--pr); box-shadow: var(--shadow-float); font-weight: 700; }
 @media (min-width: 900px) { html:not(.phone-view) .app-toast { left: 200px; right: 24px; bottom: 16px; } }
 .wd-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wd-rest { flex: none; font-weight: 500; white-space: nowrap; }
-.wk-done { min-height: 52px; justify-content: center; }
+.wd-rest { flex: none; font-weight: 500; white-space: nowrap; margin-left: 4px; }
+.wk-done { width: 100%; min-height: 52px; max-height: 56px; justify-content: center; font-size: 16px; border-radius: var(--r-pill); box-shadow: var(--shadow-float); }
 .set-tools .chip { min-width: 44px; padding: 0 10px; }
-.wk-item-head .icon-btn.round.info-db { background: var(--video); border-color: var(--video); color: var(--on-video); }
+/* D-055 2단계 고침: 도크 하나 (휴식 중엔 알약 한 줄에 ✓ 까지) */
+.rest-pill { min-height: var(--dock-h, 60px); }
+.rp-done { flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; background: var(--ok); border-color: var(--ok); color: var(--on-ok); margin-left: 2px; }
+.rest-pill.end .rp-done { background: var(--on-ok); color: var(--ok); border-color: var(--on-ok); }
+.rp-num { line-height: 1.05; }
+.rp-label { margin-top: 1px; }
+/* 지금 세트: 값을 되풀이하지 않는 −/+ 버튼만 */
+.nudge { gap: 6px; margin: 4px 0 2px 44px; flex-wrap: wrap; }
+.nudge-k { font-size: 12px; font-weight: 600; color: var(--sub); min-width: 18px; text-align: right; }
+.nudge-b { min-width: 52px; padding: 0 8px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.nudge-k + .nudge-b { margin-left: -2px; }
+/* 정보: 누르는 곳 44, 보이는 원 32, 내 운동 DB 가 있으면 아이콘·테두리만 보라 */
+.btn.info-btn { width: 44px; height: 44px; min-width: 44px; padding: 0; background: transparent; border: 0; color: var(--sub); flex: none; }
+.ib-dot { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; }
+.btn.info-btn.info-db { background: transparent; border: 0; color: var(--video); }
+.btn.info-btn.info-db .ib-dot { border-color: var(--video); }
+/* 긴 운동 이름은 2줄까지, 넘치면 … */
+.wk-item-head strong, .wk-title strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
