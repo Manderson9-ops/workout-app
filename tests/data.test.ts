@@ -21,12 +21,33 @@ describe('운동 데이터 검증', () => {
     expect(base.length).toBeLessThanOrEqual(200);
     expect(new Set(base.map((e) => e.part)).size).toBe(8);
   });
-  it('WORK_OUT_K 영상 등급 87개가 78개 운동에 연결, 미적용은 결정으로 뺀 것만 (M-15·16·22·24·26)', () => {
-    expect(Object.keys(wk.grades).length).toBe(78);
-    expect(Object.values(wk.grades).flat().length).toBe(87);
+  it('WORK_OUT_K 영상 등급 91개가 82개 운동에 연결, 미적용은 결정으로 뺀 것만 (M-15·16·22·24·26·31)', () => {
+    expect(Object.keys(wk.grades).length).toBe(82);
+    expect(Object.values(wk.grades).flat().length).toBe(91);
     const un = (wkFile as { unapplied: { reason: string }[] }).unapplied;
-    expect(un.length).toBe(40);
+    expect(un.length).toBe(48);
     expect(un.every((u) => u.reason.startsWith('반영 안 함'))).toBe(true);
+  });
+  it('어깨 영상 등급 4개 (M-29·M-30): 영상에서 확정한 것만, 이름 연결은 별칭', () => {
+    const g = (id: string) => wk.grades[id]!.map((x: { value: string }) => x.value);
+    expect(g('machine_shoulder_press')).toEqual(['S']);
+    expect(g('cable_rear_delt_fly')).toEqual(['S']); // M-29: 케이블 리버스 플라이 = 케이블 리어 델트 플라이
+    expect(g('barbell_ohp')).toEqual(['B+']);
+    expect(g('db_shoulder_press')).toEqual(['B+']);
+    // 등급 글자가 자막에서 빠진 운동은 등급을 만들지 않음 (영상에 없는 등급은 만들지 않는다). 영상의 11개 중 앱에 있는 운동 + 등급 없는 어깨 운동
+    for (const id of ['smith_shoulder_press', 'arnold_press', 'db_lateral_raise', 'cable_lateral_raise', 'machine_lateral_raise', 'reverse_pec_deck', 'face_pull', 'db_rear_delt_fly', 'db_front_raise']) expect(wk.grades[id]).toBeUndefined();
+  });
+  it('바벨 전용 자세 포인트는 바벨 오버헤드 프레스에만 (머신·스미스·덤벨 프레스에 붙지 않음)', () => {
+    // CrMyjPTSbos@02:22(바벨 균형·B+·스미스로 바꾸면 등급 상승), ZqJ_OS7rTnY@07:04(바벨 불안정·전신 피로)는 WORK_OUT_K에 일반 이름 "오버헤드 프레스"로 적혀 있어 별칭 묶음으로 풀리지만 grade_rules.json guide_rules(M-30)로 바벨 OHP에만 붙임
+    const has = (id: string, vid: string, ts: string) => get(id).guide.some((g: { video_id: string; timestamp: string }) => g.video_id === vid && g.timestamp === ts);
+    for (const [vid, ts] of [['CrMyjPTSbos', '02:22'], ['ZqJ_OS7rTnY', '07:04']] as const) {
+      expect(has('barbell_ohp', vid, ts)).toBe(true);
+      for (const id of ['machine_shoulder_press', 'smith_shoulder_press', 'db_shoulder_press', 'arnold_press']) expect(has(id, vid, ts)).toBe(false);
+    }
+  });
+  it('e2e 전제: 벤트오버 리어 델트 플라이는 영상 등급·자세 포인트가 없는 "DB 없음" 운동 (바뀌면 e2e D-036 정보 버튼 테스트의 대상 운동을 바꿀 것)', () => {
+    expect(get('db_rear_delt_fly').guide.length).toBe(0);
+    expect(wk.grades['db_rear_delt_fly']).toBeUndefined();
   });
   it('분할 템플릿 8개, 추천 조합 1개', () => {
     expect(wk.templates.length).toBe(8);
@@ -122,7 +143,7 @@ describe('등급 고르기 (BLUEPRINT 3.3)', () => {
   it('자세 포인트 연결: 고블릿 스쿼트, 스쿼트 계열(M-05), 체스트 서포티드 로우 계열(M-06)', () => {
     expect(get('goblet_squat').guide.length).toBeGreaterThan(10);
     expect(get('back_squat').guide.length).toBe(16); // 초보 스쿼트 3 + 새 영상의 스쿼트·하프·풀 스쿼트 자세 포인트
-    expect(get('lever_row_machine').guide.length).toBe(7); // 등 영상 1 + 새 영상의 로우 공통·서포티드 로우 자세 포인트
+    expect(get('lever_row_machine').guide.length).toBe(9); // 등 영상 1 + 새 영상의 로우 공통·서포티드 로우 자세 포인트 + 어깨 영상 2개의 '로우' 언급(Bc27jDy5dsk 풀다운/로우 비교, ZqJ_OS7rTnY 후면 삼각근 로우)
   });
   it('무거운 운동·한쪽씩 표시 (묶음 제외, 시간 계산에 사용)', () => {
     for (const id of ['bench_press', 'back_squat', 'deadlift', 'romanian_deadlift', 'barbell_row', 'close_grip_bench', 'good_morning', 'rack_pull', 'trap_bar_deadlift']) expect(get(id).heavy).toBe(true);

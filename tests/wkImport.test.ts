@@ -80,6 +80,28 @@ describe('WORK_OUT_K 가져오기', () => {
     expect(() => runImport(input([rec([{ exercise: '체스트 서포티드 로우', grade: 'A' }])], { decisions: [] }))).toThrow('알 수 없는 결정 ID');
     expect(runImport(input([rec([])], { families: { lat: 'x', pull: 'y' }, rules: [] })).unresolved).toContain('[family 이름 없음] sup');
   });
+  it('자세 포인트 규칙(guide_rules): 일반 이름이 묶음으로 풀려도 지정한 운동에만 붙음, 쓰이지 않거나 겹치지 않으면 오류 (M-30)', () => {
+    const kp = (text: string, timestamp: string) => ({ type: 'FORM_CUE', body_part: 'BACK.LATS', exercise: '체스트 서포티드 로우', text, timestamp });
+    const r1: WkRecord = { video_id: 'v1', title: 't', channel: 'c', publish_date: '2026-01-01', key_points: [kp('모든 서포티드 로우 공통', '01:00'), kp('T바 전용', '02:00')] };
+    const base = { rules: [], decisions: [{ id: 'M-06', status: 'APPROVED' as const, title: '', proposal: '', while_pending: '' }, { id: 'M-30', status: 'APPROVED' as const, title: '', proposal: '', while_pending: '' }] };
+    const none = runImport(input([r1], base));
+    expect(none.guides.row_a!.length).toBe(2); expect(none.guides.row_b!.length).toBe(2);
+    const ruled = runImport(input([r1], { ...base, guideRules: [{ video_id: 'v1', timestamp: '02:00', exercise: '체스트 서포티드 로우', only: ['row_a'], reason: 't', decision: 'M-30' }] }));
+    expect(ruled.guides.row_a!.map((g) => g.timestamp)).toEqual(['01:00', '02:00']);
+    expect(ruled.guides.row_b!.map((g) => g.timestamp)).toEqual(['01:00']);
+    expect(ruled.unresolved).toEqual([]);
+    expect(runImport(input([r1], { ...base, guideRules: [{ video_id: 'v1', timestamp: '09:00', only: ['row_a'], reason: 't' }] })).unresolved).toContain('[규칙 미사용] 자세 포인트 v1@09:00');
+    expect(runImport(input([r1], { ...base, guideRules: [{ video_id: 'v1', timestamp: '02:00', only: ['lat_pulldown'], reason: 't' }] })).unresolved.some((u) => u.includes('겹치지 않음'))).toBe(true);
+    expect(runImport(input([r1], { ...base, guideRules: [{ video_id: 'v1', timestamp: '02:00', only: ['nope'], reason: 't' }] })).unresolved.some((u) => u.includes('앱에 없는 운동 nope'))).toBe(true);
+    // only 에 앱에는 있지만 이 항목의 연결 결과에 없는 운동이 있으면 조용히 무시하지 않고 알림
+    expect(runImport(input([r1], { ...base, guideRules: [{ video_id: 'v1', timestamp: '02:00', only: ['row_a', 'lat_pulldown'], reason: 't' }] })).unresolved.some((u) => u.includes('lat_pulldown 은(는) 이 항목의 연결 결과'))).toBe(true);
+    // 결정 상태: 대기(PENDING)는 '제안대로 적용'(다른 규칙과 같음), 거절(REJECTED)이면 규칙이 적용되지 않아 '규칙 미사용' 오류로 드러남 (조용히 잘못 붙지 않음)
+    const withM30 = (status: 'PENDING' | 'REJECTED') => ({ rules: [], decisions: [{ id: 'M-06', status: 'APPROVED' as const, title: '', proposal: '', while_pending: '' }, { id: 'M-30', status, title: '', proposal: '', while_pending: '' }] });
+    const gRule = [{ video_id: 'v1', timestamp: '02:00', only: ['row_a'], reason: 't', decision: 'M-30' }];
+    const pending = runImport(input([r1], { ...withM30('PENDING'), guideRules: gRule }));
+    expect(pending.guides.row_b!.map((g) => g.timestamp)).toEqual(['01:00']);
+    expect(runImport(input([r1], { ...withM30('REJECTED'), guideRules: gRule })).unresolved).toContain('[규칙 미사용] 자세 포인트 v1@02:00');
+  });
   it('참고용 표시는 같은 운동에 주제 영상 등급이 있을 때만', () => {
     const rules = [{ video_id: 'v1', exercise: '랫풀다운', grade: 'A', primary_topic: false }];
     const only = runImport(input([rec([{ exercise: '랫풀다운', grade: 'A' }])], { rules }));

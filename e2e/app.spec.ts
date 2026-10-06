@@ -838,13 +838,36 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
 
   // 기록 탭: 이번 주 1회, 오늘 달력 표시 → 상세
   await page.getByRole('link', { name: '기록' }).click();
-  await expect(page.getByText('1회', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('this-week')).toContainText('1회');
+  // D-054: 일요일 시작 달력, 이번 주 요일 띠(7칸, 운동한 날 표시), 월 회수
+  await expect(page.locator('.cal-wd').first()).toHaveText('일');
+  await expect(page.locator('.cal-wd').nth(6)).toHaveText('토');
+  const dayStrip = page.getByRole('list', { name: '이번 주 운동한 날' }).getByRole('listitem');
+  await expect(dayStrip).toHaveCount(7);
+  await expect(dayStrip.first()).toContainText('일');
+  await expect(dayStrip.last()).toContainText('토');
+  await expect(page.locator('.daydot.did')).toHaveCount(1);
+  await expect(page.locator('.daydot.did')).toHaveAttribute('aria-label', /운동함/);
+  await expect(page.getByText(/이번 달 1회/)).toBeVisible();
   const d = new Date();
   const todayBtn = page.getByRole('button', { name: `${d.getMonth() + 1}월 ${d.getDate()}일 운동 1회` });
   await expect(todayBtn).toBeEnabled();
   await todayBtn.click();
   await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
-  await expect(page.getByRole('img', { name: /이번 주 부위별 작업 세트: .*이두 1세트/ })).toBeVisible();
+  // 부위별 세트: 이두 줄에 1세트, 열 지도, 운동 기록 카드에 종목 줄(최고)
+  await expect(page.getByTestId('part-row').filter({ hasText: '이두' })).toContainText('1세트');
+  await expect(page.getByTestId('bodyheat')).toBeVisible();
+  await expect(page.getByTestId('bodyheat').locator('svg')).toHaveCount(2); // 앞·뒤 나란히
+  await expect(page.getByRole('button', { name: /^팔 테스트,.*세트 1,.*바벨 컬 1세트 최고 30kg × 10회/ }).first()).toBeVisible(); // 카드 요약 이름
+  await expect(page.getByRole('group', { name: /부위별 세트 열 지도: .*이두 1세트/ })).toBeVisible();
+  const wcard = page.getByRole('button', { name: /팔 테스트/ }).first();
+  await expect(wcard).toContainText('바벨 컬 · 1세트 · 최고 30kg × 10회');
+  // 빈 주: 이전 주로 가면 안내 문구, 다시 이번 주로
+  await page.getByRole('button', { name: '이전 주' }).click();
+  await expect(page.getByText('이 주에는 운동 기록이 없어요')).toBeVisible();
+  await expect(page.getByTestId('part-row')).toHaveCount(0);
+  await page.getByRole('button', { name: '다음 주' }).click();
+  await expect(page.getByTestId('part-row').first()).toBeVisible();
   await expect(page.getByRole('table', { name: '최근 4주 부위별 작업 세트' })).toContainText('이두');
   await expect(page.getByRole('img', { name: /최근 8주 주간 볼륨: .*300kg/ })).toBeVisible();
   // 체중: 범위 밖은 거절, 정상 값 기록
@@ -1332,7 +1355,7 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await expect(page.getByText(/에 고침$/)).toBeVisible();
   await expect(page.getByText(/42\.5kg × \d+회 · RIR 2/)).toBeVisible();
   await expect(page.getByText(/작업 세트 2/)).toBeVisible();
-  await expect(page.getByText(/45:00/)).toBeVisible();
+  await expect(page.getByText(/45분/)).toBeVisible();
   // 홈 카드에도 반영, 그리고 삭제
   await page.getByRole('link', { name: '홈' }).click();
   const card2 = page.getByLabel('최근 운동 등 (고침)', { exact: true });
@@ -1355,7 +1378,7 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await expect(page.getByRole('status').filter({ hasText: '홈에서 뺐어요' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '최근 운동' })).toHaveCount(0);
   await page.getByRole('link', { name: '기록' }).click();
-  const row = page.getByRole('button', { name: /등 \(고침\) \(홈에서 뺌\)$/ });
+  const row = page.getByRole('button', { name: /^등 \(고침\),.*\(홈에서 뺌\)$/ });
   await expect(row).toBeVisible();
   await expect(row).toContainText('홈에서 뺌');
   await expect(page.getByText('아직 끝낸 운동이 없어요')).toHaveCount(0);
@@ -1651,12 +1674,12 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   const biDb = page.getByRole('link', { name: `${first} 정보 (내 운동 DB: 영상 등급·자세 포인트)` });
   await expect(biDb).toBeVisible();
   await expect(biDb).toHaveClass(/info-db/);
-  // 내 운동 DB가 없는 운동(프론트 레이즈는 영상 등급·자세 포인트 없음) → 흐린 기본 "정보": 운동 추가로 넣어 확인
+  // 내 운동 DB가 없는 운동(벤트오버 리어 델트 플라이는 영상 등급·자세 포인트 없음. 프론트 레이즈는 M-30 어깨 영상 반영 때 자세 포인트가 생겨 바꿈) → 흐린 기본 "정보": 운동 추가로 넣어 확인
   await page.getByRole('button', { name: /운동 추가/ }).first().click();
-  await page.getByRole('dialog').getByLabel('운동 검색').fill('프론트 레이즈');
-  await page.getByRole('dialog').getByRole('button', { name: /덤벨 프론트 레이즈/ }).first().click();
-  await page.getByRole('button', { name: /^덤벨 프론트 레이즈 (세트 간|라운드 후) 휴식/ }).first().click();
-  const plain = page.getByRole('link', { name: '덤벨 프론트 레이즈 정보 (DB 없음)' });
+  await page.getByRole('dialog').getByLabel('운동 검색').fill('벤트오버');
+  await page.getByRole('dialog').getByRole('button', { name: /벤트오버 리어 델트 플라이/ }).first().click();
+  await page.getByRole('button', { name: /^벤트오버 리어 델트 플라이 (세트 간|라운드 후) 휴식/ }).first().click();
+  const plain = page.getByRole('link', { name: '벤트오버 리어 델트 플라이 정보 (DB 없음)' });
   await expect(plain).toBeVisible();
   await expect(plain).not.toHaveClass(/info-db/);
   await plain.locator('xpath=..').screenshot({ path: `reports/screens/${test.info().project.name}-23-info-plain.png` });
@@ -1834,4 +1857,27 @@ test('끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으�
   await expect(pc.locator('.card.dragging')).toHaveCount(0);
   await pc.mouse.up();
   await ctx.close();
+});
+
+test('기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안내·지난주 요약·"운동 시작" → 운동 화면, 타일 증감 한 줄', async ({ page }) => {
+  // 지난주 일요일 10시에 끝난 운동 하나를 저장소에 직접 넣음 (이번 주 일~토와 겹치지 않음)
+  await page.evaluate(async () => {
+    const d = new Date(); const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay() - 7, 10, 0);
+    const w = { id: 'w-lastweek', name: '지난주 팔', startedAt: start.toISOString(), endedAt: new Date(start.getTime() + 30 * 60000).toISOString(), timer: null,
+      blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: 'barbell_curl', target: { sets: 1, reps: 10 }, sets: [{ weight: 30, reps: 10, warmup: false, done: true }] }] }] };
+    await new Promise<void>((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => { const db = r.result; const tx = db.transaction('workouts', 'readwrite'); tx.objectStore('workouts').put(w); tx.oncomplete = () => { db.close(); res(); }; tx.onerror = () => rej(tx.error); }; r.onerror = () => rej(r.error); });
+  });
+  await page.reload();
+  await page.getByRole('link', { name: '기록' }).click();
+  await expect(page.getByText('이번 주는 아직 운동이 없어요')).toBeVisible();
+  await expect(page.getByText('지난주: 이두 1세트')).toBeVisible();
+  await expect(page.getByTestId('part-row')).toHaveCount(0);
+  await expect(page.getByTestId('this-week')).toContainText('지난주 같은 요일');
+  // 타일 증감은 한 줄 (390px)
+  const hs = await page.locator('.tile-delta').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+  expect(hs).toHaveLength(4);
+  for (const h of hs) expect(h, '타일 증감 줄 높이(한 줄)').toBeLessThan(24);
+  await checkScreen(page, '10b-stats-empty-week');
+  await page.getByRole('button', { name: '운동 시작' }).click();
+  await expect(page).toHaveURL(/#\/workout/);
 });

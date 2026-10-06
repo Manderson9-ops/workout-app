@@ -69,6 +69,18 @@
     {"name":"머신 핵스쿼트","exercise":"hack_squat","status":"CONFIRMED"},
     {"name":"하프 스쿼트","families":["squat_barbell"],"status":"CONFIRMED"},
     {"name":"풀 스쿼트","families":["squat_barbell"],"status":"CONFIRMED"},
-    {"name":"레그 익스텐션(연구 예시)","exercise":"leg_extension","status":"CONFIRMED"}
+    {"name":"레그 익스텐션(연구 예시)","exercise":"leg_extension","status":"CONFIRMED"},
+    {"name":"머신 숄더 프레스 (레버식)","exercise":"machine_shoulder_press","status":"CONFIRMED"},
+    {"name":"머신 숄더 프레스","exercise":"machine_shoulder_press","status":"CONFIRMED"},
+    {"name":"오버헤드 프레스 (바벨)","exercise":"barbell_ohp","status":"CONFIRMED"},
+    {"name":"바벨 숄더 프레스","exercise":"barbell_ohp","status":"CONFIRMED"},
+    {"name":"케이블 리버스 플라이","exercise":"cable_rear_delt_fly","status":"CONFIRMED","decision":"M-29"},
+    {"name":"머신 사이드 레터럴 레이즈","exercise":"machine_lateral_raise","status":"CONFIRMED"},
+    {"name":"풀 가동범위 레터럴 레이즈","exercise":"db_lateral_raise","status":"CONFIRMED"},
+    {"name":"상체 기울인 덤벨 레터럴 레이즈","exercise":"db_lateral_raise","status":"CONFIRMED"},
+    {"name":"리어델트 플라이 머신","exercise":"reverse_pec_deck","status":"CONFIRMED"},
+    {"name":"프론트 레이즈","exercise":"db_front_raise","status":"CONFIRMED"},
+    {"name":"인클라인 스미스머신 숄더 프레스","exercise":"smith_shoulder_press","status":"CONFIRMED"},
+    {"name":"트라이셉 익스텐션","families":["overhead_ext","lying_ext"],"status":"CONFIRMED","note":"어깨 영상(Bc27jDy5dsk)이 장두 고립 운동으로 익스텐션 전반을 권함 (2026-10-03)"}
   ]
 }

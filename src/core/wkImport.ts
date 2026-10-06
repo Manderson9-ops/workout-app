@@ -9,6 +9,8 @@ export interface GradeRule { video_id: string; exercise: string; grade: string; 
 /** 반영하지 않는 티어 항목(영상+이름+등급)·이름. 실패가 아니라 '미적용'으로 기록 (M-15·16·22·24·26) */
 export interface SkipItem { video_id: string; exercise: string; grade?: string; reason: string; decision?: string }
 export interface SkipName { name: string; reason: string; decision?: string }
+/** 자세 포인트 한 개(영상+시점)를 지정한 앱 운동에만 붙임. 영상 속 일반 이름(예: "오버헤드 프레스")이 별칭 묶음으로 풀려 다른 운동에까지 붙는 것을 막음. 원본(WORK_OUT_K)은 고치지 않는다 (M-30) */
+export interface GuideRule { video_id: string; timestamp: string; exercise?: string; only: string[]; reason: string; decision?: string }
 export interface Decision { id: string; status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CUSTOM'; title: string; proposal: string; while_pending: string; resolution?: string }
 export interface Template { id: string; name: string; wk_names: string[]; per_week: string; days: Part[][]; generatable: boolean }
 export interface SubGoalRule { template: string; wk_name: string; purpose_note: string; sub_goal_only: boolean; decision?: string }
@@ -28,6 +30,7 @@ export interface ImportInput {
   ignoreTopics?: string[];
   skipItems?: SkipItem[];
   skipNames?: SkipName[];
+  guideRules?: GuideRule[];
   rules: GradeRule[];
   decisions: Decision[];
   templates: Template[];
@@ -74,7 +77,7 @@ export function runImport(inp: ImportInput): ImportResult {
   }
   const aliasByName = new Map(inp.aliases.map((a) => [normalizeName(a.name), a]));
 
-  const usedSkips = new Set<SkipItem>(), usedSkipNames = new Set<SkipName>();
+  const usedSkips = new Set<SkipItem>(), usedSkipNames = new Set<SkipName>(), usedGuideRules = new Set<GuideRule>();
   const skipNames = new Map((inp.skipNames ?? []).map((s) => [normalizeName(s.name), s]));
   const resolve = (name: string): { ids: string[]; via: string } | { ids: null; failed: boolean; reason: string } => {
     const sk = skipNames.get(normalizeName(name));
@@ -161,7 +164,18 @@ export function runImport(inp: ImportInput): ImportResult {
         else unapplied.push({ video_id: r.video_id, exercise: kp.exercise, reason: res.reason });
         continue;
       }
-      for (const id of res.ids) (guides[id] ??= []).push({ type: kp.type, text: kp.text, video_id: r.video_id, timestamp: kp.timestamp });
+      let ids = res.ids;
+      const gr = (inp.guideRules ?? []).find((g) => g.video_id === r.video_id && g.timestamp === kp.timestamp && (!g.exercise || g.exercise === kp.exercise) && allows(g.decision, false));
+      if (gr) {
+        usedGuideRules.add(gr);
+        const missing = gr.only.filter((x) => !byId.has(x));
+        if (missing.length) unresolved.push(`[자세 포인트 규칙] ${gr.video_id}@${gr.timestamp}: 앱에 없는 운동 ${missing.join(', ')}`);
+        const outside = gr.only.filter((x) => byId.has(x) && !ids.includes(x));
+        if (outside.length) unresolved.push(`[자세 포인트 규칙] ${gr.video_id}@${gr.timestamp}: only 의 ${outside.join(', ')} 은(는) 이 항목의 연결 결과(${ids.join(', ')})에 없음`);
+        ids = ids.filter((x) => gr.only.includes(x));
+        if (!ids.length) { unresolved.push(`[자세 포인트 규칙] ${gr.video_id}@${gr.timestamp}: 연결된 운동(${res.ids.join(', ')})과 only(${gr.only.join(', ')})가 겹치지 않음`); continue; }
+      }
+      for (const id of ids) (guides[id] ??= []).push({ type: kp.type, text: kp.text, video_id: r.video_id, timestamp: kp.timestamp });
     }
   }
 
@@ -178,6 +192,7 @@ export function runImport(inp: ImportInput): ImportResult {
   });
   for (const x of inp.rules) if (!usedRules.has(x)) unresolved.push(`[규칙 미사용] ${x.video_id} ${x.exercise} ${x.grade}`);
   for (const x of inp.skipItems ?? []) if (!usedSkips.has(x)) unresolved.push(`[규칙 미사용] 빼기 ${x.video_id} ${x.exercise} ${x.grade ?? ''}`.trim());
+  for (const x of inp.guideRules ?? []) if (!usedGuideRules.has(x)) unresolved.push(`[규칙 미사용] 자세 포인트 ${x.video_id}@${x.timestamp}`);
   for (const x of inp.skipNames ?? []) if (!usedSkipNames.has(x)) unresolved.push(`[규칙 미사용] 빼기 이름 ${x.name}`);
   for (const f of new Set(inp.base.map((e) => e.family))) if (!inp.families[f]) unresolved.push(`[family 이름 없음] ${f}`);
 

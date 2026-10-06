@@ -66,23 +66,26 @@ export function partAt(x: number, y: number): Part | null {
 }
 const VIEW: Record<Side, string> = { front: '0 80 724 1290', back: '724 80 724 1290' };
 
-function Figure({ side, sel, onPart }: { side: Side; sel: Partial<Record<Part, Priority>>; onPart: (p: Part) => void }) {
+/** 세트 수 → 색 단계 (D-054): 0 없음, 1~4 연함, 5~9 보통, 10+ 진함 */
+export function heatBucket(n: number): 0 | 1 | 2 | 3 { return n >= 10 ? 3 : n >= 5 ? 2 : n >= 1 ? 1 : 0; }
+
+function Figure({ side, sel, onPart, heat }: { side: Side; sel: Partial<Record<Part, Priority>>; onPart?: (p: Part) => void; heat?: Record<Part, number> }) {
   const shapes: BodyShape[] = side === 'front' ? BODY_FRONT : BODY_BACK;
   const map = SLUG_PART[side];
   return (
     // 누른 점 아래 요소를 직접 찾음: 아이폰(WebKit)은 작은 모양을 눌러도 클릭 대상을 svg 자체로 주는 경우가 있어 요소별 onClick에 기대지 않음
     <svg viewBox={VIEW[side]} class="bodymap-svg" aria-hidden="true" focusable="false" data-side={side}
-      onClick={(e) => { const p = partAt(e.clientX, e.clientY); if (p) onPart(p); }}>
+      onClick={onPart ? (e) => { const p = partAt(e.clientX, e.clientY); if (p) onPart(p); } : undefined}>
       <path d={side === 'front' ? OUTLINE_FRONT : OUTLINE_BACK} class="bm-outline" />
       {/* 누르는 영역(투명)은 근육 아래: 근육을 누르면 그 근육의 부위, 근육 사이 빈 곳을 누르면 영역의 부위 */}
-      {HITS[side].map(([part, boxes]) => boxes.map((b, k) => (
+      {!heat && HITS[side].map(([part, boxes]) => boxes.map((b, k) => (
         <rect key={part + k} x={b[0]} y={b[1]} width={b[2] - b[0]} height={b[3] - b[1]} class="bm-hit" data-part={part} />
       )))}
       {shapes.map((s) => {
         const part = map[s.slug];
         const pr = part ? sel[part] : undefined;
         return s.d.map((d, k) => (
-          <path key={s.slug + k} d={d} data-vis={part} class={part ? `bm-muscle${pr ? ' p-' + pr : ''}` : 'bm-deco'} />
+          <path key={s.slug + k} d={d} data-vis={part} class={part ? `bm-muscle${heat ? ' h-' + heatBucket(heat[part] ?? 0) : pr ? ' p-' + pr : ''}` : 'bm-deco'} />
         ));
       })}
     </svg>
@@ -106,6 +109,26 @@ export function BodyMap({ sel, onPart }: { sel: Partial<Record<Part, Priority>>;
         <span><i class="lg-high" />높음</span>
       </div>
       <p class="sub small bm-hint">{side === 'front' ? '어깨·가슴·이두·전완·코어·하체' : '어깨·등·삼두·전완·하체'}를 눌러 고르세요</p>
+    </div>
+  );
+}
+
+/** 읽기 전용 열 지도 (D-054): 부위별 세트 수를 색 단계로. 앞·뒤 그림을 나란히 (누르는 동작 없음) */
+export function BodyHeat({ sets }: { sets: Record<Part, number> }) {
+  const summary = (Object.keys(sets) as Part[]).filter((p) => sets[p] > 0).map((p) => `${p} ${sets[p]}세트`).join(', ') || '세트 없음';
+  return (
+    <div class="bodyheat" data-testid="bodyheat" role="group" aria-label={`부위별 세트 열 지도: ${summary}`}>
+      <div class="heat-pair">
+        {(['front', 'back'] as Side[]).map((x) => (
+          <figure key={x} class="heat-fig">
+            <Figure side={x} sel={{}} heat={sets} />
+            <figcaption class="sub small" aria-hidden="true">{x === 'front' ? '앞' : '뒤'}</figcaption>
+          </figure>
+        ))}
+      </div>
+      <div class="bm-legend sub small" aria-hidden="true">
+        <span><i class="lg-h0" />0</span><span><i class="lg-h1" />1~4</span><span><i class="lg-h2" />5~9</span><span><i class="lg-h3" />10+</span><span>세트</span>
+      </div>
     </div>
   );
 }

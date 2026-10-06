@@ -2,12 +2,15 @@ import { useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
-import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart } from '../../core/stats';
+import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart, addDays, weekSummary, exerciseLines, durText } from '../../core/stats';
 import type { WorkoutSummary } from '../../core/stats';
 import { BW_MIN, BW_MAX } from '../../core/backup';
 import { PARTS } from '../../core/types';
+import type { Exercise } from '../../core/types';
+import type { Workout } from '../../core/session';
+import { BodyHeat } from '../bodyMapView';
 import { LineChart, BarChart } from '../charts';
-import { NumInput, mmss } from '../components';
+import { NumInput } from '../components';
 import { startRoutine, setHomeHidden } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import type { Routine } from '../../core/session';
@@ -15,72 +18,199 @@ import { HOME_HIDDEN_LABEL } from '../../core/session';
 import { go } from '../nav';
 import { askConfirm } from '../confirm';
 
-const WD = ['월', '화', '수', '목', '금', '토', '일'];
-const md = (d: string) => d.slice(5).replace('-', '/');
+const WD = ['일', '월', '화', '수', '목', '금', '토']; // 주는 일요일 시작 (D-054)
+const md = (d: string) => d.slice(5).replace('-', '/').replace(/^0/, '').replace('/0', '/');
 const shortPart = (p: string) => (p === '전완·악력' ? '전완' : p);
+const wdClass = (i: number) => (i === 0 ? 'sun' : i === 6 ? 'sat' : '');
+const ymd = (d: string) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y!, m! - 1, dd!); };
+const weekRange = (ws: string) => `${md(ws)}~${md(addDays(ws, 6))}`;
+const timeLabel = (iso: string) => {
+  const d = new Date(iso); const h = d.getHours();
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WD[d.getDay()]}) ${h < 12 ? '오전' : '오후'} ${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+const MAX_WEEKS_BACK = 11; // 이번 주 포함 12주
+const MARK = 10; // 연구 참고선 (부위당 주 10세트)
+
+/** 지난주 같은 요일까지와의 차이. 화면에는 기호, 화면 읽기에는 문장 (기호는 aria-hidden) */
+function Delta({ cur, prev, unit = '', fmt }: { cur: number; prev: number; unit?: string; fmt?: (absDiff: number) => string }) {
+  const abs = Math.abs(cur - prev);
+  if (cur === prev) return <span class="delta"><span aria-hidden="true">–</span><span class="sr-only">지난주와 같음</span></span>;
+  const txt = fmt ? fmt(abs) : `${abs.toLocaleString()}${unit}`;
+  return cur > prev
+    ? <span class="delta up"><span aria-hidden="true">▲{txt}</span><span class="sr-only">지난주보다 {txt} 많음</span></span>
+    : <span class="delta"><span aria-hidden="true">▼{txt}</span><span class="sr-only">지난주보다 {txt} 적음</span></span>;
+}
+
+function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string, Exercise>; today: string; bw: AppState['bodyweight'] }) {
+  const ws = weekStart(today);
+  const cur = weekSummary(done, byId, ws, bw);
+  const prev = weekSummary(done, byId, addDays(ws, -7), bw, addDays(today, -7)); // 지난주 일요일 ~ 오늘과 같은 요일까지
+  const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+  const tiles: { k: string; v: string; d: preact.JSX.Element }[] = [
+    { k: '운동', v: `${cur.count}회`, d: <Delta cur={cur.count} prev={prev.count} /> },
+    { k: '작업 세트', v: String(cur.sets), d: <Delta cur={cur.sets} prev={prev.sets} /> },
+    { k: '볼륨', v: `${cur.volume.toLocaleString()}kg`, d: <Delta cur={cur.volume} prev={prev.volume} unit="kg" /> },
+    { k: '시간', v: durText(cur.durationSec), d: <Delta cur={cur.durationSec} prev={prev.durationSec} fmt={durText} /> },
+  ];
+  return (
+    <>
+      <h2>이번 주</h2>
+      <div class="card" data-testid="this-week">
+        <div class="daystrip" role="list" aria-label="이번 주 운동한 날">
+          {days.map((d, i) => {
+            const did = cur.days.has(d);
+            const cls = `daydot ${did ? 'did' : ''} ${d === today ? 'is-today' : ''} ${d > today ? 'future' : ''}`;
+            return (
+              <div key={d} role="listitem" class={cls} aria-label={`${WD[i]}요일 ${Number(d.slice(8))}일${did ? ' 운동함' : ''}${d === today ? ' 오늘' : ''}`}>
+                <span class={`wd ${wdClass(i)}`} aria-hidden="true">{WD[i]}</span>
+                <span class="dn" aria-hidden="true">{Number(d.slice(8))}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div class="tiles">
+          {tiles.map((t) => (
+            <div class="tile" key={t.k}>
+              <div class="sub small">{t.k}</div>
+              <div class="tv">{t.v}</div>
+              <div class="small sub tile-delta">{t.d}</div>
+            </div>
+          ))}
+        </div>
+        <p class="sub small" style={{ margin: '8px 0 0' }}>▲▼ = 지난주 같은 요일({WD[0]}{ymd(today).getDay() > 0 ? `~${WD[ymd(today).getDay()]}` : ''})까지와 비교 · 연속 {weekStreak(done, today)}주 · 일요일~토요일 기준</p>
+      </div>
+    </>
+  );
+}
+
+function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Exercise>; today: string }) {
+  const [off, setOff] = useState(0);
+  const thisWs = weekStart(today);
+  const ws = addDays(thisWs, -7 * off);
+  const parts = weeklyPartSets(done, byId, ws, 1)[0]!.parts;
+  const prevParts = weeklyPartSets(done, byId, addDays(ws, -7), 1)[0]!.parts;
+  const total = PARTS.reduce((s, p) => s + parts[p], 0);
+  const prevTotal = PARTS.reduce((s, p) => s + prevParts[p], 0);
+  const rows = [...PARTS].sort((a, b) => parts[b] - parts[a]);
+  const scale = Math.max(12, ...PARTS.map((p) => parts[p]));
+  const prevTop = [...PARTS].filter((p) => prevParts[p] > 0).sort((a, b) => prevParts[b] - prevParts[a]).slice(0, 3);
+  const label = off === 0 ? '이번 주' : off === 1 ? '지난주' : weekRange(ws);
+  const weeks = weeklyPartSets(done, byId, today, 4);
+  const activeParts = PARTS.filter((p) => weeks.some((w) => w.parts[p] > 0));
+  return (
+    <>
+      <h2>부위별 세트</h2>
+      <div class="card" data-testid="part-sets">
+        <div class="row between">
+          <button aria-label="이전 주" disabled={off >= MAX_WEEKS_BACK} onClick={() => setOff(off + 1)}>‹</button>
+          <strong aria-live="polite" data-testid="part-week">{label}{off > 1 ? '' : <span class="sub small"> · {weekRange(ws)}</span>}</strong>
+          <button aria-label="다음 주" disabled={off === 0} onClick={() => setOff(off - 1)}>›</button>
+        </div>
+        {total === 0 ? (
+          <div class="empty-week">
+            <p>{off === 0 ? '이번 주는 아직 운동이 없어요' : '이 주에는 운동 기록이 없어요'}</p>
+            {off === 0 && prevTotal > 0 && <p class="sub small">지난주: {prevTop.map((p) => `${shortPart(p)} ${prevParts[p]}세트`).join(' · ')}</p>}
+            {off === 0 && <button class="primary" onClick={() => go('#/workout')}>운동 시작</button>}
+          </div>
+        ) : (
+          <div class="part-grid">
+            <div class="part-bars" role="list" aria-label={`${label} 부위별 작업 세트`}>
+              <div class="part-row axis" aria-hidden="true"><span /><span class="track"><i class="mark-label" style={{ left: `${(MARK / scale) * 100}%` }}>{MARK}</i></span><span /></div>
+              {rows.map((p) => (
+                <div class={`part-row${parts[p] === 0 ? ' zero' : ''}`} role="listitem" key={p} data-testid="part-row">
+                  <span class="pn">{shortPart(p)}</span>
+                  <span class="track" aria-hidden="true"><i class="fill" style={{ width: `${(parts[p] / scale) * 100}%` }} /><i class="mark" style={{ left: `${(MARK / scale) * 100}%` }} /></span>
+                  <span class="pv">{parts[p]}세트</span>
+                </div>
+              ))}
+            </div>
+            <BodyHeat sets={parts} />
+          </div>
+        )}
+        <p class="sub small part-note">막대의 10 = 연구 참고선이에요(목표·상한 아님): 부위당 주 10세트 이상에서 근육 증가가 더 컸어요 (Schoenfeld 외 2017 메타분석). 그보다 많은 양의 효과는 근거가 적어요. 색 구간(1~4·5~9·10+)과 '주 부위만 세기(웜업 제외)'는 앱 기준이에요.</p>
+        {activeParts.length > 0 && (
+          <>
+            <div class="sub small" style={{ marginTop: '8px' }}>최근 4주</div>
+            <table class="trend" aria-label="최근 4주 부위별 작업 세트">
+              <thead><tr><th>주</th>{activeParts.map((p) => <th key={p}>{shortPart(p)}</th>)}<th>합계</th></tr></thead>
+              <tbody>{weeks.map((w) => <tr key={w.week}><td>{md(w.week)}~</td>{activeParts.map((p) => <td key={p}>{w.parts[p] || '·'}</td>)}<td><strong>{w.total}</strong></td></tr>)}</tbody>
+            </table>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
 
 export function Stats({ s }: { s: AppState }) {
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
   const done = historyOf(s);
+  const wById = new Map(done.map((w) => [w.id, w]));
   const today = localDate(Date.now());
   const [ym, setYm] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; });
   const [day, setDay] = useState<number | null>(null);
-  const sums = done.map((w) => summarize(w, byId, s.bodyweight));
+  const sums = [...done].sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0)).map((w) => summarize(w, byId, s.bodyweight)); // 최신순 (저장소 순서에 기대지 않음)
   const hiddenSet = new Set(s.settings.homeHidden ?? []); // 홈에서 뺀 기록 표시 (D-040)
-  const weeks = weeklyPartSets(done, byId, today, 4);
-  const thisWeek = weeks[weeks.length - 1]!;
   const totals = weeklyTotals(done, byId, today, 8, s.bodyweight);
   const pva = plannedVsActual(sums);
   const days = monthDays(done, ym.y, ym.m);
+  const monthCount = [...days.values()].reduce((a, b) => a + b, 0);
   const first = new Date(ym.y, ym.m - 1, 1);
-  const lead = (first.getDay() + 6) % 7;
+  const lead = first.getDay(); // 일=0
   const nDays = new Date(ym.y, ym.m, 0).getDate();
-  const dayList = day ? sums.filter((x) => x.date === `${ym.y}-${String(ym.m).padStart(2, '0')}-${String(day).padStart(2, '0')}`) : [];
+  const dateOf = (n: number) => `${ym.y}-${String(ym.m).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
+  const dayList = day ? sums.filter((x) => x.date === dateOf(day) && x.workSets > 0) : [];
   const move = (d: number) => { setDay(null); setYm(({ y, m }) => { const n = new Date(y, m - 1 + d, 1); return { y: n.getFullYear(), m: n.getMonth() + 1 }; }); };
-  const thisWeekCount = sums.filter((x) => weekStart(x.date) === weekStart(today)).length;
-  const activeParts = PARTS.filter((p) => weeks.some((w) => w.parts[p] > 0));
+  const card = (x: WorkoutSummary) => <WorkoutCard key={x.id} x={x} w={wById.get(x.id)} byId={byId} hidden={hiddenSet.has(x.id)} />;
+  // 최근 30개를 주별로 묶음
+  const groups: { ws: string; items: WorkoutSummary[] }[] = [];
+  for (const x of sums.slice(0, 30)) {
+    const ws = weekStart(x.date);
+    const g = groups[groups.length - 1];
+    if (g && g.ws === ws) g.items.push(x); else groups.push({ ws, items: [x] });
+  }
+  const thisWs = weekStart(today);
+  const groupTitle = (ws: string) => (ws === thisWs ? '이번 주' : ws === addDays(thisWs, -7) ? '지난주' : `${Number(ws.slice(5, 7))}월 ${Number(ws.slice(8))}일 주`);
 
   return (
     <main>
       <h1>기록</h1>
-      <div class="grid2">
-        <div class="card" style={{ margin: 0 }}><div class="sub small">이번 주 운동</div><div style={{ fontSize: '24px', fontWeight: 800 }}>{thisWeekCount}회</div></div>
-        <div class="card" style={{ margin: 0 }}><div class="sub small">연속</div><div style={{ fontSize: '24px', fontWeight: 800 }}>{weekStreak(done, today)}주</div></div>
-      </div>
+      <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
+      <PartSets done={done} byId={byId} today={today} />
+
+      <h2>운동 기록</h2>
+      {!sums.length && <div class="empty">아직 끝낸 운동이 없어요</div>}
+      {groups.map((g) => (
+        <section key={g.ws} aria-label={groupTitle(g.ws)}>
+          <h3 class="wk-head">{groupTitle(g.ws)}</h3>
+          {g.items.map(card)}
+        </section>
+      ))}
 
       <h2>달력</h2>
       <div class="card">
         <div class="row between">
           <button aria-label="이전 달" onClick={() => move(-1)}>‹</button>
-          <strong>{ym.y}년 {ym.m}월</strong>
+          <strong>{ym.y}년 {ym.m}월 · {ym.y === Number(today.slice(0, 4)) && ym.m === Number(today.slice(5, 7)) ? '이번 달' : '이 달'} {monthCount}회</strong>
           <button aria-label="다음 달" onClick={() => move(1)}>›</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginTop: '8px', textAlign: 'center' }}>
-          {WD.map((d) => <div key={d} class="pill">{d}</div>)}
+        <div class="cal-grid">
+          {WD.map((d, i) => <div key={d} class={`pill cal-wd ${wdClass(i)}`}>{d}</div>)}
           {Array.from({ length: lead }, (_, i) => <div key={`e${i}`} />)}
           {Array.from({ length: nDays }, (_, i) => {
             const n = i + 1; const c = days.get(n) ?? 0;
-            const isToday = `${ym.y}-${String(ym.m).padStart(2, '0')}-${String(n).padStart(2, '0')}` === today;
+            const dt = dateOf(n);
             return (
-              <button key={n} aria-label={`${ym.m}월 ${n}일${c ? ` 운동 ${c}회` : ''}`} aria-pressed={day === n} disabled={!c}
-                style={{ minWidth: 0, padding: 0, borderRadius: '10px', background: c ? '#1d4ed8' : 'transparent', borderColor: isToday ? '#eef0f4' : c ? '#1d4ed8' : 'transparent', color: c ? '#fff' : '#9aa3b5', opacity: 1, outline: day === n ? '2px solid #eef0f4' : 'none' }}
-                onClick={() => setDay(day === n ? null : n)}>{n}</button>
+              <button key={n} class={`cal-day ${wdClass((lead + i) % 7)} ${dt === today ? 'is-today' : ''} ${dt > today ? 'future' : ''} ${day === n ? 'sel' : ''}`}
+                aria-label={`${ym.m}월 ${n}일${c ? ` 운동 ${c}회` : ''}`} aria-pressed={day === n} disabled={!c}
+                onClick={() => setDay(day === n ? null : n)}>
+                <span>{n}</span>{c ? <i class="dot" /> : null}
+              </button>
             );
           })}
         </div>
-        {dayList.map((x) => <SummaryRow key={x.id} x={x} hidden={hiddenSet.has(x.id)} />)}
-      </div>
-
-      <h2>이번 주 부위별 세트</h2>
-      <div class="card">
-        <BarChart label="이번 주 부위별 작업 세트" unit="세트" highlightLast={false} points={PARTS.map((p) => ({ label: shortPart(p), value: thisWeek.parts[p] }))} />
-        {activeParts.length > 0 && (
-          <table class="trend" aria-label="최근 4주 부위별 작업 세트">
-            <thead><tr><th>주</th>{activeParts.map((p) => <th key={p}>{shortPart(p)}</th>)}<th>합계</th></tr></thead>
-            <tbody>{weeks.map((w) => <tr key={w.week}><td>{md(w.week)}~</td>{activeParts.map((p) => <td key={p}>{w.parts[p] || '·'}</td>)}<td><strong>{w.total}</strong></td></tr>)}</tbody>
-          </table>
-        )}
+        {dayList.map(card)}
       </div>
 
       <h2>주간 볼륨</h2>
@@ -94,17 +224,13 @@ export function Stats({ s }: { s: AppState }) {
           <h2>예상 시간 대비 실제</h2>
           <div class="card" aria-label="예상 시간 대비 실제">
             <p>최근 {pva.n}회 평균: {Math.abs(pva.avgDiffSec) < 60 ? '예상과 거의 같아요' : `예상보다 ${Math.round(Math.abs(pva.avgDiffSec) / 60)}분 ${pva.avgDiffSec > 0 ? '더 걸려요' : '덜 걸려요'}`} <span class="sub small">(실제 ÷ 예상 = {pva.avgRatio})</span></p>
-            <BarChart label="최근 운동 실제 시간(분)" unit="분" points={sums.filter((x) => x.plannedSec).slice(0, 8).reverse().map((x) => ({ label: md(x.date), value: Math.round(x.durationSec / 60) }))} />
+            <BarChart label="최근 운동 실제 시간(분)" unit="분" points={sums.filter((x) => x.plannedSec && x.workSets > 0).slice(0, 8).reverse().map((x) => ({ label: md(x.date), value: Math.round(x.durationSec / 60) }))} />
             <p class="sub small">플랜의 예상 시간과 비교해요. 차이가 계속 크면 알려 주세요 (시간 계산을 고칠 수 있어요).</p>
           </div>
         </>
       )}
 
       <Bodyweight s={s} today={today} />
-
-      <h2>운동 기록</h2>
-      {!sums.length && <div class="empty">아직 끝낸 운동이 없어요</div>}
-      {sums.slice(0, 30).map((x) => <SummaryRow key={x.id} x={x} hidden={hiddenSet.has(x.id)} />)}
     </main>
   );
 }
@@ -154,15 +280,29 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
   );
 }
 
-function SummaryRow({ x, hidden }: { x: WorkoutSummary; hidden: boolean }) {
+function WorkoutCard({ x, w, byId, hidden }: { x: WorkoutSummary; w: Workout | undefined; byId: Map<string, Exercise>; hidden: boolean }) {
   const diff = x.plannedSec ? x.durationSec - x.plannedSec : undefined;
+  const lines = w ? exerciseLines(w, byId) : [];
+  const parts = PARTS.filter((p) => (x.parts[p] ?? 0) > 0);
+  const empty = x.workSets === 0;
+  // 화면 읽기용 전체 요약 (본문이 가려지지 않게). 홈에서 뺌 표시는 맨 끝
+  const label = `${x.name}, ${w ? timeLabel(w.startedAt) : x.date}, ${durText(x.durationSec)}, 세트 ${x.workSets}, 볼륨 ${x.volume.toLocaleString()}kg${empty ? ', 완료 세트 0' : ''}${lines.slice(0, 3).map((l) => `, ${l.name} ${l.sets}세트${l.best ? ` 최고 ${l.best}` : ''}`).join('')}${lines.length > 3 ? `, 외 ${lines.length - 3}개 운동` : ''}${hidden ? ` (${HOME_HIDDEN_LABEL})` : ''}`;
   return (
-    <button class="list-item" aria-label={`${x.date} ${x.name}${hidden ? ` (${HOME_HIDDEN_LABEL})` : ''}`} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
-      <div class="grow">
-        <div>{x.name} <span class="pill">{md(x.date)}</span>{hidden && <span class="pill">{HOME_HIDDEN_LABEL}</span>}</div>
-        <div class="pill">{mmss(x.durationSec)}{diff !== undefined && Math.abs(diff) >= 60 ? ` (예상보다 ${Math.round(Math.abs(diff) / 60)}분 ${diff > 0 ? '김' : '짧음'})` : ''} · 작업 세트 {x.workSets} · 볼륨 {x.volume.toLocaleString()}kg</div>
+    <button class={`wcard${empty ? ' dim' : ''}`} aria-label={label} onClick={() => go(`#/stats/w/${encodeURIComponent(x.id)}`)}>
+      <div class="wc-main">
+        <div class="wc-title">{x.name}{hidden && <span class="pill hid">{HOME_HIDDEN_LABEL}</span>}{empty && <span class="pill tag">완료 세트 0</span>}</div>
+        <div class="wc-meta">{w ? timeLabel(w.startedAt) : x.date}</div>
+        <div class="wc-chips">
+          <span class="chip2">⏱ {durText(x.durationSec)}</span>
+          <span class="chip2">세트 {x.workSets}</span>
+          <span class="chip2">볼륨 {x.volume.toLocaleString()}kg</span>
+          {diff !== undefined && Math.abs(diff) >= 60 && <span class="chip2 hint">예상보다 {Math.round(Math.abs(diff) / 60)}분 {diff > 0 ? '김' : '짧음'}</span>}
+        </div>
+        {parts.length > 0 && <div class="wc-tags">{parts.map((p) => <span class="ptag" key={p}>{shortPart(p)}</span>)}</div>}
+        {lines.slice(0, 3).map((l, i) => <div class="wc-ex" key={i}>{l.name} · {l.sets}세트{l.best ? ` · 최고 ${l.best}` : ''}</div>)}
+        {lines.length > 3 && <div class="wc-ex more">외 {lines.length - 3}개 운동</div>}
       </div>
-      <span class="sub">›</span>
+      <span class="sub" aria-hidden="true">›</span>
     </button>
   );
 }
@@ -184,7 +324,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
     <main>
       <button class="ghost" onClick={() => go('#/stats')}>← 기록</button>
       <h1>{w.name}</h1>
-      <p class="sub">{new Date(w.startedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {mmss(sum.durationSec)}{sum.plannedSec ? ` (예상 ${mmss(sum.plannedSec)})` : ''}</p>
+      <p class="sub">{new Date(w.startedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {durText(sum.durationSec)}{sum.plannedSec ? ` (예상 ${durText(sum.plannedSec)})` : ''}</p>
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
       {w.editedAt && <p class="sub small">{new Date(w.editedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}에 고침</p>}
       {w.memo && <p>📝 {w.memo}</p>}

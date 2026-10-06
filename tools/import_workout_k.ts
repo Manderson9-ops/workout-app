@@ -27,7 +27,7 @@ const records = files.map((f) => readJson(join(recDir, f)));
 
 const res = runImport({
   base, families, aliases: readJson(join(ROOT, 'data/aliases.json')).aliases,
-  topicParts: ruleFile.topic_parts, ignoreTopics: ruleFile.ignore_topics, skipItems: ruleFile.skip_items, skipNames: ruleFile.skip_names, rules: ruleFile.rules, decisions: decisionFile.decisions,
+  topicParts: ruleFile.topic_parts, ignoreTopics: ruleFile.ignore_topics, skipItems: ruleFile.skip_items, skipNames: ruleFile.skip_names, guideRules: ruleFile.guide_rules, rules: ruleFile.rules, decisions: decisionFile.decisions,
   templates: templateFile.templates, subGoalRules: templateFile.sub_goal_rules,
   combos: readJson(join(ROOT, 'data/combos.json')).combos, records,
 });
@@ -55,7 +55,7 @@ const L: string[] = [];
 L.push('# WORK_OUT_K 가져오기 리포트', '', `- 원본: \`${WK_DIR}\` (읽기만 함). 이번 실행 전후 해시 ${untouched ? '**동일 (이 스크립트는 원본을 바꾸지 않음)**' : '**다름 (확인 필요)**'}`);
 L.push(`- 지난 실행 이후 원본 변화: ${Object.keys(prev).length ? `바뀜 ${changedSinceLast.length}개${changedSinceLast.length ? ' (' + changedSinceLast.join(', ') + ')' : ''}, 새 파일 ${newSinceLast.length}개${newSinceLast.length ? ' (' + newSinceLast.join(', ') + ')' : ''}, 없어진 파일 ${removedSinceLast.length}개` : '첫 실행 (비교 기준 없음)'}. WORK_OUT_K에 영상이 추가·수정되면 여기에 나타난다`);
 L.push(`- 영상 ${records.length}개, 기본 종목 ${base.length}개, 운동 묶음(family) ${Object.keys(families).length}개`);
-L.push(`- 티어 항목 ${res.tierItemCount}개 → 연결 ${res.mapped.filter((m) => m[0] !== '분할').length}개 + 반영 안 함·결정 대기로 미적용 ${res.unapplied.filter((u) => u.grade).length}개`);
+L.push(`- 티어 항목 ${res.tierItemCount}개 → 운동 연결 ${res.mapped.filter((m) => m[0] !== '분할').length}개, 반영 안 함·결정 대기로 미적용 ${res.unapplied.filter((u) => u.grade).length}개 (분할 템플릿은 별도, 한 항목이 두 곳에 걸릴 수 있어 합계는 다를 수 있음)`);
 L.push(`- 영상 등급이 붙은 운동 ${Object.keys(res.grades).length}개 (등급 ${Object.values(res.grades).flat().length}개), 자세 포인트가 붙은 운동 ${Object.keys(res.guides).length}개`);
 L.push(`- 연결 실패: **${res.unresolved.length}건**`, '');
 if (res.unresolved.length) L.push('## 연결 실패 (빌드 중단)', '', ...res.unresolved.map((u) => `- ${u}`), '');
