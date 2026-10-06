@@ -40,6 +40,8 @@ export function Exercises({ s }: { s: AppState }) {
   const [equip, setEquip] = useState<Equipment | ''>(saved.equip ?? '');
   const [minG, setMinG] = useState<Grade | ''>(saved.minG ?? '');
   const [muscle, setMuscle] = useState<string>(saved.muscle ?? '');
+  const active2 = (equip ? 1 : 0) + (minG ? 1 : 0) + (muscle ? 1 : 0);
+  const [moreOpen, setMoreOpen] = useState<boolean>(active2 > 0);
   const remember = (p: object) => sessionStorage.setItem(scopedKey(KEY), JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, muscle, ...p }));
   const level = s.settings.level;
   const inPart = all.filter((e) => (part ? eligibleParts(e).includes(part) : true));
@@ -66,8 +68,11 @@ export function Exercises({ s }: { s: AppState }) {
       <div class="row wrap">
         <button class={`chip ${favOnly ? 'on' : ''}`} aria-pressed={favOnly} onClick={() => { setFavOnly(!favOnly); remember({ favOnly: !favOnly }); }}><Icon name={favOnly ? 'star' : 'starLine'} size={16} />즐겨찾기만</button>
         <button class={`chip ${videoOnly ? 'on' : ''}`} aria-pressed={videoOnly} onClick={() => { setVideoOnly(!videoOnly); remember({ videoOnly: !videoOnly }); }}>영상 등급만</button>
-        <span class="sub small">{rows.length}개</span>
+        <button class={`chip filter-toggle${active2 ? ' on' : ''}`} aria-expanded={moreOpen} aria-controls="ex-more-filters" aria-label={`필터 (장비·등급·주 근육)${active2 ? `, ${active2}개 적용` : ''}`} onClick={() => setMoreOpen(!moreOpen)}>
+          <Icon name="chevron" size={14} class={`rot${moreOpen ? ' open' : ''}`} />필터{active2 > 0 && <span class="f-count" aria-hidden="true">{active2}</span>}
+        </button>
       </div>
+      {moreOpen && <div id="ex-more-filters">
       <div class="grid2 filter-row">
         <select value={equip} aria-label="장비 필터" onChange={(e) => { const v = (e.target as HTMLSelectElement).value as Equipment | ''; setEquip(v); remember({ equip: v }); }}>
           <option value="">장비 전체</option>{EQUIPMENT.map((x) => <option key={x} value={x}>{EQUIPMENT_LABEL[x]}</option>)}
@@ -79,6 +84,8 @@ export function Exercises({ s }: { s: AppState }) {
       <select value={mg} aria-label="주 근육 필터" class="filter-row" onChange={(e) => { const v = (e.target as HTMLSelectElement).value; setMuscle(v); remember({ muscle: v }); }}>
         <option value="">주 근육 전체</option>{groups.map((g) => <option key={g} value={g}>주 근육: {g}</option>)}
       </select>
+      </div>}
+      <p class="sub small ex-count" aria-live="polite">{rows.length}개</p>
       {/* D-055 3단계: 목록 줄 = 등급 배지(영상/추정/내 등급) · 이름(즐겨찾기 별) · 부위 태그 · 종류·장비 · 주/보조 근육 */}
       {rows.length > 0 ? (
         <div class="card ex-list">
@@ -150,12 +157,12 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
       <p class="sub">{e.part} · {e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.unilateral ? ' · 한쪽씩' : ''}{e.heavy ? ' · 무거운 운동' : ''}</p>
       <p class="sub small">{muscleText(e.muscles)} · 묶음: {families[e.family] ?? '직접 추가'}{e.aliases?.length ? ` · 다른 이름: ${e.aliases.join(', ')}` : ''}</p>
       {e.note && <p class="sub small">메모: {e.note}</p>}
-      {/* D-055 3단계: 내 기록 숫자 3개 (추정 1RM = Epley, 12회 이하 · 최근 무게 · 한 횟수) */}
+      {/* D-055 3단계: 내 기록 숫자 3개 (추정 1RM = Epley, 12회 이하 · 최근 무게 · 해 본 횟수(운동 번수, 반복 횟수 아님)) */}
       <section class="card ex-metrics" aria-label="내 기록 요약">
         <div class="metrics3">
           <Metric label="추정 1RM" value={best > 0 ? best : undefined} unit="kg" status={best > 0 ? 'Epley 추정' : '아직 없음'} />
           <Metric label="최근 무게" value={lastW !== undefined ? lastW : undefined} unit="kg" status={lastDate ? lastDate : '아직 없음'} />
-          <Metric label="한 횟수" value={hist.length || undefined} unit="회" status={hist.length ? '운동 기록 기준' : '아직 없음'} />
+          <Metric label="해 본 횟수" value={hist.length || undefined} unit="번" status={hist.length ? '운동한 날 기준' : '아직 없음'} />
         </div>
       </section>
       <div class="row wrap ex-actions">

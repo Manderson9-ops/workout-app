@@ -141,9 +141,13 @@ function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Ex
 /** 부위 창 (D-055 3단계): 그 주 그 부위로 한 운동·작업 세트·최고 세트, 누르면 기록 상세 */
 function PartWeekSheet({ part, rows, week, onClose }: { part: Part; rows: PartWeekRow[]; week: string; onClose: () => void }) {
   const total = rows.reduce((n, r) => n + r.sets, 0);
+  // 운동(종목)별 세트 합: 같은 운동을 여러 번 했어도 운동 1개로 센다
+  const byEx = new Map<string, { name: string; sets: number }>();
+  for (const r of rows) { const x = byEx.get(r.exerciseId) ?? { name: r.name, sets: 0 }; x.sets += r.sets; byEx.set(r.exerciseId, x); }
   return (
     <Sheet title={`${part} · ${week}`} onClose={onClose} trap>
-      <p class="sub">작업 세트 {total}개 · 운동 {rows.length}개 (웜업 제외, 주 부위 기준)</p>
+      <p class="sub">작업 세트 {total}개 · 운동 {byEx.size}개 · {rows.length}회 (웜업 제외, 주 부위 기준)</p>
+      <ul class="pw-ex" aria-label="운동별 세트">{[...byEx.values()].map((x, i) => <li key={i}><span>{x.name}</span><b>{x.sets}세트</b></li>)}</ul>
       <div class="pw-list">
         {rows.map((r, i) => (
           <button key={i} class="pw-row" onClick={() => { onClose(); go(`#/stats/w/${encodeURIComponent(r.workoutId)}`); }}

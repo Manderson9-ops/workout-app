@@ -284,13 +284,13 @@ export function PlanBuilder({ s }: { s: AppState }) {
         <section aria-label="생성된 플랜">
           <div class="panel step-card result-card">{/* .card 아님: 아래 운동 카드 목록(.card)과 구분 */}
           <div class="card-head"><span class="step-no" aria-hidden="true">3</span><h2 class="card-title grow">{plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : plan.status === 'reduced' ? '결과 · 플랜 (일부 부위만)' : '결과 · 플랜'}</h2>
-            {plan.blocks.length > 0 && <span class="sub">예상 {mmss(plan.estimatedSec)}{plan.targetSec ? ` / ${Math.round(plan.targetSec / 60)}분` : ''}</span>}</div>
+            </div>
           {plan.blocks.length > 0 && (() => {
             const items = plan.blocks.flatMap((b) => b.items);
             const sets = items.reduce((n, i) => n + i.sets, 0);
             return (
               <div class="metrics3 plan-metrics" aria-label="플랜 요약">
-                <Metric label="예상 시간" parts={[[Math.round(plan.estimatedSec / 60), '분']]} status={plan.targetSec ? `목표 ${Math.round(plan.targetSec / 60)}분` : '제한 없음'} />
+                <Metric label="예상 시간" value={mmss(plan.estimatedSec)} status={plan.targetSec ? `목표 ${Math.round(plan.targetSec / 60)}분` : '제한 없음'} />{/* 예상 시간은 여기 한 곳만 (분:초) */}
                 <Metric label="세트" parts={[[sets, '세트']]} status={`웜업 제외`} />
                 <Metric label="운동" parts={[[items.length, '개']]} status={`블록 ${plan.blocks.length}개`} />
               </div>

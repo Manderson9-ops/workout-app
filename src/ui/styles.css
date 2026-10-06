@@ -30,7 +30,7 @@
   --map-body: #12151c; --map-outline: #525a6b; --map-deco: #3a414f; --hover-veil: rgba(255, 255, 255, .06);
   --shadow-drag: 0 12px 28px rgba(0, 0, 0, .8);
   /* 기록 탭 부위 막대의 연구 참고 범위 띠 (10~20세트) */
-  --band: rgba(34, 197, 94, .14);
+  --ref-band: rgba(148, 163, 184, .16); --ref-line: #94a3b8; /* 연구 참고 띠: 중립 회색 (완료·성공 초록과 구분) */
   --nav-h: 64px; --nav-gap: 10px; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
   /* 탭 바가 차지하는 아래 공간 (떠 있는 바 + 아래 여백 + 안전 영역) */
   --nav-space: calc(var(--nav-h) + var(--nav-gap) + var(--safe-b));
@@ -587,9 +587,9 @@ button.tonal { background: var(--acc-soft); border-color: transparent; color: va
 button.part-row { width: 100%; min-height: 44px; padding: 0 4px; border: 0; border-radius: var(--r-btn); background: transparent; font-weight: 500; font-size: 14px; color: var(--text); text-align: left; justify-content: stretch; }
 button.part-row:not(:disabled):active { background: var(--card2); }
 button.part-row:disabled { opacity: .45; }
-.part-row .band { position: absolute; top: -3px; bottom: -3px; background: var(--band); border-left: 1px dashed var(--ok); border-right: 1px dashed var(--ok); border-radius: 2px; }
+.part-row .band { position: absolute; top: -3px; bottom: -3px; background: var(--ref-band); border-left: 1px dashed var(--ref-line); border-right: 1px dashed var(--ref-line); border-radius: 2px; }
 .part-row .fill { z-index: 1; }
-.band-label { position: absolute; top: -2px; font-size: 10px; font-style: normal; color: var(--ok); text-align: center; white-space: nowrap; }
+.band-label { position: absolute; top: -2px; font-size: 11px; font-style: normal; color: var(--sub); text-align: center; white-space: nowrap; }
 .trend-head { margin-top: 8px; }
 .bodyheat.tap .bm-muscle { cursor: pointer; }
 .pw-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
@@ -632,3 +632,10 @@ button.chip.full { width: 100%; }
 .level-chip { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 .wk-head > .grow, .wk-title > .grow, .wk-item-head > .grow { min-width: 0; }
 .wk-head > .wk-more, .wk-item-head > .wk-more, .wk-chev, .wk-head > .drag-handle { flex: none; }
+.wk-finish-bottom { width: 100%; margin-top: 8px; }
+.filter-toggle { display: inline-flex; align-items: center; gap: 4px; }
+.f-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill); background: var(--acc-fill); color: var(--on-acc); font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px; }
+.ex-count { margin: 6px 2px 0; }
+.pw-ex { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.pw-ex li { display: inline-flex; gap: 6px; align-items: baseline; background: var(--card2); border-radius: var(--r-pill); padding: 4px 10px; font-size: 13px; }
+.pw-ex b { font-variant-numeric: tabular-nums; }

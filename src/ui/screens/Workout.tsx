@@ -326,7 +326,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         );
       })}
       <button class="big" onClick={() => setPicker({ mode: 'add' })}>+ 운동 추가</button>
-      <button class="big danger" style={{ marginTop: '8px' }} onClick={finish}>운동 끝내기</button>
+      <button class="big wk-finish wk-finish-bottom" onClick={finish}>운동 끝내기</button>
 
       {/* 아래 도크 하나 (D-055 2단계): 휴식 중 = [고리·남은 시간·다음] [−15] [+15] [건너뛰기] [✓ 현재 세트 완료], 아닐 때 = 넓은 완료 버튼 한 줄 */}
       <div class={`timer dock${w.timer && rem === 0 ? ' end flash' : ''}`} role="timer" aria-live="polite">

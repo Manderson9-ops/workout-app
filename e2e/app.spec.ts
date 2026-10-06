@@ -7,6 +7,9 @@ import { checkSyncDir } from '../tools/sync_check';
 import { emptyState, handleSync } from '../src/core/syncMerge';
 import { APP_VERSION } from '../src/core/version';
 import { displayVersion } from '../src/core/changelog';
+
+/** 플랜 결과의 예상 시간 숫자 (예상 시간은 '플랜 요약' 첫 칸 한 곳에만, 분:초) */
+const estMetric = (root: Page | Locator) => root.getByLabel('플랜 요약').locator('.metric').first();
 const SHOWN_VERSION = displayVersion(APP_VERSION); // 화면 표시 버전 ("0.9.0", 꼬리표 없음 D-055 검토 A5)
 
 mkdirSync('reports/screens', { recursive: true });
@@ -106,7 +109,7 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
   await expect(planSec.getByText('원암 랫풀다운', { exact: true })).toBeVisible();
-  await expect(planSec.getByText(/예상 \d+:\d{2} \/ 45분/)).toBeVisible();
+  await expect(estMetric(planSec)).toHaveText(/^예상 시간\d+:\d{2}목표 45분$/);
   await expect(planSec.getByText(/라운드 후 휴식 \d+초/).first()).toBeVisible(); // 블록별 휴식 표시 (5.10)
   await checkScreen(page, '02-plan');
   // 다른 화면에 다녀와도 플랜 유지
@@ -278,8 +281,14 @@ test('운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링�
   await expect(page.getByRole('button', { name: '랫풀다운', exact: true })).toBeVisible();
   await checkScreen(page, '06-exercises');
   await page.getByLabel('운동 검색').fill('');
+  // 장비·등급·주 근육은 [필터] 안 (D-055 v0.9.2 검토): 처음엔 접힘, 적용 개수 배지
+  const ft = page.getByRole('button', { name: /^필터 \(장비·등급·주 근육\)/ });
+  await expect(ft).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByLabel('장비 필터')).toHaveCount(0);
+  await ft.click();
   await page.getByLabel('장비 필터').selectOption('smith');
   await page.getByLabel('등급 필터').selectOption('S');
+  await expect(ft).toHaveAccessibleName('필터 (장비·등급·주 근육), 2개 적용');
   await expect(page.getByRole('button', { name: '스미스머신 JM프레스' })).toBeVisible();
   await expect(page.getByRole('button', { name: '원암 랫풀다운' })).toHaveCount(0);
   await page.getByRole('button', { name: '스미스머신 JM프레스' }).click();
@@ -299,7 +308,7 @@ test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 →
   await page.getByLabel('최소 등급').selectOption('B-');
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   // 이전에는 "예상 33:12 / 75분"
-  await expect(page.getByText(/^예상 7[0-5]:\d\d \/ 75분$/)).toBeVisible();
+  await expect(estMetric(page)).toHaveText(/^예상 시간7[0-5]:\d\d목표 75분$/);
   await expect(page.getByRole('status', { name: '목표 시간보다 짧은 이유' })).toHaveCount(0);
   for (const n of ['스미스머신 스쿼트', '루마니안 데드리프트', '라잉 레그 컬', '바벨 힙 쓰러스트', '스탠딩 카프 레이즈']) await expect(page.getByRole('button', { name: `${n} 삭제` })).toBeVisible();
   await shot(page, '41-plan-legs-75');
@@ -312,17 +321,18 @@ test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 →
   await expect(note).toContainText(/목표보다 약 \d+분 짧아요/);
   await expect(note).toContainText('한 근육을 한 번에 약 11세트보다 많이 해도 근성장 차이를 확인하기 어려웠다');
   await checkScreen(page, '42-plan-chest-slack');
-  const before = (await page.getByText(/^예상 \d+:\d\d \/ 75분$/).textContent())!;
+  const before = (await estMetric(page).textContent())!;
   await note.getByRole('button', { name: '+ 삼두 더해서 다시 만들기' }).click();
   await expect(page.getByRole('button', { name: '삼두 보통' })).toBeVisible();
   await expect(page.getByText(/^삼두 [SABCDF][+-]? \(/).first()).toBeVisible();
-  const after = (await page.getByText(/^예상 \d+:\d\d \/ 75분$/).textContent())!;
+  const after = (await estMetric(page).textContent())!;
   const mins = (t: string) => Number(/(\d+):/.exec(t)![1]);
   expect(mins(after)).toBeGreaterThan(mins(before) + 10);
   // 종목 탭: 주/보조 근육 표시, 주 근육 필터
   await page.getByRole('link', { name: '종목' }).click();
   await page.getByRole('button', { name: '하체', exact: true }).click();
   await expect(page.getByRole('button', { name: '스미스머신 스쿼트' })).toContainText('주 대퇴사두 · 보조 둔근');
+  await page.getByRole('button', { name: /^필터 \(장비·등급·주 근육\)/ }).click();
   await page.getByLabel('주 근육 필터').selectOption('햄스트링');
   const rows = page.locator('.list-item .muscles');
   expect(await rows.count()).toBeGreaterThanOrEqual(5);
@@ -477,7 +487,7 @@ test('플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 �
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
-  const est = async () => { const t = (await planSec.getByText(/예상 \d+:\d{2}/).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
+  const est = async () => { const t = (await estMetric(planSec).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
   // 다른 부위(코어) 운동을 뒤에 추가
   await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
   const dlg = page.getByRole('dialog', { name: '운동 추가' });
@@ -519,7 +529,7 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
-  const est = async () => { const t = (await planSec.getByText(/예상 \d+:\d{2}/).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
+  const est = async () => { const t = (await estMetric(planSec).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
   // 묶음 밖의 단일 카드를 하나 두려고 코어 운동을 뒤에 추가
   await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
   const dlg0 = page.getByRole('dialog', { name: '운동 추가' });
@@ -1658,10 +1668,10 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   await planSec.getByRole('button', { name: `${first} 세트 늘리기` }).click();
   await expect(setsBox).toContainText(`${sets0 + 1}세트`);
   await expect(repsBox).toContainText(`${reps0 + 2}회`);
-  const est0 = await planSec.getByText(/예상 \d+:\d{2}/).textContent();
+  const est0 = await estMetric(planSec).textContent();
   await planSec.getByRole('button', { name: `${first} 횟수 줄이기` }).click();
   await expect(repsBox).toContainText(`${reps0 + 1}회`);
-  expect(await planSec.getByText(/예상 \d+:\d{2}/).textContent(), '횟수를 바꾸면 예상 시간도 다시 계산').not.toBe(est0);
+  expect(await estMetric(planSec).textContent(), '횟수를 바꾸면 예상 시간도 다시 계산').not.toBe(est0);
 
   // 순서: 1번째 블록을 아래로 → 2번째 블록이 맨 위
   const firstBlock = (await cards.nth(0).locator('strong').allTextContents()).join(' + ');
@@ -1727,7 +1737,7 @@ test('플랜 바로 고치기 (D-036): 시간 운동 초 −/+ 가 예상 시간
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
-  const est = async () => { const t = (await planSec.getByText(/예상 \d+:\d{2}/).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
+  const est = async () => { const t = (await estMetric(planSec).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
 
   // 다른 부위(코어)의 시간 운동 추가 → 초 조절
   await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
@@ -2341,7 +2351,8 @@ test('D-055 3단계 기록 탭: 부위 막대·몸 그림을 누르면 그 주 �
   await expect(page.getByText(/연구 참고 범위 10~20세트/)).toContainText('목표·상한 아님');
   await bar.click();
   const sheet = page.getByRole('dialog', { name: /^이두 · 이번 주/ });
-  await expect(sheet).toContainText('작업 세트 1개');
+  await expect(sheet).toContainText('작업 세트 1개 · 운동 1개');
+  await expect(sheet.getByRole('list', { name: '운동별 세트' })).toContainText('1세트');
   await expect(sheet.getByRole('button', { name: new RegExp(`${name.replace(/[()]/g, '.')} 1세트 최고 12kg`) })).toBeVisible();
   await checkScreen(page, '78-stats-part-sheet');
   await page.keyboard.press('Escape');
