@@ -8,6 +8,7 @@ import { mergeLate } from '../../core/session';
 import { syncNow } from '../sync';
 import { go } from '../nav';
 import { askConfirm, showNotice } from '../confirm';
+import { Icon } from '../icons';
 
 const since = (ms: number) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.round(m / 60)}시간 전`; };
 /** 가져오기 진행 중 (확인·동기화를 기다리는 동안 다시 눌러 두 번 가져오지 않게) */
@@ -22,7 +23,7 @@ export function RemoteCards({ s }: { s: AppState }) {
     <>
       {remote && (
         <div class="card" role="note" aria-label="다른 기기에서 진행 중">
-          <div><strong>📱 다른 기기에서 진행 중</strong> · {remote.name}</div>
+          <div class="row remote-head"><Icon name="workout" size={18} /><span><strong>다른 기기에서 진행 중</strong> · {remote.name}</span></div>
           {remote.timer && remote.timer.endsAt > Date.now() && <p class="small">휴식 중 · 약 {Math.round((remote.timer.endsAt - Date.now()) / 1000)}초 남음 <span class="sub">(다른 기기 시계 기준)</span></p>}
           <p class="sub small">세트 {doneSets(remote)}개 완료 · 마지막 신호 {since(parseHlc((remote as Workout & { _s?: { h: string } })._s?.h).ms || Date.parse(remote.startedAt))}. 이 기기에서는 볼 수만 있어요.</p>
           <button onClick={async () => {

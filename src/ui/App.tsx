@@ -116,7 +116,7 @@ export function App() {
       {screen}
       {active && !onWorkout && (
         <a class="banner" href="#/workout" aria-label="운동 계속하기">
-          <span>운동 중 · {active.name}</span><span class="num-s">{mmss((Date.now() - Date.parse(active.startedAt)) / 1000)} ▶</span>
+          <span>운동 중 · {active.name}</span><span class="row num-s">{mmss((Date.now() - Date.parse(active.startedAt)) / 1000)}<Icon name="chevron" size={18} /></span>
         </a>
       )}
       <ConfirmHost />

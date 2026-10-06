@@ -76,3 +76,24 @@ describe('D-055 2단계: 휴식 고리는 남은 비율 (줄어듦)', () => {
     expect(ringDash(200, 120, C).fraction).toBe(1);
   });
 });
+
+describe('D-055 3단계: 같은 종목이 한 운동에 두 칸이면 서로 비교하고 한 번만 셈', () => {
+  it('두 번째 칸의 같은 무게는 갱신 아님, 더 나을 때만, 알림은 종목 1개', () => {
+    const h = [W('h', '2026-10-01T10:00:00.000Z', [S(60, 5)])];
+    const cur = {
+      id: 'cur', name: 'c', startedAt: '2026-10-06T10:00:00.000Z', timer: null,
+      blocks: [
+        { kind: 'single', restSec: 90, roundRestSec: 0, transitionSec: 0, items: [{ exerciseId: 'bench', target: { sets: 1, reps: 5 }, sets: [S(62.5, 5, { doneAt: '2026-10-06T10:01:00.000Z' })] }] },
+        { kind: 'single', restSec: 90, roundRestSec: 0, transitionSec: 0, items: [{ exerciseId: 'bench', target: { sets: 2, reps: 5 }, sets: [S(62.5, 5, { doneAt: '2026-10-06T10:10:00.000Z' }), S(65, 5, { doneAt: '2026-10-06T10:12:00.000Z' })] }] },
+      ],
+    } as unknown as Workout;
+    expect([...workoutPRs(cur, h).keys()]).toEqual(['0-0-0', '1-0-1']);
+    expect(prExerciseCount(cur, h)).toBe(1);
+  });
+  it('고친 과거 운동은 고친 값으로 비교, 13회 이상은 1RM 대신 횟수 규칙', () => {
+    const edited = W('h', '2026-10-01T10:00:00.000Z', [S(70, 5)]); // 원래 60×5 → 70×5 로 고침
+    expect(isPR(S(65, 5), bestsFrom(historyOf([edited])))).toBeNull();
+    expect(isPR(S(40, 15), bestsFrom([S(40, 14)]))).toBe('reps');
+  });
+});
+function historyOf(ws: Workout[]): SetLog[] { return ws.flatMap((w) => w.blocks.flatMap((b) => b.items.flatMap((i) => i.sets))); }

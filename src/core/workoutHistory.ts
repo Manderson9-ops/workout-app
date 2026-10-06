@@ -82,23 +82,32 @@ export function isPR(set: SetLog, prev: Bests): PrKind | null {
  */
 export function workoutPRs(w: Workout, history: readonly Workout[]): Map<string, PrKind> {
   const out = new Map<string, PrKind>();
+  // 같은 종목이 한 운동에 두 칸(교체·추가로 다시 들어온 경우)이어도 한 줄로 모아 비교 (검토 v0.9.1: 서로의 세트도 "앞서 끝낸 세트")
+  const byEx = new Map<string, { s: SetLog; key: string; k: number }[]>();
   w.blocks.forEach((b, bi) => b.items.forEach((it, ii) => {
     if (it.skipped) return;
-    const before = historySets(history, it.exerciseId, w.id);
-    // 완료한 순서대로 비교 (doneAt, 없으면 줄 순서)
-    const order = it.sets.map((s, k) => ({ s, k })).filter(({ s }) => s.done).sort((a, b2) => (a.s.doneAt ?? '').localeCompare(b2.s.doneAt ?? '') || a.k - b2.k);
+    const list = byEx.get(it.exerciseId) ?? [];
+    it.sets.forEach((s, k) => { if (s.done) list.push({ s, key: `${bi}-${ii}-${k}`, k: bi * 10000 + ii * 100 + k }); });
+    byEx.set(it.exerciseId, list);
+  }));
+  for (const [exId, list] of byEx) {
+    const before = historySets(history, exId, w.id);
+    if (!bestsFrom(before).sets.length) continue; // 처음 하는 운동은 갱신 아님
+    // 완료한 순서대로 (doneAt, 없으면 화면 순서)
+    list.sort((a, b) => (a.s.doneAt ?? '').localeCompare(b.s.doneAt ?? '') || a.k - b.k);
     const seen: SetLog[] = [...before];
-    for (const { s, k } of order) {
+    for (const { s, key } of list) {
       const kind = isPR(s, bestsFrom(seen));
-      if (kind && bestsFrom(before).sets.length) out.set(`${bi}-${ii}-${k}`, kind);
+      if (kind) out.set(key, kind);
       seen.push(s);
     }
-  }));
+  }
   return out;
 }
-/** 끝낼 때 알림용: 기록 갱신한 운동 수 */
+/** 끝낼 때 알림용: 기록 갱신한 종목 수 (같은 종목이 두 칸이어도 1개) */
 export function prExerciseCount(w: Workout, history: readonly Workout[]): number {
-  return new Set([...workoutPRs(w, history).keys()].map((k) => k.split('-').slice(0, 2).join('-'))).size;
+  const exOf = (key: string) => { const [b, i] = key.split('-').map(Number); return w.blocks[b!]?.items[i!]?.exerciseId; };
+  return new Set([...workoutPRs(w, history).keys()].map(exOf).filter(Boolean)).size;
 }
 
 /**

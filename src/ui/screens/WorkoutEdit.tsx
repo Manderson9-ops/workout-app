@@ -11,6 +11,7 @@ import { targetReps } from '../../core/time';
 import { toLocalInput, fromLocalInput, durationMin, setTimes, moveStart, patchSet, patchSetByKey, keyOf, withKeys, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, EDIT_LIMITS } from '../../core/workoutEdit';
 import { go } from '../nav';
 import { HeadButtons, BackButton } from '../header';
+import { Icon } from '../icons';
 import { askConfirm } from '../confirm';
 
 /**
@@ -126,7 +127,7 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
                     : <NumInput integer label={`${nm} 횟수`} suffix="" pendingKey={`ed-${key}-r`} value={x.reps} onChange={(v) => setDraft((d) => patchSetByKey(d, key, { reps: v }))} />}
                   <NumInput integer label={`${nm} RIR`} suffix="" pendingKey={`ed-${key}-i`} value={x.rir} onChange={(v) => setDraft((d) => patchSetByKey(d, key, { rir: v }))} />
                   <label class="ck"><input type="checkbox" aria-label={`${nm} 완료`} checked={x.done} onChange={(e) => { const c = (e.target as HTMLInputElement).checked; setDraft((d) => patchSetByKey(d, key, { done: c })); }} /></label>
-                  <button class="ghost" aria-label={`${nm} 지우기`} onClick={() => void act((d) => { const z = d.blocks[bi]?.items[ii]?.sets.findIndex((q) => keyOf(q) === key) ?? -1; return z >= 0 ? deleteSet(d, bi, ii, z) : d; })}>✕</button>
+                  <button class="ghost" aria-label={`${nm} 지우기`} onClick={() => void act((d) => { const z = d.blocks[bi]?.items[ii]?.sets.findIndex((q) => keyOf(q) === key) ?? -1; return z >= 0 ? deleteSet(d, bi, ii, z) : d; })}><Icon name="close" size={18} /></button>
                 </div>
               );
             })}

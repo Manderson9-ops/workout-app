@@ -3,7 +3,7 @@
  * 탭·메뉴·원형 버튼에서 이모지 대신 쓴다. 장식용이라 화면 읽기에서는 숨김(aria-hidden) — 이름은 버튼·링크에 붙인다.
  */
 export type IconName = 'home' | 'plan' | 'workout' | 'stats' | 'exercises' | 'settings' | 'feedback' | 'more' | 'back' | 'play' | 'chevron' | 'close' | 'info' | 'sparkle'
-  | 'swap' | 'skip' | 'undo' | 'note' | 'plate' | 'check' | 'star' | 'plus' | 'minus';
+  | 'swap' | 'skip' | 'undo' | 'note' | 'plate' | 'check' | 'star' | 'starLine' | 'plus' | 'minus' | 'alert' | 'sync' | 'video' | 'lock';
 
 const P: Record<IconName, string[]> = {
   // 집
@@ -37,6 +37,14 @@ const P: Record<IconName, string[]> = {
   plate: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z'],
   check: ['M5 12.5 10 17.5 19.5 7'],
   star: ['M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'],
+  starLine: ['M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'],
+  // 주의: 세모 + 느낌표
+  alert: ['M12 4 2.8 19.5h18.4z', 'M12 10v4.5', 'M12 17h.01'],
+  // 동기화: 위·아래 화살표
+  sync: ['M8 4v15', 'M4.5 7.5 8 4l3.5 3.5', 'M16 20V5', 'M19.5 16.5 16 20l-3.5-3.5'],
+  // 영상: 화면 + 재생
+  video: ['M3.5 6h17v12h-17z', 'M10 9.5v5l4.5-2.5z'],
+  lock: ['M6 11h12v9H6z', 'M8.5 11V8a3.5 3.5 0 0 1 7 0v3'],
   plus: ['M12 5v14', 'M5 12h14'],
   minus: ['M5 12h14'],
   sparkle: ['M12 3v4', 'M12 17v4', 'M3 12h4', 'M17 12h4', 'M6 6l2.5 2.5', 'M15.5 15.5 18 18', 'M18 6l-2.5 2.5', 'M8.5 15.5 6 18'],

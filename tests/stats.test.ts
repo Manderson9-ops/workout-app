@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, isCountedWorkout } from '../src/core/stats';
+import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, isCountedWorkout, partWeekDetail } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
 import { heatBucket } from '../src/ui/bodyMapView';
@@ -275,5 +275,17 @@ describe('D-054 2차: 시간 문구·0세트 제외·지난주 같은 요일까�
   it('bestSetLabel: 무게 있는 맨몸 운동은 kg 표시, 시간+무게 혼합은 초 우선', () => {
     expect(bestSetLabel([s(10, 8), s(10, 6)])).toBe('10kg × 8회');
     expect(bestSetLabel([{ weight: 20, seconds: 60, warmup: false, done: true }])).toBe('60초');
+  });
+});
+
+describe('D-055 3단계: 부위 창 (그 주 그 부위 운동)', () => {
+  const a = wk('a', at(2026, 9, 28, 9), [{ id: 'bench', sets: [s(60, 8), s(62.5, 6), s(20, 10, { warmup: true })] }, { id: 'curl', sets: [s(12, 10)] }], 40);
+  const b = wk('b', at(2026, 9, 30, 9), [{ id: 'bench', sets: [s(65, 5), s(70, 3, { done: false })] }], 30);
+  const other = wk('o', at(2026, 9, 21, 9), [{ id: 'bench', sets: [s(99, 1)] }], 30); // 전 주
+  it('작업 세트만 세고(웜업·안 한 세트 제외) 막대 숫자와 합이 같음, 날짜 순', () => {
+    const r = partWeekDetail([b, a, other], byId, '2026-09-27', '가슴');
+    expect(r.map((x) => [x.date, x.sets, x.best])).toEqual([['2026-09-28', 2, '62.5kg × 6회'], ['2026-09-30', 1, '65kg × 5회']]);
+    expect(r.reduce((n, x) => n + x.sets, 0)).toBe(weeklyPartSets([a, b, other], byId, '2026-09-30', 1)[0]!.parts.가슴);
+    expect(partWeekDetail([a], byId, '2026-09-27', '하체')).toEqual([]);
   });
 });

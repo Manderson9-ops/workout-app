@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { activeOf, historyOf, mutate, flushPending, getState } from '../store';
 import { catalog } from '../catalog';
@@ -13,6 +13,7 @@ import type { MenuItem } from '../components';
 import { Icon } from '../icons';
 import { summarize } from '../../core/stats';
 import { previousSetsFor, prevFor, prevText, workoutPRs, prExerciseCount, ringDash } from '../../core/workoutHistory';
+import type { PrKind, PrevSets } from '../../core/workoutHistory';
 import { showToast } from '../toast';
 import { ScreenHeader } from '../header';
 import { resolveGrade } from '../../core/exercises';
@@ -71,7 +72,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       const cw = activeOf(getState());
       const nPr = cw && cw.id === id ? prExerciseCount(cw, historyOf(getState())) : 0;
       const r = await finishActiveWorkout(id); // 실패 문구는 finishActiveWorkout이 setFinishError로 남김
-      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); if (nPr) showToast(`★ 기록 갱신 ${nPr}개 운동 (앱 기준)`); }
+      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); if (nPr) showToast(`기록 갱신 ${nPr}개 운동 (앱 기준)`, 'star'); }
     } finally { finishing.current = false; }
   };
   // 블록 끌어서 순서 바꾸기 (D-037). 펼친 카드는 옮긴 자리를 따라감
@@ -86,6 +87,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     }).catch(() => undefined);
   }, (i) => (w?.blocks[i]?.items.map((it) => byId.get(it.exerciseId)?.name_ko ?? it.exerciseId).join(' + ') ?? ''));
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
+  // 지난번·기록 갱신 계산은 기록(s.workouts)·지금 운동(w)이 바뀔 때만 (1초마다 다시 그려도 전체 기록을 다시 훑지 않음, 검토 v0.9.1)
+  const histMemo = useMemo(() => historyOf(s), [s.workouts]);
+  const prsMemo = useMemo(() => (w ? workoutPRs(w, histMemo) : new Map<string, PrKind>()), [w, histMemo]);
+  const prevCache = useMemo(() => new Map<string, PrevSets>(), [histMemo, w?.id]);
 
   // 표시 시각은 렌더 순간의 현재 시각 (250ms 틱은 다시 그리기용). 오래된 시각이면 설정보다 1초 길게 보일 수 있음
   const nowMs = Math.max(now, Date.now());
@@ -111,8 +116,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     return (
       <main>
         <ScreenHeader title="운동" />
-        {remoteActiveOf(s) && <p role="status" class="card small">📱 운동 「{remoteActiveOf(s)!.name}」은 다른 기기에서 진행 중이에요 (다른 기기로 넘어갔어요). 홈에서 볼 수 있어요.</p>}
-        {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" style={{ margin: 0 }}>⚠️ {finishErr}</p><button class="ghost" aria-label="알림 닫기" onClick={() => setFinishError(null)}>✕</button></div>}
+        {remoteActiveOf(s) && <p role="status" class="card small">운동 「{remoteActiveOf(s)!.name}」은 다른 기기에서 진행 중이에요 (다른 기기로 넘어갔어요). 홈에서 볼 수 있어요.</p>}
+        {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" class="err-line"><Icon name="alert" size={18} />{finishErr}</p><button class="ghost icon-btn" aria-label="알림 닫기" onClick={() => setFinishError(null)}><Icon name="close" size={18} /></button></div>}
         <p class="sub">진행 중인 운동이 없어요. 루틴을 골라 시작하세요.</p>
         <div class="row between"><h2>루틴 고르기</h2><div class="row"><button onClick={() => go('#/routines')}>내 루틴 관리</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜</button></div></div>
         <RoutineList s={s} mode="pick" />
@@ -124,7 +129,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const upd = (fn: (x: Workout) => Workout) => updateWorkoutAfterInputs(w.id, fn);
   const cur = currentStep(w);
   const openIdx = open ?? cur?.block ?? 0;
-  const history = historyOf(s);
+  const history = histMemo;
   const prog = progress(w, nowMs, (id, reps) => { const e = byId.get(id); return e ? setTime(e, reps) : 40; });
   const nameOf = (id: string) => byId.get(id)?.name_ko ?? id;
   const complete = (st: Step) => { unlockAudio(); setEnded(false); void upd((cw) => completeSet(cw, st, Date.now())); setOpen(null); };
@@ -132,7 +137,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const nextRest = cur ? restAfter(w, cur) : null;
   // D-055 2단계: 볼륨(완료 작업 세트), 기록 갱신(앱 기준)
   const volume = summarize(w, byId, s.bodyweight).volume;
-  const prs = workoutPRs(w, history);
+  const prs = prsMemo;
   const isBar = (exId: string) => !!byId.get(exId)?.equipment.some((e) => e === 'barbell' || e === 'smith');
   const openPlate = async (b: number, i: number, k: number) => { await flushPending(); setPlate(activeOf(getState())?.blocks[b]?.items[i]?.sets[k]?.weight ?? 20); };
 
@@ -184,7 +189,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     return (
       <div key={k} class="set-wrap">
         <div class={`set-row ${x.done ? 'done' : ''} ${isCur ? 'current' : ''} ${x.warmup ? 'warm' : ''}`}>
-          <button class="set-idx" aria-label={`${label} 자세히 (RIR·메모)`} aria-expanded={expanded} onClick={() => { if (!isCur) setDetailKey(detail === key ? null : key); }}>{x.warmup ? 'W' : workNo}</button>
+          <button class="set-idx" aria-label={`${label} 자세히 (RIR·메모)`} aria-expanded={expanded} title="누르면 RIR·메모" onClick={() => { if (!isCur) setDetailKey(detail === key ? null : key); }}><span class="idx-n">{x.warmup ? 'W' : workNo}</span><Icon name="chevron" size={12} class={`idx-chev${expanded ? ' open' : ''}`} /></button>
           <span class="set-prev" aria-label={`${label} 지난번 ${prevTxt === '-' ? '없음' : prevTxt}`}>{prevTxt}</span>
           <NumInput pendingKey={`${b}-${i}-${k}-w`} label={`${label} 무게`} value={x.weight} suffix="" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
           {timeEx
@@ -201,7 +206,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           </div>
         )}
         {expanded && detailRow(b, i, k, x, isCur, label, timeEx)}
-        {x.memo && <div class="pill set-memo">📝 {x.memo}</div>}
+        {x.memo && <div class="pill set-memo memo-line"><Icon name="note" size={14} />{x.memo}</div>}
       </div>
     );
   };
@@ -251,10 +256,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       <ScreenHeader eyebrow="운동 중" title={w.name}>
         <div class="row head-actions wk-actions">
           <button class="ghost" aria-label="운동 메모" onClick={() => setMemo({ title: '오늘 운동 메모', value: w.memo, save: (m) => void upd((cw) => setWorkoutMemo(cw, m)) })}><Icon name="note" size={18} />메모</button>
-          <button class="danger-fill wk-finish" onClick={finish}>끝내기</button>
+          <button class="wk-finish" onClick={finish}>끝내기</button>
         </div>
       </ScreenHeader>
-      {w.memo && <p class="sub small">📝 {w.memo}</p>}
+      {w.memo && <p class="sub small memo-line"><Icon name="note" size={14} />{w.memo}</p>}
       {/* 숫자 3개 (D-055 2단계): 경과 시간(파랑)·볼륨·세트 */}
       <section class="wk-metrics" aria-label="운동 진행">
         <div class="metrics3">
@@ -278,7 +283,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
               <div class="row between grow wk-title" onClick={() => setOpen(isOpen ? -1 : bi)} role="button" aria-expanded={isOpen}>
                 <div class="grow">
                   {!single && <span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'} · 번갈아</span>}
-                  <div><strong>{b.items.map((it) => nameOf(it.exerciseId)).join(' + ')}</strong>{doneAll ? ' ✅' : ''}</div>
+                  <div><strong>{b.items.map((it) => nameOf(it.exerciseId)).join(' + ')}</strong>{doneAll && <span class="done-chip"><Icon name="check" size={14} />완료</span>}</div>
                   <div class="pill">{single ? `세트 간 휴식 ${b.restSec}초` : `라운드 후 휴식 ${b.roundRestSec}초`}</div>
                 </div>
                 <Icon name="chevron" size={18} class={`wk-chev${isOpen ? ' open' : ''}`} />
@@ -288,7 +293,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             {isOpen && b.items.map((it, ii) => {
               const ex = byId.get(it.exerciseId);
               const g = ex ? resolveGrade(ex, ex.part, s.settings.level, undefined, s.meta.get(ex.id)?.userGrade) : undefined;
-              const prev = previousSetsFor(history, it.exerciseId, w.id);
+              const prev = prevCache.get(it.exerciseId) ?? (() => { const p = previousSetsFor(history, it.exerciseId, w.id); prevCache.set(it.exerciseId, p); return p; })();
               const timeEx = it.target.seconds !== undefined;
               return (
                 <div key={ii} class={`wk-item${it.skipped ? ' skipped' : ''}`}>
@@ -312,7 +317,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
                     </div>
                   )}
                   {it.skipped && <button class="tonal" onClick={() => upd((cw) => skipItem(cw, bi, ii, false))}>되살리기</button>}
-                  {it.memo && <p class="sub small">📝 {it.memo}</p>}
+                  {it.memo && <p class="sub small memo-line"><Icon name="note" size={14} />{it.memo}</p>}
                 </div>
               );
             })}
@@ -324,7 +329,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
 
       {/* 아래 도크 하나 (D-055 2단계): 휴식 중 = [고리·남은 시간·다음] [−15] [+15] [건너뛰기] [✓ 현재 세트 완료], 아닐 때 = 넓은 완료 버튼 한 줄 */}
       <div class={`timer dock${w.timer && rem === 0 ? ' end flash' : ''}`} role="timer" aria-live="polite">
-        {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" style={{ margin: 0 }}>⚠️ {finishErr}</p><button class="ghost" aria-label="알림 닫기" onClick={() => setFinishError(null)}>✕</button></div>}
+        {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" class="err-line"><Icon name="alert" size={18} />{finishErr}</p><button class="ghost icon-btn" aria-label="알림 닫기" onClick={() => setFinishError(null)}><Icon name="close" size={18} /></button></div>}
         {timerOn && w.timer ? (
           <div class={`rest-pill${rem === 0 ? ' end' : ''}`}>
             <svg class="ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" data-fraction={ring.fraction.toFixed(3)}>

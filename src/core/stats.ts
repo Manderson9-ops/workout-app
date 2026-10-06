@@ -184,6 +184,25 @@ export function weeklyPartSets(workouts: Workout[], byId: Map<string, Exercise>,
   });
 }
 
+/**
+ * 기록 탭 부위 창 (D-055 3단계, Fitbod 식): 그 주(일~토)에 그 부위(운동의 주 부위)로 한 운동·작업 세트·최고 세트.
+ * weeklyPartSets 와 같은 기준 (끝난 운동, 완료한 작업 세트, 웜업 제외) → 막대 숫자와 합이 같음
+ */
+export interface PartWeekRow { date: string; workoutId: string; workoutName: string; exerciseId: string; name: string; sets: number; best?: string }
+export function partWeekDetail(workouts: Workout[], byId: Map<string, Exercise>, weekStartDate: string, part: Part): PartWeekRow[] {
+  const out: PartWeekRow[] = [];
+  for (const w of workouts) {
+    if (!w.endedAt || weekStart(localDate(w.startedAt)) !== weekStartDate) continue;
+    for (const b of w.blocks) for (const it of b.items) {
+      const ex = byId.get(it.exerciseId);
+      const n = workSets(it.sets).length;
+      if (!ex || ex.part !== part || !n) continue;
+      out.push({ date: localDate(w.startedAt), workoutId: w.id, workoutName: w.name, exerciseId: it.exerciseId, name: ex.name_ko, sets: n, ...(bestSetLabel(it.sets) ? { best: bestSetLabel(it.sets)! } : {}) });
+    }
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+
 /** 달력: 그 달의 날짜별 운동 수 (끝난 운동) */
 export function monthDays(workouts: Workout[], year: number, month: number): Map<number, number> {
   const out = new Map<number, number>();

@@ -125,7 +125,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
         <div class="routine-tools">
           {showSearch && <div class="row search-row">
             <input placeholder="루틴·운동·부위 검색 (초성 가능)" value={q} aria-label="루틴 검색" onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
-            {q && <button class="ghost" aria-label="검색어 지우기" onClick={() => setQ('')}>✕</button>}
+            {q && <button class="ghost icon-btn" aria-label="검색어 지우기" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
           </div>}
           {showSort && <div class="row wrap" role="group" aria-label="정렬" style={{ marginTop: '6px' }}>
             {(Object.keys(SORT_LABEL) as RoutineSort[]).map((k) => <button key={k} class={`chip ${sort === k ? 'on' : ''}`} aria-pressed={sort === k} onClick={() => setSort(k)}>{SORT_LABEL[k]}</button>)}
@@ -146,7 +146,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
       )}
       {mode === 'all' && hidden.length > 0 && (
         <div style={{ marginTop: '12px' }}>
-          <button class="ghost" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}>{showHidden ? '▾' : '▸'} 숨긴 루틴 {hidden.length}개</button>
+          <button class="ghost" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}><Icon name="chevron" size={16} class={`rot${showHidden ? ' open' : ''}`} />숨긴 루틴 {hidden.length}개</button>
           {showHidden && <div class="wide-cards">{sortRoutines(hidden, use, 'name').map((r) => card(r, true))}</div>}
         </div>
       )}

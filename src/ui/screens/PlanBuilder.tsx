@@ -13,7 +13,7 @@ import type { Grade } from '../../core/version';
 import { resolveGrade } from '../../core/exercises';
 import { DEFAULT_TIME, blockTime, targetReps, warmupFor } from '../../core/time';
 import type { TimedBlock } from '../../core/time';
-import { GradeBadge, ExercisePicker, Sheet, mmss, Labeled, MiniStepper } from '../components';
+import { GradeBadge, ExercisePicker, Sheet, mmss, Labeled, MiniStepper, Metric } from '../components';
 import type { StepBtn } from '../components';
 import { ScreenHeader } from '../header';
 import { savePlanAsRoutine, startRoutine } from '../actions';
@@ -24,6 +24,7 @@ import { PartSheet } from '../prioritySheet';
 import { togglePart as togglePartForm, setPartPriority } from '../../core/planForm';
 import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
 import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, groupKindWithNext, mergeWithNextBlock, splitPlanBlock, bulkSets, bulkReps, addToGroup, stepRoundRest, stepTransition, GROUP_MAX, ROUND_REST_MIN, ROUND_REST_MAX, ROUND_REST_STEP, TRANSITION_MIN, TRANSITION_MAX, TRANSITION_STEP, rangeText, changedCount, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
+import { Icon } from '../icons';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
 const KEY = 'planBuilder.v1';
@@ -209,7 +210,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
     if (!plan || plan.blocks.length <= 1) return null;
     const b = plan.blocks[bi]!; const key = blockKey(b); const nm = blockName(b);
     return (
-      <span class="row" style={{ gap: '4px' }}>
+      <span class="row gap4">
         <button {...dnd.handleProps(bi)}>≡</button>
         <span class="sub small" aria-hidden="true">{bi + 1}번째</span>
         <button class="ghost" data-move={key} data-dir="-1" aria-label={`${nm} 위로 (지금 ${bi + 1}번째)`} disabled={bi === 0} onClick={() => move(bi, -1)}>↑</button>
@@ -224,7 +225,10 @@ export function PlanBuilder({ s }: { s: AppState }) {
       <ScreenHeader title="플랜 만들기" />
       {/* PC 넓은 화면: 왼쪽 조건, 오른쪽 결과 (D-030) */}
       <div class="wide-2"><div>
-      <label>부위 (그림이나 버튼을 누르면 우선순위를 고르는 창이 열려요 · 기본 높음)</label>
+      {/* D-055 3단계: 단계 카드 1 부위·우선순위 → 2 시간·등급·묶음 → 3 결과 */}
+      <section class="card step-card" aria-label="1단계 부위·우선순위">
+      <div class="card-head"><span class="step-no" aria-hidden="true">1</span><span class="card-title grow">부위·우선순위</span><span class="sub small">{nParts ? `${nParts}개 고름` : '아직 없음'}</span></div>
+      <p class="sub small step-hint">그림이나 버튼을 누르면 우선순위를 고르는 창이 열려요 · 기본 높음</p>
       {/* 그림 먼저, 버튼은 아래: 버튼 글자가 길어져도 그림 위치가 바뀌지 않게 (연속으로 누를 때 빗나가지 않게) */}
       <BodyMap sel={f.parts} onPart={openPart} />
       <div class="row wrap" role="group" aria-label="부위">
@@ -246,7 +250,10 @@ export function PlanBuilder({ s }: { s: AppState }) {
           {templates.find((t) => t.id === tpl)!.days.map((d, i) => <option key={i} value={i}>{i + 1}일차: {d.join('+')}</option>)}
         </select>}
       </div>
-      <label>운동 시간</label>
+      </section>
+      <section class="card step-card" aria-label="2단계 시간·등급·묶음">
+      <div class="card-head"><span class="step-no" aria-hidden="true">2</span><span class="card-title grow">시간·등급·묶음</span><span class="sub small">{f.minutes ? `${f.minutes}분` : '제한 없음'} · {f.minGrade} 이상</span></div>
+      <label class="first">운동 시간</label>
       <div class="row wrap">
         {[30, 45, 60, 75, 90].map((m) => <button key={m} class={`chip ${f.minutes === m ? 'on' : ''}`} onClick={() => update({ minutes: m })}>{m}분</button>)}
         <button class={`chip ${f.minutes === undefined ? 'on' : ''}`} onClick={() => update({ minutes: undefined })}>제한 없음</button>
@@ -256,7 +263,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
           <select value={f.minGrade} onChange={(e) => update({ minGrade: (e.target as HTMLSelectElement).value as Grade })} aria-label="최소 등급">
             {GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
           </select></div>
-        <div><label>수준</label><button class="chip on" style={{ width: '100%' }} onClick={() => go('#/settings')}>{s.settings.level} (설정에서 변경)</button></div>
+        <div><label>수준</label><button class="chip on full" onClick={() => go('#/settings')}>{s.settings.level} (설정에서 변경)</button></div>
       </div>
       <p class="sub small" data-testid="level-rule">{s.settings.level}: 운동당 최대 {MAX_SETS_BY_LEVEL[s.settings.level]}세트(앱 기준) · 한 근육은 한 번에 {SESSION_CAP[s.settings.level]}세트까지({s.settings.level === '초보' ? '앱 기준' : '연구 근거'}, 보조로 쓰이면 0.5세트로 셈)</p>
       <label>세트 방식 (시간이 부족하면 자동으로 묶음)</label>
@@ -267,17 +274,28 @@ export function PlanBuilder({ s }: { s: AppState }) {
         ))}
         <button class={`chip ${f.prefer ? 'on' : ''}`} aria-pressed={f.prefer} onClick={() => update({ prefer: !f.prefer })}>묶음 우선</button>
       </div>
-      <div style={{ marginTop: '14px' }}>
+      <div class="step-go">
         <button class="primary big" disabled={!nParts} onClick={() => generate(false)}>{nParts ? '플랜 만들기' : '부위를 먼저 고르세요'}</button>
       </div>
+      </section>
 
       </div><div>
       {plan && (
         <section aria-label="생성된 플랜">
-          <div class="row between" style={{ marginTop: '16px' }}>
-            <h2>{plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : plan.status === 'reduced' ? '플랜 (일부 부위만)' : '플랜'}</h2>
-            {plan.blocks.length > 0 && <span class="sub">예상 {mmss(plan.estimatedSec)}{plan.targetSec ? ` / ${Math.round(plan.targetSec / 60)}분` : ''}</span>}
-          </div>
+          <div class="panel step-card result-card">{/* .card 아님: 아래 운동 카드 목록(.card)과 구분 */}
+          <div class="card-head"><span class="step-no" aria-hidden="true">3</span><h2 class="card-title grow">{plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : plan.status === 'reduced' ? '결과 · 플랜 (일부 부위만)' : '결과 · 플랜'}</h2>
+            {plan.blocks.length > 0 && <span class="sub">예상 {mmss(plan.estimatedSec)}{plan.targetSec ? ` / ${Math.round(plan.targetSec / 60)}분` : ''}</span>}</div>
+          {plan.blocks.length > 0 && (() => {
+            const items = plan.blocks.flatMap((b) => b.items);
+            const sets = items.reduce((n, i) => n + i.sets, 0);
+            return (
+              <div class="metrics3 plan-metrics" aria-label="플랜 요약">
+                <Metric label="예상 시간" parts={[[Math.round(plan.estimatedSec / 60), '분']]} status={plan.targetSec ? `목표 ${Math.round(plan.targetSec / 60)}분` : '제한 없음'} />
+                <Metric label="세트" parts={[[sets, '세트']]} status={`웜업 제외`} />
+                <Metric label="운동" parts={[[items.length, '개']]} status={`블록 ${plan.blocks.length}개`} />
+              </div>
+            );
+          })()}
           <p class="sr-only" aria-live="polite">{moved?.msg ?? (groupMsg || dnd.msg)}</p>
           {plan.blocks.length > 0 && plan.targetSec !== undefined && plan.estimatedSec > plan.targetSec && <p class="pill warn-text" role="status">목표 시간보다 약 {Math.ceil((plan.estimatedSec - plan.targetSec) / 60)}분 길어요 (직접 바꾼 내용은 그대로 둠)</p>}
           {plan.blocks.length > 0 && plan.slack && plan.targetSec !== undefined && plan.estimatedSec < plan.targetSec - 300 && (
@@ -303,6 +321,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
                 { aria: '모든 운동 횟수 늘리기', off: bulkOff('reps', 1), on: () => bulkDo('reps', 1) }))}
             </div>
           )}
+          </div>
           {plan.blocks.map((b, bi) => (
             <div class="card" key={blockKey(b)} {...dnd.itemAttrs(bi)}>
               {plan.blocks.length > 1 && <div class="row between">{moveBtns(bi)}{b.kind === 'single' && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}</div>}
@@ -322,7 +341,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
                 );
               })()}
               {b.items.map((it, ii) => (
-                <div key={it.exerciseId} style={{ marginTop: ii ? '10px' : '4px' }}>
+                <div key={it.exerciseId} class={ii ? 'plan-item next' : 'plan-item'}>
                   <div class="row between">
                     <div class="grow">
                       <div class="row"><GradeBadge g={{ value: it.grade, source: it.gradeSource, estimated: it.estimated }} /><strong>{it.name}</strong></div>
@@ -330,7 +349,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
                     </div>
                     {b.kind === 'single' && plan.blocks.length <= 1 && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}
                   </div>
-                  <div class="row wrap plan-steps" style={{ marginTop: '6px' }}>
+                  <div class="row wrap plan-steps">
                     <span class="mini-step" role="group" aria-label={`${it.name} 세트`}>
                       <button aria-label={`${it.name} 세트 줄이기`} disabled={it.sets <= SETS_MIN} onClick={() => editItem(bi, ii, (x) => stepSets(x, -1))}>−</button>
                       <span class="val">{it.sets}세트</span>
@@ -343,8 +362,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
                       <button aria-label={`${it.name} ${it.seconds !== undefined ? '시간' : '횟수'} 늘리기`} disabled={it.seconds !== undefined ? it.seconds >= SECS_MAX : it.reps >= REPS_MAX} onClick={() => editItem(bi, ii, (x) => stepReps(x, 1))}>+</button>
                     </span>
                   </div>
-                  <div class="row wrap" style={{ marginTop: '6px' }}>
-                    <button class={locks.has(it.exerciseId) ? 'chip on' : 'chip'} aria-pressed={locks.has(it.exerciseId)} onClick={() => { const n = new Set(locks); if (n.has(it.exerciseId)) n.delete(it.exerciseId); else n.add(it.exerciseId); setLocks(n); }}>{locks.has(it.exerciseId) ? '🔒 잠금' : '잠금'}</button>
+                  <div class="row wrap plan-actions">
+                    <button class={locks.has(it.exerciseId) ? 'chip on' : 'chip'} aria-pressed={locks.has(it.exerciseId)} onClick={() => { const n = new Set(locks); if (n.has(it.exerciseId)) n.delete(it.exerciseId); else n.add(it.exerciseId); setLocks(n); }}>{locks.has(it.exerciseId) ? <><Icon name="lock" size={16} />잠금됨</> : '잠금'}</button>
                     <button onClick={() => setPicker({ b: bi, i: ii })}>교체</button>
                     <button class="danger" aria-label={`${it.name} 삭제`} onClick={() => editItem(bi, ii, () => null)}>삭제</button>
                   </div>
@@ -372,7 +391,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
                         </div>
                       </div>
                     </details>
-                    <div class="row wrap" style={{ marginTop: '6px' }}>
+                    <div class="row wrap plan-actions">
                       <button aria-label={`+ 묶음에 운동 추가: ${nm}`} disabled={full} onClick={() => setGroupAdd(bi)}>+ 묶음에 운동 추가</button>
                       {full && <span class="sub small">묶음은 {GROUP_MAX}개까지</span>}
                     </div>
@@ -388,9 +407,9 @@ export function PlanBuilder({ s }: { s: AppState }) {
                 const next = plan.blocks[bi + 1];
                 if (!kind && b.items.length < 2) return null;
                 return (
-                  <div class="row wrap group-actions" style={{ marginTop: '8px' }}>
+                  <div class="row wrap group-actions">
                     {kind && next && <button aria-label={`${text}: ${blockName(b)} + ${blockName(next)}`}
-                      onClick={() => { setMoved(null); setPlan(recompute(mergeWithNextBlock(plan, bi), all)); setGroupMsg(`${blockName(b)} + ${blockName(next)}: ${label}로 묶었어요`); }}>⤓ {text}</button>}
+                      onClick={() => { setMoved(null); setPlan(recompute(mergeWithNextBlock(plan, bi), all)); setGroupMsg(`${blockName(b)} + ${blockName(next)}: ${label}로 묶었어요`); }}>{text}</button>}
                     {b.items.length > 1 && <button aria-label={`묶음 풀기: ${blockName(b)}`}
                       onClick={() => { setMoved(null); setPlan(recompute(splitPlanBlock(plan, bi), all)); setGroupMsg(`${blockName(b)}: 묶음을 풀었어요`); }}>묶음 풀기</button>}
                   </div>
@@ -398,10 +417,10 @@ export function PlanBuilder({ s }: { s: AppState }) {
               })()}
             </div>
           ))}
-          <button class="big" style={{ margin: '4px 0 10px' }} onClick={() => setAdding(true)}>+ 운동 추가</button>
-          <button class="ghost" onClick={() => setShowReasons(!showReasons)}>{showReasons ? '▾' : '▸'} 이렇게 짠 이유</button>
+          <button class="big plan-add" onClick={() => setAdding(true)}>+ 운동 추가</button>
+          <button class="ghost" onClick={() => setShowReasons(!showReasons)}><Icon name="chevron" size={16} class={`rot${showReasons ? ' open' : ''}`} />이렇게 짠 이유</button>
           {showReasons && <ul class="reasons">{plan.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
-          <div class="row" style={{ marginTop: '12px' }}>
+          <div class="row plan-save">
             <button class="grow" onClick={() => generate(true)}>다시 생성{locks.size ? ` (잠금 ${locks.size}개 유지)` : ''}</button>
             {plan.blocks.length > 0 && <button class="primary grow" onClick={() => setSaving(true)}>저장</button>}
           </div>
@@ -437,13 +456,13 @@ export function PlanBuilder({ s }: { s: AppState }) {
         <Sheet title="루틴으로 저장" onClose={() => setSaving(false)}>
           <label>이름</label>
           <input value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} aria-label="루틴 이름" />
-          <div class="row" style={{ marginTop: '12px' }}>
+          <div class="row plan-save">
             <button class="grow" onClick={async () => { await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec, plan.warmup.seconds); setPlan(null); go('#/'); }}>저장만</button>
             <button class="primary grow" onClick={async () => { const r = await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec, plan.warmup.seconds); setPlan(null); await startRoutine(s, r); }}>저장하고 시작</button>
           </div>
         </Sheet>
       )}
-      {!plan && <p class="sub small" style={{ marginTop: '14px' }}>{byId.size}개 운동 중에서 등급·수준·장비·시간에 맞게 고릅니다. 영상 등급이 없는 운동은 "추정"으로 표시돼요.</p>}
+      {!plan && <p class="sub small step-go">{byId.size}개 운동 중에서 등급·수준·장비·시간에 맞게 고릅니다. 영상 등급이 없는 운동은 "추정"으로 표시돼요.</p>}
       </div></div>
     </main>
   );

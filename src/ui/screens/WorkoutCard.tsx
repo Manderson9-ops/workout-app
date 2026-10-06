@@ -8,7 +8,7 @@ import { PARTS } from '../../core/types';
 import type { Workout } from '../../core/session';
 import { HOME_HIDDEN_LABEL } from '../../core/session';
 import type { WorkoutSummary } from '../../core/stats';
-import { exerciseLines, durText } from '../../core/stats';
+import { exerciseLines, durText, durParts } from '../../core/stats';
 import { go } from '../nav';
 import { Icon } from '../icons';
 import { MenuSheet } from '../components';
@@ -34,12 +34,13 @@ export function WorkoutCard({ x, w, byId, hidden, withMenu }: { x: WorkoutSummar
       <div class="wc-main">
         <div class="wc-title">{x.name}{hidden && <span class="pill hid">{HOME_HIDDEN_LABEL}</span>}{empty && <span class="pill tag">완료 세트 0</span>}{edited && <span class="pill">고침</span>}</div>
         <div class="wc-meta">{w ? timeLabel(w.startedAt) : x.date}</div>
-        <div class="wc-chips">
-          <span class="chip2">⏱ {durText(x.durationSec)}</span>
-          <span class="chip2">세트 {x.workSets}</span>
-          <span class="chip2">볼륨 {x.volume.toLocaleString()}kg</span>
-          {diff !== undefined && Math.abs(diff) >= 60 && <span class="chip2 hint">예상보다 {Math.round(Math.abs(diff) / 60)}분 {diff > 0 ? '김' : '짧음'}</span>}
+        {/* D-055 3단계: 숫자는 작은 Metric (라벨 + 굵은 숫자 + 작은 단위, 고정폭) */}
+        <div class="wc-metrics" aria-hidden="true">
+          <span class="mm"><span class="mm-l">시간</span> <span class="mm-v">{durParts(x.durationSec).map(([n, u], i) => <span key={i}><b>{n}</b><small>{u}</small></span>)}</span></span>
+          <span class="mm"><span class="mm-l">세트</span> <span class="mm-v"><b>{x.workSets}</b></span></span>
+          <span class="mm"><span class="mm-l">볼륨</span> <span class="mm-v"><b>{x.volume.toLocaleString()}</b><small>kg</small></span></span>
         </div>
+        {diff !== undefined && Math.abs(diff) >= 60 && <div class="wc-chips"><span class="chip2 hint">예상보다 {Math.round(Math.abs(diff) / 60)}분 {diff > 0 ? '김' : '짧음'}</span></div>}
         {parts.length > 0 && <div class="wc-tags">{parts.map((p) => <span class="ptag" key={p}>{shortPart(p)}</span>)}</div>}
         {lines.slice(0, 3).map((l, i) => <div class="wc-ex" key={i}>{l.name} · {l.sets}세트{l.best ? ` · 최고 ${l.best}` : ''}</div>)}
         {lines.length > 3 && <div class="wc-ex more">외 {lines.length - 3}개 운동</div>}

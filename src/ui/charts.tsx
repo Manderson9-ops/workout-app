@@ -17,14 +17,14 @@ export function LineChart({ points, unit, label, height = 140 }: { points: Point
   const last = points[points.length - 1]!;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width="100%" role="img" aria-label={`${label}: ${points.map((p) => `${p.label} ${p.value}${unit}`).join(', ')}`}>
-      <line x1={pad.l} x2={w - pad.r} y1={y(max)} y2={y(max)} stroke="#2e3342" />
-      <line x1={pad.l} x2={w - pad.r} y1={y(min)} y2={y(min)} stroke="#2e3342" />
-      <text x={pad.l - 4} y={y(max) + 4} fill="#9aa3b5" font-size="10" text-anchor="end">{fmt(max)}</text>
-      <text x={pad.l - 4} y={y(min) + 4} fill="#9aa3b5" font-size="10" text-anchor="end">{fmt(min)}</text>
-      <path d={d} fill="none" stroke="#3b82f6" stroke-width="2.5" />
-      {points.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.value)} r="3" fill="#3b82f6" />)}
-      <text x={pad.l} y={h - 6} fill="#9aa3b5" font-size="10">{points[0]!.label}</text>
-      <text x={w - pad.r} y={h - 6} fill="#9aa3b5" font-size="10" text-anchor="end">{last.label} · {last.value}{unit}</text>
+      <line x1={pad.l} x2={w - pad.r} y1={y(max)} y2={y(max)} class="ch-grid" />
+      <line x1={pad.l} x2={w - pad.r} y1={y(min)} y2={y(min)} class="ch-grid" />
+      <text x={pad.l - 4} y={y(max) + 4} class="ch-text" font-size="10" text-anchor="end">{fmt(max)}</text>
+      <text x={pad.l - 4} y={y(min) + 4} class="ch-text" font-size="10" text-anchor="end">{fmt(min)}</text>
+      <path d={d} class="ch-line" />
+      {points.map((p, i) => <circle key={i} cx={x(i)} cy={y(p.value)} r="3" class="ch-dot" />)}
+      <text x={pad.l} y={h - 6} class="ch-text" font-size="10">{points[0]!.label}</text>
+      <text x={w - pad.r} y={h - 6} class="ch-text" font-size="10" text-anchor="end">{last.label} · {last.value}{unit}</text>
     </svg>
   );
 }
@@ -41,9 +41,9 @@ export function BarChart({ points, unit, label, height = 120, highlightLast = tr
         const x = pad.l + i * bw + bw * 0.15;
         return (
           <g key={i}>
-            <rect x={x} y={h - pad.b - bh} width={bw * 0.7} height={bh} rx="3" fill={highlightLast && i === points.length - 1 ? '#3b82f6' : '#3b82f666'} />
-            {p.value > 0 && <text x={x + bw * 0.35} y={h - pad.b - bh - 3} fill="#eef0f4" font-size="10" text-anchor="middle">{p.value}</text>}
-            <text x={x + bw * 0.35} y={h - 5} fill="#9aa3b5" font-size="10" text-anchor="middle">{p.label}</text>
+            <rect x={x} y={h - pad.b - bh} width={bw * 0.7} height={bh} rx="3" class={highlightLast && i === points.length - 1 ? 'ch-bar last' : 'ch-bar'} />
+            {p.value > 0 && <text x={x + bw * 0.35} y={h - pad.b - bh - 3} class="ch-val" font-size="10" text-anchor="middle">{p.value}</text>}
+            <text x={x + bw * 0.35} y={h - 5} class="ch-text" font-size="10" text-anchor="middle">{p.label}</text>
           </g>
         );
       })}

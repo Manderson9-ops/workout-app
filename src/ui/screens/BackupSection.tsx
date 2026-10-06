@@ -32,7 +32,7 @@ export function BackupSection({ s }: { s: AppState }) {
     const c = r.file.counts;
     // 미리 보기 판에서 만든 백업을 본판에 넣으려 할 때 (D-031: 한 방향)
     if (r.file.preview && !IS_PREVIEW && !(await askConfirm({ title: '미리 보기 판(β) 백업이에요', message: '시험용 데이터일 수 있어요.\n그래도 본판 데이터를 이것으로 바꿀까요?', ok: '계속', danger: true }))) return;
-    const warnActive = active ? `\n\n⚠ 진행 중인 운동("${active.name}")도 사라져요.` : '';
+    const warnActive = active ? `\n\n주의: 진행 중인 운동("${active.name}")도 사라져요.` : '';
     if (!(await askConfirm({ title: '이 백업으로 바꿀까요?', ok: '바꾸기', danger: true, message: `${new Date(r.file.exportedAt).toLocaleString('ko-KR')} 백업\n운동 기록 ${c.workouts}개, 루틴 ${c.routines}개, 체중 ${c.bodyweight}개\n\n지금 이 폰의 데이터는 모두 이 백업으로 바뀌어요 (합치지 않음). 먼저 "백업 파일 저장"으로 지금 데이터를 저장해 두는 것을 권해요.${warnActive}` }))) return;
     // 동기화가 켜져 있으면 어디까지 바꿀지 고름 (D-032): 서버까지(다른 기기도 다시 받음) / 이 기기만(동기화 끔)
     let scope: 'server' | 'local' = 'local';
