@@ -92,13 +92,13 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
  * 아래에서 올라오는 창. trap = 화면 읽기·키보드용 대화상자(aria-modal, 초점 가두기, Esc로 닫기, 닫으면 연 버튼으로 초점)
  * (확인 창 ConfirmHost는 modal + 자기 키 처리를 씁)
  */
-export function Sheet({ onClose, title, children, modal, trap }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean }) {
+export function Sheet({ onClose, title, children, modal, trap, cls }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean; cls?: string }) {
   const panel = useRef<HTMLDivElement>(null);
   useDialogKeys(trap ? panel : null, onClose);
   return (
     <>
       <div class="sheet-bg" onClick={onClose} />
-      <div class="sheet" role="dialog" aria-label={title} aria-modal={modal || trap ? 'true' : undefined} ref={panel}>
+      <div class={`sheet${cls ? ` ${cls}` : ''}`} role="dialog" aria-label={title} aria-modal={modal || trap ? 'true' : undefined} ref={panel}>
         <div class="row between sheet-head"><h3>{title}</h3><button class="ghost icon-btn" onClick={onClose} aria-label="닫기"><Icon name="close" size={20} /></button></div>
         {children}
       </div>
@@ -157,13 +157,23 @@ export function Card({ title, href, label, children, testid, class: cls }: { tit
 
 export type Tone = 'ok' | 'pr' | 'warn' | 'bad' | 'acc' | 'sub';
 /** 큰 숫자 + 작은 단위 + 아래 상태 한 마디 (색 + 기호, 색만으로 전달하지 않음). value 가 없으면 "--" */
-export function Metric({ label, value, unit, status, tone = 'sub', mark }: { label: string; value?: string | number; unit?: string; status?: string; tone?: Tone; mark?: string }) {
-  const none = value === undefined;
+export function Metric({ label, value, unit, parts, status, tone = 'sub', mark, children, statusClass }: {
+  label: string; value?: string | number; unit?: string;
+  /** 숫자와 단위가 여럿일 때 (예: 1시간 2분 → [[1,'시간'],[2,'분']]) */
+  parts?: [string | number, string][];
+  status?: string; tone?: Tone; mark?: string;
+  /** 상태 줄을 직접 그릴 때 (증감 등) */
+  children?: ComponentChildren; statusClass?: string;
+}) {
+  const pv = parts ?? (value === undefined ? undefined : [[value, unit ?? '']] as [string | number, string][]);
   return (
     <div class="metric">
       <div class="m-label">{label}</div>
-      <div class="m-val"><span class={`num${none ? ' none' : ''}`}>{none ? '--' : value}</span>{!none && unit && <span class="unit">{unit}</span>}</div>
-      {status && <div class={`m-status t-${tone}`}>{mark && <span aria-hidden="true">{mark} </span>}{status}</div>}
+      <div class="m-val">
+        {!pv ? <span class="num none">--</span> : pv.map(([n, u], i) => <span key={i} class="m-pair"><span class="num">{n}</span>{u && <span class="unit">{u}</span>}</span>)}
+      </div>
+      {status && <div class={`m-status t-${tone}${statusClass ? ` ${statusClass}` : ''}`}>{mark && <span aria-hidden="true">{mark} </span>}{status}</div>}
+      {children !== undefined && <div class={`m-status${statusClass ? ` ${statusClass}` : ''}`}>{children}</div>}
     </div>
   );
 }

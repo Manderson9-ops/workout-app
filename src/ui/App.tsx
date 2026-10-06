@@ -121,6 +121,7 @@ export function App() {
       {/* 점의 뜻 (색·모양만으로 전하지 않게 화면 읽기에 설명) */}
       <span id="new-dot-desc" class="sr-only">새 기능 있음</span>
       <span id="wk-dot-desc" class="sr-only">진행 중인 운동 있음</span>
+      <div class="nav-scrim" aria-hidden="true" />
       <nav class="nav" aria-label="주 메뉴">
         {TABS.map((t) => {
           const on = t.on(path);

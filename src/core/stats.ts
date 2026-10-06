@@ -102,6 +102,16 @@ export function durText(sec: number): string {
   return m % 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m / 60}시간`;
 }
 
+/** durText 를 숫자·단위 쌍으로 (큰 숫자 + 작은 단위 표시용, D-055). 글자를 이으면 durText 와 같음(띄어쓰기 제외) */
+export function durParts(sec: number): [number, string][] {
+  const s = Math.max(0, Math.round(sec));
+  if (s === 0) return [[0, '분']];
+  if (s < 60) return [[s, '초']];
+  const m = Math.round(s / 60);
+  if (m < 60) return [[m, '분']];
+  return m % 60 ? [[Math.floor(m / 60), '시간'], [m % 60, '분']] : [[m / 60, '시간']];
+}
+
 /** 통계에 셈하는 운동: 끝났고 완료한 작업 세트가 하나 이상 (D-054). 세트 0개 운동은 기록 목록에만 흐리게 보임 */
 export function isCountedWorkout(w: Workout): boolean {
   return !!w.endedAt && w.blocks.some((b) => b.items.some((i) => workSets(i.sets).length > 0));

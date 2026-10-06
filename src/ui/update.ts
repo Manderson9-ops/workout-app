@@ -30,8 +30,12 @@ async function setWaiting(w: ServiceWorker) {
 }
 
 export function registerServiceWorker(): void {
-  // 시험용: e2e·스크린샷이 'app:sim-update' 이벤트로 배너를 띄움 (detail = version.json 모양 또는 null = 읽기 실패 흉내)
-  window.addEventListener('app:sim-update', (e) => { simulated = true; later = false; info = parseVersionInfo((e as CustomEvent).detail); notify(); });
+  // 시험용: e2e·스크린샷이 'app:sim-update' 이벤트로 배너를 띄움 (detail = version.json 모양 또는 null = 읽기 실패 흉내).
+  // 개발 서버이거나 시험이 window.__wkTest = true 를 세운 때만 반응 (본판에서는 우연히 배너가 뜨지 않게)
+  window.addEventListener('app:sim-update', (e) => {
+    if (!import.meta.env.DEV && !(window as Window & { __wkTest?: boolean }).__wkTest) return;
+    simulated = true; later = false; info = parseVersionInfo((e as CustomEvent).detail); notify();
+  });
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
   window.addEventListener('load', async () => {
     try {

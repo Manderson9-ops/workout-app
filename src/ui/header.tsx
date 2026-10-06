@@ -8,15 +8,16 @@ import { FeedbackNavItem } from './screens/FeedbackUi';
 import { SyncBadge } from './screens/SyncSection';
 import { newDotTarget } from './whatsNew';
 
-export function HeadButtons() {
+/** settings=false: 설정 버튼 없이 개선만 (끝낸 운동 수정처럼 취소/저장으로만 떠나야 하는 화면) */
+export function HeadButtons({ settings = true }: { settings?: boolean } = {}) {
   const onSettings = (location.hash || '#/').startsWith('#/settings');
   const dot = newDotTarget() === 'settings';
   return (
     <div class="head-btns">
       <FeedbackNavItem />
-      <a class="icon-btn round" href="#/settings" aria-label="설정" aria-current={onSettings ? 'page' : undefined} aria-describedby={dot ? 'new-dot-desc' : undefined}>
+      {settings && <a class="icon-btn round" href="#/settings" aria-label="설정" aria-current={onSettings ? 'page' : undefined} aria-describedby={dot ? 'new-dot-desc' : undefined}>
         <Icon name="settings" />{dot && <i class="ndot" aria-hidden="true" />}
-      </a>
+      </a>}
     </div>
   );
 }

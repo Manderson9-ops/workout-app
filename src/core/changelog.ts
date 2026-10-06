@@ -88,6 +88,20 @@ export function tabOfPath(path: string): TabId | 'settings' | undefined {
   return undefined;
 }
 
+/**
+ * 바뀐 점 한 줄 → 짧은 제목 + 나머지 (새로 바뀐 점 시트용). 첫 ':' 앞이 1~32자면 그것이 제목, 나머지는 설명.
+ * ':' 가 없으면 32자 이하는 제목만, 더 길면 28자 안의 마지막 띄어쓰기까지 + '…' 제목에 나머지를 설명으로
+ */
+export function changeHeadline(line: string): { head: string; rest?: string } {
+  const t = line.trim();
+  const c = t.indexOf(':');
+  if (c >= 1 && c <= 32) { const rest = t.slice(c + 1).trim(); return rest ? { head: t.slice(0, c).trim(), rest } : { head: t.slice(0, c).trim() }; }
+  if (t.length <= 32) return { head: t };
+  const cut = t.lastIndexOf(' ', 28);
+  const at = cut >= 12 ? cut : 28;
+  return { head: `${t.slice(0, at).trim()}…`, rest: t.slice(at).trim() };
+}
+
 /** "2026-10-06" → "10월 6일" */
 export function koDate(d: string): string {
   const m = d.match(/^\d{4}-(\d{2})-(\d{2})/);

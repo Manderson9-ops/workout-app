@@ -6,7 +6,7 @@ import { useState } from 'preact/hooks';
 import { APP_VERSION } from '../../core/version';
 import { koDate } from '../../core/changelog';
 import { IS_PREVIEW } from '../appName';
-import { CHANGELOG } from '../whatsNew';
+import { CHANGELOG, ChangeLines } from '../whatsNew';
 import { checkForUpdate } from '../update';
 import { ScreenHeader } from '../header';
 import { Icon } from '../icons';
@@ -38,7 +38,7 @@ export function AboutScreen() {
         {CHANGELOG.map((e, i) => (
           <details key={e.version} class="card cl-item" open={i === 0}>
             <summary><span class="cl-ver">{e.version}</span><span class="sub">{koDate(e.date)}</span>{e.version === APP_VERSION && <span class="chip-s acc">지금</span>}</summary>
-            <ul class="wn-lines">{e.changes.map((c, k) => <li key={k}>{c}</li>)}</ul>
+            <ChangeLines lines={e.changes} full />
             {e.where && e.where !== '#/settings/about' && <button class="wn-go" onClick={() => go(e.where!)} aria-label={`${e.version} 바뀐 곳 보러 가기`}>보러 가기 <Icon name="chevron" size={18} /></button>}
           </details>
         ))}

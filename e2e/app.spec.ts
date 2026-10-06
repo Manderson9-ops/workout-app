@@ -1978,7 +1978,11 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
 });
 
 test('D-055 새 버전 배너: 버전·바뀐 점 한 줄·[지금 적용][나중에], 파일을 못 읽으면 "새 버전이 있어요", 운동 중엔 작게·확인 후 적용', async ({ page }) => {
-  const sim = (detail: unknown) => page.evaluate((d) => window.dispatchEvent(new CustomEvent('app:sim-update', { detail: d })), detail);
+  // 시험 표시(__wkTest)를 세운 뒤에만 흉내 이벤트가 먹힘 (본판에서 우연히 뜨지 않게)
+  const sim = (detail: unknown) => page.evaluate((d) => { (window as Window & { __wkTest?: boolean }).__wkTest = true; window.dispatchEvent(new CustomEvent('app:sim-update', { detail: d })); }, detail);
+  // 표시 없이 보낸 이벤트는 무시됨
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('app:sim-update', { detail: { version: '9.9.9', changes: ['x'] } })));
+  await expect(page.getByRole('status', { name: '새 버전 안내' })).toHaveCount(0);
   await sim({ version: '0.9.9-preview', date: '2026-10-07', changes: ['운동 중 화면 새 모양', '둘째 줄'] });
   const banner = page.getByRole('status', { name: '새 버전 안내' });
   await expect(banner).toContainText('새 버전 0.9.9-preview 준비됨');
@@ -2014,6 +2018,8 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   await endWorkout(page);
   await expect(page.getByTestId('home-week')).toContainText('1회');
   await expect(page.getByTestId('home-week')).toHaveAttribute('href', '#/stats');
+  // 다음 운동 (앱 판단): 하나뿐인 루틴을 오늘 했으면 그대로 보이고 이유 줄 "오늘 이미 했어요"
+  await expect(next).toContainText('오늘 이미 했어요');
   // 최근 운동 = 기록 탭 카드(button.wcard) + ⋯
   const recent = page.getByRole('group', { name: '최근 운동 등 30분' });
   await expect(recent.locator('button.wcard')).toContainText('세트 1');
@@ -2029,8 +2035,20 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   await expect(more).toBeFocused();
   await routineMenu(page, '등 30분', '편집');
   await expect(page.getByLabel('루틴 이름')).toHaveValue('등 30분');
+  // 루틴 편집에서도 개선 메모·설정 원형 버튼 (예전엔 아래 메뉴에서 어디서든)
+  await expect(page.getByRole('button', { name: '개선 메모 쓰기' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '설정', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '← 홈' }).click();
   await checkScreen(page, '69-home');
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await expect(page.getByRole('button', { name: /^등 30분,/ })).toContainText('세트 1');
+  // 끝낸 운동 수정: 개선 메모는 있고 설정은 없음 (취소/저장으로만 떠남)
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+  await recentMenu(page.getByRole('group', { name: '최근 운동 등 30분' }), '수정');
+  await expect(page.getByRole('heading', { name: '운동 기록 수정' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '개선 메모 쓰기' })).toBeVisible();
+  await expect(page.getByRole('link', { name: '설정', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '개선 메모 쓰기' }).click();
+  await expect(page.getByRole('dialog', { name: '개선 메모' })).toBeVisible();
+  await checkScreen(page, '70-workout-edit-feedback');
 });

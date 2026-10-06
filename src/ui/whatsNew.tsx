@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import changelog from '../../CHANGELOG.json';
 import type { ChangelogEntry, TabId } from '../core/changelog';
-import { sortedEntries, whatsNewDecision, entriesSince, whatsNewLines, tabOfPath, koDate } from '../core/changelog';
+import { sortedEntries, whatsNewDecision, entriesSince, whatsNewLines, tabOfPath, koDate, changeHeadline } from '../core/changelog';
 import { APP_VERSION } from '../core/version';
 import { lsGet, lsSet, lsRemove } from './appName';
 import type { AppState } from './store';
@@ -48,25 +48,35 @@ export function useWhatsNew(s: AppState): [ChangelogEntry[] | null, () => void] 
   return [list, () => setList(null)];
 }
 
+/** 바뀐 점 줄: 굵은 짧은 제목 + 아래 흐린 설명(2줄까지). 화면 읽기에는 전체 문장이 그대로 읽힘 */
+export function ChangeLines({ lines, full }: { lines: string[]; full?: boolean }) {
+  return (
+    <ul class={`wn-lines${full ? ' full' : ''}`}>
+      {lines.map((l, i) => { const h = changeHeadline(l); return (
+        <li key={i}><strong class="wn-h">{h.head}</strong>{h.rest && <span class="wn-rest">{h.rest}</span>}</li>
+      ); })}
+    </ul>
+  );
+}
+
 export function WhatsNewSheet({ list, onClose }: { list: ChangelogEntry[]; onClose: () => void }) {
   const [all, setAll] = useState(false);
   const { entries, more } = whatsNewLines(list, all ? Infinity : 8);
-  const top = list[0]!;
   return (
-    <Sheet title="새로 바뀐 점" onClose={onClose} trap>
-      <p class="sub" style={{ margin: '0 0 8px' }}>
-        <span class="chip-s acc">{top.version}</span> {koDate(top.date)} 업데이트{list.length > 1 ? ` · 버전 ${list.length}개` : ''}
-      </p>
+    <Sheet title="새로 바뀐 점" onClose={onClose} trap cls="wn-sheet">
       <div class="wn-list">
         {entries.map(({ e, lines }) => (
           <section class="wn-entry" key={e.version} aria-label={`${e.version} 바뀐 점`}>
-            {list.length > 1 && <div class="wn-head sub">{e.version} · {koDate(e.date)}</div>}
-            <ul class="wn-lines">{lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
-            {e.where && (
-              <button class="wn-go" onClick={() => { onClose(); go(e.where!); }} aria-label={`${e.version} 바뀐 곳 보러 가기`}>
-                보러 가기 <Icon name="chevron" size={18} />
-              </button>
-            )}
+            {/* 버전 머리 줄: 버전·날짜 + 그 버전의 [보러 가기] 하나 (줄마다 두지 않음) */}
+            <div class="wn-head">
+              <span class="sub">{e.version} · {koDate(e.date)}</span>
+              {e.where && (
+                <button class="wn-go" onClick={() => { onClose(); go(e.where!); }} aria-label={`${e.version} 바뀐 곳 보러 가기`}>
+                  보러 가기 <Icon name="chevron" size={18} />
+                </button>
+              )}
+            </div>
+            <ChangeLines lines={lines} />
           </section>
         ))}
       </div>

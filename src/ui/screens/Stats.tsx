@@ -2,7 +2,7 @@ import { useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
-import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart, addDays, weekSummary, durText } from '../../core/stats';
+import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart, addDays, weekSummary, durText, durParts } from '../../core/stats';
 import type { WorkoutSummary } from '../../core/stats';
 import { BW_MIN, BW_MAX } from '../../core/backup';
 import { PARTS } from '../../core/types';
@@ -10,7 +10,7 @@ import type { Exercise } from '../../core/types';
 import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
 import { LineChart, BarChart } from '../charts';
-import { NumInput, Empty } from '../components';
+import { NumInput, Empty, Metric } from '../components';
 import { ScreenHeader } from '../header';
 import { WorkoutCard, shortPart } from './WorkoutCard';
 import { startRoutine, setHomeHidden } from '../actions';
@@ -43,11 +43,12 @@ function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string
   const cur = weekSummary(done, byId, ws, bw);
   const prev = weekSummary(done, byId, addDays(ws, -7), bw, addDays(today, -7)); // 지난주 일요일 ~ 오늘과 같은 요일까지
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
-  const tiles: { k: string; v: string; d: preact.JSX.Element }[] = [
-    { k: '운동', v: `${cur.count}회`, d: <Delta cur={cur.count} prev={prev.count} /> },
-    { k: '작업 세트', v: String(cur.sets), d: <Delta cur={cur.sets} prev={prev.sets} /> },
-    { k: '볼륨', v: `${cur.volume.toLocaleString()}kg`, d: <Delta cur={cur.volume} prev={prev.volume} unit="kg" /> },
-    { k: '시간', v: durText(cur.durationSec), d: <Delta cur={cur.durationSec} prev={prev.durationSec} fmt={durText} /> },
+  // D-055: 홈과 같은 Metric (큰 숫자 + 작은 단위, 아래 증감)
+  const tiles: { k: string; parts: [string | number, string][]; d: preact.JSX.Element }[] = [
+    { k: '운동', parts: [[cur.count, '회']], d: <Delta cur={cur.count} prev={prev.count} /> },
+    { k: '작업 세트', parts: [[cur.sets, '세트']], d: <Delta cur={cur.sets} prev={prev.sets} /> },
+    { k: '볼륨', parts: [[cur.volume.toLocaleString(), 'kg']], d: <Delta cur={cur.volume} prev={prev.volume} unit="kg" /> },
+    { k: '시간', parts: durParts(cur.durationSec), d: <Delta cur={cur.durationSec} prev={prev.durationSec} fmt={durText} /> },
   ];
   return (
     <>
@@ -68,9 +69,7 @@ function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string
         <div class="tiles">
           {tiles.map((t) => (
             <div class="tile" key={t.k}>
-              <div class="sub small">{t.k}</div>
-              <div class="tv">{t.v}</div>
-              <div class="small sub tile-delta">{t.d}</div>
+              <Metric label={t.k} parts={t.parts} statusClass="tile-delta">{t.d}</Metric>
             </div>
           ))}
         </div>

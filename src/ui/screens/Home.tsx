@@ -8,10 +8,11 @@ import type { AppState } from '../store';
 import { mutate, activeOf, historyOf } from '../store';
 import { setHomeHidden, startRoutine } from '../actions';
 import { homeRecent } from '../../core/session';
-import type { Workout, Routine } from '../../core/session';
+import type { Workout } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { weekSummary, weekStart, addDays, localDate, summarize } from '../../core/stats';
-import { routineUse, routineParts, sortRoutines, sinceText } from '../../core/routineList';
+import { routineUse, routineParts, pickNextRoutine, sinceText } from '../../core/routineList';
+import type { NextPick } from '../../core/routineList';
 import type { Part } from '../../core/types';
 import { BackupBanner } from './BackupSection';
 import { SendStatus } from './AutoSendSection';
@@ -86,17 +87,25 @@ function ThisWeekCard({ s }: { s: AppState }) {
   );
 }
 
-function NextWorkoutCard({ s, r }: { s: AppState; r: Routine }) {
+/** 다음 운동 이유 한 줄 (D-055 앱 판단: 오늘 안 한 루틴 중 가장 오래전에 한 것) */
+function nextReason(p: NextPick): string {
+  if (p.reason === 'oldest') return `가장 오래전에 한 루틴 · ${sinceText(p.lastAt, Date.now())}`;
+  if (p.reason === 'never') return '아직 안 한 루틴';
+  return '오늘 이미 했어요';
+}
+
+function NextWorkoutCard({ s, pick }: { s: AppState; pick: NextPick }) {
+  const r = pick.routine;
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
-  const u = routineUse(historyOf(s)).get(r.id);
   const items = r.blocks.flatMap((b) => b.items);
   const parts = routineParts(r, (id): Part | undefined => byId.get(id)?.part);
   return (
     <Card title="다음 운동" testid="home-next">
       <div class="next-name">{r.name}</div>
       {parts.length > 0 && <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>}
-      <p class="sub next-meta">운동 {items.length}개{r.estimatedSec ? ` · 약 ${minutes(r.estimatedSec)}` : ''} · 마지막 {sinceText(u?.lastAt, Date.now())}</p>
+      <p class={`next-why ${pick.reason === 'doneToday' ? 't-sub' : 't-acc'}`}>{nextReason(pick)}</p>
+      <p class="sub next-meta">운동 {items.length}개{r.estimatedSec ? ` · 약 ${minutes(r.estimatedSec)}` : ''}</p>
       <button class="primary big" onClick={() => startRoutine(s, r)} aria-label={`다음 운동으로 시작: ${r.name}`}><Icon name="play" size={20} />시작</button>
     </Card>
   );
@@ -112,7 +121,7 @@ export function Home({ s }: { s: AppState }) {
   const byId = new Map(all.map((e) => [e.id, e]));
   const hiddenIds = new Set(s.settings.routineHidden ?? []);
   const visible = s.routines.filter((r) => !hiddenIds.has(r.id));
-  const next = sortRoutines(visible.filter((r) => r.blocks.some((b) => b.items.length)), routineUse(history), 'recent')[0];
+  const next = pickNextRoutine(visible, routineUse(history), localDate(Date.now()));
   const today = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
   return (
     <main class="home">
@@ -150,7 +159,7 @@ export function Home({ s }: { s: AppState }) {
       <div class="wide-cards">
         <ThisWeekCard s={s} />
         {!active && (next
-          ? <NextWorkoutCard s={s} r={next} />
+          ? <NextWorkoutCard s={s} pick={next} />
           : !s.routines.length && (
             <Empty title="다음 운동" text="아직 루틴이 없어요" hint="플랜 만들기에서 부위·시간을 고르면 자동으로 짜 드려요">
               <button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button>
