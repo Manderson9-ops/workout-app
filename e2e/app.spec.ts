@@ -2140,3 +2140,36 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   await expect(page.getByRole('dialog', { name: '개선 메모' })).toBeVisible();
   await checkScreen(page, '70-workout-edit-feedback');
 });
+
+test('D-055 검토 R2: 서비스 워커를 켠 채 새 워커가 대기할 때, 서버 version.json 이 같은 버전이면 배너·새로 고침 없이 조용히 교체, 더 새로우면 배너 (배너 단계는 Chromium 만)', async ({ page, browserName }) => {
+  type W = Window & { __cc?: number };
+  // 서비스 워커가 화면을 맡을 때까지 (처음 설치 때의 한 번 새로 고침은 예전 동작 그대로)
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 15000 }).toBe(true);
+  await page.evaluate(() => { (window as W).__cc = 0; navigator.serviceWorker.addEventListener('controllerchange', () => { (window as W).__cc!++; }); });
+  let loads = 0; page.on('load', () => { loads++; });
+  // 배포 흉내: 같은 범위에 스크립트 주소만 바꿔 다시 등록 → 브라우저가 새 워커를 설치해 대기시킴 (앱의 updatefound → installed → setWaiting 경로 그대로)
+  // (Playwright 는 서비스 워커 스크립트 요청을 가로채지 못해 sw.js 내용을 바꾸는 대신 주소를 바꿈)
+  const deploy = (n: number) => page.evaluate(async (k) => { await navigator.serviceWorker.register(`${location.pathname.replace(/[^/]*$/, '')}sw.js?deploy=${k}`); }, n);
+  const banner = page.getByRole('status', { name: '새 버전 안내' });
+
+  // 1) 서버 version.json = 지금 버전 (페이지가 이미 새 코드) → 조용히 새 워커로 바뀌고, 배너·새로 고침 없음
+  await deploy(1);
+  await expect.poll(() => page.evaluate(() => (window as W).__cc), { timeout: 15000 }).toBe(1);
+  await page.waitForTimeout(800);
+  expect(loads, '조용한 교체에서는 새로 고치지 않음').toBe(0);
+  await expect(banner).toHaveCount(0);
+  expect(await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())!.waiting)).toBe(false);
+
+  // WebKit: 서비스 워커가 화면을 맡은 뒤의 version.json 요청은 Playwright 가로채기가 안 먹어 2) 는 Chromium 만 (1) 조용한 교체는 두 엔진 모두 시험)
+  if (browserName !== 'chromium') return;
+  // 2) 서버가 더 새 버전 → 새 워커가 대기하면 배너 "새 버전 9.9.9 준비됨" (적용 전에는 새로 고치지 않음)
+  await page.context().route('**/version.json', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ version: '9.9.9-preview', date: '2026-12-01', changes: ['대기 워커 경로 시험'] }) }));
+  await deploy(2);
+  await expect(banner).toContainText('새 버전 9.9.9 준비됨', { timeout: 15000 });
+  await expect(banner).toContainText('대기 워커 경로 시험');
+  expect(await page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())!.waiting)).toBe(true);
+  expect(loads).toBe(0);
+  // [지금 적용] → 대기 워커로 바꾸고 한 번 새로 고침
+  await banner.getByRole('button', { name: '지금 적용' }).click();
+  await expect.poll(() => loads, { timeout: 15000 }).toBe(1);
+});

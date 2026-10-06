@@ -441,3 +441,5 @@ html.editing .nav-scrim { display: none; }
 .next-tag { display: inline-flex; margin: 0 0 6px; }
 .notice-row { align-items: center; }
 .notice-row .notice-ico { margin-top: 0; }
+.delta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delta .d-cap { color: var(--sub); font-weight: 500; font-size: 12px; }

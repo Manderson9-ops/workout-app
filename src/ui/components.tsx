@@ -178,6 +178,24 @@ export function Metric({ label, value, unit, parts, status, tone = 'sub', mark, 
   );
 }
 
+/**
+ * 지난주(같은 요일까지)와의 차이 한 줄 (D-055 검토 R3: 홈·기록 탭 같은 모양).
+ * 화면: "▲1 지난주보다" / "▼1 지난주보다" / "= 지난주와 같음", 화면 읽기: "지난주보다 1 많음" 같은 문장.
+ * 늘면 초록, 줄거나 같으면 회색 (줄었다고 빨강으로 다그치지 않음, Gentler Streak). 기호 + 글자라 색만으로 전하지 않음
+ */
+export function Delta({ cur, prev, unit = '', fmt }: { cur: number; prev: number; unit?: string; fmt?: (absDiff: number) => string }) {
+  const abs = Math.abs(cur - prev);
+  if (cur === prev) return <span class="delta"><span aria-hidden="true">= <span class="d-cap">지난주와 같음</span></span><span class="sr-only">지난주와 같음</span></span>;
+  const txt = fmt ? fmt(abs) : `${abs.toLocaleString()}${unit}`;
+  const up = cur > prev;
+  return (
+    <span class={`delta${up ? ' up' : ''}`}>
+      <span aria-hidden="true"><span class="d-num">{up ? '▲' : '▼'}{txt}</span> <span class="d-cap">지난주보다</span></span>
+      <span class="sr-only">지난주보다 {txt} {up ? '많음' : '적음'}</span>
+    </span>
+  );
+}
+
 /** 빈 상태 (카드 모양 유지): "--" + 문구 + 다음 행동 */
 export function Empty({ title, text = '아직 기록 없음', hint, children, label, dash = false }: { title?: string; text?: string; hint?: string; children?: ComponentChildren; label?: string; /** 숫자 자리 카드일 때만 「--」 (D-055 검토: 숫자가 아닌 카드에 대시는 어색) */ dash?: boolean }) {
   return (

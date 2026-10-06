@@ -21,7 +21,7 @@ import { RemoteCards } from './RemoteCards';
 import { WorkoutCardWithMenu } from './WorkoutCard';
 import { softDelete } from '../../db/db';
 import { catalog } from '../catalog';
-import { minutes, mmss, Card, Metric, Empty } from '../components';
+import { minutes, mmss, Card, Metric, Empty, Delta } from '../components';
 import { Icon } from '../icons';
 import { ScreenHeader } from '../header';
 import { go } from '../nav';
@@ -49,13 +49,6 @@ async function removeRecent(w: Workout): Promise<'ok' | 'alt' | false | null> {
   return pick;
 }
 
-/** 지난주 같은 요일까지와 비교 한 마디 (격려 톤: 줄어도 빨강으로 다그치지 않음) */
-function vsLastWeek(cur: number, prev: number): { status: string; tone: 'ok' | 'sub'; mark: string } {
-  if (cur > prev) return { status: `지난주보다 ${cur - prev} 많아요`, tone: 'ok', mark: '▲' };
-  if (cur === prev) return { status: '지난주와 같아요', tone: 'sub', mark: '=' };
-  return { status: `지난주보다 ${prev - cur} 적어요`, tone: 'sub', mark: '▼' };
-}
-
 function ThisWeekCard({ s }: { s: AppState }) {
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
@@ -66,15 +59,14 @@ function ThisWeekCard({ s }: { s: AppState }) {
   const prev = weekSummary(done, byId, addDays(ws, -7), s.bodyweight, addDays(today, -7));
   const never = done.length === 0;
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
-  const c = vsLastWeek(cur.count, prev.count);
-  const st = vsLastWeek(cur.sets, prev.sets);
   // 링크 이름에 탭 이름(홈·플랜·운동·기록·종목)을 넣지 않음: 탭 링크와 헷갈리지 않게
   const label = never ? '이번 주 요약: 아직 없음. 자세히 보기' : `이번 주 요약: ${cur.count}회, 작업 세트 ${cur.sets}개, 한 요일 ${days.filter((d) => cur.days.has(d)).map((d) => WD[days.indexOf(d)]).join('·') || '없음'}. 자세히 보기`;
   return (
     <Card title="이번 주" href="#/stats" label={label} testid="home-week">
       <div class="metrics2">
-        <Metric label="운동" value={never ? undefined : cur.count} unit="회" status={never ? '아직 기록 없음' : c.status} tone={c.tone} mark={never ? undefined : c.mark} />
-        <Metric label="작업 세트" value={never ? undefined : cur.sets} unit="세트" status={never ? '첫 운동을 해 보세요' : st.status} tone={st.tone} mark={never ? undefined : st.mark} />
+        {/* 증감은 기록 탭 타일과 같은 Delta (D-055 검토 R3) */}
+        <Metric label="운동" value={never ? undefined : cur.count} unit="회" status={never ? '아직 기록 없음' : undefined} statusClass="tile-delta">{never ? undefined : <Delta cur={cur.count} prev={prev.count} />}</Metric>
+        <Metric label="작업 세트" value={never ? undefined : cur.sets} unit="세트" status={never ? '첫 운동을 해 보세요' : undefined} statusClass="tile-delta">{never ? undefined : <Delta cur={cur.sets} prev={prev.sets} />}</Metric>
       </div>
       <div class="weekdots" aria-hidden="true">
         {days.map((d, i) => (

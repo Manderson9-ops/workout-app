@@ -10,7 +10,7 @@ import type { Exercise } from '../../core/types';
 import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
 import { LineChart, BarChart } from '../charts';
-import { NumInput, Empty, Metric } from '../components';
+import { NumInput, Empty, Metric, Delta } from '../components';
 import { ScreenHeader } from '../header';
 import { WorkoutCard, shortPart } from './WorkoutCard';
 import { startRoutine, setHomeHidden } from '../actions';
@@ -27,16 +27,6 @@ const ymd = (d: string) => { const [y, m, dd] = d.split('-').map(Number); return
 const weekRange = (ws: string) => `${md(ws)}~${md(addDays(ws, 6))}`;
 const MAX_WEEKS_BACK = 11; // 이번 주 포함 12주
 const MARK = 10; // 연구 참고선 (부위당 주 10세트)
-
-/** 지난주 같은 요일까지와의 차이. 화면에는 기호, 화면 읽기에는 문장 (기호는 aria-hidden) */
-function Delta({ cur, prev, unit = '', fmt }: { cur: number; prev: number; unit?: string; fmt?: (absDiff: number) => string }) {
-  const abs = Math.abs(cur - prev);
-  if (cur === prev) return <span class="delta"><span aria-hidden="true">–</span><span class="sr-only">지난주와 같음</span></span>;
-  const txt = fmt ? fmt(abs) : `${abs.toLocaleString()}${unit}`;
-  return cur > prev
-    ? <span class="delta up"><span aria-hidden="true">▲{txt}</span><span class="sr-only">지난주보다 {txt} 많음</span></span>
-    : <span class="delta"><span aria-hidden="true">▼{txt}</span><span class="sr-only">지난주보다 {txt} 적음</span></span>;
-}
 
 function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string, Exercise>; today: string; bw: AppState['bodyweight'] }) {
   const ws = weekStart(today);

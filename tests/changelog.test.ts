@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { wheresOf, visits, clearVisited, dotTargets, displayVersion, cmpVersion, entriesSince, whatsNewDecision, whatsNewLines, buildVersionInfo, parseVersionInfo, tabOfPath, previousVersion, koDate } from '../src/core/changelog';
+import { waitingDecision, wheresOf, visits, clearVisited, dotTargets, displayVersion, cmpVersion, entriesSince, whatsNewDecision, whatsNewLines, buildVersionInfo, parseVersionInfo, tabOfPath, previousVersion, koDate } from '../src/core/changelog';
 import type { ChangelogEntry } from '../src/core/changelog';
 import { APP_VERSION } from '../src/core/version';
 
@@ -84,5 +84,14 @@ describe('D-055 검토 4·7: 새 기능 점은 where 마다, 그 화면을 열�
   it('화면 표시 버전은 꼬리표 없이 (A5)', () => {
     expect(displayVersion('0.9.0-preview')).toBe('0.9.0');
     expect(displayVersion('1.2.3')).toBe('1.2.3');
+  });
+});
+
+describe('D-055 검토 R1: 대기 서비스 워커가 생겼을 때', () => {
+  it('서버 버전이 지금 버전 이하면 조용히 (배너·새로 고침 없음), 더 새로우면 배너, 못 읽으면 배너', () => {
+    expect(waitingDecision('0.9.0-preview', '0.9.0-preview')).toBe('silent');
+    expect(waitingDecision('0.8.13-preview', '0.9.0-preview')).toBe('silent');
+    expect(waitingDecision('0.9.1-preview', '0.9.0-preview')).toBe('banner');
+    expect(waitingDecision(undefined, '0.9.0-preview')).toBe('banner');
   });
 });

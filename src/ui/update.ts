@@ -7,7 +7,7 @@
  * - [나중에] = 이번 실행 동안만 숨김 (다음에 앱을 열면 다시 보임)
  */
 import { useEffect, useState } from 'preact/hooks';
-import { parseVersionInfo, cmpVersion } from '../core/changelog';
+import { parseVersionInfo, cmpVersion, waitingDecision } from '../core/changelog';
 import type { VersionInfo } from '../core/changelog';
 import { APP_VERSION } from '../core/version';
 import { scopedKey } from './appName';
@@ -34,10 +34,18 @@ async function fetchInfo(): Promise<VersionInfo | undefined> {
     return r.ok ? parseVersionInfo(await r.json()) : undefined;
   } catch { return undefined; }
 }
+/** 이번 controllerchange 는 새로 고치지 않음 (이미 새 코드로 도는 페이지에서 조용히 워커만 바꿈, 검토 R1) */
+let quietSwap = false;
 async function setWaiting(w: ServiceWorker) {
-  waiting = w; notify(); // 먼저 "새 버전이 있어요"로 보이고, 파일을 읽으면 번호·바뀐 점으로 바꿈
+  // 서버 버전을 먼저 보고 정함: 페이지가 이미 그 버전이면 배너 없이 조용히 ("새로 바뀐 점" 시트와 같은 버전으로 겹치지 않게)
   const v = await fetchInfo();
+  if (waitingDecision(v?.version, APP_VERSION) === 'silent') {
+    quietSwap = true;
+    w.postMessage('skipWaiting');
+    return;
+  }
   if (v) info = v;
+  waiting = w;
   notify();
 }
 /** 새 서비스 워커가 설치를 마칠 때까지 잠깐 기다림 (최대 8초) */
@@ -96,7 +104,10 @@ export function registerServiceWorker(): void {
         if (r.waiting && navigator.serviceWorker.controller) void setWaiting(r.waiting);
         r.addEventListener('updatefound', () => track(r.installing));
         let reloaded = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; location.reload(); } });
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (quietSwap) { quietSwap = false; return; } // 조용한 교체: 쓰는 도중 갑자기 새로 고치지 않음 (다음에 열 때 새 워커가 화면을 맡음)
+          if (!reloaded) { reloaded = true; location.reload(); }
+        });
       } catch { reg = null; /* 등록 실패해도 앱은 동작 */ }
     }
     void checkRemote(true);

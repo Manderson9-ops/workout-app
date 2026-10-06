@@ -43,6 +43,17 @@ export function whatsNewDecision(lastSeen: string | null, current: string, hasDa
   return { show: false, store: lastSeen };
 }
 
+/**
+ * 대기 서비스 워커가 생겼을 때 (D-055 검토 R1). 페이지는 화면(HTML)을 네트워크 먼저 받아 이미 새 코드로 돌고 있을 수 있음:
+ * - 서버 version.json 이 지금 버전 이하 → 'silent': 배너 없이 조용히 새 워커로 바꾸고 새로 고치지 않음 (이미 그 버전)
+ * - 더 새로움 → 'banner' ("새 버전 X 준비됨")
+ * - 못 읽음 → 'banner' ("새 버전이 있어요", 지금과 같음)
+ */
+export function waitingDecision(remoteVersion: string | undefined, appVersion: string): 'banner' | 'silent' {
+  if (!remoteVersion) return 'banner';
+  return cmpVersion(remoteVersion, appVersion) > 0 ? 'banner' : 'silent';
+}
+
 /** 시트에 보일 줄 (최신 먼저, 최대 max 줄). 잘렸으면 more = 남은 줄 수 */
 export function whatsNewLines(list: readonly ChangelogEntry[], max = 8): { entries: { e: ChangelogEntry; lines: string[] }[]; more: number } {
   let left = max; let total = 0;
