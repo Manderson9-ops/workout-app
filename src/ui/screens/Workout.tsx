@@ -141,7 +141,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const isBar = (exId: string) => !!byId.get(exId)?.equipment.some((e) => e === 'barbell' || e === 'smith');
   const openPlate = async (b: number, i: number, k: number) => { await flushPending(); setPlate(activeOf(getState())?.blocks[b]?.items[i]?.sets[k]?.weight ?? 20); };
 
-  /** 세트 줄 아래 펼침: 현재 세트는 늘 (무게·횟수 −/+, RIR, 원판, 메모), 다른 세트는 번호를 누르면 (RIR, 원판, 메모) */
+  /** 세트 줄 아래 펼침: 현재 세트는 늘 2줄 (① 무게·횟수 −/+ · 원판, ② RIR · 메모), 다른 세트는 번호를 누르면 (RIR, 원판, 메모) */
   const detailRow = (b: number, i: number, k: number, x: SetLog, isCur: boolean, label: string, timeEx: boolean) => {
     const st = { block: b, item: i, set: k };
     const it = w.blocks[b]!.items[i]!;
@@ -161,6 +161,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
               <button class="tonal nudge-b" aria-label={`${label} 횟수 조절 줄이기`} title="1회 줄이기" onClick={() => void upd((cw) => stepSet(cw, st, 'reps', -1))}>−1</button>
               <button class="tonal nudge-b" aria-label={`${label} 횟수 조절 늘리기`} title="1회 늘리기" onClick={() => void upd((cw) => stepSet(cw, st, 'reps', 1))}>+1</button>
             </>}
+            {isBar(it.exerciseId) && <button class="chip nudge-plate" aria-label={`${label} 원판 계산`} onClick={() => void openPlate(b, i, k)}>원판</button>}
           </div>
         )}
         <div class="row wrap small set-tools">
@@ -168,7 +169,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             <span class="sub" title="남은 횟수 여유 (RIR)">RIR</span>
             {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} aria-pressed={x.rir === r} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
           </>}
-          {isBar(it.exerciseId) && <button class="chip" aria-label={`${label} 원판 계산`} onClick={() => void openPlate(b, i, k)}>원판</button>}
+          {!isCur && isBar(it.exerciseId) && <button class="chip" aria-label={`${label} 원판 계산`} onClick={() => void openPlate(b, i, k)}>원판</button>}
           <button class="chip" aria-label={`${label} 메모`} onClick={() => setMemo({ title: `${label} 메모`, value: x.memo, save: (m) => void upd((cw) => updateSet(cw, st, { memo: m })) })}>메모</button>
         </div>
       </div>

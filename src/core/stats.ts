@@ -60,6 +60,26 @@ export function exerciseHistory(workouts: Workout[], exerciseId: string, ex: Exe
 
 export interface WorkoutSummary { id: string; name: string; date: string; durationSec: number; plannedSec?: number; workSets: number; volume: number; parts: Partial<Record<Part, number>> }
 
+export interface PvaRow { label: string; plannedMin: number; actualMin: number }
+/** 분 표시: 10분 미만은 소수 한 자리(짧은 운동이 0으로 사라지지 않게), 그 이상은 정수 */
+export function minutesLabel(sec: number): number { const m = sec / 60; return m < 10 ? Math.round(m * 10) / 10 : Math.round(m); }
+/**
+ * 예상 대비 실제 그래프 막대 (오래된 것 → 최근). plannedVsActual 과 같은 운동만 센다(예상 있음, 시간 > 0, 완료 세트 > 0).
+ * 같은 날 운동이 여러 번이면 라벨 뒤에 순번(10/7 ②)을 붙여 겹치지 않게 한다. sums 는 최신순.
+ */
+export function plannedVsActualRows(sums: WorkoutSummary[], last = 8): PvaRow[] {
+  const xs = sums.filter((x) => x.plannedSec && x.durationSec > 0 && x.workSets > 0).slice(0, last).reverse();
+  const perDate = new Map<string, number>();
+  for (const x of xs) perDate.set(x.date, (perDate.get(x.date) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  const circ = '①②③④⑤⑥⑦⑧⑨';
+  return xs.map((x) => {
+    const k = (seen.get(x.date) ?? 0) + 1; seen.set(x.date, k);
+    const md = `${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8))}`;
+    return { label: (perDate.get(x.date)! > 1 ? `${md} ${circ[k - 1] ?? k}` : md), plannedMin: minutesLabel(x.plannedSec!), actualMin: minutesLabel(x.durationSec) };
+  });
+}
+
 export function summarize(w: Workout, byId: Map<string, Exercise>, bw: BodyweightEntry[] = []): WorkoutSummary {
   const date = localDate(w.startedAt);
   const bwKg = bodyweightOn(bw, date);

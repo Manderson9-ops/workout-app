@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, isCountedWorkout, partWeekDetail } from '../src/core/stats';
+import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, isCountedWorkout, partWeekDetail, plannedVsActualRows, minutesLabel } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
 import { heatBucket } from '../src/ui/bodyMapView';
@@ -289,3 +289,26 @@ describe('D-055 3단계: 부위 창 (그 주 그 부위 운동)', () => {
     expect(partWeekDetail([a], byId, '2026-09-27', '하체')).toEqual([]);
   });
 });
+
+describe('plannedVsActualRows (예상 대비 실제 그래프)', () => {
+  const S = (id: string, date: string, durationSec: number, plannedSec?: number, workSets = 3) => ({ id, name: id, date, durationSec, plannedSec, workSets, volume: 0, parts: {} });
+  it('같은 날 두 번이면 라벨에 순번, 오래된 것 → 최근, 짧은 운동도 0이 아님', () => {
+    // 최신순 입력: 같은 날(10/7) 두 번 + 그 전날
+    const rows = plannedVsActualRows([S('c', '2026-10-07', 30, 2520), S('b', '2026-10-07', 2700, 2520), S('a', '2026-10-06', 3000, 2700)]);
+    expect(rows.map((r) => r.label)).toEqual(['10/6', '10/7 ①', '10/7 ②']);
+    expect(new Set(rows.map((r) => r.label)).size).toBe(3);
+    expect(rows[2]).toEqual({ label: '10/7 ②', plannedMin: 42, actualMin: 0.5 }); // 30초 → 0.5분 (0으로 사라지지 않음)
+    expect(rows[1]!.actualMin).toBe(45);
+  });
+  it('plannedVsActual 과 같은 운동만 (예상 없음·0초·완료 세트 0 제외), 최대 8개', () => {
+    const rows = plannedVsActualRows([S('x', '2026-10-07', 600), S('y', '2026-10-07', 0, 600), S('z', '2026-10-07', 600, 600, 0), S('ok', '2026-10-05', 600, 900)]);
+    expect(rows).toEqual([{ label: '10/5', plannedMin: 15, actualMin: 10 }]);
+    const many = Array.from({ length: 12 }, (_, i) => S(String(i), `2026-09-${String(20 - i).padStart(2, '0')}`, 600, 600));
+    expect(plannedVsActualRows(many)).toHaveLength(8);
+    expect(plannedVsActualRows(many).at(-1)!.label).toBe('9/20');
+  });
+  it('minutesLabel: 10분 미만 소수 한 자리', () => {
+    expect([minutesLabel(2), minutesLabel(59), minutesLabel(570), minutesLabel(2530)]).toEqual([0, 1, 9.5, 42]);
+  });
+});
+

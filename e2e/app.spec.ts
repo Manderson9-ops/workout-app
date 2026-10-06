@@ -850,6 +850,11 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '바벨 컬 세트 줄이기', exact: true }).click();
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await page.getByLabel('바벨 컬 1세트 무게', { exact: true }).fill('30');
+  // 현재 세트 펼침은 2줄 (① kg·회 −/+ · 원판, ② RIR · 메모) → 세트 줄 포함 3줄 이하 (iPhone 13 폭)
+  const det = page.locator('.set-detail').filter({ has: page.getByRole('button', { name: '바벨 컬 1세트 원판 계산' }) });
+  const tops = await det.getByRole('button').evaluateAll((els) => [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().top)))]);
+  expect(tops.length).toBeLessThanOrEqual(2);
+  for (const bb of await det.getByRole('button').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height))) expect(bb).toBeGreaterThanOrEqual(44);
   // 운동 중 원판 계산 시트 (바벨·스미스 운동에만 버튼)
   await page.getByRole('button', { name: '바벨 컬 1세트 원판 계산' }).click();
   await expect(page.getByRole('dialog', { name: '원판 계산기' })).toBeVisible();

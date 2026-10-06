@@ -2,7 +2,7 @@ import { useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
-import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart, addDays, weekSummary, durText, durParts, partWeekDetail } from '../../core/stats';
+import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart, addDays, weekSummary, durText, durParts, partWeekDetail, plannedVsActualRows } from '../../core/stats';
 import type { PartWeekRow } from '../../core/stats';
 import type { WorkoutSummary } from '../../core/stats';
 import { BW_MIN, BW_MAX } from '../../core/backup';
@@ -10,7 +10,7 @@ import { PARTS } from '../../core/types';
 import type { Exercise, Part } from '../../core/types';
 import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
-import { LineChart, BarChart } from '../charts';
+import { LineChart, BarChart, PairBarChart } from '../charts';
 import { NumInput, Empty, Metric, Delta, Sheet } from '../components';
 import { ScreenHeader } from '../header';
 import { WorkoutCard, shortPart } from './WorkoutCard';
@@ -240,7 +240,7 @@ export function Stats({ s }: { s: AppState }) {
           <section class="card" aria-label="예상 시간 대비 실제">
             <div class="card-head"><span class="card-title">예상 시간 대비 실제</span></div>
             <p>최근 {pva.n}회 평균: {Math.abs(pva.avgDiffSec) < 60 ? '예상과 거의 같아요' : `예상보다 ${Math.round(Math.abs(pva.avgDiffSec) / 60)}분 ${pva.avgDiffSec > 0 ? '더 걸려요' : '덜 걸려요'}`} <span class="sub small">(실제 ÷ 예상 = {pva.avgRatio})</span></p>
-            <BarChart label="최근 운동 실제 시간(분)" unit="분" points={sums.filter((x) => x.plannedSec && x.workSets > 0).slice(0, 8).reverse().map((x) => ({ label: md(x.date), value: Math.round(x.durationSec / 60) }))} />
+            <PairBarChart label="최근 운동 예상 대비 실제 시간" unit="분" points={plannedVsActualRows(sums).map((r) => ({ label: r.label, planned: r.plannedMin, actual: r.actualMin }))} />
             <p class="sub small">플랜의 예상 시간과 비교해요. 차이가 계속 크면 알려 주세요 (시간 계산을 고칠 수 있어요).</p>
           </section>
         </>

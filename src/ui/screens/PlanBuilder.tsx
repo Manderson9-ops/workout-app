@@ -263,7 +263,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
           <select value={f.minGrade} onChange={(e) => update({ minGrade: (e.target as HTMLSelectElement).value as Grade })} aria-label="최소 등급">
             {GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
           </select></div>
-        <div><label>수준</label><button class="chip on full" onClick={() => go('#/settings')}>{s.settings.level} (설정에서 변경)</button></div>
+        <div><label>수준</label><button class="chip on full level-chip" aria-label={`수준 ${s.settings.level}, 설정에서 변경`} title="설정에서 변경" onClick={() => go('#/settings')}>{s.settings.level}<Icon name="chevron" size={14} /></button></div>
       </div>
       <p class="sub small" data-testid="level-rule">{s.settings.level}: 운동당 최대 {MAX_SETS_BY_LEVEL[s.settings.level]}세트(앱 기준) · 한 근육은 한 번에 {SESSION_CAP[s.settings.level]}세트까지({s.settings.level === '초보' ? '앱 기준' : '연구 근거'}, 보조로 쓰이면 0.5세트로 셈)</p>
       <label>세트 방식 (시간이 부족하면 자동으로 묶음)</label>
