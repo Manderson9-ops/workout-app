@@ -54,6 +54,11 @@ export function waitingDecision(remoteVersion: string | undefined, appVersion: s
   return cmpVersion(remoteVersion, appVersion) > 0 ? 'banner' : 'silent';
 }
 
+/** controllerchange 때 새로 고침을 건너뛸지: 조용히 바꾼 워커가 있고, 지금 화면을 맡은 워커가 바로 그 워커일 때만 (같은 객체) */
+export function skipReloadFor<T>(quiet: T | null | undefined, controller: T | null | undefined): boolean {
+  return quiet != null && controller != null && quiet === controller;
+}
+
 /** 시트에 보일 줄 (최신 먼저, 최대 max 줄). 잘렸으면 more = 남은 줄 수 */
 export function whatsNewLines(list: readonly ChangelogEntry[], max = 8): { entries: { e: ChangelogEntry; lines: string[] }[]; more: number } {
   let left = max; let total = 0;

@@ -2,7 +2,8 @@
  * 단색 선 아이콘 (D-055 디자인 시스템 2장). 24px 격자, 선 굵기 2, 색은 글자색(currentColor)을 따름.
  * 탭·메뉴·원형 버튼에서 이모지 대신 쓴다. 장식용이라 화면 읽기에서는 숨김(aria-hidden) — 이름은 버튼·링크에 붙인다.
  */
-export type IconName = 'home' | 'plan' | 'workout' | 'stats' | 'exercises' | 'settings' | 'feedback' | 'more' | 'back' | 'play' | 'chevron' | 'close' | 'info' | 'sparkle';
+export type IconName = 'home' | 'plan' | 'workout' | 'stats' | 'exercises' | 'settings' | 'feedback' | 'more' | 'back' | 'play' | 'chevron' | 'close' | 'info' | 'sparkle'
+  | 'swap' | 'skip' | 'undo' | 'note' | 'plate' | 'check' | 'star' | 'plus' | 'minus';
 
 const P: Record<IconName, string[]> = {
   // 집
@@ -25,13 +26,26 @@ const P: Record<IconName, string[]> = {
   chevron: ['M9 5l7 7-7 7'],
   close: ['M6 6l12 12', 'M18 6 6 18'],
   info: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 11v5.5', 'M12 7.5h.01'],
+  // 교체: 서로 반대 화살표 두 개
+  swap: ['M4 8h13', 'M14 4.5 17.5 8 14 11.5', 'M20 16H7', 'M10 12.5 6.5 16l3.5 3.5'],
+  // 건너뛰기: 앞으로 + 세로줄
+  skip: ['M5 5.5v13l9-6.5z', 'M18 5.5v13'],
+  undo: ['M9 7 4.5 11.5 9 16', 'M4.5 11.5H15a4.5 4.5 0 0 1 0 9h-2'],
+  // 메모: 연필
+  note: ['M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z', 'M14 8l3 3'],
+  // 원판: 두 원
+  plate: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z'],
+  check: ['M5 12.5 10 17.5 19.5 7'],
+  star: ['M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'],
+  plus: ['M12 5v14', 'M5 12h14'],
+  minus: ['M5 12h14'],
   sparkle: ['M12 3v4', 'M12 17v4', 'M3 12h4', 'M17 12h4', 'M6 6l2.5 2.5', 'M15.5 15.5 18 18', 'M18 6l-2.5 2.5', 'M8.5 15.5 6 18'],
 };
 
 export function Icon({ name, size = 24, class: cls }: { name: IconName; size?: number; class?: string }) {
   const dots = name === 'more';
   return (
-    <svg class={`icon${cls ? ` ${cls}` : ''}`} width={size} height={size} viewBox="0 0 24 24" fill={name === 'play' ? 'currentColor' : 'none'} stroke="currentColor"
+    <svg class={`icon${cls ? ` ${cls}` : ''}`} width={size} height={size} viewBox="0 0 24 24" fill={name === 'play' || name === 'star' ? 'currentColor' : 'none'} stroke="currentColor"
       stroke-width={dots ? 3.2 : 2} stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
       {P[name].map((d, i) => <path key={i} d={d} />)}
     </svg>

@@ -7,7 +7,7 @@
  * - [나중에] = 이번 실행 동안만 숨김 (다음에 앱을 열면 다시 보임)
  */
 import { useEffect, useState } from 'preact/hooks';
-import { parseVersionInfo, cmpVersion, waitingDecision } from '../core/changelog';
+import { parseVersionInfo, cmpVersion, waitingDecision, skipReloadFor } from '../core/changelog';
 import type { VersionInfo } from '../core/changelog';
 import { APP_VERSION } from '../core/version';
 import { scopedKey } from './appName';
@@ -34,13 +34,17 @@ async function fetchInfo(): Promise<VersionInfo | undefined> {
     return r.ok ? parseVersionInfo(await r.json()) : undefined;
   } catch { return undefined; }
 }
-/** 이번 controllerchange 는 새로 고치지 않음 (이미 새 코드로 도는 페이지에서 조용히 워커만 바꿈, 검토 R1) */
-let quietSwap = false;
+/**
+ * 조용히 바꾼 워커 (검토 R1·3차 지적): 화면을 맡는 워커가 바로 이 워커일 때만 새로 고침을 건너뜀.
+ * 그 워커가 쓸모없어지면(redundant, 더 새 워커에 밀림 등) 잊음 → 다른 워커로 바뀔 때는 예전처럼 새로 고침
+ */
+let quietWorker: ServiceWorker | null = null;
 async function setWaiting(w: ServiceWorker) {
   // 서버 버전을 먼저 보고 정함: 페이지가 이미 그 버전이면 배너 없이 조용히 ("새로 바뀐 점" 시트와 같은 버전으로 겹치지 않게)
   const v = await fetchInfo();
   if (waitingDecision(v?.version, APP_VERSION) === 'silent') {
-    quietSwap = true;
+    quietWorker = w;
+    w.addEventListener('statechange', () => { if (w.state === 'redundant' && quietWorker === w) quietWorker = null; });
     w.postMessage('skipWaiting');
     return;
   }
@@ -105,7 +109,8 @@ export function registerServiceWorker(): void {
         r.addEventListener('updatefound', () => track(r.installing));
         let reloaded = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (quietSwap) { quietSwap = false; return; } // 조용한 교체: 쓰는 도중 갑자기 새로 고치지 않음 (다음에 열 때 새 워커가 화면을 맡음)
+          // 조용한 교체: 화면을 맡은 워커가 조용히 바꾼 그 워커일 때만 새로 고치지 않음 (쓰는 도중 갑자기 새로 고침 없음)
+          if (skipReloadFor(quietWorker, navigator.serviceWorker.controller)) { quietWorker = null; return; }
           if (!reloaded) { reloaded = true; location.reload(); }
         });
       } catch { reg = null; /* 등록 실패해도 앱은 동작 */ }

@@ -5,10 +5,15 @@ import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
   currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, setWorkoutMemo, addSet, removeSet, skipItem, replaceItem, appendExercise, moveWorkoutBlock,
-  adjustTimer, clearTimer, timerRemaining, progress, restAfter, lastSets,
+  adjustTimer, clearTimer, timerRemaining, progress, restAfter,
 } from '../../core/session';
 import { setTime, targetReps } from '../../core/time';
-import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, mmss } from '../components';
+import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, MenuSheet, Metric, mmss } from '../components';
+import type { MenuItem } from '../components';
+import { Icon } from '../icons';
+import { summarize } from '../../core/stats';
+import { previousSetsFor, prevFor, prevText, workoutPRs, prExerciseCount } from '../../core/workoutHistory';
+import { showToast } from '../toast';
 import { ScreenHeader } from '../header';
 import { resolveGrade } from '../../core/exercises';
 import { hasDbInfo } from '../../core/planEdit';
@@ -36,6 +41,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [picker, setPicker] = useState<{ mode: 'swap'; b: number; i: number } | { mode: 'add' } | null>(null);
   const [ended, setEnded] = useState(false);
   const [plate, setPlate] = useState<number | null>(null);
+  /** 펼친 세트 줄 (번호를 누르면 RIR·메모). 키 = "블록-운동-세트" */
+  const [detail, setDetailKey] = useState<string | null>(null);
+  /** ⋯ 메뉴를 연 운동 */
+  const [menu, setMenu] = useState<{ b: number; i: number } | null>(null);
   /** 운동 화면이 뜬 시각 (휴식이 끝날 때 이 화면에 있었는지 판정용, 진단) */
   const shownAt = useRef(Date.now());
   // PC 키보드: Ctrl+Enter(맥 ⌘+Enter) = 현재 세트 완료 (D-030)
@@ -58,8 +67,11 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     finishing.current = true;
     try {
       setFinishError(null);
+      // 끝내기 전에 기록 갱신(앱 기준) 운동 수를 셈 → 홈에서 짧은 알림 (D-055 2단계)
+      const cw = activeOf(getState());
+      const nPr = cw && cw.id === id ? prExerciseCount(cw, historyOf(getState())) : 0;
       const r = await finishActiveWorkout(id); // 실패 문구는 finishActiveWorkout이 setFinishError로 남김
-      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); }
+      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); if (nPr) showToast(`★ 기록 갱신 ${nPr}개 운동 (앱 기준)`); }
     } finally { finishing.current = false; }
   };
   // 블록 끌어서 순서 바꾸기 (D-037). 펼친 카드는 옮긴 자리를 따라감
@@ -118,45 +130,95 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const complete = (st: Step) => { unlockAudio(); setEnded(false); void upd((cw) => completeSet(cw, st, Date.now())); setOpen(null); };
   const curItem = cur ? w.blocks[cur.block]!.items[cur.item]! : undefined;
   const nextRest = cur ? restAfter(w, cur) : null;
+  // D-055 2단계: 볼륨(완료 작업 세트), 기록 갱신(앱 기준)
+  const volume = summarize(w, byId, s.bodyweight).volume;
+  const prs = workoutPRs(w, history);
+  const isBar = (exId: string) => !!byId.get(exId)?.equipment.some((e) => e === 'barbell' || e === 'smith');
+  const openPlate = async (b: number, i: number, k: number) => { await flushPending(); setPlate(activeOf(getState())?.blocks[b]?.items[i]?.sets[k]?.weight ?? 20); };
 
-  const setRow = (b: number, i: number, k: number, x: SetLog) => {
+  /** 세트 줄 아래 펼침: 현재 세트는 늘 (무게·횟수 −/+, RIR, 원판, 메모), 다른 세트는 번호를 누르면 (RIR, 원판, 메모) */
+  const detailRow = (b: number, i: number, k: number, x: SetLog, isCur: boolean, label: string, timeEx: boolean) => {
     const st = { block: b, item: i, set: k };
-    const isCur = cur && cur.block === b && cur.item === i && cur.set === k;
     const it = w.blocks[b]!.items[i]!;
-    const timeEx = it.target.seconds !== undefined;
-    const workNo = it.sets.slice(0, k + 1).filter((z) => !z.warmup).length;
-    const label = `${nameOf(it.exerciseId)} ${x.warmup ? '웜업' : workNo + '세트'}`;
     return (
-      <div key={k}>
-        <div class={`set-row ${x.done ? 'done' : ''} ${isCur ? 'current' : ''}`}>
-          <div class="set-no" aria-label={x.warmup ? '웜업 세트' : `${workNo}세트`}>{x.warmup ? 'W' : workNo}</div>
-          <NumInput pendingKey={`${b}-${i}-${k}-w`} label={`${label} 무게`} value={x.weight} suffix="kg" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
-          {timeEx
-            ? <NumInput integer pendingKey={`${b}-${i}-${k}-s`} label={`${label} 초`} value={x.seconds} suffix="초" onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
-            : <NumInput integer pendingKey={`${b}-${i}-${k}-r`} label={`${label} 횟수`} value={x.reps} suffix="회" onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
-          {x.done
-            ? <button class="check" aria-label="완료 취소" onClick={() => upd((cw) => undoSet(cw, st))}>↺</button>
-            : <button class={`check ${isCur ? 'ok' : ''}`} aria-label={`${nameOf(it.exerciseId)} ${x.warmup ? '웜업' : workNo + '세트'} 완료`} onClick={() => complete(st)}>✓</button>}
-        </div>
+      <div class="set-detail">
         {isCur && (
-          <div class="grid2" style={{ margin: '4px 0 2px' }}>
+          <div class="grid2">
             <Stepper pendingKey={`${b}-${i}-${k}-w2`} label={`${label} 무게 조절`} value={x.weight} step={2.5} suffix="kg" onStep={(d) => void upd((cw) => stepSet(cw, st, 'weight', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
             {timeEx
               ? <Stepper integer pendingKey={`${b}-${i}-${k}-s2`} label={`${label} 초 조절`} value={x.seconds} step={5} suffix="초" onStep={(d) => void upd((cw) => stepSet(cw, st, 'seconds', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
               : <Stepper integer pendingKey={`${b}-${i}-${k}-r2`} label={`${label} 횟수 조절`} value={x.reps} step={1} suffix="회" onStep={(d) => void upd((cw) => stepSet(cw, st, 'reps', d))} onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
           </div>
         )}
-        {isCur && !x.warmup && (
-          <div class="row wrap small" style={{ margin: '4px 0 6px 42px' }}>
-            <span class="sub">남은 횟수 여유(RIR)</span>
-            {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
-            {byId.get(it.exerciseId)?.equipment.some((e) => e === 'barbell' || e === 'smith') && <button class="chip" aria-label={`${label} 원판 계산`} onClick={async () => { await flushPending(); setPlate(activeOf(getState())?.blocks[b]?.items[i]?.sets[k]?.weight ?? 20); }}>원판</button>}
-            <button class="chip" aria-label={`${label} 메모`} onClick={() => setMemo({ title: `${label} 메모`, value: x.memo, save: (m) => void upd((cw) => updateSet(cw, st, { memo: m })) })}>메모</button>
-          </div>
-        )}
-        {x.memo && <div class="pill" style={{ marginLeft: '36px' }}>📝 {x.memo}</div>}
+        <div class="row wrap small set-tools">
+          {!x.warmup && <>
+            <span class="sub" title="남은 횟수 여유 (RIR)">RIR</span>
+            {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} aria-pressed={x.rir === r} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
+          </>}
+          {isBar(it.exerciseId) && <button class="chip" aria-label={`${label} 원판 계산`} onClick={() => void openPlate(b, i, k)}>원판</button>}
+          <button class="chip" aria-label={`${label} 메모`} onClick={() => setMemo({ title: `${label} 메모`, value: x.memo, save: (m) => void upd((cw) => updateSet(cw, st, { memo: m })) })}>메모</button>
+        </div>
       </div>
     );
+  };
+
+  const setRow = (b: number, i: number, k: number, x: SetLog, prevSet: SetLog | undefined) => {
+    const st = { block: b, item: i, set: k };
+    const isCur = !!cur && cur.block === b && cur.item === i && cur.set === k;
+    const it = w.blocks[b]!.items[i]!;
+    const timeEx = it.target.seconds !== undefined;
+    const workNo = it.sets.slice(0, k + 1).filter((z) => !z.warmup).length;
+    const label = `${nameOf(it.exerciseId)} ${x.warmup ? '웜업' : workNo + '세트'}`;
+    const key = `${b}-${i}-${k}`;
+    const pr = x.done ? prs.get(key) : undefined;
+    const expanded = isCur || detail === key;
+    const prevTxt = prevText(prevSet, timeEx);
+    return (
+      <div key={k} class="set-wrap">
+        <div class={`set-row ${x.done ? 'done' : ''} ${isCur ? 'current' : ''} ${x.warmup ? 'warm' : ''}`}>
+          <button class="set-idx" aria-label={`${label} 자세히 (RIR·메모)`} aria-expanded={expanded} onClick={() => { if (!isCur) setDetailKey(detail === key ? null : key); }}>{x.warmup ? 'W' : workNo}</button>
+          <span class="set-prev" aria-label={`${label} 지난번 ${prevTxt === '-' ? '없음' : prevTxt}`}>{prevTxt}</span>
+          <NumInput pendingKey={`${b}-${i}-${k}-w`} label={`${label} 무게`} value={x.weight} suffix="" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
+          {timeEx
+            ? <NumInput integer pendingKey={`${b}-${i}-${k}-s`} label={`${label} 초`} value={x.seconds} suffix="" onChange={(v) => upd((cw) => updateSet(cw, st, { seconds: v }))} />
+            : <NumInput integer pendingKey={`${b}-${i}-${k}-r`} label={`${label} 횟수`} value={x.reps} suffix="" onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
+          {x.done
+            ? <button class="check done" aria-label="완료 취소" title={`${label} 완료됨 (누르면 완료 취소)`} onClick={() => upd((cw) => undoSet(cw, st))}><Icon name="check" size={22} /></button>
+            : <button class={`check ${isCur ? 'cur' : ''}`} aria-label={`${label} 완료`} onClick={() => complete(st)}><Icon name="check" size={22} /></button>}
+        </div>
+        {pr && (
+          <div class="pr-line" title="앱 기준: 추정 1RM(Epley, 12회 이하)이 지난 최고보다 크거나, 지난 어떤 세트보다 무겁거나, 그 무게 이상에서 횟수가 더 많음">
+            <span class="pr-badge"><Icon name="star" size={14} />기록 갱신</span>
+            <span class="sub small">{pr === '1rm' ? '추정 1RM 최고' : pr === 'weight' ? '가장 무거운 무게' : '이 무게 이상 최다 횟수'} · 앱 기준</span>
+          </div>
+        )}
+        {expanded && detailRow(b, i, k, x, isCur, label, timeEx)}
+        {x.memo && <div class="pill set-memo">📝 {x.memo}</div>}
+      </div>
+    );
+  };
+
+  /** 운동 하나의 ⋯ 메뉴 (교체·건너뛰기/되살리기·메모·원판·정보) */
+  const itemMenu = (bi: number, ii: number): MenuItem[] => {
+    const it = w.blocks[bi]!.items[ii]!;
+    const n = nameOf(it.exerciseId);
+    const firstOpen = Math.max(0, it.sets.findIndex((x) => !x.done));
+    return [
+      { label: '교체', aria: `${n} 교체`, run: () => setPicker({ mode: 'swap', b: bi, i: ii }) },
+      { label: it.skipped ? '되살리기' : '건너뛰기', aria: `${n} ${it.skipped ? '되살리기' : '건너뛰기'}`, run: () => void upd((cw) => skipItem(cw, bi, ii, !it.skipped)) },
+      { label: '운동 메모', aria: `${n} 메모`, run: () => setMemo({ title: `${n} 메모`, value: it.memo, save: (m) => void upd((cw) => setItemMemo(cw, bi, ii, m)) }) },
+      ...(isBar(it.exerciseId) ? [{ label: '원판 계산', aria: `${n} 원판 계산기`, run: () => void openPlate(bi, ii, firstOpen) }] : []),
+      { label: '정보 (영상 등급·자세 포인트)', aria: `${n} 정보 보기`, run: () => go(`#/exercises/${encodeURIComponent(it.exerciseId)}`) },
+    ];
+  };
+  const menuBtn = (bi: number, ii: number) => (
+    <button class="icon-btn round wk-more" aria-label={`${nameOf(w.blocks[bi]!.items[ii]!.exerciseId)} 메뉴`} aria-haspopup="dialog" onClick={() => setMenu({ b: bi, i: ii })}><Icon name="more" /></button>
+  );
+  const infoLink = (exId: string) => {
+    const ex = byId.get(exId);
+    return hasDbInfo(ex)
+      ? <a class="btn info-db icon-btn round" href={`#/exercises/${encodeURIComponent(exId)}`} aria-label={`${nameOf(exId)} 정보 (내 운동 DB: 영상 등급·자세 포인트)`} title="내 운동 DB 있음 (영상 등급·자세 포인트)"><Icon name="exercises" size={20} /></a>
+      : <a class="btn ghost icon-btn round" href={`#/exercises/${encodeURIComponent(exId)}`} aria-label={`${nameOf(exId)} 정보 (DB 없음)`} title="정보 (내 운동 DB 없음)"><Icon name="info" size={20} /></a>;
   };
 
   // 브라우저 기본 confirm()은 조용히 취소될 수 있어 앱 안 확인 창을 씀 (D-038)
@@ -167,57 +229,78 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     await doFinish(id);
   };
   const delta = prog.deltaSec;
+  const timerOn = !!w.timer && (rem > 0 || ended);
+  const total = w.timer ? Math.max(1, Math.round((w.timer.endsAt - w.timer.startedAt) / 1000)) : 1;
+  const frac = Math.min(1, Math.max(0, rem / total));
+  const R = 18; const C = 2 * Math.PI * R;
+  const menuItem = menu ? w.blocks[menu.b]?.items[menu.i] : undefined;
 
   return (
-    <main style={{ paddingBottom: 'calc(var(--nav-h) + 260px)' }}>
+    <main class="wk-main">
       <ScreenHeader eyebrow="운동 중" title={w.name}>
-        <div class="row head-actions">
-          <button aria-label="운동 메모" onClick={() => setMemo({ title: '오늘 운동 메모', value: w.memo, save: (m) => void upd((cw) => setWorkoutMemo(cw, m)) })}>메모</button>
-          <button class="danger" onClick={finish}>종료</button>
+        <div class="row head-actions wk-actions">
+          <button class="ghost" aria-label="운동 메모" onClick={() => setMemo({ title: '오늘 운동 메모', value: w.memo, save: (m) => void upd((cw) => setWorkoutMemo(cw, m)) })}><Icon name="note" size={18} />메모</button>
+          <button class="danger-fill wk-finish" onClick={finish}>끝내기</button>
         </div>
       </ScreenHeader>
       {w.memo && <p class="sub small">📝 {w.memo}</p>}
-      <div class="row between sub small"><span>경과 {mmss(prog.elapsedSec)}</span><span>{prog.doneSets}/{prog.totalSets}세트</span><span>남은 예상 {mmss(prog.remainingSec)}</span></div>
-      {delta !== undefined && Math.abs(delta) >= 60 && <div class="pill" aria-label="예정 대비">{delta > 0 ? `예정보다 약 ${Math.round(delta / 60)}분 늦음` : `예정보다 약 ${Math.round(-delta / 60)}분 빠름`}</div>}
+      {/* 숫자 3개 (D-055 2단계): 경과 시간(파랑)·볼륨·세트 */}
+      <section class="wk-metrics" aria-label="운동 진행">
+        <div class="metrics3">
+          <Metric label="시간" parts={[[mmss(prog.elapsedSec), '']]} statusClass="sub">{`남은 예상 ${mmss(prog.remainingSec)}`}</Metric>
+          <Metric label="볼륨" parts={[[volume.toLocaleString(), 'kg']]} />
+          <Metric label="세트" parts={[[`${prog.doneSets}/${prog.totalSets}`, '세트']]} />
+        </div>
+        <div class="progress" aria-hidden="true"><div style={{ width: `${prog.totalSets ? (100 * prog.doneSets) / prog.totalSets : 0}%` }} /></div>
+        {delta !== undefined && Math.abs(delta) >= 60 && <div class="sub small wk-delta" aria-label="예정 대비">{delta > 0 ? `예정보다 약 ${Math.round(delta / 60)}분 늦음` : `예정보다 약 ${Math.round(-delta / 60)}분 빠름`}</div>}
+      </section>
       <p class="sr-only" aria-live="polite">{dnd.msg}</p>
-      <div class="progress" style={{ margin: '6px 0 10px' }}><div style={{ width: `${prog.totalSets ? (100 * prog.doneSets) / prog.totalSets : 0}%` }} /></div>
 
       {w.blocks.map((b, bi) => {
         const isOpen = bi === openIdx;
         const doneAll = b.items.every((it) => it.skipped || it.sets.every((x) => x.done));
+        const single = b.kind === 'single';
         return (
-          <div class={`card ${cur?.block === bi ? 'active' : ''}`} key={bi} {...dnd.itemAttrs(bi)}>
-            <div class="row" style={{ alignItems: 'flex-start', gap: '4px' }}>
-            {w.blocks.length > 1 && <button {...dnd.handleProps(bi)}>≡</button>}
-            <div class="row between grow" onClick={() => setOpen(isOpen ? -1 : bi)} role="button" aria-expanded={isOpen} style={{ minHeight: '44px', cursor: 'pointer' }}>
-              <div class="grow">
-                {b.kind !== 'single' && <span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'} · 번갈아</span>}
-                <div><strong>{b.items.map((it) => nameOf(it.exerciseId)).join(' + ')}</strong>{doneAll ? ' ✅' : ''}</div>
-                <div class="pill">{b.kind === 'single' ? `세트 간 휴식 ${b.restSec}초` : `라운드 후 휴식 ${b.roundRestSec}초`}</div>
+          <div class={`card wk-card ${cur?.block === bi ? 'active' : ''} ${doneAll ? 'all-done' : ''}`} key={bi} {...dnd.itemAttrs(bi)}>
+            <div class="row wk-head">
+              {w.blocks.length > 1 && <button {...dnd.handleProps(bi)}>≡</button>}
+              <div class="row between grow wk-title" onClick={() => setOpen(isOpen ? -1 : bi)} role="button" aria-expanded={isOpen}>
+                <div class="grow">
+                  {!single && <span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'} · 번갈아</span>}
+                  <div><strong>{b.items.map((it) => nameOf(it.exerciseId)).join(' + ')}</strong>{doneAll ? ' ✅' : ''}</div>
+                  <div class="pill">{single ? `세트 간 휴식 ${b.restSec}초` : `라운드 후 휴식 ${b.roundRestSec}초`}</div>
+                </div>
+                <Icon name="chevron" size={18} class={`wk-chev${isOpen ? ' open' : ''}`} />
               </div>
-              <span class="sub">{isOpen ? '▾' : '▸'}</span>
-            </div>
+              {single && menuBtn(bi, 0)}
             </div>
             {isOpen && b.items.map((it, ii) => {
               const ex = byId.get(it.exerciseId);
               const g = ex ? resolveGrade(ex, ex.part, s.settings.level, undefined, s.meta.get(ex.id)?.userGrade) : undefined;
-              const prev = lastSets(history, it.exerciseId);
+              const prev = previousSetsFor(history, it.exerciseId, w.id);
+              const timeEx = it.target.seconds !== undefined;
               return (
-                <div key={ii} style={{ marginTop: '10px', opacity: it.skipped ? 0.5 : 1 }}>
-                  <div class="row">{g && <GradeBadge g={g} />}<strong class="grow">{b.kind !== 'single' ? `${String.fromCharCode(65 + ii)}. ` : ''}{nameOf(it.exerciseId)}</strong>
-                    {hasDbInfo(ex)
-                      ? <a class="btn small info-db" href={`#/exercises/${encodeURIComponent(it.exerciseId)}`} aria-label={`${nameOf(it.exerciseId)} 정보 (내 운동 DB: 영상 등급·자세 포인트)`} title="내 운동 DB 있음 (영상 등급·자세 포인트)">📚 정보</a>
-                      : <a class="btn ghost small" href={`#/exercises/${encodeURIComponent(it.exerciseId)}`} aria-label={`${nameOf(it.exerciseId)} 정보 (DB 없음)`}>정보</a>}</div>
-                  {prev.length > 0 && <div class="pill">지난번: {prev.map((p) => `${p.weight ?? '-'}kg×${p.reps ?? p.seconds ?? '-'}`).join(', ')}</div>}
-                  {!it.skipped && it.sets.map((x, k) => setRow(bi, ii, k, x))}
-                  <div class="row wrap" style={{ marginTop: '6px' }}>
-                    <button onClick={() => upd((cw) => addSet(cw, bi, ii))}>+ 세트</button>
-                    <button onClick={() => upd((cw) => addSet(cw, bi, ii, true))}>+ 웜업</button>
-                    {it.sets.length > 1 && !it.sets[it.sets.length - 1]!.done && <button onClick={() => upd((cw) => removeSet(cw, { block: bi, item: ii, set: it.sets.length - 1 }))}>− 세트</button>}
-                    <button onClick={() => setPicker({ mode: 'swap', b: bi, i: ii })}>교체</button>
-                    <button onClick={() => upd((cw) => skipItem(cw, bi, ii, !it.skipped))}>{it.skipped ? '되살리기' : '건너뛰기'}</button>
-                    <button onClick={() => setMemo({ title: `${nameOf(it.exerciseId)} 메모`, value: it.memo, save: (m) => void upd((cw) => setItemMemo(cw, bi, ii, m)) })}>메모</button>
+                <div key={ii} class={`wk-item${it.skipped ? ' skipped' : ''}`}>
+                  <div class="row wk-item-head">
+                    {g && <GradeBadge g={g} />}
+                    {!single ? <strong class="grow">{String.fromCharCode(65 + ii)}. {nameOf(it.exerciseId)}</strong> : <span class="grow sub small">{it.skipped ? '건너뜀' : `지난번 ${prev.at ? new Date(prev.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) : '기록 없음'}`}</span>}
+                    {infoLink(it.exerciseId)}
+                    {!single && menuBtn(bi, ii)}
                   </div>
+                  {!it.skipped && (
+                    <div class="set-table">
+                      <div class="set-row set-head" aria-hidden="true"><span>세트</span><span>지난번</span><span>kg</span><span>{timeEx ? '초' : '회'}</span><span><Icon name="check" size={16} /></span></div>
+                      {it.sets.map((x, k) => setRow(bi, ii, k, x, prevFor(prev, it.sets, k)))}
+                    </div>
+                  )}
+                  {!it.skipped && (
+                    <div class="row set-foot">
+                      <button class="tonal" onClick={() => upd((cw) => addSet(cw, bi, ii))}>+ 세트</button>
+                      <button class="tonal" onClick={() => upd((cw) => addSet(cw, bi, ii, true))}>+ 웜업</button>
+                      {it.sets.length > 1 && !it.sets[it.sets.length - 1]!.done && <button class="tonal" onClick={() => upd((cw) => removeSet(cw, { block: bi, item: ii, set: it.sets.length - 1 }))}>− 세트</button>}
+                    </div>
+                  )}
+                  {it.skipped && <button class="tonal" onClick={() => upd((cw) => skipItem(cw, bi, ii, false))}>되살리기</button>}
                   {it.memo && <p class="sub small">📝 {it.memo}</p>}
                 </div>
               );
@@ -228,26 +311,28 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       <button class="big" onClick={() => setPicker({ mode: 'add' })}>+ 운동 추가</button>
       <button class="big danger" style={{ marginTop: '8px' }} onClick={finish}>운동 끝내기</button>
 
-      {/* 휴식 타이머 / 다음 세트 */}
+      {/* 휴식 타이머 알약 (D-055 2단계) + 현재 세트 완료. 아래 메뉴 바로 위에 뜸 */}
       <div class={`timer ${w.timer && rem === 0 ? 'end flash' : ''}`} role="timer" aria-live="polite">
         {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" style={{ margin: 0 }}>⚠️ {finishErr}</p><button class="ghost" aria-label="알림 닫기" onClick={() => setFinishError(null)}>✕</button></div>}
-        {w.timer && (rem > 0 || ended) ? (
-          <div class="row between">
-            <div>
-              <div class="small">{rem > 0 ? w.timer.label : '휴식 끝! 다음 세트'}</div>
-              <div class="num" aria-label={`휴식 남은 시간 ${rem}초`}>{mmss(rem)}</div>
+        {timerOn && w.timer ? (
+          <div class={`rest-pill${rem === 0 ? ' end' : ''}`}>
+            <svg class="ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+              <circle cx="22" cy="22" r={R} class="ring-bg" />
+              <circle cx="22" cy="22" r={R} class="ring-fg" stroke-dasharray={`${C}`} stroke-dashoffset={`${C * (1 - frac)}`} transform="rotate(-90 22 22)" />
+            </svg>
+            <div class="rp-mid grow">
+              <div class="rp-label">{rem > 0 ? w.timer.label : '휴식 끝! 다음 세트'}</div>
+              <div class="rp-num" aria-label={`휴식 남은 시간 ${rem}초`}>{mmss(rem)}</div>
             </div>
-            <div class="row">
-              <button aria-label="15초 줄이기" onClick={() => upd((cw) => adjustTimer(cw, -15, Date.now()))}>−15</button>
-              <button aria-label="15초 늘리기" onClick={() => upd((cw) => adjustTimer(cw, 15, Date.now()))}>+15</button>
-              <button aria-label="휴식 건너뛰기" onClick={() => { setEnded(false); void upd((cw) => clearTimer(cw)); }}>건너뛰기</button>
-            </div>
+            <button class="rp-btn" aria-label="15초 줄이기" onClick={() => upd((cw) => adjustTimer(cw, -15, Date.now()))}>−15</button>
+            <button class="rp-btn" aria-label="15초 늘리기" onClick={() => upd((cw) => adjustTimer(cw, 15, Date.now()))}>+15</button>
+            <button class="rp-btn" aria-label="휴식 건너뛰기" onClick={() => { setEnded(false); void upd((cw) => clearTimer(cw)); }}><Icon name="skip" size={20} /></button>
           </div>
         ) : null}
         {cur && curItem ? (
-          <button class="ok big" style={{ marginTop: w.timer && (rem > 0 || ended) ? '8px' : 0 }} onClick={() => complete(cur)} aria-label="현재 세트 완료">
-            ✓ {nameOf(curItem.exerciseId)} {curItem.sets[cur.set]!.warmup ? '웜업' : `${curItem.sets.slice(0, cur.set + 1).filter((z) => !z.warmup).length}세트`} 완료
-            {nextRest ? <span class="small" style={{ fontWeight: 500 }}> → 휴식 {nextRest.sec}초</span> : null}
+          <button class="ok big wk-done" onClick={() => complete(cur)} aria-label="현재 세트 완료">
+            <Icon name="check" size={20} /><span class="wd-text">{nameOf(curItem.exerciseId)} {curItem.sets[cur.set]!.warmup ? '웜업' : `${curItem.sets.slice(0, cur.set + 1).filter((z) => !z.warmup).length}세트`} 완료</span>
+            {nextRest ? <span class="small wd-rest"> → 휴식 {nextRest.sec}초</span> : null}
           </button>
         ) : (
           <button class="primary big" onClick={() => void doFinish(w.id)}>모든 세트 완료 · 운동 끝내기</button>
@@ -256,6 +341,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
 
       {plate !== null && <PlateSheet weight={plate} onClose={() => setPlate(null)} />}
       {memo && <MemoSheet title={memo.title} value={memo.value} onSave={memo.save} onClose={() => setMemo(null)} />}
+      {menu && menuItem && <MenuSheet title={nameOf(menuItem.exerciseId)} items={itemMenu(menu.b, menu.i)} onClose={() => setMenu(null)} />}
       {picker && (
         <ExercisePicker s={s} all={all} title={picker.mode === 'swap' ? '운동 교체' : '운동 추가'}
           part={picker.mode === 'swap' ? byId.get(w.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part : undefined}

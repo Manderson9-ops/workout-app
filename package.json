@@ -1,6 +1,6 @@
 {
   "name": "workout-app",
-  "version": "0.9.0-preview",
+  "version": "0.9.1-preview",
   "private": true,
   "type": "module",
   "description": "iPhone PWA workout logger with rule-based plan generator. Rules: G:\\내 드라이브\\WORK_OUT_APP\\AGENTS.md",

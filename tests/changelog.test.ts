@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { waitingDecision, wheresOf, visits, clearVisited, dotTargets, displayVersion, cmpVersion, entriesSince, whatsNewDecision, whatsNewLines, buildVersionInfo, parseVersionInfo, tabOfPath, previousVersion, koDate } from '../src/core/changelog';
+import { skipReloadFor, waitingDecision, wheresOf, visits, clearVisited, dotTargets, displayVersion, cmpVersion, entriesSince, whatsNewDecision, whatsNewLines, buildVersionInfo, parseVersionInfo, tabOfPath, previousVersion, koDate } from '../src/core/changelog';
 import type { ChangelogEntry } from '../src/core/changelog';
 import { APP_VERSION } from '../src/core/version';
 
@@ -93,5 +93,15 @@ describe('D-055 검토 R1: 대기 서비스 워커가 생겼을 때', () => {
     expect(waitingDecision('0.8.13-preview', '0.9.0-preview')).toBe('silent');
     expect(waitingDecision('0.9.1-preview', '0.9.0-preview')).toBe('banner');
     expect(waitingDecision(undefined, '0.9.0-preview')).toBe('banner');
+  });
+});
+
+describe('D-055 3차 지적: 조용한 교체 뒤 새로 고침 건너뛰기는 그 워커일 때만', () => {
+  it('같은 워커만 true, 다른 워커·없음은 false', () => {
+    const a = { id: 'a' }; const b = { id: 'b' };
+    expect(skipReloadFor(a, a)).toBe(true);
+    expect(skipReloadFor(a, b)).toBe(false);
+    expect(skipReloadFor(null, a)).toBe(false);
+    expect(skipReloadFor(a, null)).toBe(false);
   });
 });

@@ -19,6 +19,7 @@ import type { IconName } from './icons';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
 import { useUpdateAvailable } from './update';
 import { ConfirmHost, askConfirm } from './confirm';
+import { ToastHost } from './toast';
 import { useWhatsNew, WhatsNewSheet, newDotTargets, clearDotIfVisited } from './whatsNew';
 import { displayVersion } from '../core/changelog';
 import type { TabId } from '../core/changelog';
@@ -119,6 +120,7 @@ export function App() {
         </a>
       )}
       <ConfirmHost />
+      <ToastHost />
       {news && <WhatsNewSheet list={news} onClose={closeNews} />}
       {/* 점의 뜻 (색·모양만으로 전하지 않게 화면 읽기에 설명) */}
       <span id="new-dot-desc" class="sr-only">새 기능 있음</span>

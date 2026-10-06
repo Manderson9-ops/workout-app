@@ -59,7 +59,7 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
   const shown = text ?? (value === undefined ? '' : String(value));
   return (
     <div style={{ position: 'relative' }}>
-      <input inputMode={integer ? 'numeric' : 'decimal'} aria-label={label} value={shown} placeholder="-" style={{ textAlign: 'center', paddingRight: '26px' }}
+      <input inputMode={integer ? 'numeric' : 'decimal'} aria-label={label} value={shown} placeholder="-" style={{ textAlign: 'center', paddingRight: suffix ? '26px' : undefined }}
         onFocus={() => setText(shown)} onBlur={() => { setText(null); flush().catch(() => undefined); /* 실패하면 대기로 남아 다음 버튼 때 다시 */ }}
         onKeyDown={(e) => {
           // PC 키보드: Enter로 다음 입력칸 (D-030)
@@ -84,7 +84,7 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
           timer.current = setTimeout(() => { flush().catch(() => undefined); }, 300);
           registerPending(key, flush);
         }} />
-      <span class="pill" style={{ position: 'absolute', right: '8px', top: '13px', pointerEvents: 'none' }}>{suffix}</span>
+      {suffix && <span class="pill" style={{ position: 'absolute', right: '8px', top: '13px', pointerEvents: 'none' }}>{suffix}</span>}
     </div>
   );
 }
