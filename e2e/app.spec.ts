@@ -45,6 +45,19 @@ async function touchTargets(page: Page) {
   });
   expect(bad, '44pt 미만 터치 영역').toEqual([]);
 }
+/**
+ * 다음 문서 로드 때 앱 스크립트보다 먼저 localStorage 를 바꿈 (이 탭에서 한 번만).
+ * page.evaluate 로 바로 바꾸면, 아직 시작 판단(새로 바뀐 점: 마지막 본 버전 읽고 지금 버전 저장)을 하기 전인 페이지가
+ * 그 값을 먼저 써 버려 새로 고친 뒤에는 시트가 안 뜰 수 있음 (WebKit 에서 재현, D-055). 그래서 새 문서 시작 시점에 넣는다
+ */
+async function seedNextLoad(page: Page, seed: Record<string, string | null>) {
+  const once = `e2e-seed-${Date.now()}-${Math.random()}`;
+  await page.addInitScript(([key, s]) => {
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    for (const [k, v] of Object.entries(s)) { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); }
+  }, [once, seed] as const);
+}
 async function checkScreen(page: Page, name: string) { await noHorizontalScroll(page); await touchTargets(page); await shot(page, name); }
 /** D-055: 루틴 카드의 ⋯ → [편집]/[지우기] (홈·내 루틴. 운동 탭 고르기는 편집이 바로 보임) */
 async function routineMenu(scope: Page | Locator, name: string, action: '편집' | '지우기') {
@@ -1929,7 +1942,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   expect(vj.changes.length).toBeLessThanOrEqual(5);
 
   // 예전 버전(0.8.12)에서 올라온 것처럼 → 시트: 0.9.0 + 0.8.13 (최신 먼저), 확인에 초점
-  await page.evaluate(() => localStorage.setItem('app.lastSeenVersion', '0.8.12-preview'));
+  await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.12-preview' });
   await page.reload();
   const sheet = page.getByRole('dialog', { name: '새로 바뀐 점' });
   await expect(sheet).toBeVisible();
@@ -1969,11 +1982,12 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await page.goto('./#/settings/about');
   await checkScreen(page, '66-about');
   await page.reload();
+  await expect(page.getByRole('heading', { name: '앱 정보' })).toBeVisible(); // 앱이 뜬 뒤에 (뜨기 전 '시트 없음'은 의미 없음)
   await expect(page.getByRole('dialog', { name: '새로 바뀐 점' })).toHaveCount(0);
 
   // 새 기능 점: 0.9.0의 where(#/settings/about) → 설정 버튼에 점. 설정만 열면 그대로("앱 정보" 줄에 "새"), 앱 정보를 열어야 사라짐. Esc로 시트 닫기
   await page.goto('./#/');
-  await page.evaluate(() => { localStorage.setItem('app.lastSeenVersion', '0.8.13-preview'); localStorage.removeItem('app.newDots'); });
+  await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
   await expect(sheet.locator('.wn-entry')).toHaveCount(2); // 0.9.1 + 0.9.0
@@ -2001,7 +2015,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
 
 test('D-055 0.8.x 에서 올라옴: 마지막 본 버전 기록이 없고 루틴이 있으면 "새로 바뀐 점"(이번 버전만)을 보여 줌', async ({ page }) => {
   await makeRoutine(page, ['등'], '30분');
-  await page.evaluate(() => { localStorage.removeItem('app.lastSeenVersion'); localStorage.removeItem('app.newDots'); });
+  await seedNextLoad(page, { 'app.lastSeenVersion': null, 'app.newDots': null });
   await page.reload();
   const sheet = page.getByRole('dialog', { name: '새로 바뀐 점' });
   await expect(sheet).toBeVisible();
