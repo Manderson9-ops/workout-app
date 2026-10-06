@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { cmpVersion, entriesSince, whatsNewDecision, whatsNewLines, buildVersionInfo, parseVersionInfo, tabOfPath, previousVersion, koDate } from '../src/core/changelog';
+import { wheresOf, visits, clearVisited, dotTargets, displayVersion, cmpVersion, entriesSince, whatsNewDecision, whatsNewLines, buildVersionInfo, parseVersionInfo, tabOfPath, previousVersion, koDate } from '../src/core/changelog';
 import type { ChangelogEntry } from '../src/core/changelog';
 import { APP_VERSION } from '../src/core/version';
 
@@ -60,5 +60,29 @@ describe('D-055 업데이트 안내 (CHANGELOG)', () => {
     expect(buildVersionInfo(pkg.version, cl.versions).version).toBe(APP_VERSION);
     for (const e of cl.versions) if (e.where) expect(e.where).toMatch(/^#\/[\w/-]*$/);
     for (let i = 1; i < cl.versions.length; i++) expect(cmpVersion(cl.versions[i - 1]!.version, cl.versions[i]!.version)).toBeGreaterThan(0);
+  });
+});
+
+describe('D-055 검토 4·7: 새 기능 점은 where 마다, 그 화면을 열면 그 점만 지움', () => {
+  it('올라온 버전들의 where (중복·이상한 값 제외)', () => {
+    expect(wheresOf(entriesSince(list, '0.8.12-preview', '0.9.0-preview'))).toEqual(['#/settings/about', '#/stats']);
+    expect(wheresOf([{ ...E('1.0.0'), where: 'javascript:x' }, E('1.0.1', 1, '#/plan'), E('1.0.2', 1, '#/plan')])).toEqual(['#/plan']);
+  });
+  it('설정만 열면 앱 정보 점은 그대로, 앱 정보를 열어야 지워짐. 기록 상세도 기록 탭 점을 지움', () => {
+    const d = ['#/settings/about', '#/stats'];
+    expect(clearVisited(d, '/settings')).toEqual(d);
+    expect(clearVisited(d, '/settings/about')).toEqual(['#/stats']);
+    expect(clearVisited(d, '/stats/w/abc')).toEqual(['#/settings/about']);
+    expect(visits('#/', '/plan')).toBe(false);
+    expect(visits('#/', '/')).toBe(true);
+    expect(visits('#/routines', '/routines?hidden')).toBe(true);
+    expect(visits('#/stats', '/statsx')).toBe(false);
+  });
+  it('점 위치: 탭 또는 설정 버튼', () => {
+    expect([...dotTargets(['#/settings/about', '#/stats', '#/routines'])]).toEqual(['settings', 'stats', 'home']);
+  });
+  it('화면 표시 버전은 꼬리표 없이 (A5)', () => {
+    expect(displayVersion('0.9.0-preview')).toBe('0.9.0');
+    expect(displayVersion('1.2.3')).toBe('1.2.3');
   });
 });

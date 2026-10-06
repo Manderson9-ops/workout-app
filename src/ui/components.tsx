@@ -179,11 +179,11 @@ export function Metric({ label, value, unit, parts, status, tone = 'sub', mark, 
 }
 
 /** 빈 상태 (카드 모양 유지): "--" + 문구 + 다음 행동 */
-export function Empty({ title, text = '아직 기록 없음', hint, children, label }: { title?: string; text?: string; hint?: string; children?: ComponentChildren; label?: string }) {
+export function Empty({ title, text = '아직 기록 없음', hint, children, label, dash = false }: { title?: string; text?: string; hint?: string; children?: ComponentChildren; label?: string; /** 숫자 자리 카드일 때만 「--」 (D-055 검토: 숫자가 아닌 카드에 대시는 어색) */ dash?: boolean }) {
   return (
     <section class="card empty-card" aria-label={label ?? title ?? text}>
       {title && <div class="card-head"><span class="card-title">{title}</span></div>}
-      <div class="empty-dash" aria-hidden="true">--</div>
+      {dash && <div class="empty-dash" aria-hidden="true">--</div>}
       <p class="empty-text">{text}</p>
       {hint && <p class="sub empty-hint">{hint}</p>}
       {children && <div class="row wrap empty-actions">{children}</div>}

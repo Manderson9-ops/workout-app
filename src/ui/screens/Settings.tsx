@@ -14,6 +14,8 @@ import { DiagSection } from './DiagSection';
 import { go } from '../nav';
 import { ScreenHeader } from '../header';
 import { Icon } from '../icons';
+import { hasNewDot } from '../whatsNew';
+import { displayVersion } from '../../core/changelog';
 import { IS_PREVIEW } from '../appName';
 import { audioMode, setAudioMode } from '../device';
 import type { AudioMode } from '../device';
@@ -25,12 +27,14 @@ export function SettingsScreen({ s }: { s: AppState }) {
   const excluded = [...s.meta.values()].filter((m) => m.excluded);
   const [pv, setPv] = useState(phoneView());
   const [am, setAm] = useState<AudioMode>(audioMode());
+  // D-055 검토 7: 새 기능이 앱 정보 화면이면 이 줄에 "새" (점은 앱 정보를 열어야 지워짐)
+  const aboutNew = hasNewDot('#/settings/about');
   return (
     <main>
       <ScreenHeader title="설정" />
-      <a class="card row-link" href="#/settings/about" aria-label={`앱 정보·업데이트 내역, 지금 ${APP_VERSION} ${IS_PREVIEW ? 'β 미리 보기 판' : '본판'}`}>
+      <a class="card row-link" href="#/settings/about" aria-label={`앱 정보·업데이트 내역, 지금 ${displayVersion(APP_VERSION)}, 판 ${IS_PREVIEW ? 'β 미리 보기' : '본판'}${aboutNew ? ', 새 기능 있음' : ''}`}>
         <Icon name="info" />
-        <span class="grow"><span class="rl-title">앱 정보·업데이트 내역</span><span class="sub rl-sub">{APP_VERSION} · {IS_PREVIEW ? 'β 미리 보기 판' : '본판'}</span></span>
+        <span class="grow"><span class="rl-title">앱 정보·업데이트 내역{aboutNew && <span class="chip-s new" aria-hidden="true">새</span>}</span><span class="sub rl-sub">{displayVersion(APP_VERSION)} · 판: {IS_PREVIEW ? 'β 미리 보기' : '본판'}</span></span>
         <Icon name="chevron" size={18} class="card-more" />
       </a>
       <label>내 수준 (영상 등급이 수준별로 다를 때 사용)</label>

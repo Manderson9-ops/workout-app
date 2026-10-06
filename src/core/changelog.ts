@@ -102,6 +102,33 @@ export function changeHeadline(line: string): { head: string; rest?: string } {
   return { head: `${t.slice(0, at).trim()}…`, rest: t.slice(at).trim() };
 }
 
+/**
+ * 새 기능 점 (D-055 검토 4·7): 올라온 버전들(마지막 본 버전 이후)의 where 마다 점을 하나씩 두고, 그 화면을 열면 그 점만 지운다.
+ * where 는 '#/stats' 처럼 해시 경로. '#/settings/about' 은 설정 화면만 열어서는 안 지워지고 앱 정보를 열어야 지워짐
+ */
+export function wheresOf(entries: readonly ChangelogEntry[]): string[] {
+  return [...new Set(entries.map((e) => e.where).filter((w): w is string => !!w && /^#\/[\w/-]*$/.test(w)))];
+}
+/** 그 화면(path, '#' 없이 '/stats/w/x' 모양)을 열면 지워지는 where 인가 */
+export function visits(where: string, path: string): boolean {
+  const w = where.replace(/^#/, '') || '/';
+  const p = path.replace(/^#/, '') || '/';
+  if (w === '/') return p === '/';
+  return p === w || p.startsWith(`${w}/`) || p.startsWith(`${w}?`);
+}
+export function clearVisited(dots: readonly string[], path: string): string[] {
+  return dots.filter((w) => !visits(w, path));
+}
+/** 점이 붙을 곳 (하단 탭 또는 설정 버튼) */
+export function dotTargets(dots: readonly string[]): Set<TabId | 'settings'> {
+  return new Set(dots.map((w) => tabOfPath(w)).filter((x): x is TabId | 'settings' => !!x));
+}
+
+/** 화면에 보이는 버전: 꼬리표(-preview 등)를 뺀 숫자만 (D-055 검토 A5). 판 구분은 "판: 본판/β 미리 보기" 칩으로만 */
+export function displayVersion(v: string): string {
+  return v.split('-')[0]!;
+}
+
 /** "2026-10-06" → "10월 6일" */
 export function koDate(d: string): string {
   const m = d.match(/^\d{4}-(\d{2})-(\d{2})/);

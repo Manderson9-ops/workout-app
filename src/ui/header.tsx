@@ -6,12 +6,12 @@ import type { ComponentChildren } from 'preact';
 import { Icon } from './icons';
 import { FeedbackNavItem } from './screens/FeedbackUi';
 import { SyncBadge } from './screens/SyncSection';
-import { newDotTarget } from './whatsNew';
+import { newDotTargets } from './whatsNew';
 
 /** settings=false: 설정 버튼 없이 개선만 (끝낸 운동 수정처럼 취소/저장으로만 떠나야 하는 화면) */
 export function HeadButtons({ settings = true }: { settings?: boolean } = {}) {
   const onSettings = (location.hash || '#/').startsWith('#/settings');
-  const dot = newDotTarget() === 'settings';
+  const dot = newDotTargets().has('settings');
   return (
     <div class="head-btns">
       <FeedbackNavItem />
@@ -20,6 +20,11 @@ export function HeadButtons({ settings = true }: { settings?: boolean } = {}) {
       </a>}
     </div>
   );
+}
+
+/** 뒤로 버튼 (모든 화면 같은 모양: ‹ 아이콘 + 파랑 글자, 맨 위 줄 왼쪽). aria 가 없으면 이름 = 글자 */
+export function BackButton({ label, onClick, aria }: { label: string; onClick: () => void; aria?: string }) {
+  return <button class="ghost back" onClick={onClick} aria-label={aria}><Icon name="back" size={20} />{label}</button>;
 }
 
 export function ScreenHeader({ title, eyebrow, back, children, titleClass }: {
@@ -33,7 +38,7 @@ export function ScreenHeader({ title, eyebrow, back, children, titleClass }: {
     <header class="scr-head">
       {back && (
         <div class="scr-backrow">
-          <button class="ghost back" onClick={back.onClick} aria-label={back.aria}><Icon name="back" size={20} />{back.label}</button>
+          <BackButton {...back} />
           <HeadButtons />
         </div>
       )}

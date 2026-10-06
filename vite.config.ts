@@ -4,6 +4,7 @@ import preact from '@preact/preset-vite';
 import { readFileSync } from 'node:fs';
 import { buildVersionInfo } from './src/core/changelog.ts';
 import type { ChangelogEntry } from './src/core/changelog.ts';
+import { buildSw, buildId } from './tools/sw_build.ts';
 
 /**
  * D-055: 빌드 때 version.json 생성 (dist/ 와 dist-next/ 맨 위). 버전·날짜·이번 버전 바뀐 점 최대 5줄·where 만 (비밀 없음).
@@ -14,10 +15,14 @@ function versionJson(): Plugin {
   return {
     name: 'version-json',
     apply: 'build',
-    generateBundle() {
+    generateBundle(_opts, bundle) {
       const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
       const cl = JSON.parse(readFileSync(new URL('./CHANGELOG.json', import.meta.url), 'utf8').replace(/^\uFEFF/, '')) as { versions: ChangelogEntry[] };
       this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify(buildVersionInfo(pkg.version, cl.versions), null, 2) + '\n' });
+      // D-055 검토 A1: sw.js 를 틀에서 만들어 빌드 이름(버전+파일 해시)을 넣음 → 배포마다 내용이 달라져 새 서비스 워커가 설치됨
+      const tpl = readFileSync(new URL('./src/sw.template.js', import.meta.url), 'utf8');
+      const files = Object.keys(bundle).filter((f) => f !== 'sw.js' && f !== 'version.json');
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source: buildSw(tpl, buildId(pkg.version, files)) });
     },
   };
 }

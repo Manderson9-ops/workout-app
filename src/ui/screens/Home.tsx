@@ -153,9 +153,6 @@ export function Home({ s }: { s: AppState }) {
           </div>
         </div>
       )}
-      {backupDue(s.settings.lastBackupAt, history.length, Date.now()) && (
-        <BackupBanner s={s} />
-      )}
       <div class="wide-cards">
         <ThisWeekCard s={s} />
         {!active && (next
@@ -167,10 +164,12 @@ export function Home({ s }: { s: AppState }) {
             </Empty>
           ))}
       </div>
+      {/* 백업 알림은 오늘의 숫자·다음 운동 아래 작은 알림으로 (D-055 검토 A3) */}
+      {backupDue(s.settings.lastBackupAt, history.length, Date.now()) && <BackupBanner s={s} />}
       {s.routines.length > 0 ? (
         <>
           <div class="row between sec-head"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
-          <RoutineList s={s} mode="home" />
+          <RoutineList s={s} mode="home" nextId={!active ? next?.routine.id : undefined} />
         </>
       ) : null}
       {recent.length > 0 && <h2>최근 운동</h2>}

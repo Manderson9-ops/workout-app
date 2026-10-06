@@ -36,7 +36,7 @@ type Toast = { text: string; undo?: () => Promise<void> } | null;
 /**
  * mode: 'home' = 최근 3개 + "모두 보기", 'all' = 전체(검색·정렬·숨긴 루틴), 'pick' = 운동 탭에서 고르기(시작·편집, 지우기 없음)
  */
-export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | 'pick' }) {
+export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | 'all' | 'pick'; /** 홈 "다음 운동"에 나온 루틴 (카드에 표시만) */ nextId?: string }) {
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
   const nameOf = (id: string) => byId.get(id)?.name_ko ?? id;
@@ -90,7 +90,7 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
       <div class={`card routine-card${isHidden ? ' is-hidden' : ''}`} key={r.id} role="group" aria-label={`루틴 ${r.name}`}>
         <div class="row between" style={{ alignItems: 'flex-start' }}>
           <div class="grow">
-            <h3 class="routine-name">{r.name}</h3>
+            <h3 class="routine-name">{r.name}</h3>{r.id === nextId && <span class="chip-s acc next-tag">다음 운동</span>}
             <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>
           </div>
           <div class="routine-when sub small" role="note" aria-label={u ? `마지막으로 한 날 ${when}, 총 ${u.count}회` : '아직 안 한 루틴'}

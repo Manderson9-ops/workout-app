@@ -10,7 +10,7 @@ import type { Workout } from '../../core/session';
 import { targetReps } from '../../core/time';
 import { toLocalInput, fromLocalInput, durationMin, setTimes, moveStart, patchSet, patchSetByKey, keyOf, withKeys, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, EDIT_LIMITS } from '../../core/workoutEdit';
 import { go } from '../nav';
-import { HeadButtons } from '../header';
+import { HeadButtons, BackButton } from '../header';
 import { askConfirm } from '../confirm';
 
 /**
@@ -85,7 +85,7 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
   return (
     <main>
       <div class="scr-backrow">
-        <button class="ghost" onClick={() => void cancel()}>← 취소</button>
+        <BackButton label="취소" aria="수정 취소하고 돌아가기" onClick={() => void cancel()} />
         {/* 설정 버튼은 두지 않음: 이 화면은 취소/저장으로만 떠남 (고친 내용을 모르고 떠나지 않게) */}
         <HeadButtons settings={false} />
       </div>

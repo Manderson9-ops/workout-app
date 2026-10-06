@@ -19,7 +19,8 @@ import type { IconName } from './icons';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
 import { useUpdateAvailable } from './update';
 import { ConfirmHost, askConfirm } from './confirm';
-import { useWhatsNew, WhatsNewSheet, newDotTarget, clearDotIfVisited } from './whatsNew';
+import { useWhatsNew, WhatsNewSheet, newDotTargets, clearDotIfVisited } from './whatsNew';
+import { displayVersion } from '../core/changelog';
 import type { TabId } from '../core/changelog';
 
 export function useHash(): string {
@@ -40,7 +41,7 @@ function UpdateBanner({ active, onWorkout }: { active: boolean; onWorkout: boole
   const [u, apply, later] = useUpdateAvailable();
   if (!u.ready || onWorkout) return null;
   const go = async () => { if (!active || await askConfirm({ title: '운동 중이에요', message: '기록은 저장돼 있어요. 새 버전으로 바꿀까요?', ok: '바꾸기' })) apply(); };
-  const title = u.info ? `새 버전 ${u.info.version} 준비됨` : '새 버전이 있어요';
+  const title = u.info ? `새 버전 ${displayVersion(u.info.version)} 준비됨` : '새 버전이 있어요';
   if (active) {
     return (
       <div class="upd-banner small-b" role="status" aria-label="새 버전 안내">
@@ -57,6 +58,7 @@ function UpdateBanner({ active, onWorkout }: { active: boolean; onWorkout: boole
           <strong>{title}</strong>
           {u.info?.changes[0] && <p class="upd-line">{u.info.changes[0]}</p>}
           {!u.info && <p class="upd-line">적용하면 바뀐 점을 알려 드려요</p>}
+          {u.note && <p class="upd-line t-warn" role="alert">{u.note}</p>}
         </div>
       </div>
       <div class="row upd-btns">
@@ -105,7 +107,7 @@ export function App() {
   else screen = <Home s={s} />;
 
   const onWorkout = path.startsWith('/workout');
-  const dot = newDotTarget();
+  const dots = newDotTargets();
   return (
     <>
       <UpdateBanner active={!!active} onWorkout={onWorkout} />
@@ -126,7 +128,7 @@ export function App() {
         {TABS.map((t) => {
           const on = t.on(path);
           const wk = t.id === 'workout' && !!active;
-          const nd = dot === t.id && !on;
+          const nd = dots.has(t.id) && !on;
           return (
             <a key={t.id} href={t.h} class={on ? 'on' : ''} aria-label={t.label} aria-current={on ? 'page' : undefined}
               aria-describedby={wk ? 'wk-dot-desc' : nd ? 'new-dot-desc' : undefined}>

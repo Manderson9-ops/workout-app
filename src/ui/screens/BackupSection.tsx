@@ -4,6 +4,7 @@ import type { AppState } from '../store';
 import { activeOf } from '../store';
 import { saveBackupFile, readBackupFile, restoreBackup, resetAll, prepareBackup, SAVE_MESSAGE } from '../backupActions';
 import { IS_PREVIEW } from '../appName';
+import { Icon } from '../icons';
 import { askConfirm, askChoice } from '../confirm';
 
 /** 데이터가 바뀌고 잠시(0.8초) 조용하면 백업 파일을 미리 만듦 (입력 중에는 만들지 않음) */
@@ -89,12 +90,14 @@ export function BackupBanner({ s }: { s: AppState }) {
   const [msg, setMsg] = useState<string | null>(null);
   usePreparedBackup(s);
   return (
-    <div class="card" role="note" aria-label="백업 알림">
-      <div class="row between">
+    // D-055 검토 A3: 홈 맨 위 큰 카드 대신 "다음 운동" 아래 작은 알림 (채운 파랑 버튼은 [▶ 시작] 하나만)
+    <div class="notice notice-row" role="note" aria-label="백업 알림">
+      <Icon name="info" size={20} class="notice-ico" />
+      <div class="grow">
         <span class="small">{s.settings.lastBackupAt ? '마지막 백업 후 7일이 지났어요' : '아직 백업한 적이 없어요'}</span>
-        <button class="primary" onClick={async () => { const r = await saveBackupFile(); setMsg(SAVE_MESSAGE[r]); }}>지금 백업</button>
+        {msg && <p role="status" class="small sub">{msg}</p>}
       </div>
-      {msg && <p role="status" class="small">{msg}</p>}
+      <button onClick={async () => { const r = await saveBackupFile(); setMsg(SAVE_MESSAGE[r]); }} aria-label="지금 백업">백업</button>
     </div>
   );
 }

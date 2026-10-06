@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { checkSyncDir } from '../tools/sync_check';
 import { emptyState, handleSync } from '../src/core/syncMerge';
 import { APP_VERSION } from '../src/core/version';
+import { displayVersion } from '../src/core/changelog';
+const SHOWN_VERSION = displayVersion(APP_VERSION); // 화면 표시 버전 ("0.9.0", 꼬리표 없음 D-055 검토 A5)
 
 mkdirSync('reports/screens', { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `reports/screens/${test.info().project.name}-${name}.png` });
@@ -659,9 +661,9 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   await pick.getByRole('button', { name: '하체 45분 편집' }).click();
   await expect(page).toHaveURL(/#\/routine\//);
   await expect(page.getByLabel('루틴 이름')).toHaveValue('하체 45분');
-  await expect(page.getByRole('button', { name: '← 운동' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '← 홈' })).toHaveCount(0);
-  await page.getByRole('button', { name: '← 운동' }).click();
+  await expect(page.getByRole('button', { name: '운동', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '홈', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '운동', exact: true }).click();
   await expect(page).toHaveURL(/#\/workout/);
   await expect(page.getByRole('heading', { name: '루틴 고르기' })).toBeVisible();
   await pick.getByRole('button', { name: '가슴 30분 시작' }).click();
@@ -777,7 +779,7 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
   // 저장 → 다시 편집: 값 유지
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await routineMenu(page, '부위 추가 루틴', '편집');
-  await expect(page.getByRole('button', { name: '← 홈' })).toBeVisible(); // 홈·내 루틴에서 연 편집은 홈으로
+  await expect(page.getByRole('button', { name: '홈', exact: true })).toBeVisible(); // 홈·내 루틴에서 연 편집은 홈으로
   const cards2 = page.locator('main .card');
   await expect(cards2).toHaveCount(2);
   expect(await sets(cards2.nth(0))).toEqual(finalG);
@@ -1933,8 +1935,8 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toBeVisible();
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
-  await expect(entries.first()).toHaveAttribute('aria-label', `${APP_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.8.13-preview 바뀐 점');
+  await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.8.13 바뀐 점');
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
@@ -1944,25 +1946,34 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
-  await sheet.getByRole('button', { name: `${APP_VERSION} 바뀐 곳 보러 가기` }).click();
+  // 0.8.12 에서 올라옴 → 점 2개: 앱 정보(설정 버튼)·기록 탭 (0.8.13 where #/stats)
+  const statsTab = page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: '기록' });
+  await expect(statsTab).toHaveAttribute('aria-describedby', 'new-dot-desc');
+  await sheet.getByRole('button', { name: `${SHOWN_VERSION} 바뀐 곳 보러 가기` }).click();
   await expect(page).toHaveURL(/#\/settings\/about$/);
   await expect(sheet).toHaveCount(0);
   // 앱 정보: 버전 칩(본판), 마지막 업데이트 날짜, 버전별 바뀐 점(최신만 펼침), 오픈소스 고지
   await expect(page.getByRole('heading', { name: '앱 정보' })).toBeVisible();
-  await expect(page.getByTestId('about-version')).toHaveText(APP_VERSION);
-  await expect(page.getByLabel('지금 버전')).toContainText('본판');
+  await expect(page.getByTestId('about-version')).toHaveText(SHOWN_VERSION);
+  await expect(page.getByTestId('about-edition')).toHaveText('판: 본판');
+  await expect(page.getByLabel('지금 버전')).toContainText(`빌드 이름 ${APP_VERSION}`);
   await expect(page.getByLabel('지금 버전')).toContainText('마지막 업데이트');
   await expect(page.locator('details.cl-item[open]')).toHaveCount(1);
   await expect(page.getByRole('link', { name: '오픈소스 고지' })).toBeVisible();
   await page.getByRole('button', { name: '새 버전 확인' }).click();
-  await expect(page.getByLabel('지금 버전').getByRole('status')).not.toHaveText('');
+  await expect(page.getByLabel('지금 버전').getByRole('status')).toHaveText(`지금 최신 버전이에요 (${SHOWN_VERSION})`); // 서버 version.json 과 비교
+  // 기록 탭 점: 앱 정보를 열어도 그대로, 기록 탭을 열면 사라짐 (where 마다 따로)
+  await expect(statsTab.locator('.ndot')).toHaveCount(1);
+  await statsTab.click();
+  await expect(statsTab.locator('.ndot')).toHaveCount(0);
+  await page.goto('./#/settings/about');
   await checkScreen(page, '66-about');
   await page.reload();
   await expect(page.getByRole('dialog', { name: '새로 바뀐 점' })).toHaveCount(0);
 
-  // 새 기능 점: 0.9.0의 where(#/settings/about) → 설정 버튼에 점, 설정을 열면 사라짐. Esc로 시트 닫기
+  // 새 기능 점: 0.9.0의 where(#/settings/about) → 설정 버튼에 점. 설정만 열면 그대로("앱 정보" 줄에 "새"), 앱 정보를 열어야 사라짐. Esc로 시트 닫기
   await page.goto('./#/');
-  await page.evaluate(() => { localStorage.setItem('app.lastSeenVersion', '0.8.13-preview'); localStorage.removeItem('app.newDot'); });
+  await page.evaluate(() => { localStorage.setItem('app.lastSeenVersion', '0.8.13-preview'); localStorage.removeItem('app.newDots'); });
   await page.reload();
   await expect(sheet).toBeVisible();
   await expect(sheet.locator('.wn-entry')).toHaveCount(1); // 0.9.0만
@@ -1971,10 +1982,77 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   const gear = page.getByRole('link', { name: '설정', exact: true });
   await expect(gear.locator('.ndot')).toHaveCount(1);
   await expect(gear).toHaveAttribute('aria-describedby', 'new-dot-desc');
+  await expect(page.getByRole('navigation', { name: '주 메뉴' }).locator('.ndot')).toHaveCount(0); // 0.9.0 은 탭이 아니라 설정
   await gear.click();
-  await expect(page.getByRole('link', { name: /앱 정보·업데이트 내역/ })).toBeVisible();
+  const aboutRow = page.getByRole('link', { name: /앱 정보·업데이트 내역/ });
+  await expect(aboutRow).toContainText('새');
+  await expect(aboutRow).toHaveAttribute('aria-label', /새 기능 있음/);
+  await checkScreen(page, '71-settings-new');
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+  await expect(gear.locator('.ndot')).toHaveCount(1); // 설정만 열어서는 안 지워짐
+  await gear.click();
+  await aboutRow.click();
+  await expect(page.getByRole('heading', { name: '앱 정보' })).toBeVisible();
   await page.getByRole('link', { name: '홈', exact: true }).click();
   await expect(page.getByRole('link', { name: '설정', exact: true }).locator('.ndot')).toHaveCount(0);
+  await page.getByRole('link', { name: '설정', exact: true }).click();
+  await expect(aboutRow).not.toHaveAttribute('aria-label', /새 기능 있음/);
+});
+
+test('D-055 0.8.x 에서 올라옴: 마지막 본 버전 기록이 없고 루틴이 있으면 "새로 바뀐 점"(이번 버전만)을 보여 줌', async ({ page }) => {
+  await makeRoutine(page, ['등'], '30분');
+  await page.evaluate(() => { localStorage.removeItem('app.lastSeenVersion'); localStorage.removeItem('app.newDots'); });
+  await page.reload();
+  const sheet = page.getByRole('dialog', { name: '새로 바뀐 점' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('.wn-entry')).toHaveCount(1);
+  await expect(sheet.locator('.wn-entry')).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
+  await sheet.getByRole('button', { name: '확인' }).click();
+  expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
+  await page.reload();
+  await expect(sheet).toHaveCount(0);
+});
+
+test.describe('D-055 실제 업데이트 경로 (흉내 이벤트 없이 서버 version.json 비교)', () => {
+  // 서비스 워커를 막아 version.json 요청이 페이지에서 바로 나가게 함 (가로채기 가능). 대기 워커가 없으니 [지금 적용] = 새로 고침 경로
+  test.use({ serviceWorkers: 'block' });
+  test('서버가 더 새 버전(9.9.9)이면 배너 + 앱 정보 "새 버전 9.9.9가 있어요", 적용은 한 번만 새로 고침(무한 새로 고침 없음)', async ({ page }) => {
+    await page.route('**/version.json', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ version: '9.9.9-preview', date: '2026-12-01', changes: ['서버에 올라온 새 기능', '둘째'] }) }));
+    await page.reload();
+    const banner = page.getByRole('status', { name: '새 버전 안내' });
+    await expect(banner).toContainText('새 버전 9.9.9 준비됨');
+    await expect(banner).toContainText('서버에 올라온 새 기능');
+    await checkScreen(page, '72-update-banner-real');
+    await banner.getByRole('button', { name: '나중에' }).click();
+    await expect(banner).toHaveCount(0);
+    // 앱 정보 [새 버전 확인]: 서버와 비교해 새 버전이라고 답하고 [지금 적용]
+    await page.goto('./#/settings/about');
+    await page.getByRole('button', { name: '새 버전 확인' }).click();
+    const card = page.getByLabel('지금 버전');
+    await expect(card.getByRole('status')).toHaveText('새 버전 9.9.9가 있어요');
+    await expect(banner).toBeVisible(); // 확인하면 [나중에] 로 숨긴 배너도 다시
+    // 적용 → 새로 고침 1번 (아직 옛 버전이 오면 다시 배너) → 두 번째 적용은 새로 고치지 않고 안내
+    let loads = 0; page.on('load', () => { loads++; });
+    await banner.getByRole('button', { name: '지금 적용' }).click();
+    await expect.poll(() => loads).toBe(1);
+    await expect(banner).toContainText('새 버전 9.9.9 준비됨');
+    await banner.getByRole('button', { name: '지금 적용' }).click();
+    await expect(banner.getByRole('alert')).toContainText('아직 새 버전을 받지 못했어요');
+    await page.waitForTimeout(500);
+    expect(loads).toBe(1);
+    // 서버가 같은 버전이면 "최신"
+    await page.unroute('**/version.json');
+    await page.goto('./#/settings/about');
+    await page.getByRole('button', { name: '새 버전 확인' }).click();
+    await expect(card.getByRole('status')).toHaveText(`지금 최신 버전이에요 (${SHOWN_VERSION})`);
+  });
+});
+
+test('D-055 sw.js 는 빌드 이름(버전 포함)을 담음 (배포마다 바뀌어 새 서비스 워커가 설치됨)', async ({ page }) => {
+  const sw = await (await page.request.get('./sw.js')).text();
+  expect(sw).toContain(`const BUILD = '${APP_VERSION}+`);
+  expect(sw).not.toContain('__BUILD__');
+  expect(sw).toContain("if (new URL(req.url).pathname.endsWith('/version.json')) return;"); // version.json 은 저장하지 않음
 });
 
 test('D-055 새 버전 배너: 버전·바뀐 점 한 줄·[지금 적용][나중에], 파일을 못 읽으면 "새 버전이 있어요", 운동 중엔 작게·확인 후 적용', async ({ page }) => {
@@ -1985,7 +2063,7 @@ test('D-055 새 버전 배너: 버전·바뀐 점 한 줄·[지금 적용][나�
   await expect(page.getByRole('status', { name: '새 버전 안내' })).toHaveCount(0);
   await sim({ version: '0.9.9-preview', date: '2026-10-07', changes: ['운동 중 화면 새 모양', '둘째 줄'] });
   const banner = page.getByRole('status', { name: '새 버전 안내' });
-  await expect(banner).toContainText('새 버전 0.9.9-preview 준비됨');
+  await expect(banner).toContainText('새 버전 0.9.9 준비됨');
   await expect(banner).toContainText('운동 중 화면 새 모양');
   await expect(banner).not.toContainText('둘째 줄');
   await expect(banner.getByRole('button', { name: '지금 적용' })).toBeVisible();
@@ -2020,6 +2098,16 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   await expect(page.getByTestId('home-week')).toHaveAttribute('href', '#/stats');
   // 다음 운동 (앱 판단): 하나뿐인 루틴을 오늘 했으면 그대로 보이고 이유 줄 "오늘 이미 했어요"
   await expect(next).toContainText('오늘 이미 했어요');
+  // 390×844 첫 화면: 백업 알림은 다음 운동 아래, [▶ 시작]은 탭 바 위에 다 보임 (검토 A3)
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const backup = page.getByRole('note', { name: '백업 알림' });
+  await expect(backup).toBeVisible();
+  const startBox = (await next.getByRole('button', { name: /^다음 운동으로 시작/ }).boundingBox())!;
+  const navBox = (await page.locator('nav.nav').boundingBox())!;
+  expect(startBox.y + startBox.height, '[▶ 시작] 아래 끝 < 탭 바 위 끝').toBeLessThan(navBox.y);
+  expect((await backup.boundingBox())!.y).toBeGreaterThan(startBox.y);
+  await expect(backup.getByRole('button', { name: '지금 백업' })).not.toHaveClass(/primary/);
+  await expect(page.locator('.routine-card').first().locator('.next-tag')).toHaveText('다음 운동');
   // 최근 운동 = 기록 탭 카드(button.wcard) + ⋯
   const recent = page.getByRole('group', { name: '최근 운동 등 30분' });
   await expect(recent.locator('button.wcard')).toContainText('세트 1');
@@ -2038,7 +2126,7 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   // 루틴 편집에서도 개선 메모·설정 원형 버튼 (예전엔 아래 메뉴에서 어디서든)
   await expect(page.getByRole('button', { name: '개선 메모 쓰기' })).toBeVisible();
   await expect(page.getByRole('link', { name: '설정', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '← 홈' }).click();
+  await page.getByRole('button', { name: '홈', exact: true }).click();
   await checkScreen(page, '69-home');
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await expect(page.getByRole('button', { name: /^등 30분,/ })).toContainText('세트 1');

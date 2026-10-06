@@ -20,6 +20,10 @@
   --r-in: 8px; --r-btn: 12px; --r-card: 20px; --r-sheet: 24px; --r-pill: 999px;
   /* 그림자: 떠 있는 것(탭 바·시트·알림)에만 */
   --shadow-float: 0 10px 30px rgba(0, 0, 0, .55);
+  /* 겹침: 떠 있는 탭 바 바탕(살짝 비침), 탭 바 아래 가림막의 투명 끝, 시트 뒤 어둡게 */
+  --nav-bg: rgba(22, 27, 34, .92); --scrim-clear: rgba(14, 17, 22, 0); --backdrop: rgba(0, 0, 0, .6);
+  /* 요일 색 (D-054): 일요일 빨강, 토요일 파랑 */
+  --sun: #f87171; --sat: #60a5fa;
   --nav-h: 64px; --nav-gap: 10px; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
   /* 탭 바가 차지하는 아래 공간 (떠 있는 바 + 아래 여백 + 안전 영역) */
   --nav-space: calc(var(--nav-h) + var(--nav-gap) + var(--safe-b));
@@ -67,7 +71,7 @@ label { display: block; font-size: 14px; color: var(--sub); margin: 12px 0 6px; 
 .list-item { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line); min-height: 56px; cursor: pointer; }
 .list-item:last-child { border-bottom: 0; }
 /* D-055: 떠 있는 알약 탭 바 (가장자리 여백, 반투명 + 흐림, 안전 영역). 선택 탭 = 파랑 아이콘·글자 + 옇은 파랑 배경 */
-.nav { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-gap) + var(--safe-b)); height: var(--nav-h); max-width: 520px; margin: 0 auto; padding: 6px; gap: 2px; display: flex; border-radius: var(--r-pill); background: rgba(22, 27, 34, .92); border: 1px solid var(--line); box-shadow: var(--shadow-float); z-index: 20; -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
+.nav { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-gap) + var(--safe-b)); height: var(--nav-h); max-width: 520px; margin: 0 auto; padding: 6px; gap: 2px; display: flex; border-radius: var(--r-pill); background: var(--nav-bg); border: 1px solid var(--line); box-shadow: var(--shadow-float); z-index: 20; -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
 .nav a { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 44px; border-radius: var(--r-pill); color: var(--sub); text-decoration: none; font-size: 11px; font-weight: 600; }
 .nav a.on { color: var(--acc-text); background: var(--acc-soft); }
 .nav a.on .icon { color: var(--acc); }
@@ -92,7 +96,7 @@ label { display: block; font-size: 14px; color: var(--sub); margin: 12px 0 6px; 
 .warn-text { color: var(--warn); }
 .mini-step .val { min-width: 52px; text-align: center; font-weight: 600; }
 /* 내 운동 DB(영상 등급·자세 포인트)가 있는 운동의 정보 버튼 */
-.btn.info-db { background: var(--video); border-color: var(--video); color: #1b1033; }
+.btn.info-db { background: var(--video); border-color: var(--video); color: var(--on-video); }
 .check { width: 52px; height: 52px; border-radius: 14px; font-size: 22px; padding: 0; }
 .timer { position: fixed; left: 0; right: 0; bottom: var(--nav-space); z-index: 25; background: var(--card); border-top: 2px solid var(--acc); box-shadow: 0 -8px 20px #000a; padding: 12px 14px; }
 .timer.end { background: var(--ok); color: var(--on-ok); border-top-color: var(--ok); }
@@ -101,7 +105,7 @@ label { display: block; font-size: 14px; color: var(--sub); margin: 12px 0 6px; 
 @keyframes flash { 50% { filter: brightness(1.6); } }
 .progress { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--acc); }
-.sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); z-index: 40; }
+.sheet-bg { position: fixed; inset: 0; background: var(--backdrop); z-index: 40; }
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 80vh; overflow-y: auto; background: var(--card); border-radius: var(--r-sheet) var(--r-sheet) 0 0; padding: 16px 16px calc(16px + var(--safe-b)); z-index: 41; box-shadow: var(--shadow-float); }
 .sheet-head h3 { font-size: 20px; font-weight: 700; margin: 0; }
 .reasons { margin: 6px 0 0; padding-left: 18px; color: var(--sub); font-size: 14px; }
@@ -247,7 +251,6 @@ button.back { margin-bottom: 4px; }
 .lbl-step { display: inline-flex; flex-wrap: nowrap; align-items: center; gap: 6px; white-space: nowrap; }
 
 /* D-054: 기록 탭 (이번 주·부위별 세트·운동 기록 카드·달력). 일요일 빨강, 토요일 파랑 */
-:root { --sun: #f87171; --sat: #60a5fa; }
 .sun { color: var(--sun); } .sat { color: var(--sat); }
 .daystrip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; justify-items: center; }
 .daydot { width: 44px; height: 44px; max-width: 100%; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid transparent; background: var(--card2); line-height: 1.1; }
@@ -420,7 +423,7 @@ a.row-link > .icon:first-child { color: var(--acc); }
 .sheet-foot { position: sticky; bottom: calc(-16px - var(--safe-b)); margin: 12px -16px calc(-16px - var(--safe-b)); padding: 10px 16px calc(16px + var(--safe-b)); background: var(--card); border-top: 1px solid var(--line); }
 .upd-short { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 /* 떠 있는 탭 바 아래·옆으로 내용이 비쳐 보이지 않게 (가장자리 틈 사이로 버튼 조각이 보이던 문제) 아래쪽을 배경색으로 서서히 덮음 */
-.nav-scrim { position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--nav-space) + 28px); z-index: 18; pointer-events: none; background: linear-gradient(to bottom, rgba(14, 17, 22, 0), var(--bg) 42%); }
+.nav-scrim { position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--nav-space) + 28px); z-index: 18; pointer-events: none; background: linear-gradient(to bottom, var(--scrim-clear), var(--bg) 42%); }
 html.editing .nav-scrim { display: none; }
 @media (min-width: 900px) { html:not(.phone-view) .nav-scrim { display: none; } }
 .next-why { margin: 8px 0 0; font-size: 13px; font-weight: 600; }
@@ -430,3 +433,11 @@ html.editing .nav-scrim { display: none; }
 .m-val { flex-wrap: wrap; }
 .tile-delta { color: var(--sub); font-size: 13px; }
 .sheet.wn-sheet { max-height: 90vh; }
+/* D-055 검토 반영 */
+.ver-row { gap: 8px; }
+.about-line { margin: 6px 0 0; }
+.about-actions { margin-top: 10px; }
+.chip-s.new { margin-left: 8px; background: var(--acc-fill); color: var(--on-acc); font-size: 12px; vertical-align: 2px; }
+.next-tag { display: inline-flex; margin: 0 0 6px; }
+.notice-row { align-items: center; }
+.notice-row .notice-ico { margin-top: 0; }
