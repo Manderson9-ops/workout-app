@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkSyncDir } from '../tools/sync_check';
 import { emptyState, handleSync } from '../src/core/syncMerge';
+import { APP_VERSION } from '../src/core/version';
 
 mkdirSync('reports/screens', { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `reports/screens/${test.info().project.name}-${name}.png` });
@@ -43,6 +44,16 @@ async function touchTargets(page: Page) {
   expect(bad, '44pt 미만 터치 영역').toEqual([]);
 }
 async function checkScreen(page: Page, name: string) { await noHorizontalScroll(page); await touchTargets(page); await shot(page, name); }
+/** D-055: 루틴 카드의 ⋯ → [편집]/[지우기] (홈·내 루틴. 운동 탭 고르기는 편집이 바로 보임) */
+async function routineMenu(scope: Page | Locator, name: string, action: '편집' | '지우기') {
+  await scope.getByRole('button', { name: `${name} 메뉴`, exact: true }).click();
+  await scope.getByRole('button', { name: `${name} ${action}`, exact: true }).click();
+}
+/** D-055: 홈 최근 운동 카드의 ⋯ → [수정]/[삭제] */
+async function recentMenu(card: Locator, action: '수정' | '삭제') {
+  await card.getByRole('button', { name: / 메뉴$/ }).click();
+  await card.getByRole('button', { name: new RegExp(` ${action}$`) }).click();
+}
 
 /** 플랜을 만들어 루틴으로 저장만 (홈으로) */
 /** D-047: 부위 버튼 → 우선순위 창(기본 높음) → (원하면 고르기) → 완료 */
@@ -133,7 +144,7 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   await tap(page.getByRole('button', { name: '종료' }));
   await tap(page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' })); // 앱 안 확인 창 (D-038)
   await expect(page.getByText('최근 운동')).toBeVisible();
-  await expect(page.getByText(/작업 세트 3개/)).toBeVisible();
+  await expect(page.getByRole('group', { name: /^최근 운동 / }).first()).toContainText('세트 3');
   expect(taps, '루틴 시작 → 세트 3개 → 종료 (확인창 포함)').toBeLessThanOrEqual(12);
   await checkScreen(page, '05-home-after');
 
@@ -599,7 +610,7 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   await list.getByRole('button', { name: '이름 순' }).click();
   expect(await list.locator('.routine-card').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')))).toEqual(['루틴 가슴 30분', '루틴 등 30분', '루틴 이두 30분', '루틴 하체 45분']);
   // 목록에서만 숨기기 → 숨긴 루틴에 있음 → 다시 보이기
-  await list.getByRole('button', { name: '가슴 30분 지우기' }).click();
+  await routineMenu(list, '가슴 30분', '지우기');
   await answer(page, '목록에서만 숨기기');
   await expect(page.getByRole('status').filter({ hasText: '「가슴 30분」 루틴을 목록에서 숨겼어요' })).toHaveCount(1);
   await expect(page.locator('.toast').getByRole('button', { name: '되돌리기' })).toBeVisible();
@@ -610,9 +621,9 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   await list.getByRole('button', { name: '가슴 30분 다시 보이기' }).click();
   await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(4);
   // 숨긴 루틴은 운동 탭 고르기에도 안 나옴 / 완전 삭제는 되돌릴 수 없음 (확인 창)
-  await list.getByRole('button', { name: '이두 30분 지우기' }).click();
+  await routineMenu(list, '이두 30분', '지우기');
   await answer(page, '목록에서만 숨기기');
-  await list.getByRole('button', { name: '등 30분 지우기' }).click();
+  await routineMenu(list, '등 30분', '지우기');
   await answer(page, '완전 삭제');
   await expect(list.getByRole('group', { name: '루틴 등 30분' })).toHaveCount(0);
   await expect(list.getByRole('button', { name: /숨긴 루틴 1개/ })).toHaveAttribute('aria-expanded', 'true'); // 아까 펼친 그대로
@@ -626,12 +637,12 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   await expect(list.getByRole('group', { name: '루틴 빈 A' }).getByRole('button', { name: '빈 A 운동 넣기' })).toBeVisible(); // 운동 없는 루틴은 시작 대신 운동 넣기
   await list.getByLabel('루틴 검색').fill('빈');
   await expect(list.locator('.routine-card')).toHaveCount(3);
-  await list.getByRole('button', { name: '빈 A 지우기' }).click();
+  await routineMenu(list, '빈 A', '지우기');
   await answer(page, '목록에서만 숨기기');
   await expect(list.getByLabel('루틴 검색')).toHaveValue('빈');
   await list.getByRole('button', { name: '검색어 지우기' }).click();
   await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(4);
-  for (const n of ['B', 'C']) { await list.getByRole('button', { name: `빈 ${n} 지우기` }).click(); await answer(page, '완전 삭제'); }
+  for (const n of ['B', 'C']) { await routineMenu(list, `빈 ${n}`, '지우기'); await answer(page, '완전 삭제'); }
   if ((await list.getByRole('button', { name: /숨긴 루틴/ }).getAttribute('aria-expanded')) !== 'true') await list.getByRole('button', { name: /숨긴 루틴/ }).click();
   await list.getByRole('button', { name: '빈 A 완전 삭제' }).click();
   await answer(page, '완전 삭제');
@@ -765,7 +776,7 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
   await checkScreen(page, '63-routine-part-add');
   // 저장 → 다시 편집: 값 유지
   await page.getByRole('button', { name: '저장', exact: true }).click();
-  await page.locator('main .card').filter({ has: page.getByRole('heading', { name: '부위 추가 루틴' }) }).getByRole('button', { name: '편집' }).click();
+  await routineMenu(page, '부위 추가 루틴', '편집');
   await expect(page.getByRole('button', { name: '← 홈' })).toBeVisible(); // 홈·내 루틴에서 연 편집은 홈으로
   const cards2 = page.locator('main .card');
   await expect(cards2).toHaveCount(2);
@@ -1128,7 +1139,7 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
   expect(info).toEqual({ ver: 50, stamped: true });
   // 지우면 기록은 없어지고 지움 표시가 남음
   await page.getByRole('link', { name: '홈' }).click();
-  await page.getByRole('button', { name: '예전 루틴 지우기' }).click();
+  await routineMenu(page, '예전 루틴', '지우기');
   await answer(page, '완전 삭제');
   await expect(page.getByRole('heading', { name: '예전 루틴' })).toHaveCount(0);
   const tomb = await page.evaluate(async () => new Promise<boolean>((res) => {
@@ -1215,7 +1226,8 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   // 폰이 인터넷 없이 루틴 이름을 고침 → 동기화 실패 표시 → 다시 연결되면 PC에 반영
   down = true;
   await page.getByRole('link', { name: '홈' }).click();
-  await page.getByRole('button', { name: '편집' }).first().click();
+  await page.locator('.routine-card').first().getByRole('button', { name: / 메뉴$/ }).click();
+  await page.getByRole('dialog').getByRole('button', { name: / 편집$/ }).click();
   await page.getByLabel('루틴 이름').fill('PC에서 짠 루틴');
   await page.getByRole('button', { name: '저장', exact: true }).click();
   await page.getByRole('link', { name: '설정' }).click();
@@ -1225,7 +1237,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await syncNowOn(page); await syncNowOn(pc);
   // PC에서 루틴 지움 → 폰에서도 사라짐
   await pc.getByRole('link', { name: '홈' }).click();
-  await pc.getByRole('button', { name: 'PC에서 짠 루틴 지우기', exact: true }).click();
+  await routineMenu(pc, 'PC에서 짠 루틴', '지우기');
   await answer(pc, '완전 삭제');
   await syncNowOn(pc); await syncNowOn(page);
   await page.getByRole('link', { name: '홈' }).click();
@@ -1328,14 +1340,14 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await endWorkout(page);
   await expect(page).toHaveURL(/#\/$/);
-  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
-  await expect(card).toContainText('작업 세트 1개');
+  const card = page.getByRole('group', { name: /^최근 운동 / }).first();
+  await expect(card).toContainText('세트 1');
   // 카드 누르면 상세
-  await card.getByRole('link').click();
+  await card.locator('button.wcard').click();
   await expect(page).toHaveURL(/#\/stats\/w\//);
   await page.getByRole('link', { name: '홈' }).click();
   // 수정
-  await card.getByRole('button', { name: /수정$/ }).click();
+  await recentMenu(card, '수정');
   await expect(page.getByRole('heading', { name: '운동 기록 수정' })).toBeVisible();
   await page.getByLabel('운동 이름').fill('등 (고침)');
   await page.getByLabel('운동 시간(분)').fill('45');
@@ -1359,9 +1371,9 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   // 홈 카드에도 반영, 그리고 삭제
   await page.getByRole('link', { name: '홈' }).click();
   const card2 = page.getByLabel('최근 운동 등 (고침)', { exact: true });
-  await expect(card2).toContainText('작업 세트 2개 · 45분 · 고침');
+  await expect(card2).toContainText('세트 2'); await expect(card2).toContainText('45분'); await expect(card2).toContainText('고침');
   // 삭제 → 두 갈래 (D-040). 닫기·Esc는 아무것도 안 함, 처음 초점은 안전한 "목록에서만 빼기"
-  const del2 = card2.getByRole('button', { name: '최근 운동 등 (고침) 삭제' });
+  const del2 = { click: async () => { await card2.getByRole('button', { name: '최근 운동 등 (고침) 메뉴' }).click(); await card2.getByRole('button', { name: '최근 운동 등 (고침) 삭제' }).click(); } };
   const sheet = page.locator('.sheet[aria-modal="true"]');
   await del2.click();
   await expect(sheet.getByRole('heading', { name: '이 운동을 어떻게 할까요?' })).toBeVisible();
@@ -1397,7 +1409,7 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   const card3 = page.getByLabel('최근 운동 등 (고침)2', { exact: true });
   await expect(card3).toBeVisible();
   // 3) 완전 삭제 → 기록 탭에서도 사라짐
-  await card3.getByRole('button', { name: /삭제$/ }).click();
+  await recentMenu(card3, '삭제');
   await answer(page, '완전 삭제');
   await expect(card3).toHaveCount(0);
   await page.getByRole('link', { name: '기록' }).click();
@@ -1412,7 +1424,8 @@ test('수정 화면: 입력 중 세트를 지워도 값이 옆 세트로 가지 
   const w2 = page.locator('input[aria-label$="2세트 무게"]').first();
   await w2.fill('50'); await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await endWorkout(page);
-  await page.locator('.card[aria-label^="최근 운동 "]').first().getByRole('button', { name: /수정$/ }).click();
+  await page.getByRole('group', { name: /^최근 운동 / }).first().getByRole('button', { name: / 메뉴$/ }).click();
+  await page.getByRole('button', { name: /^최근 운동 .* 수정$/ }).click();
   await expect(page.locator('nav.nav')).toBeHidden();
   const before = await page.getByLabel('운동 시간(분)').inputValue();
   await page.getByLabel('시작 날짜와 시각').fill('2026-09-28T07:30');
@@ -1435,15 +1448,15 @@ test('수정 화면: 취소하면 기록 그대로', async ({ page }) => {
   await page.getByRole('button', { name: /시작/ }).first().click();
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await endWorkout(page);
-  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
+  const card = page.getByRole('group', { name: /^최근 운동 / }).first();
   const before = await card.textContent();
-  await card.getByRole('button', { name: /수정$/ }).click();
+  await recentMenu(card, '수정');
   await page.getByLabel('운동 이름').fill('바뀌면 안 됨');
   await page.getByRole('button', { name: '취소', exact: true }).click();
   await answer(page, '버리기');
   await expect(page).toHaveURL(/#\/stats\/w\//);
   await page.getByRole('link', { name: '홈' }).click();
-  await expect(page.locator('.card[aria-label^="최근 운동 "]').first()).toHaveText(before!);
+  await expect(page.getByRole('group', { name: /^최근 운동 / }).first()).toHaveText(before!);
 });
 
 void makeRoutine;
@@ -1451,7 +1464,7 @@ void makeRoutine;
 test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동이면 그대로 / 동기화 중 초기화·불러오기 두 갈래: 닫으면 아무것도 안 바꿈, "이 기기만"은 동기화 끄고 진행', async ({ page }) => {
   await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
   await makeRoutine(page, ['등'], '30분');
-  const del = page.getByRole('button', { name: '등 30분 지우기', exact: true });
+  const del = { click: () => routineMenu(page, '등 30분', '지우기') }; // D-055: ⋯ 안의 [지우기]
   const card = page.getByRole('heading', { name: '등 30분', exact: true });
   const sheet = page.locator('.sheet[aria-modal="true"]');
   const syncOn = () => page.evaluate(() => localStorage.getItem('sync.on'));
@@ -1551,8 +1564,10 @@ test('기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바�
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await endWorkout(page);
   await expect(page).toHaveURL(/#\/$/);
-  const card = page.locator('.card[aria-label^="최근 운동 "]').first();
-  const id = decodeURIComponent((await card.getByRole('link').first().getAttribute('href'))!.split('/').pop()!);
+  const card = page.getByRole('group', { name: /^최근 운동 / }).first();
+  await card.locator('button.wcard').click();
+  const id = decodeURIComponent(page.url().split('/').pop()!);
+  await page.getByRole('link', { name: '홈' }).click();
   // 다른 기기 흉내: 앱을 거치지 않고 저장소의 기록을 직접 바꿈 (동기화로 들어온 것과 같은 결과)
   const remote = (memo: string | null) => page.evaluate(([wid, m]) => new Promise<void>((res, rej) => {
     const o = indexedDB.open('workout-app');
@@ -1569,7 +1584,7 @@ test('기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바�
   const sheet = page.locator('.sheet[aria-modal="true"]');
 
   // 바뀜 → 묻는 동안 또 바뀜 → 덮어쓰기 → 다시 물음 → 덮어쓰기 → 저장
-  await card.getByRole('button', { name: /수정$/ }).click();
+  await recentMenu(card, '수정');
   await page.getByLabel('운동 이름').fill('내 수정 1');
   await remote('다른 기기 A');
   await page.getByRole('button', { name: '저장', exact: true }).click();
@@ -1818,7 +1833,7 @@ test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 �
   await expect.poll(rn).toEqual([r0[2], r0[0], r0[1]]);
   await checkScreen(page, '26-routine-drag');
   await page.getByRole('button', { name: '저장', exact: true }).click();
-  await page.locator('main .card').filter({ has: page.getByRole('heading', { name: '끌기 루틴' }) }).getByRole('button', { name: '편집' }).click();
+  await routineMenu(page, '끌기 루틴', '편집');
   await expect(async () => expect(await rn()).toEqual([r0[2], r0[0], r0[1]])).toPass({ timeout: 5000 });
 });
 
@@ -1880,4 +1895,142 @@ test('기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안
   await checkScreen(page, '10b-stats-empty-week');
   await page.getByRole('button', { name: '운동 시작' }).click();
   await expect(page).toHaveURL(/#\/workout/);
+});
+
+// ===== D-055 디자인 1단계: 업데이트 안내·틀 =====
+test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버전에서 올라왔을 때)·보러 가기·새 기능 점, 앱 정보, version.json', async ({ page }) => {
+  // 처음 설치: 시트 없이 지금 버전만 저장 (이 기기 localStorage)
+  await expect(page.getByRole('dialog', { name: '새로 바뀐 점' })).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
+  // 아래 탭은 정확히 5개, 설정·개선은 제목 줄 오른쪽 원형 버튼
+  const nav = page.getByRole('navigation', { name: '주 메뉴' });
+  await expect(nav.getByRole('link')).toHaveCount(5);
+  await expect(nav.getByRole('link')).toHaveText(['홈', '플랜', '운동', '기록', '종목']);
+  await expect(nav.getByRole('link', { name: '홈' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: '설정', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '개선 메모 쓰기' })).toBeVisible();
+  // 빈 홈: "이번 주"는 -- + 아직 기록 없음, 다음 운동은 빈 카드 + 플랜 만들기
+  await expect(page.getByRole('heading', { name: '오늘', exact: true })).toBeVisible();
+  await expect(page.getByTestId('home-week')).toContainText('--');
+  await expect(page.getByTestId('home-week')).toContainText('아직 기록 없음');
+  await expect(page.getByRole('region', { name: '다음 운동' })).toContainText('아직 루틴이 없어요');
+  await checkScreen(page, '64-home-empty');
+  // 빈 기록 탭
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+
+  // version.json: 빌드 때 생성, 지금 버전·바뀐 점 (서비스 워커가 저장하지 않음)
+  const vj = await (await page.request.get('./version.json')).json();
+  expect(vj.version).toBe(APP_VERSION);
+  expect(vj.changes.length).toBeGreaterThan(0);
+  expect(vj.changes.length).toBeLessThanOrEqual(5);
+
+  // 예전 버전(0.8.12)에서 올라온 것처럼 → 시트: 0.9.0 + 0.8.13 (최신 먼저), 확인에 초점
+  await page.evaluate(() => localStorage.setItem('app.lastSeenVersion', '0.8.12-preview'));
+  await page.reload();
+  const sheet = page.getByRole('dialog', { name: '새로 바뀐 점' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveAttribute('aria-modal', 'true');
+  const entries = sheet.locator('.wn-entry');
+  await expect(entries.first()).toHaveAttribute('aria-label', `${APP_VERSION} 바뀐 점`);
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.8.13-preview 바뀐 점');
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
+  await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
+  await checkScreen(page, '65-whats-new');
+  await sheet.getByRole('button', { name: /^모두 보기/ }).click();
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(10);
+  // 다시 열면 안 뜸 (본 버전 저장)
+  expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
+  // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
+  await sheet.getByRole('button', { name: `${APP_VERSION} 바뀐 곳 보러 가기` }).click();
+  await expect(page).toHaveURL(/#\/settings\/about$/);
+  await expect(sheet).toHaveCount(0);
+  // 앱 정보: 버전 칩(본판), 마지막 업데이트 날짜, 버전별 바뀐 점(최신만 펼침), 오픈소스 고지
+  await expect(page.getByRole('heading', { name: '앱 정보' })).toBeVisible();
+  await expect(page.getByTestId('about-version')).toHaveText(APP_VERSION);
+  await expect(page.getByLabel('지금 버전')).toContainText('본판');
+  await expect(page.getByLabel('지금 버전')).toContainText('마지막 업데이트');
+  await expect(page.locator('details.cl-item[open]')).toHaveCount(1);
+  await expect(page.getByRole('link', { name: '오픈소스 고지' })).toBeVisible();
+  await page.getByRole('button', { name: '새 버전 확인' }).click();
+  await expect(page.getByLabel('지금 버전').getByRole('status')).not.toHaveText('');
+  await checkScreen(page, '66-about');
+  await page.reload();
+  await expect(page.getByRole('dialog', { name: '새로 바뀐 점' })).toHaveCount(0);
+
+  // 새 기능 점: 0.9.0의 where(#/settings/about) → 설정 버튼에 점, 설정을 열면 사라짐. Esc로 시트 닫기
+  await page.goto('./#/');
+  await page.evaluate(() => { localStorage.setItem('app.lastSeenVersion', '0.8.13-preview'); localStorage.removeItem('app.newDot'); });
+  await page.reload();
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('.wn-entry')).toHaveCount(1); // 0.9.0만
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  const gear = page.getByRole('link', { name: '설정', exact: true });
+  await expect(gear.locator('.ndot')).toHaveCount(1);
+  await expect(gear).toHaveAttribute('aria-describedby', 'new-dot-desc');
+  await gear.click();
+  await expect(page.getByRole('link', { name: /앱 정보·업데이트 내역/ })).toBeVisible();
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+  await expect(page.getByRole('link', { name: '설정', exact: true }).locator('.ndot')).toHaveCount(0);
+});
+
+test('D-055 새 버전 배너: 버전·바뀐 점 한 줄·[지금 적용][나중에], 파일을 못 읽으면 "새 버전이 있어요", 운동 중엔 작게·확인 후 적용', async ({ page }) => {
+  const sim = (detail: unknown) => page.evaluate((d) => window.dispatchEvent(new CustomEvent('app:sim-update', { detail: d })), detail);
+  await sim({ version: '0.9.9-preview', date: '2026-10-07', changes: ['운동 중 화면 새 모양', '둘째 줄'] });
+  const banner = page.getByRole('status', { name: '새 버전 안내' });
+  await expect(banner).toContainText('새 버전 0.9.9-preview 준비됨');
+  await expect(banner).toContainText('운동 중 화면 새 모양');
+  await expect(banner).not.toContainText('둘째 줄');
+  await expect(banner.getByRole('button', { name: '지금 적용' })).toBeVisible();
+  await checkScreen(page, '67-update-banner');
+  await banner.getByRole('button', { name: '나중에' }).click();
+  await expect(banner).toHaveCount(0);
+  await sim(null); // version.json 읽기 실패
+  await expect(banner).toContainText('새 버전이 있어요');
+  // 운동 중: 작은 한 줄, [적용]은 확인 창을 거침 (취소하면 그대로)
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('button', { name: '등 30분 시작' }).click();
+  await expect(banner).toHaveCount(0); // 운동 화면에서는 숨김
+  await expect(page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: '운동' })).toHaveAttribute('aria-describedby', 'wk-dot-desc'); // 운동 중 점
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+  await expect(banner).toContainText('새 버전 준비됨');
+  await banner.getByRole('button', { name: '적용' }).click();
+  await expect(page.getByRole('dialog', { name: '운동 중이에요' })).toBeVisible();
+  await answer(page, '취소');
+  await expect(banner).toBeVisible();
+});
+
+test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·지우기, Esc·초점 되돌림), 최근 운동은 기록 탭과 같은 카드', async ({ page }) => {
+  await makeRoutine(page, ['등'], '30분');
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+  const next = page.getByRole('region', { name: '다음 운동' });
+  await expect(next).toContainText('등 30분');
+  await next.getByRole('button', { name: '다음 운동으로 시작: 등 30분' }).click();
+  await expect(page.getByRole('heading', { name: '등 30분', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '현재 세트 완료' }).click();
+  await endWorkout(page);
+  await expect(page.getByTestId('home-week')).toContainText('1회');
+  await expect(page.getByTestId('home-week')).toHaveAttribute('href', '#/stats');
+  // 최근 운동 = 기록 탭 카드(button.wcard) + ⋯
+  const recent = page.getByRole('group', { name: '최근 운동 등 30분' });
+  await expect(recent.locator('button.wcard')).toContainText('세트 1');
+  // ⋯ → 편집·지우기 창, 처음 초점은 편집, Esc로 닫으면 ⋯ 버튼으로 초점
+  const more = page.getByRole('button', { name: '등 30분 메뉴', exact: true });
+  await more.focus(); await page.keyboard.press('Enter'); // 키보드로 열기 (WebKit은 누른 버튼에 초점을 주지 않음)
+  const menu = page.getByRole('dialog', { name: '등 30분' });
+  await expect(menu.getByRole('button', { name: '등 30분 편집' })).toBeFocused();
+  await expect(menu.getByRole('button', { name: '등 30분 지우기' })).toBeVisible();
+  await checkScreen(page, '68-routine-menu');
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(more).toBeFocused();
+  await routineMenu(page, '등 30분', '편집');
+  await expect(page.getByLabel('루틴 이름')).toHaveValue('등 30분');
+  await page.getByRole('button', { name: '← 홈' }).click();
+  await checkScreen(page, '69-home');
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^등 30분,/ })).toContainText('세트 1');
 });

@@ -12,6 +12,8 @@ import { BackupSection } from './BackupSection';
 import { FeedbackList } from './FeedbackUi';
 import { DiagSection } from './DiagSection';
 import { go } from '../nav';
+import { ScreenHeader } from '../header';
+import { Icon } from '../icons';
 import { IS_PREVIEW } from '../appName';
 import { audioMode, setAudioMode } from '../device';
 import type { AudioMode } from '../device';
@@ -25,7 +27,12 @@ export function SettingsScreen({ s }: { s: AppState }) {
   const [am, setAm] = useState<AudioMode>(audioMode());
   return (
     <main>
-      <h1>설정</h1>
+      <ScreenHeader title="설정" />
+      <a class="card row-link" href="#/settings/about" aria-label={`앱 정보·업데이트 내역, 지금 ${APP_VERSION} ${IS_PREVIEW ? 'β 미리 보기 판' : '본판'}`}>
+        <Icon name="info" />
+        <span class="grow"><span class="rl-title">앱 정보·업데이트 내역</span><span class="sub rl-sub">{APP_VERSION} · {IS_PREVIEW ? 'β 미리 보기 판' : '본판'}</span></span>
+        <Icon name="chevron" size={18} class="card-more" />
+      </a>
       <label>내 수준 (영상 등급이 수준별로 다를 때 사용)</label>
       <div class="row wrap">{LEVELS.map((l) => <button key={l} class={`chip ${st.level === l ? 'on' : ''}`} aria-pressed={st.level === l} onClick={() => put({ level: l as Level })}>{l}</button>)}</div>
       <label>쓸 수 있는 장비 (없는 장비 운동은 플랜에서 빠짐)</label>

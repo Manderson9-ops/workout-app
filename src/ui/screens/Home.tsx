@@ -1,19 +1,33 @@
+/**
+ * 홈 "오늘" (D-055 디자인 시스템 3장 1단계 5번).
+ * 작은 날짜 + 큰 "오늘" / 이번 주(운동·세트 + 요일 점, 기록 탭으로 ›) / 다음 운동(최근 루틴 1개 큰 [▶ 시작]) /
+ * 내 루틴([▶ 시작] + ⋯ 편집·지우기) / 최근 운동(기록 탭과 같은 카드 + ⋯ 수정·삭제) / 저장 안내는 처음 1회 작은 알림
+ */
 import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, activeOf, historyOf } from '../store';
-import { setHomeHidden } from '../actions';
+import { setHomeHidden, startRoutine } from '../actions';
 import { homeRecent } from '../../core/session';
-import type { Workout } from '../../core/session';
+import type { Workout, Routine } from '../../core/session';
 import { backupDue } from '../../core/backup';
+import { weekSummary, weekStart, addDays, localDate, summarize } from '../../core/stats';
+import { routineUse, routineParts, sortRoutines, sinceText } from '../../core/routineList';
+import type { Part } from '../../core/types';
 import { BackupBanner } from './BackupSection';
 import { SendStatus } from './AutoSendSection';
 import { RoutineList, newRoutine } from './MyRoutines';
 import { RemoteCards } from './RemoteCards';
+import { WorkoutCardWithMenu } from './WorkoutCard';
 import { softDelete } from '../../db/db';
-import { minutes, mmss } from '../components';
+import { catalog } from '../catalog';
+import { minutes, mmss, Card, Metric, Empty } from '../components';
+import { Icon } from '../icons';
+import { ScreenHeader } from '../header';
 import { go } from '../nav';
 import { askChoice } from '../confirm';
 import { syncEnabled } from '../sync';
+
+const WD = ['일', '월', '화', '수', '목', '금', '토']; // 주는 일요일 시작 (D-054)
 
 /**
  * 홈 "최근 운동" 삭제 (D-040): 목록에서만 빼기(기록·통계 그대로, 기록 상세에서 되돌림) / 완전 삭제(되돌릴 수 없음).
@@ -34,60 +48,130 @@ async function removeRecent(w: Workout): Promise<'ok' | 'alt' | false | null> {
   return pick;
 }
 
+/** 지난주 같은 요일까지와 비교 한 마디 (격려 톤: 줄어도 빨강으로 다그치지 않음) */
+function vsLastWeek(cur: number, prev: number): { status: string; tone: 'ok' | 'sub'; mark: string } {
+  if (cur > prev) return { status: `지난주보다 ${cur - prev} 많아요`, tone: 'ok', mark: '▲' };
+  if (cur === prev) return { status: '지난주와 같아요', tone: 'sub', mark: '=' };
+  return { status: `지난주보다 ${prev - cur} 적어요`, tone: 'sub', mark: '▼' };
+}
+
+function ThisWeekCard({ s }: { s: AppState }) {
+  const all = catalog(s.custom);
+  const byId = new Map(all.map((e) => [e.id, e]));
+  const done = historyOf(s);
+  const today = localDate(Date.now());
+  const ws = weekStart(today);
+  const cur = weekSummary(done, byId, ws, s.bodyweight);
+  const prev = weekSummary(done, byId, addDays(ws, -7), s.bodyweight, addDays(today, -7));
+  const never = done.length === 0;
+  const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
+  const c = vsLastWeek(cur.count, prev.count);
+  const st = vsLastWeek(cur.sets, prev.sets);
+  // 링크 이름에 탭 이름(홈·플랜·운동·기록·종목)을 넣지 않음: 탭 링크와 헷갈리지 않게
+  const label = never ? '이번 주 요약: 아직 없음. 자세히 보기' : `이번 주 요약: ${cur.count}회, 작업 세트 ${cur.sets}개, 한 요일 ${days.filter((d) => cur.days.has(d)).map((d) => WD[days.indexOf(d)]).join('·') || '없음'}. 자세히 보기`;
+  return (
+    <Card title="이번 주" href="#/stats" label={label} testid="home-week">
+      <div class="metrics2">
+        <Metric label="운동" value={never ? undefined : cur.count} unit="회" status={never ? '아직 기록 없음' : c.status} tone={c.tone} mark={never ? undefined : c.mark} />
+        <Metric label="작업 세트" value={never ? undefined : cur.sets} unit="세트" status={never ? '첫 운동을 해 보세요' : st.status} tone={st.tone} mark={never ? undefined : st.mark} />
+      </div>
+      <div class="weekdots" aria-hidden="true">
+        {days.map((d, i) => (
+          <span key={d} class={`wdot${cur.days.has(d) ? ' did' : ''}${d === today ? ' today' : ''}${d > today ? ' future' : ''}`}>
+            <i />{WD[i]}
+          </span>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function NextWorkoutCard({ s, r }: { s: AppState; r: Routine }) {
+  const all = catalog(s.custom);
+  const byId = new Map(all.map((e) => [e.id, e]));
+  const u = routineUse(historyOf(s)).get(r.id);
+  const items = r.blocks.flatMap((b) => b.items);
+  const parts = routineParts(r, (id): Part | undefined => byId.get(id)?.part);
+  return (
+    <Card title="다음 운동" testid="home-next">
+      <div class="next-name">{r.name}</div>
+      {parts.length > 0 && <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>}
+      <p class="sub next-meta">운동 {items.length}개{r.estimatedSec ? ` · 약 ${minutes(r.estimatedSec)}` : ''} · 마지막 {sinceText(u?.lastAt, Date.now())}</p>
+      <button class="primary big" onClick={() => startRoutine(s, r)} aria-label={`다음 운동으로 시작: ${r.name}`}><Icon name="play" size={20} />시작</button>
+    </Card>
+  );
+}
+
 export function Home({ s }: { s: AppState }) {
   const active = activeOf(s);
   // 빼기·완전 삭제 뒤 카드가 사라지므로 결과를 글로 알림 (화면 읽기 프로그램도 읽음)
   const [done, setDone] = useState<string | null>(null);
-  const recent = homeRecent(historyOf(s), s.settings.homeHidden, 5); // "목록에서만 빼기" 한 것은 건너뜀 (D-040)
+  const history = historyOf(s);
+  const recent = homeRecent(history, s.settings.homeHidden, 5); // "목록에서만 빼기" 한 것은 건너뜀 (D-040)
+  const all = catalog(s.custom);
+  const byId = new Map(all.map((e) => [e.id, e]));
+  const hiddenIds = new Set(s.settings.routineHidden ?? []);
+  const visible = s.routines.filter((r) => !hiddenIds.has(r.id));
+  const next = sortRoutines(visible.filter((r) => r.blocks.some((b) => b.items.length)), routineUse(history), 'recent')[0];
+  const today = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
   return (
-    <main>
-      <h1>운동 기록</h1>
+    <main class="home">
+      <ScreenHeader eyebrow={today} title="오늘" />
       <SendStatus />
       <RemoteCards s={s} />
       {active && (
         <div class="card active">
-          <div class="row between"><h3>운동 중: {active.name}</h3><span class="sub">{mmss((Date.now() - Date.parse(active.startedAt)) / 1000)}</span></div>
+          <div class="row between"><h3>운동 중: {active.name}</h3><span class="sub num-s">{mmss((Date.now() - Date.parse(active.startedAt)) / 1000)}</span></div>
           <button class="primary big" onClick={() => go('#/workout')}>계속하기</button>
         </div>
       )}
       {!s.settings.storageNoticeSeen && (
-        <div class="card" role="note" aria-label="저장 안내">
-          {syncEnabled() ? (
-            <>
-              <h3>기록은 이 기기와 내 구글 드라이브에 저장돼요</h3>
-              <p class="small">PC ↔ 폰 동기화가 켜져 있어 다른 기기에서도 같은 기록이 보여요. 그래도 설정 → 백업 파일 저장으로 가끔 백업해 두세요.</p>
-            </>
-          ) : (
-            <>
-              <h3>기록은 이 기기에만 저장돼요</h3>
-              <p class="small">아이폰은 사파리에서 공유 → "홈 화면에 추가"로 설치해서 쓰세요. 앱(홈 화면 아이콘)을 지우면 기록도 지워져요. 설정 → 백업 파일 저장으로 가끔 백업하거나, 설정 → PC ↔ 폰 동기화를 켜 주세요.</p>
-            </>
-          )}
-          <button onClick={() => mutate((d) => d.settings.put({ ...s.settings, key: 'main', storageNoticeSeen: true }))}>알겠어요</button>
+        <div class="notice" role="note" aria-label="저장 안내">
+          <Icon name="info" size={20} class="notice-ico" />
+          <div class="grow">
+            {syncEnabled() ? (
+              <>
+                <strong>기록은 이 기기와 내 구글 드라이브에 저장돼요</strong>
+                <p class="small sub">PC ↔ 폰 동기화가 켜져 있어 다른 기기에서도 같은 기록이 보여요. 그래도 설정에서 가끔 백업해 두세요.</p>
+              </>
+            ) : (
+              <>
+                <strong>기록은 이 기기에만 저장돼요</strong>
+                <p class="small sub">앱(홈 화면 아이콘)을 지우면 기록도 지워져요. 설정에서 가끔 백업하거나 PC ↔ 폰 동기화를 켜 두세요. 아이폰은 사파리 공유 → "홈 화면에 추가"로 설치해요.</p>
+              </>
+            )}
+            <button class="notice-ok" onClick={() => mutate((d) => d.settings.put({ ...s.settings, key: 'main', storageNoticeSeen: true }))}>알겠어요</button>
+          </div>
         </div>
       )}
-      {backupDue(s.settings.lastBackupAt, historyOf(s).length, Date.now()) && (
+      {backupDue(s.settings.lastBackupAt, history.length, Date.now()) && (
         <BackupBanner s={s} />
       )}
-      <div class="row between"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
-      <RoutineList s={s} mode="home" />
+      <div class="wide-cards">
+        <ThisWeekCard s={s} />
+        {!active && (next
+          ? <NextWorkoutCard s={s} r={next} />
+          : !s.routines.length && (
+            <Empty title="다음 운동" text="아직 루틴이 없어요" hint="플랜 만들기에서 부위·시간을 고르면 자동으로 짜 드려요">
+              <button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button>
+              <button onClick={() => void newRoutine()}>+ 직접 만들기</button>
+            </Empty>
+          ))}
+      </div>
+      {s.routines.length > 0 ? (
+        <>
+          <div class="row between sec-head"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
+          <RoutineList s={s} mode="home" />
+        </>
+      ) : null}
       {recent.length > 0 && <h2>최근 운동</h2>}
       <div class="wide-cards">
-      {recent.map((w) => {
-        const sets = w.blocks.flatMap((b) => b.items.flatMap((i) => i.sets)).filter((x) => x.done && !x.warmup).length;
-        return (
-          <div class="card" key={w.id} role="group" aria-label={`최근 운동 ${w.name}`}>
-            <a class="card-link" href={`#/stats/w/${encodeURIComponent(w.id)}`} aria-label={`${w.name} 자세히 보기`}>
-              <div class="row between"><span>{w.name}</span><span class="sub small">{new Date(w.startedAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })}</span></div>
-              <div class="sub small">작업 세트 {sets}개 · {minutes((Date.parse(w.endedAt!) - Date.parse(w.startedAt)) / 1000)}{w.editedAt ? ' · 고침' : ''}</div>
-            </a>
-            <div class="row" style={{ marginTop: '6px', justifyContent: 'flex-end' }}>
-              <button aria-label={`최근 운동 ${w.name} 수정`} onClick={() => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`)}>수정</button>
-              <button class="danger" aria-label={`최근 운동 ${w.name} 삭제`} onClick={() => void removeRecent(w).then((p) => { if (p === 'ok') setDone(`"${w.name}"을(를) 홈에서 뺐어요. 기록 탭의 상세에서 되돌릴 수 있어요`); else if (p === 'alt') setDone(`"${w.name}"을(를) 완전히 지웠어요`); })}>삭제</button>
-            </div>
-          </div>
-        );
-      })}
+        {recent.map((w) => (
+          <WorkoutCardWithMenu key={w.id} x={summarize(w, byId, s.bodyweight)} w={w} byId={byId} items={[
+            { label: '수정', aria: `최근 운동 ${w.name} 수정`, run: () => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`) },
+            { label: '삭제…', aria: `최근 운동 ${w.name} 삭제`, danger: true, run: () => void removeRecent(w).then((p) => { if (p === 'ok') setDone(`"${w.name}"을(를) 홈에서 뺐어요. 기록 탭의 상세에서 되돌릴 수 있어요`); else if (p === 'alt') setDone(`"${w.name}"을(를) 완전히 지웠어요`); }) },
+          ]} />
+        ))}
       </div>
       <p role="status" class="small sub" style={{ minHeight: done ? undefined : 0, margin: done ? undefined : 0 }}>{done ?? ''}</p>
     </main>

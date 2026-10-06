@@ -15,6 +15,7 @@ import { DEFAULT_TIME, blockTime, targetReps, warmupFor } from '../../core/time'
 import type { TimedBlock } from '../../core/time';
 import { GradeBadge, ExercisePicker, Sheet, mmss, Labeled, MiniStepper } from '../components';
 import type { StepBtn } from '../components';
+import { ScreenHeader } from '../header';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
 import { useDragSort } from '../dragSort';
@@ -220,7 +221,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
 
   return (
     <main>
-      <h1>플랜 만들기</h1>
+      <ScreenHeader title="플랜 만들기" />
       {/* PC 넓은 화면: 왼쪽 조건, 오른쪽 결과 (D-030) */}
       <div class="wide-2"><div>
       <label>부위 (그림이나 버튼을 누르면 우선순위를 고르는 창이 열려요 · 기본 높음)</label>

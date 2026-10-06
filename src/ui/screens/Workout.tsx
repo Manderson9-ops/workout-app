@@ -9,6 +9,7 @@ import {
 } from '../../core/session';
 import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, mmss } from '../components';
+import { ScreenHeader } from '../header';
 import { resolveGrade } from '../../core/exercises';
 import { hasDbInfo } from '../../core/planEdit';
 import { updateWorkoutAfterInputs, finishActiveWorkout, useFinishError, setFinishError } from '../actions';
@@ -97,7 +98,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   if (!w) {
     return (
       <main>
-        <h1>운동</h1>
+        <ScreenHeader title="운동" />
         {remoteActiveOf(s) && <p role="status" class="card small">📱 운동 「{remoteActiveOf(s)!.name}」은 다른 기기에서 진행 중이에요 (다른 기기로 넘어갔어요). 홈에서 볼 수 있어요.</p>}
         {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" style={{ margin: 0 }}>⚠️ {finishErr}</p><button class="ghost" aria-label="알림 닫기" onClick={() => setFinishError(null)}>✕</button></div>}
         <p class="sub">진행 중인 운동이 없어요. 루틴을 골라 시작하세요.</p>
@@ -146,7 +147,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           </div>
         )}
         {isCur && !x.warmup && (
-          <div class="row small" style={{ margin: '4px 0 6px 42px' }}>
+          <div class="row wrap small" style={{ margin: '4px 0 6px 42px' }}>
             <span class="sub">남은 횟수 여유(RIR)</span>
             {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
             {byId.get(it.exerciseId)?.equipment.some((e) => e === 'barbell' || e === 'smith') && <button class="chip" aria-label={`${label} 원판 계산`} onClick={async () => { await flushPending(); setPlate(activeOf(getState())?.blocks[b]?.items[i]?.sets[k]?.weight ?? 20); }}>원판</button>}
@@ -169,11 +170,12 @@ export function WorkoutScreen({ s }: { s: AppState }) {
 
   return (
     <main style={{ paddingBottom: 'calc(var(--nav-h) + 260px)' }}>
-      <div class="row between">
-        <h1 class="grow" style={{ margin: '4px 0' }}>{w.name}</h1>
-        <button aria-label="운동 메모" onClick={() => setMemo({ title: '오늘 운동 메모', value: w.memo, save: (m) => void upd((cw) => setWorkoutMemo(cw, m)) })}>메모</button>
-        <button class="danger" onClick={finish}>종료</button>
-      </div>
+      <ScreenHeader eyebrow="운동 중" title={w.name}>
+        <div class="row head-actions">
+          <button aria-label="운동 메모" onClick={() => setMemo({ title: '오늘 운동 메모', value: w.memo, save: (m) => void upd((cw) => setWorkoutMemo(cw, m)) })}>메모</button>
+          <button class="danger" onClick={finish}>종료</button>
+        </div>
+      </ScreenHeader>
       {w.memo && <p class="sub small">📝 {w.memo}</p>}
       <div class="row between sub small"><span>경과 {mmss(prog.elapsedSec)}</span><span>{prog.doneSets}/{prog.totalSets}세트</span><span>남은 예상 {mmss(prog.remainingSec)}</span></div>
       {delta !== undefined && Math.abs(delta) >= 60 && <div class="pill" aria-label="예정 대비">{delta > 0 ? `예정보다 약 ${Math.round(delta / 60)}분 늦음` : `예정보다 약 ${Math.round(-delta / 60)}분 빠름`}</div>}

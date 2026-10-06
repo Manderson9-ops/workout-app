@@ -13,6 +13,7 @@ import { LineChart, BarChart } from '../charts';
 import { GRADES } from '../../core/version';
 import type { Grade } from '../../core/version';
 import { GradeBadge, Sheet } from '../components';
+import { ScreenHeader } from '../header';
 import { setMeta } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import { go } from '../nav';
@@ -55,7 +56,7 @@ export function Exercises({ s }: { s: AppState }) {
     .sort((a, b) => GRADES.indexOf(a.g.value) - GRADES.indexOf(b.g.value) || (a.g.estimated ? 1 : 0) - (b.g.estimated ? 1 : 0) || a.e.name_ko.localeCompare(b.e.name_ko));
   return (
     <main>
-      <div class="row between"><h1>운동 종목</h1><button onClick={() => setAdding(true)}>+ 직접 추가</button></div>
+      <ScreenHeader title="운동 종목"><div class="row head-actions"><button onClick={() => setAdding(true)}>+ 직접 추가</button></div></ScreenHeader>
       <input placeholder="검색 (초성 가능: ㄹㅍㄷ, 별칭: 사레레)" value={q} aria-label="운동 검색" onInput={(e) => { const v = (e.target as HTMLInputElement).value; setQ(v); remember({ q: v }); }} />
       <div class="row wrap" style={{ margin: '8px 0' }}>
         <button class={`chip ${!part ? 'on' : ''}`} onClick={() => { setPart(undefined); remember({ part: undefined }); }}>전체</button>
@@ -137,7 +138,7 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
   const title = (vid: string) => sourceVideos.find((v) => v.video_id === vid)?.title ?? vid;
   return (
     <main>
-      <button class="ghost" onClick={() => history.back()} aria-label="뒤로">← 뒤로</button>
+      <ScreenHeader back={{ label: '뒤로', onClick: () => history.back(), aria: '뒤로' }} />
       <div class="row"><GradeBadge g={g} /><h1 class="grow" style={{ margin: '4px 0' }}>{e.name_ko}</h1></div>
       <p class="sub">{e.part} · {e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.unilateral ? ' · 한쪽씩' : ''}{e.heavy ? ' · 무거운 운동' : ''}</p>
       <p class="sub small">{muscleText(e.muscles)} · 묶음: {families[e.family] ?? '직접 추가'}{e.aliases?.length ? ` · 다른 이름: ${e.aliases.join(', ')}` : ''}</p>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, activeOf } from '../store';
 import { Sheet } from '../components';
+import { Icon } from '../icons';
 import { newFeedbackId, FB_TEXT_MAX, usedFeedbackIds } from '../../core/feedback';
 import { db } from '../store';
 import { lsGet, lsRemove } from '../appName';
@@ -13,9 +14,9 @@ import { softDelete } from '../../db/db';
 import { askConfirm } from '../confirm';
 
 const openers = new Set<() => void>();
-/** 메뉴의 "개선" 버튼 (메뉴는 backdrop-filter라 안에 고정 시트를 두면 위치가 틀어져서, 시트는 FeedbackButton이 메뉴 밖에서 띄움) */
+/** 화면 제목 줄 오른쪽 원형 "개선" 버튼 (D-055). 시트는 FeedbackButton이 App 맨 위에서 띄움 (머리 안에 고정 시트를 두면 위치가 틀어질 수 있어서) */
 export function FeedbackNavItem() {
-  return <button type="button" class="nav-fb" aria-label="개선 메모 쓰기" onClick={() => openers.forEach((f) => f())}><span class="ico">💬</span>개선</button>;
+  return <button type="button" class="icon-btn round" aria-label="개선 메모 쓰기" title="개선 메모" onClick={() => openers.forEach((f) => f())}><Icon name="feedback" /></button>;
 }
 
 /** 어느 화면에서든 개선 메모 (S3). 화면·진행 중 운동·앱 버전이 자동으로 붙고, 동기화로 PC에 감 */
@@ -63,7 +64,7 @@ export function FeedbackList({ s }: { s: AppState }) {
   return (
     <>
       <h2>개선 메모</h2>
-      <p class="sub small">아래(PC는 왼쪽) 메뉴의 💬 개선 으로 언제든 적을 수 있어요. PC에서 "개선 메모 처리해 줘"라고 하면 모아서 고쳐요.</p>
+      <p class="sub small">화면 제목 오른쪽의 말풍선 버튼(개선 메모 쓰기)으로 언제든 적을 수 있어요. PC에서 "개선 메모 처리해 줘"라고 하면 모아서 고쳐요.</p>
       {!items.length && <p class="sub small">아직 없어요.</p>}
       {items.map((f) => (
         <div class="card" key={f.id} aria-label={`개선 메모 ${f.id}`}>

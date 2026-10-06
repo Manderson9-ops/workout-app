@@ -26,6 +26,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  // version.json (D-055): 항상 네트워크로만 (저장하면 새 버전 안내가 옛 내용을 보여 줌). 앱도 cache:'no-store' 로 읽음
+  if (new URL(req.url).pathname.endsWith('/version.json')) return;
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./', copy)); return res; })
       .catch(() => caches.match('./')));

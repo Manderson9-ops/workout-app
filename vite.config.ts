@@ -1,10 +1,31 @@
 import { defineConfig } from 'vitest/config';
+import type { Plugin } from 'vite';
 import preact from '@preact/preset-vite';
+import { readFileSync } from 'node:fs';
+import { buildVersionInfo } from './src/core/changelog.ts';
+import type { ChangelogEntry } from './src/core/changelog.ts';
+
+/**
+ * D-055: 빌드 때 version.json 생성 (dist/ 와 dist-next/ 맨 위). 버전·날짜·이번 버전 바뀐 점 최대 5줄·where 만 (비밀 없음).
+ * 앱은 새 서비스 워커가 기다릴 때 이 파일을 cache:'no-store' 로 읽어 "새 버전 0.9.1 준비됨 · 바뀐 점" 배너를 띄운다. sw.js 는 이 파일을 저장하지 않음.
+ * package.json 버전과 CHANGELOG.json 맨 위 버전이 다르면 빌드 실패.
+ */
+function versionJson(): Plugin {
+  return {
+    name: 'version-json',
+    apply: 'build',
+    generateBundle() {
+      const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
+      const cl = JSON.parse(readFileSync(new URL('./CHANGELOG.json', import.meta.url), 'utf8').replace(/^\uFEFF/, '')) as { versions: ChangelogEntry[] };
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify(buildVersionInfo(pkg.version, cl.versions), null, 2) + '\n' });
+    },
+  };
+}
 
 // GitHub Pages 주소: https://manderson9-ops.github.io/workout-app/
 export default defineConfig({
   base: '/workout-app/',
-  plugins: [preact()],
+  plugins: [preact(), versionJson()],
   test: {
     // 커버리지 계측 중에는 코드가 2~3배 느려지므로 시간 측정 관문은 계측 없는 실행(npm run test:plans)에서만 판정
     env: { COVERAGE_RUN: process.argv.includes('--coverage') ? '1' : '' },

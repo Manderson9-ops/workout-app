@@ -31,8 +31,8 @@ export function SyncBadge() {
   if (st.phase === 'off') return null;
   const text = st.phase === 'syncing' ? '동기화 중…' : st.phase === 'error' ? `동기화 안 됨 · ${syncErrorText(st.error)}` : st.pending ? `보낼 것 ${st.pending}건` : `동기화됨 · ${ago(st.lastOkAt)}`;
   return (
-    <div role="status" aria-label="동기화 상태" class="small" style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top) + 2px)', right: '8px', zIndex: 25, padding: '2px 8px', borderRadius: '10px', background: 'var(--card2)', color: st.phase === 'error' ? 'var(--warn)' : 'var(--sub)', pointerEvents: 'none' }}>
-      {st.phase === 'error' ? '⚠ ' : '⇅ '}{text}
+    <div role="status" aria-label="동기화 상태" class={`sync-line${st.phase === 'error' ? ' t-warn' : ''}`}>
+      <span aria-hidden="true">{st.phase === 'error' ? '⚠ ' : '⇅ '}</span>{text}
     </div>
   );
 }

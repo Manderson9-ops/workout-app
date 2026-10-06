@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'preact/hooks';
+import { useState, useRef, useEffect, useLayoutEffect } from 'preact/hooks';
+import { Icon } from './icons';
 import { registerPending, flushKey, flushValue } from './store';
 import type { ComponentChildren } from 'preact';
 import type { BuiltExercise, Part } from '../core/types';
@@ -87,15 +88,96 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
     </div>
   );
 }
-export function Sheet({ onClose, title, children, modal }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean }) {
+/**
+ * 아래에서 올라오는 창. trap = 화면 읽기·키보드용 대화상자(aria-modal, 초점 가두기, Esc로 닫기, 닫으면 연 버튼으로 초점)
+ * (확인 창 ConfirmHost는 modal + 자기 키 처리를 씁)
+ */
+export function Sheet({ onClose, title, children, modal, trap }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean }) {
+  const panel = useRef<HTMLDivElement>(null);
+  useDialogKeys(trap ? panel : null, onClose);
   return (
     <>
       <div class="sheet-bg" onClick={onClose} />
-      <div class="sheet" role="dialog" aria-label={title} aria-modal={modal ? 'true' : undefined}>
-        <div class="row between"><h3>{title}</h3><button class="ghost" onClick={onClose} aria-label="닫기">✕</button></div>
+      <div class="sheet" role="dialog" aria-label={title} aria-modal={modal || trap ? 'true' : undefined} ref={panel}>
+        <div class="row between sheet-head"><h3>{title}</h3><button class="ghost icon-btn" onClick={onClose} aria-label="닫기"><Icon name="close" size={20} /></button></div>
         {children}
       </div>
     </>
+  );
+}
+
+/** 대화상자 키: 열릴 때 [data-autofocus](없으면 첫 버튼)에 초점, Tab은 안에서만 돌고, Esc = 닫기, 닫히면 연 곳으로 초점 */
+export function useDialogKeys(ref: { current: HTMLElement | null } | null, onClose: () => void) {
+  const close = useRef(onClose);
+  close.current = onClose;
+  useLayoutEffect(() => {
+    if (!ref) return;
+    const back = document.activeElement as HTMLElement | null;
+    const focusables = () => [...(ref.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], summary, input, select, textarea') ?? [])].filter((x) => x.offsetParent !== null || x === document.activeElement);
+    // 처음 초점: 창 맨 위가 보이게 스크롤하지 않음 (아래 버튼에 초점을 줘도 제목부터 읽히게)
+    (ref.current?.querySelector<HTMLElement>('[data-autofocus]') ?? focusables()[1] ?? focusables()[0])?.focus({ preventScroll: true });
+    if (ref.current) ref.current.scrollTop = 0;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); close.current(); return; }
+      if (e.key !== 'Tab') return;
+      const els = focusables();
+      if (!els.length) return;
+      const i = els.indexOf(document.activeElement as HTMLElement);
+      const n = e.shiftKey ? (i <= 0 ? els.length - 1 : i - 1) : (i === els.length - 1 || i < 0 ? 0 : i + 1);
+      e.preventDefault(); els[n]!.focus();
+    };
+    window.addEventListener('keydown', k);
+    return () => { window.removeEventListener('keydown', k); if (back?.isConnected) back.focus(); };
+  }, []);
+}
+
+/** ⋯ 메뉴 창 (루틴·최근 운동). 항목을 누르면 창을 먼저 닫고 실행 (확인 창과 겹치지 않게) */
+export interface MenuItem { label: string; aria: string; danger?: boolean; run: () => void }
+export function MenuSheet({ title, items, onClose }: { title: string; items: MenuItem[]; onClose: () => void }) {
+  return (
+    <Sheet title={title} onClose={onClose} trap>
+      <div class="menu-list">
+        {items.map((it, i) => (
+          <button key={it.aria} class={`big menu-item${it.danger ? ' danger' : ''}`} aria-label={it.aria} data-autofocus={i === 0 ? true : undefined} onClick={() => { onClose(); setTimeout(it.run, 0); /* 창이 닫히고 초점이 ⋯로 돌아간 뒤 실행 (확인 창이 초점을 잡게) */ }}>{it.label}</button>
+        ))}
+        <button class="big ghost" onClick={onClose}>취소</button>
+      </div>
+    </Sheet>
+  );
+}
+
+/**
+ * 카드 (디자인 시스템 2장): 회색 제목(왼쪽) + 선택적 ›. href 가 있으면 카드 전체가 링크(안에 다른 버튼을 두지 않음)
+ */
+export function Card({ title, href, label, children, testid, class: cls }: { title?: string; href?: string; label?: string; children: ComponentChildren; testid?: string; class?: string }) {
+  const head = title && <div class="card-head"><span class="card-title">{title}</span>{href && <Icon name="chevron" size={18} class="card-more" />}</div>;
+  if (href) return <a class={`card card-tap${cls ? ` ${cls}` : ''}`} href={href} aria-label={label} data-testid={testid}>{head}{children}</a>;
+  return <section class={`card${cls ? ` ${cls}` : ''}`} aria-label={label ?? title} data-testid={testid}>{head}{children}</section>;
+}
+
+export type Tone = 'ok' | 'pr' | 'warn' | 'bad' | 'acc' | 'sub';
+/** 큰 숫자 + 작은 단위 + 아래 상태 한 마디 (색 + 기호, 색만으로 전달하지 않음). value 가 없으면 "--" */
+export function Metric({ label, value, unit, status, tone = 'sub', mark }: { label: string; value?: string | number; unit?: string; status?: string; tone?: Tone; mark?: string }) {
+  const none = value === undefined;
+  return (
+    <div class="metric">
+      <div class="m-label">{label}</div>
+      <div class="m-val"><span class={`num${none ? ' none' : ''}`}>{none ? '--' : value}</span>{!none && unit && <span class="unit">{unit}</span>}</div>
+      {status && <div class={`m-status t-${tone}`}>{mark && <span aria-hidden="true">{mark} </span>}{status}</div>}
+    </div>
+  );
+}
+
+/** 빈 상태 (카드 모양 유지): "--" + 문구 + 다음 행동 */
+export function Empty({ title, text = '아직 기록 없음', hint, children, label }: { title?: string; text?: string; hint?: string; children?: ComponentChildren; label?: string }) {
+  return (
+    <section class="card empty-card" aria-label={label ?? title ?? text}>
+      {title && <div class="card-head"><span class="card-title">{title}</span></div>}
+      <div class="empty-dash" aria-hidden="true">--</div>
+      <p class="empty-text">{text}</p>
+      {hint && <p class="sub empty-hint">{hint}</p>}
+      {children && <div class="row wrap empty-actions">{children}</div>}
+    </section>
   );
 }
 
