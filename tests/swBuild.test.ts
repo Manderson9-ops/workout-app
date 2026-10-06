@@ -26,3 +26,15 @@ describe('D-055 검토 A1: sw.js 는 배포마다 달라짐 (새 서비스 워�
     expect(() => buildId('0.9.0 preview', [])).toThrow();
   });
 });
+
+describe('설치 때 미리 담을 빌드 파일 목록 (0.9.3 화면 나눠 받기)', () => {
+  const tpl = readFileSync('src/sw.template.js', 'utf8');
+  it('assets 목록을 정렬해 ASSETS 자리에 넣음, 이상한 이름은 거절', () => {
+    const out = buildSw(tpl, 'v1', ['assets/Stats-B.js', 'assets/index-A.js']);
+    expect(out).toContain("const ASSETS = ['assets/Stats-B.js', 'assets/index-A.js'];");
+    expect(buildSw(tpl, 'v1')).toContain('const ASSETS = [];');
+    expect(() => buildSw(tpl, 'v1', ["assets/x.js'];alert(1);//"])).toThrow();
+    expect(() => buildSw(tpl, 'v1', ['../secret.js'])).toThrow();
+  });
+});
+

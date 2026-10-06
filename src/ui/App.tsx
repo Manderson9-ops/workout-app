@@ -2,27 +2,34 @@ import { useEffect, useState } from 'preact/hooks';
 import './styles.css';
 import { useAppState, activeOf } from './store';
 import { Home } from './screens/Home';
-import { PlanBuilder } from './screens/PlanBuilder';
-import { Exercises, ExerciseDetail } from './screens/Exercises';
-import { WorkoutScreen } from './screens/Workout';
-import { SettingsScreen } from './screens/Settings';
-import { AboutScreen } from './screens/About';
-import { RoutineEditor } from './screens/RoutineEditor';
 import { RoutinesScreen } from './screens/MyRoutines';
-import { Stats, WorkoutDetail } from './screens/Stats';
 import { FeedbackButton } from './screens/FeedbackUi';
-import { WorkoutEdit } from './screens/WorkoutEdit';
-import { ToolsScreen } from './screens/Tools';
+import { lazyScreen, preloadScreens } from './lazy';
+import { ensureFullCatalog } from './catalog';
 import { mmss } from './components';
 import { Icon } from './icons';
 import type { IconName } from './icons';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
-import { useUpdateAvailable } from './update';
+import { useUpdateAvailable, markFirstScreen } from './update';
 import { ConfirmHost, askConfirm } from './confirm';
 import { ToastHost } from './toast';
 import { useWhatsNew, WhatsNewSheet, newDotTargets, clearDotIfVisited } from './whatsNew';
 import { displayVersion } from '../core/changelog';
 import type { TabId } from '../core/changelog';
+
+/** 홈 말고 다른 화면은 처음 열 때 받음 (0.9.3 성능 관문). 운동 목록을 쓰는 화면은 자세 포인트까지 든 전체 목록도 함께 기다림 */
+const withFull = <T,>(p: Promise<T>) => Promise.all([p, ensureFullCatalog()]).then(([m]) => m);
+const PlanBuilder = lazyScreen(() => withFull(import('./screens/PlanBuilder')).then((m) => m.PlanBuilder), '플랜 만들기');
+const Exercises = lazyScreen(() => withFull(import('./screens/Exercises')).then((m) => m.Exercises), '운동 종목');
+const ExerciseDetail = lazyScreen(() => withFull(import('./screens/Exercises')).then((m) => m.ExerciseDetail));
+const WorkoutScreen = lazyScreen(() => withFull(import('./screens/Workout')).then((m) => m.WorkoutScreen), '운동');
+const SettingsScreen = lazyScreen(() => withFull(import('./screens/Settings')).then((m) => m.SettingsScreen), '설정');
+const AboutScreen = lazyScreen(() => import('./screens/About').then((m) => m.AboutScreen), '앱 정보');
+const RoutineEditor = lazyScreen(() => withFull(import('./screens/RoutineEditor')).then((m) => m.RoutineEditor), '루틴');
+const Stats = lazyScreen(() => withFull(import('./screens/Stats')).then((m) => m.Stats), '기록');
+const WorkoutDetail = lazyScreen(() => withFull(import('./screens/Stats')).then((m) => m.WorkoutDetail));
+const WorkoutEdit = lazyScreen(() => withFull(import('./screens/WorkoutEdit')).then((m) => m.WorkoutEdit));
+const ToolsScreen = lazyScreen(() => import('./screens/Tools').then((m) => m.ToolsScreen), '도구');
 
 export function useHash(): string {
   const [h, set] = useState(location.hash || '#/');
@@ -90,6 +97,7 @@ export function App() {
   const [news, closeNews] = useWhatsNew(s);
   const path = hash.replace(/^#/, '');
   useEffect(() => { clearDotIfVisited(path); tick((x) => x + 1); }, [path]);
+  useEffect(() => { if (s.ready) { markFirstScreen(); preloadScreens(); } }, [s.ready]);
   if (!s.ready) return <main><p class="sub">불러오는 중…</p></main>;
 
   let screen;

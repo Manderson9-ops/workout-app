@@ -1,4 +1,4 @@
-import { useRef, useState } from 'preact/hooks';
+import { useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
@@ -33,8 +33,9 @@ const BAND_HI = 20; // 연구 참고 범위 위 끝 (Baz-Valle 외 2022: 훈련�
 
 function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string, Exercise>; today: string; bw: AppState['bodyweight'] }) {
   const ws = weekStart(today);
-  const cur = weekSummary(done, byId, ws, bw);
-  const prev = weekSummary(done, byId, addDays(ws, -7), bw, addDays(today, -7)); // 지난주 일요일 ~ 오늘과 같은 요일까지
+  const [cur, prev] = useMemo(() => [weekSummary(done, byId, ws, bw),
+    weekSummary(done, byId, addDays(ws, -7), bw, addDays(today, -7))], [done, byId, ws, bw, today]); // 지난주 일요일 ~ 오늘과 같은 요일까지
+  const streak = useMemo(() => weekStreak(done, today), [done, today]);
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
   // D-055: 홈과 같은 Metric (큰 숫자 + 작은 단위, 아래 증감)
   const tiles: { k: string; parts: [string | number, string][]; d: preact.JSX.Element }[] = [
@@ -66,7 +67,7 @@ function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string
             </div>
           ))}
         </div>
-        <p class="sub small" style={{ margin: '8px 0 0' }}>▲▼ = 지난주 같은 요일({WD[0]}{ymd(today).getDay() > 0 ? `~${WD[ymd(today).getDay()]}` : ''})까지와 비교 · 연속 {weekStreak(done, today)}주 · 일요일~토요일 기준</p>
+        <p class="sub small" style={{ margin: '8px 0 0' }}>▲▼ = 지난주 같은 요일({WD[0]}{ymd(today).getDay() > 0 ? `~${WD[ymd(today).getDay()]}` : ''})까지와 비교 · 연속 {streak}주 · 일요일~토요일 기준</p>
       </section>
     </>
   );
@@ -76,8 +77,7 @@ function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Ex
   const [off, setOff] = useState(0);
   const thisWs = weekStart(today);
   const ws = addDays(thisWs, -7 * off);
-  const parts = weeklyPartSets(done, byId, ws, 1)[0]!.parts;
-  const prevParts = weeklyPartSets(done, byId, addDays(ws, -7), 1)[0]!.parts;
+  const [parts, prevParts] = useMemo(() => [weeklyPartSets(done, byId, ws, 1)[0]!.parts, weeklyPartSets(done, byId, addDays(ws, -7), 1)[0]!.parts], [done, byId, ws]);
   const total = PARTS.reduce((s, p) => s + parts[p], 0);
   const prevTotal = PARTS.reduce((s, p) => s + prevParts[p], 0);
   const rows = [...PARTS].sort((a, b) => parts[b] - parts[a]);
@@ -86,7 +86,7 @@ function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Ex
   const [sheetPart, setSheetPart] = useState<Part | null>(null);
   const prevTop = [...PARTS].filter((p) => prevParts[p] > 0).sort((a, b) => prevParts[b] - prevParts[a]).slice(0, 3);
   const label = off === 0 ? '이번 주' : off === 1 ? '지난주' : weekRange(ws);
-  const weeks = weeklyPartSets(done, byId, today, 4);
+  const weeks = useMemo(() => weeklyPartSets(done, byId, today, 4), [done, byId, today]);
   const activeParts = PARTS.filter((p) => weeks.some((w) => w.parts[p] > 0));
   return (
     <>
@@ -163,29 +163,38 @@ function PartWeekSheet({ part, rows, week, onClose }: { part: Part; rows: PartWe
 }
 
 export function Stats({ s }: { s: AppState }) {
-  const all = catalog(s.custom);
-  const byId = new Map(all.map((e) => [e.id, e]));
-  const done = historyOf(s);
-  const wById = new Map(done.map((w) => [w.id, w]));
   const today = localDate(Date.now());
+  // 0.9.3 성능 관문 (기록 1,000회): 앱은 1초마다 다시 그리므로 무거운 계산은 기록·운동 목록·체중·날짜가 바뀔 때만
+  const all = catalog(s.custom);
+  const { byId, done, wById, sorted, sumOf, take, totals, pva, pvaRows } = useMemo(() => {
+    const byId = new Map(all.map((e) => [e.id, e]));
+    const done = historyOf(s);
+    const wById = new Map(done.map((w) => [w.id, w]));
+    const sorted = [...done].sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0)); // 최신순 (저장소 순서에 기대지 않음)
+    // 요약은 필요한 것만 최신순으로 (기록 1,000회여도 화면에 쓰는 건 최근 30개·예상 대비 10개·고른 날 뿐)
+    const cache = new Map<string, WorkoutSummary>();
+    const sumOf = (w: Workout) => { let x = cache.get(w.id); if (!x) { x = summarize(w, byId, s.bodyweight); cache.set(w.id, x); } return x; };
+    /** 최신순으로 조건에 맞는 요약 n개 (전체를 요약한 뒤 거른 것과 같은 결과) */
+    const take = (n: number, ok: (x: WorkoutSummary) => boolean = () => true) => { const out: WorkoutSummary[] = []; for (const w of sorted) { if (out.length >= n) break; const x = sumOf(w); if (ok(x)) out.push(x); } return out; };
+    const timed = (x: WorkoutSummary) => !!x.plannedSec && x.durationSec > 0 && x.workSets > 0; // plannedVsActual·plannedVsActualRows 와 같은 조건
+    const totals = weeklyTotals(done, byId, today, 8, s.bodyweight);
+    return { byId, done, wById, sorted, sumOf, take, totals, pva: plannedVsActual(take(10, timed)), pvaRows: plannedVsActualRows(take(8, timed)) };
+  }, [all, s.workouts, s.bodyweight, today]);
   const [ym, setYm] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; });
   const [day, setDay] = useState<number | null>(null);
-  const sums = [...done].sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0)).map((w) => summarize(w, byId, s.bodyweight)); // 최신순 (저장소 순서에 기대지 않음)
   const hiddenSet = new Set(s.settings.homeHidden ?? []); // 홈에서 뺀 기록 표시 (D-040)
-  const totals = weeklyTotals(done, byId, today, 8, s.bodyweight);
-  const pva = plannedVsActual(sums);
-  const days = monthDays(done, ym.y, ym.m);
+  const days = useMemo(() => monthDays(done, ym.y, ym.m), [done, ym.y, ym.m]);
   const monthCount = [...days.values()].reduce((a, b) => a + b, 0);
   const first = new Date(ym.y, ym.m - 1, 1);
   const lead = first.getDay(); // 일=0
   const nDays = new Date(ym.y, ym.m, 0).getDate();
   const dateOf = (n: number) => `${ym.y}-${String(ym.m).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
-  const dayList = day ? sums.filter((x) => x.date === dateOf(day) && x.workSets > 0) : [];
+  const dayList = day ? sorted.filter((w) => localDate(w.startedAt) === dateOf(day)).map(sumOf).filter((x) => x.workSets > 0) : [];
   const move = (d: number) => { setDay(null); setYm(({ y, m }) => { const n = new Date(y, m - 1 + d, 1); return { y: n.getFullYear(), m: n.getMonth() + 1 }; }); };
   const card = (x: WorkoutSummary) => <WorkoutCard key={x.id} x={x} w={wById.get(x.id)} byId={byId} hidden={hiddenSet.has(x.id)} />;
   // 최근 30개를 주별로 묶음
   const groups: { ws: string; items: WorkoutSummary[] }[] = [];
-  for (const x of sums.slice(0, 30)) {
+  for (const x of take(30)) {
     const ws = weekStart(x.date);
     const g = groups[groups.length - 1];
     if (g && g.ws === ws) g.items.push(x); else groups.push({ ws, items: [x] });
@@ -200,7 +209,7 @@ export function Stats({ s }: { s: AppState }) {
       <PartSets done={done} byId={byId} today={today} />
 
       <h2>운동 기록</h2>
-      {!sums.length && <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 주별 카드로 쌓여요"><button class="primary" onClick={() => go('#/workout')}>운동 시작</button></Empty>}
+      {!sorted.length && <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 주별 카드로 쌓여요"><button class="primary" onClick={() => go('#/workout')}>운동 시작</button></Empty>}
       {groups.map((g) => (
         <section key={g.ws} aria-label={groupTitle(g.ws)}>
           <h3 class="wk-head">{groupTitle(g.ws)}</h3>
@@ -244,7 +253,7 @@ export function Stats({ s }: { s: AppState }) {
           <section class="card" aria-label="예상 시간 대비 실제">
             <div class="card-head"><span class="card-title">예상 시간 대비 실제</span></div>
             <p>최근 {pva.n}회 평균: {Math.abs(pva.avgDiffSec) < 60 ? '예상과 거의 같아요' : `예상보다 ${Math.round(Math.abs(pva.avgDiffSec) / 60)}분 ${pva.avgDiffSec > 0 ? '더 걸려요' : '덜 걸려요'}`} <span class="sub small">(실제 ÷ 예상 = {pva.avgRatio})</span></p>
-            <PairBarChart label="최근 운동 예상 대비 실제 시간" unit="분" points={plannedVsActualRows(sums).map((r) => ({ label: r.label, planned: r.plannedMin, actual: r.actualMin }))} />
+            <PairBarChart label="최근 운동 예상 대비 실제 시간" unit="분" points={pvaRows.map((r) => ({ label: r.label, planned: r.plannedMin, actual: r.actualMin }))} />
             <p class="sub small">플랜의 예상 시간과 비교해요. 차이가 계속 크면 알려 주세요 (시간 계산을 고칠 수 있어요).</p>
           </section>
         </>

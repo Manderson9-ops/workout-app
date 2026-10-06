@@ -17,10 +17,15 @@ export function buildId(version: string, fileNames: readonly string[]): string {
   return `${version}+${fnv1a([...fileNames].sort().join('\n'))}`;
 }
 
-/** 틀에 빌드 이름을 넣은 sw.js 내용. 틀에 자리('__BUILD__')가 정확히 하나가 아니면 오류 */
-export function buildSw(template: string, id: string): string {
+/**
+ * 틀에 빌드 이름을 넣은 sw.js 내용. 틀에 자리('__BUILD__')가 정확히 하나가 아니면 오류.
+ * assets: 설치 때 미리 담을 빌드 파일(assets/…) 목록 (0.9.3, 화면 나눠 받기). 틀의 ASSETS 자리(__ASSETS__ 주석)에 넣는다
+ */
+export function buildSw(template: string, id: string, assets: readonly string[] = []): string {
   const n = template.split("'__BUILD__'").length - 1;
   if (n !== 1) throw new Error(`sw.js 틀에 '__BUILD__' 자리가 ${n}개예요 (1개여야 함)`);
   if (!/^[\w.+-]+$/.test(id)) throw new Error(`빌드 이름 형식이 이상해요: ${id}`);
-  return template.replace("'__BUILD__'", () => `'${id}'`);
+  for (const a of assets) if (!/^assets\/[\w.-]+$/.test(a)) throw new Error(`빌드 파일 이름이 이상해요: ${a}`);
+  const list = [...assets].sort().map((a) => `'${a}'`).join(', ');
+  return template.replace("'__BUILD__'", () => `'${id}'`).replace('/*__ASSETS__*/', () => list);
 }

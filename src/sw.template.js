@@ -10,6 +10,10 @@ const APP = new URL(self.registration.scope).pathname.split('/').filter(Boolean)
 // 배포마다 이 줄이 달라져 "새 버전 준비됨" 안내가 뜬다. 캐시 이름에도 넣어 옛 캐시를 정리한다
 const BUILD = '__BUILD__';
 const CACHE = APP + ':' + BUILD;
+// 빌드 파일 전체 목록 (0.9.3): 화면을 나눠 받게 되어(lazy) HTML 에 없는 묶음도 있으므로, 빌드 때 tools/sw_build.ts 가 assets/ 목록을 넣는다.
+// 설치(첫 화면 묶음) → 화면을 맡은(claim) 뒤에 나머지를 담는다: 설치가 길어지면 처음 설치 때의 한 번 새로 고침이 사용 도중에 일어나므로.
+// 다 담기면 처음 연 뒤로는 한 번도 안 연 화면도 인터넷 없이 열림
+const ASSETS = [/*__ASSETS__*/];
 const OWN = (k) => k.startsWith(APP + ':') || k === APP + '-v1';
 // 설치 때 화면(HTML)과 그 화면이 쓰는 빌드 파일(assets)까지 미리 담음: 새 버전으로 바뀐 직후 인터넷이 없어도 열리게
 self.addEventListener('install', (e) => {
@@ -25,7 +29,13 @@ self.addEventListener('install', (e) => {
 });
 self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && OWN(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && OWN(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+    .then(() => caches.open(CACHE)).then(async (c) => {
+      const want = ASSETS.map((a) => new URL(a, self.registration.scope).href);
+      const have = new Set((await c.keys()).map((r) => r.url));
+      const missing = want.filter((u) => !have.has(u));
+      if (missing.length) await c.addAll(missing);
+    }).catch(() => { /* 못 담은 것은 처음 열 때 담김 */ }));
 });
 self.addEventListener('fetch', (e) => {
   const req = e.request;
@@ -37,7 +47,8 @@ self.addEventListener('fetch', (e) => {
       .catch(() => caches.match('./')));
     return;
   }
-  e.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+  // ignoreVary: 미리 담은 묶음(서비스 워커가 받음, Origin 머리글 없음)이 화면의 모듈 요청(Origin 있음)과도 맞게. 파일 이름에 내용 해시가 있어 안전
+  e.respondWith(caches.match(req, { ignoreVary: true }).then((hit) => hit || fetch(req).then((res) => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
     return res;
   })));

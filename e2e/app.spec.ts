@@ -1964,13 +1964,13 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
   await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.1 바뀐 점'); // 0.9.2(5줄) + 0.9.1(3줄) = 8줄
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.2 바뀐 점'); // 0.9.3(2줄) + 0.9.2(5줄) + 0.9.1(1줄) = 8줄
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
   await checkScreen(page, '65-whats-new');
   await sheet.getByRole('button', { name: /^모두 보기/ }).click();
-  await expect(sheet.locator('.wn-lines li')).toHaveCount(20); // 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(22); // 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
@@ -2005,13 +2005,13 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('.wn-entry')).toHaveCount(2); // 0.9.2(5줄) + 0.9.1(3줄) = 8줄, 0.9.0 은 [모두 보기]
+  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.3(2줄) + 0.9.2(5줄) + 0.9.1(1줄) = 8줄, 0.9.0 은 [모두 보기]
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   const gear = page.getByRole('link', { name: '설정', exact: true });
   await expect(gear.locator('.ndot')).toHaveCount(1);
   await expect(gear).toHaveAttribute('aria-describedby', 'new-dot-desc');
-  await expect(page.getByRole('navigation', { name: '주 메뉴' }).locator('.ndot')).toHaveCount(2); // 0.9.2 = 기록 탭, 0.9.1 = 운동 탭, 0.9.0 은 탭이 아니라 설정 버튼
+  await expect(page.getByRole('navigation', { name: '주 메뉴' }).locator('.ndot')).toHaveCount(2); // 0.9.2 = 기록 탭, 0.9.1 = 운동 탭 (0.9.3 = 홈, 지금 홈이라 점 없음), 0.9.0 은 탭이 아니라 설정 버튼
   await gear.click();
   const aboutRow = page.getByRole('link', { name: /앱 정보·업데이트 내역/ });
   await expect(aboutRow).toContainText('새');
@@ -2405,5 +2405,30 @@ test('D-055 3단계 운동 화면: 시간 운동 지난번(초), 고친 지난 �
   await page.getByRole('button', { name: `${first} 1세트 완료` }).click();
   await expect(page.locator('.pr-line')).toHaveCount(0);
   await checkScreen(page, '80-workout-p3');
+});
+
+test('0.9.3 성능 관문: 화면을 나눠 받아도 한 번 연 뒤에는 인터넷 없이 안 열어 본 화면(종목·기록·플랜)까지 열림 (서비스 워커가 모든 묶음을 미리 담음, 오프라인 단계는 Chromium 만)', async ({ page, context, browserName }) => {
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 15000 }).toBe(true);
+  await page.waitForLoadState('load');
+  await expect.poll(() => page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); return !!r && !r.installing && !r.waiting && !!r.active; }), { timeout: 15000 }).toBe(true);
+  // 설치 때 담은 JS 묶음 수 = sw.js 의 ASSETS 중 JS 수 (화면을 열지 않았어도 다 담김)
+  const want = await page.evaluate(async () => { const t = await (await fetch('sw.js', { cache: 'no-store' })).text(); return (t.match(/'assets\/[^']+\.js'/g) ?? []).length; });
+  expect(want).toBeGreaterThanOrEqual(8);
+  // 화면을 맡은 뒤 나머지 묶음을 담으므로 다 담길 때까지 기다림
+  await expect.poll(() => page.evaluate(async () => { let n = 0; for (const k of await caches.keys()) n += (await (await caches.open(k)).keys()).filter((r) => /\/assets\/[^/]+\.js$/.test(r.url)).length; return n; }), { timeout: 15000 }).toBeGreaterThanOrEqual(want);
+  // WebKit 은 Playwright 오프라인 상태에서 새로 고침이 내부 오류로 끝남 (도구 한계) → 담긴 묶음 수까지만 확인
+  if (browserName === 'webkit') return;
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '오늘' })).toBeVisible();
+  await page.getByRole('link', { name: '종목' }).click();
+  await expect(page.getByRole('button', { name: '랫풀다운', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '랫풀다운', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '영상 등급' })).toBeVisible(); // 자세 포인트(나눠 받는 데이터)까지
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(page.getByTestId('this-week')).toBeVisible();
+  await page.getByRole('link', { name: '플랜' }).click();
+  await expect(page.getByRole('region', { name: '1단계 부위·우선순위' })).toBeVisible();
+  await context.setOffline(false);
 });
 

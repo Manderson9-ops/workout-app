@@ -3,7 +3,7 @@
  * 작은 날짜 + 큰 "오늘" / 이번 주(운동·세트 + 요일 점, 기록 탭으로 ›) / 다음 운동(최근 루틴 1개 큰 [▶ 시작]) /
  * 내 루틴([▶ 시작] + ⋯ 편집·지우기) / 최근 운동(기록 탭과 같은 카드 + ⋯ 수정·삭제) / 저장 안내는 처음 1회 작은 알림
  */
-import { useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, activeOf, historyOf } from '../store';
 import { setHomeHidden, startRoutine } from '../actions';
@@ -51,12 +51,14 @@ async function removeRecent(w: Workout): Promise<'ok' | 'alt' | false | null> {
 
 function ThisWeekCard({ s }: { s: AppState }) {
   const all = catalog(s.custom);
-  const byId = new Map(all.map((e) => [e.id, e]));
-  const done = historyOf(s);
   const today = localDate(Date.now());
   const ws = weekStart(today);
-  const cur = weekSummary(done, byId, ws, s.bodyweight);
-  const prev = weekSummary(done, byId, addDays(ws, -7), s.bodyweight, addDays(today, -7));
+  // 0.9.3 성능 관문 (기록 1,000회): 앱이 1초마다 다시 그려도 기록·날짜가 바뀔 때만 다시 셈
+  const { done, cur, prev } = useMemo(() => {
+    const byId = new Map(all.map((e) => [e.id, e]));
+    const done = historyOf(s);
+    return { done, cur: weekSummary(done, byId, ws, s.bodyweight), prev: weekSummary(done, byId, addDays(ws, -7), s.bodyweight, addDays(today, -7)) };
+  }, [all, s.workouts, s.bodyweight, ws, today]);
   const never = done.length === 0;
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
   // 링크 이름에 탭 이름(홈·플랜·운동·기록·종목)을 넣지 않음: 탭 링크와 헷갈리지 않게
@@ -107,13 +109,16 @@ export function Home({ s }: { s: AppState }) {
   const active = activeOf(s);
   // 빼기·완전 삭제 뒤 카드가 사라지므로 결과를 글로 알림 (화면 읽기 프로그램도 읽음)
   const [done, setDone] = useState<string | null>(null);
-  const history = historyOf(s);
-  const recent = homeRecent(history, s.settings.homeHidden, 5); // "목록에서만 빼기" 한 것은 건너뜀 (D-040)
   const all = catalog(s.custom);
-  const byId = new Map(all.map((e) => [e.id, e]));
-  const hiddenIds = new Set(s.settings.routineHidden ?? []);
-  const visible = s.routines.filter((r) => !hiddenIds.has(r.id));
-  const next = pickNextRoutine(visible, routineUse(history), localDate(Date.now()));
+  const day = localDate(Date.now());
+  const { history, recent, byId, next } = useMemo(() => {
+    const history = historyOf(s);
+    const recent = homeRecent(history, s.settings.homeHidden, 5); // "목록에서만 빼기" 한 것은 건너뜀 (D-040)
+    const byId = new Map(all.map((e) => [e.id, e]));
+    const hiddenIds = new Set(s.settings.routineHidden ?? []);
+    const visible = s.routines.filter((r) => !hiddenIds.has(r.id));
+    return { history, recent, byId, next: pickNextRoutine(visible, routineUse(history), day) };
+  }, [all, s.workouts, s.settings.homeHidden, s.settings.routineHidden, s.routines, day]);
   const today = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
   return (
     <main class="home">

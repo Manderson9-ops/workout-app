@@ -82,6 +82,15 @@ export async function checkRemote(force = false): Promise<CheckResult> {
   return { kind: 'ready', version: v.version };
 }
 
+/**
+ * 첫 화면(홈 등)이 그려진 직후 (0.9.3 성능 관문). 서비스 워커 등록·버전 확인이 첫 화면 그리기와 네트워크를 다투지 않게.
+ * 너무 늦추면 처음 설치 때의 한 번 새로 고침이 사용 도중에 일어나므로 그려진 바로 다음 프레임에 (늦어도 3초)
+ */
+let firstScreenDone: () => void = () => undefined;
+const firstScreen = new Promise<void>((res) => { firstScreenDone = res; });
+export function markFirstScreen(): void { requestAnimationFrame(() => setTimeout(firstScreenDone, 0)); }
+function afterFirstPaint(): Promise<void> { return Promise.race([firstScreen, new Promise<void>((res) => setTimeout(res, 3000))]); }
+
 export function registerServiceWorker(): void {
   // 시험용: e2e·스크린샷이 'app:sim-update' 이벤트로 배너를 띄움 (detail = version.json 모양 또는 null = 읽기 실패 흉내).
   // 개발 서버이거나 시험이 window.__wkTest = true 를 세운 때만 반응 (본판에서는 우연히 배너가 뜨지 않게)
@@ -97,8 +106,13 @@ export function registerServiceWorker(): void {
     void checkRemote();
   });
   window.addEventListener('load', async () => {
+    // 0.9.3 성능 관문: 첫 화면이 그려진 직후 등록·버전 확인 (첫 화면 그리기와 네트워크를 다투지 않게)
+    await afterFirstPaint();
     if ('serviceWorker' in navigator) {
       try {
+        // 처음 설치(이 화면을 맡은 워커가 아직 없음)면 워커가 화면을 맡아도 새로 고치지 않음 (0.9.3): 화면은 이미 최신이고,
+        // 등록을 첫 화면 뒤로 옮겨서 새로 고침이 사용 도중(첫 탭 직후 등)에 일어나 입력을 잃을 수 있으므로
+        const firstInstall = !navigator.serviceWorker.controller;
         reg = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
         const r = reg;
         const track = (w: ServiceWorker | null) => {
@@ -108,9 +122,11 @@ export function registerServiceWorker(): void {
         if (r.waiting && navigator.serviceWorker.controller) void setWaiting(r.waiting);
         r.addEventListener('updatefound', () => track(r.installing));
         let reloaded = false;
+        let firstClaimed = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           // 조용한 교체: 화면을 맡은 워커가 조용히 바꾼 그 워커일 때만 새로 고치지 않음 (쓰는 도중 갑자기 새로 고침 없음)
           if (skipReloadFor(quietWorker, navigator.serviceWorker.controller)) { quietWorker = null; return; }
+          if (firstInstall && !firstClaimed) { firstClaimed = true; return; } // 처음 설치 때 한 번은 새로 고치지 않음 (그 뒤 교체는 예전대로 새로 고침)
           if (!reloaded) { reloaded = true; location.reload(); }
         });
       } catch { reg = null; /* 등록 실패해도 앱은 동작 */ }
