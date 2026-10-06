@@ -4,6 +4,7 @@ import type { AppState } from '../store';
 import { activeOf } from '../store';
 import { saveBackupFile, readBackupFile, restoreBackup, resetAll, prepareBackup, SAVE_MESSAGE } from '../backupActions';
 import { IS_PREVIEW } from '../appName';
+import { Icon } from '../icons';
 import { askConfirm, askChoice } from '../confirm';
 
 /** 데이터가 바뀌고 잠시(0.8초) 조용하면 백업 파일을 미리 만듦 (입력 중에는 만들지 않음) */
@@ -31,7 +32,7 @@ export function BackupSection({ s }: { s: AppState }) {
     const c = r.file.counts;
     // 미리 보기 판에서 만든 백업을 본판에 넣으려 할 때 (D-031: 한 방향)
     if (r.file.preview && !IS_PREVIEW && !(await askConfirm({ title: '미리 보기 판(β) 백업이에요', message: '시험용 데이터일 수 있어요.\n그래도 본판 데이터를 이것으로 바꿀까요?', ok: '계속', danger: true }))) return;
-    const warnActive = active ? `\n\n⚠ 진행 중인 운동("${active.name}")도 사라져요.` : '';
+    const warnActive = active ? `\n\n주의: 진행 중인 운동("${active.name}")도 사라져요.` : '';
     if (!(await askConfirm({ title: '이 백업으로 바꿀까요?', ok: '바꾸기', danger: true, message: `${new Date(r.file.exportedAt).toLocaleString('ko-KR')} 백업\n운동 기록 ${c.workouts}개, 루틴 ${c.routines}개, 체중 ${c.bodyweight}개\n\n지금 이 폰의 데이터는 모두 이 백업으로 바뀌어요 (합치지 않음). 먼저 "백업 파일 저장"으로 지금 데이터를 저장해 두는 것을 권해요.${warnActive}` }))) return;
     // 동기화가 켜져 있으면 어디까지 바꿀지 고름 (D-032): 서버까지(다른 기기도 다시 받음) / 이 기기만(동기화 끔)
     let scope: 'server' | 'local' = 'local';
@@ -89,12 +90,14 @@ export function BackupBanner({ s }: { s: AppState }) {
   const [msg, setMsg] = useState<string | null>(null);
   usePreparedBackup(s);
   return (
-    <div class="card" role="note" aria-label="백업 알림">
-      <div class="row between">
+    // D-055 검토 A3: 홈 맨 위 큰 카드 대신 "다음 운동" 아래 작은 알림 (채운 파랑 버튼은 [▶ 시작] 하나만)
+    <div class="notice notice-row" role="note" aria-label="백업 알림">
+      <Icon name="info" size={20} class="notice-ico" />
+      <div class="grow">
         <span class="small">{s.settings.lastBackupAt ? '마지막 백업 후 7일이 지났어요' : '아직 백업한 적이 없어요'}</span>
-        <button class="primary" onClick={async () => { const r = await saveBackupFile(); setMsg(SAVE_MESSAGE[r]); }}>지금 백업</button>
+        {msg && <p role="status" class="small sub">{msg}</p>}
       </div>
-      {msg && <p role="status" class="small">{msg}</p>}
+      <button onClick={async () => { const r = await saveBackupFile(); setMsg(SAVE_MESSAGE[r]); }} aria-label="지금 백업">백업</button>
     </div>
   );
 }

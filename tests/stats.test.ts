@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, isCountedWorkout } from '../src/core/stats';
+import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, isCountedWorkout, partWeekDetail, plannedVsActualRows, minutesLabel } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
 import { heatBucket } from '../src/ui/bodyMapView';
@@ -277,3 +277,38 @@ describe('D-054 2차: 시간 문구·0세트 제외·지난주 같은 요일까�
     expect(bestSetLabel([{ weight: 20, seconds: 60, warmup: false, done: true }])).toBe('60초');
   });
 });
+
+describe('D-055 3단계: 부위 창 (그 주 그 부위 운동)', () => {
+  const a = wk('a', at(2026, 9, 28, 9), [{ id: 'bench', sets: [s(60, 8), s(62.5, 6), s(20, 10, { warmup: true })] }, { id: 'curl', sets: [s(12, 10)] }], 40);
+  const b = wk('b', at(2026, 9, 30, 9), [{ id: 'bench', sets: [s(65, 5), s(70, 3, { done: false })] }], 30);
+  const other = wk('o', at(2026, 9, 21, 9), [{ id: 'bench', sets: [s(99, 1)] }], 30); // 전 주
+  it('작업 세트만 세고(웜업·안 한 세트 제외) 막대 숫자와 합이 같음, 날짜 순', () => {
+    const r = partWeekDetail([b, a, other], byId, '2026-09-27', '가슴');
+    expect(r.map((x) => [x.date, x.sets, x.best])).toEqual([['2026-09-28', 2, '62.5kg × 6회'], ['2026-09-30', 1, '65kg × 5회']]);
+    expect(r.reduce((n, x) => n + x.sets, 0)).toBe(weeklyPartSets([a, b, other], byId, '2026-09-30', 1)[0]!.parts.가슴);
+    expect(partWeekDetail([a], byId, '2026-09-27', '하체')).toEqual([]);
+  });
+});
+
+describe('plannedVsActualRows (예상 대비 실제 그래프)', () => {
+  const S = (id: string, date: string, durationSec: number, plannedSec?: number, workSets = 3) => ({ id, name: id, date, durationSec, plannedSec, workSets, volume: 0, parts: {} });
+  it('같은 날 두 번이면 라벨에 순번, 오래된 것 → 최근, 짧은 운동도 0이 아님', () => {
+    // 최신순 입력: 같은 날(10/7) 두 번 + 그 전날
+    const rows = plannedVsActualRows([S('c', '2026-10-07', 30, 2520), S('b', '2026-10-07', 2700, 2520), S('a', '2026-10-06', 3000, 2700)]);
+    expect(rows.map((r) => r.label)).toEqual(['10/6', '10/7 ①', '10/7 ②']);
+    expect(new Set(rows.map((r) => r.label)).size).toBe(3);
+    expect(rows[2]).toEqual({ label: '10/7 ②', plannedMin: 42, actualMin: 0.5 }); // 30초 → 0.5분 (0으로 사라지지 않음)
+    expect(rows[1]!.actualMin).toBe(45);
+  });
+  it('plannedVsActual 과 같은 운동만 (예상 없음·0초·완료 세트 0 제외), 최대 8개', () => {
+    const rows = plannedVsActualRows([S('x', '2026-10-07', 600), S('y', '2026-10-07', 0, 600), S('z', '2026-10-07', 600, 600, 0), S('ok', '2026-10-05', 600, 900)]);
+    expect(rows).toEqual([{ label: '10/5', plannedMin: 15, actualMin: 10 }]);
+    const many = Array.from({ length: 12 }, (_, i) => S(String(i), `2026-09-${String(20 - i).padStart(2, '0')}`, 600, 600));
+    expect(plannedVsActualRows(many)).toHaveLength(8);
+    expect(plannedVsActualRows(many).at(-1)!.label).toBe('9/20');
+  });
+  it('minutesLabel: 10분 미만 소수 한 자리', () => {
+    expect([minutesLabel(2), minutesLabel(59), minutesLabel(570), minutesLabel(2530)]).toEqual([0, 1, 9.5, 42]);
+  });
+});
+

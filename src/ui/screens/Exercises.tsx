@@ -12,7 +12,9 @@ import { exerciseHistory } from '../../core/stats';
 import { LineChart, BarChart } from '../charts';
 import { GRADES } from '../../core/version';
 import type { Grade } from '../../core/version';
-import { GradeBadge, Sheet } from '../components';
+import { GradeBadge, Sheet, Metric, Empty } from '../components';
+import { ScreenHeader } from '../header';
+import { Icon } from '../icons';
 import { setMeta } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import { go } from '../nav';
@@ -38,6 +40,8 @@ export function Exercises({ s }: { s: AppState }) {
   const [equip, setEquip] = useState<Equipment | ''>(saved.equip ?? '');
   const [minG, setMinG] = useState<Grade | ''>(saved.minG ?? '');
   const [muscle, setMuscle] = useState<string>(saved.muscle ?? '');
+  const active2 = (equip ? 1 : 0) + (minG ? 1 : 0) + (muscle ? 1 : 0);
+  const [moreOpen, setMoreOpen] = useState<boolean>(active2 > 0);
   const remember = (p: object) => sessionStorage.setItem(scopedKey(KEY), JSON.stringify({ q, part, favOnly, videoOnly, equip, minG, muscle, ...p }));
   const level = s.settings.level;
   const inPart = all.filter((e) => (part ? eligibleParts(e).includes(part) : true));
@@ -55,18 +59,21 @@ export function Exercises({ s }: { s: AppState }) {
     .sort((a, b) => GRADES.indexOf(a.g.value) - GRADES.indexOf(b.g.value) || (a.g.estimated ? 1 : 0) - (b.g.estimated ? 1 : 0) || a.e.name_ko.localeCompare(b.e.name_ko));
   return (
     <main>
-      <div class="row between"><h1>운동 종목</h1><button onClick={() => setAdding(true)}>+ 직접 추가</button></div>
+      <ScreenHeader title="운동 종목" actions={<button class="icon-btn round head-add" aria-label="운동 직접 추가" title="운동 직접 추가" onClick={() => setAdding(true)}><Icon name="plus" /></button>} />
       <input placeholder="검색 (초성 가능: ㄹㅍㄷ, 별칭: 사레레)" value={q} aria-label="운동 검색" onInput={(e) => { const v = (e.target as HTMLInputElement).value; setQ(v); remember({ q: v }); }} />
-      <div class="row wrap" style={{ margin: '8px 0' }}>
+      <div class="row wrap filter-row">
         <button class={`chip ${!part ? 'on' : ''}`} onClick={() => { setPart(undefined); remember({ part: undefined }); }}>전체</button>
         {PARTS.map((p) => <button key={p} class={`chip ${part === p ? 'on' : ''}`} onClick={() => { setPart(p); remember({ part: p }); }}>{p}</button>)}
       </div>
       <div class="row wrap">
-        <button class={`chip ${favOnly ? 'on' : ''}`} aria-pressed={favOnly} onClick={() => { setFavOnly(!favOnly); remember({ favOnly: !favOnly }); }}>★ 즐겨찾기</button>
+        <button class={`chip ${favOnly ? 'on' : ''}`} aria-pressed={favOnly} onClick={() => { setFavOnly(!favOnly); remember({ favOnly: !favOnly }); }}><Icon name={favOnly ? 'star' : 'starLine'} size={16} />즐겨찾기만</button>
         <button class={`chip ${videoOnly ? 'on' : ''}`} aria-pressed={videoOnly} onClick={() => { setVideoOnly(!videoOnly); remember({ videoOnly: !videoOnly }); }}>영상 등급만</button>
-        <span class="sub small">{rows.length}개</span>
+        <button class={`chip filter-toggle${active2 ? ' on' : ''}`} aria-expanded={moreOpen} aria-controls="ex-more-filters" aria-label={`필터 (장비·등급·주 근육)${active2 ? `, ${active2}개 적용` : ''}`} onClick={() => setMoreOpen(!moreOpen)}>
+          <Icon name="chevron" size={14} class={`rot${moreOpen ? ' open' : ''}`} />필터{active2 > 0 && <span class="f-count" aria-hidden="true">{active2}</span>}
+        </button>
       </div>
-      <div class="grid2" style={{ marginTop: '8px' }}>
+      {moreOpen && <div id="ex-more-filters">
+      <div class="grid2 filter-row">
         <select value={equip} aria-label="장비 필터" onChange={(e) => { const v = (e.target as HTMLSelectElement).value as Equipment | ''; setEquip(v); remember({ equip: v }); }}>
           <option value="">장비 전체</option>{EQUIPMENT.map((x) => <option key={x} value={x}>{EQUIPMENT_LABEL[x]}</option>)}
         </select>
@@ -74,25 +81,30 @@ export function Exercises({ s }: { s: AppState }) {
           <option value="">등급 전체</option>{GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
         </select>
       </div>
-      <select value={mg} aria-label="주 근육 필터" style={{ marginTop: '8px' }} onChange={(e) => { const v = (e.target as HTMLSelectElement).value; setMuscle(v); remember({ muscle: v }); }}>
+      <select value={mg} aria-label="주 근육 필터" class="filter-row" onChange={(e) => { const v = (e.target as HTMLSelectElement).value; setMuscle(v); remember({ muscle: v }); }}>
         <option value="">주 근육 전체</option>{groups.map((g) => <option key={g} value={g}>주 근육: {g}</option>)}
       </select>
-      <div class="card" style={{ padding: '0 10px' }}>
-        {rows.map(({ e, g }) => {
-          const m = s.meta.get(e.id);
-          return (
-            <div class="list-item" key={e.id} role="button" aria-label={e.name_ko} onClick={() => go(`#/exercises/${encodeURIComponent(e.id)}`)}>
-              <GradeBadge g={g} />
-              <div class="grow">
-                <div>{m?.favorite ? '★ ' : ''}{e.name_ko}{m?.excluded ? ' (제외됨)' : ''}</div>
-                <div class="pill">{e.part} · {e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.guide.length ? ` · 자세 포인트 ${e.guide.length}` : ''}</div>
-                {e.muscles.length > 0 && <div class="muscles">{muscleText(e.muscles)}</div>}
+      </div>}
+      <p class="sub small ex-count" aria-live="polite">{rows.length}개</p>
+      {/* D-055 3단계: 목록 줄 = 등급 배지(영상/추정/내 등급) · 이름(즐겨찾기 별) · 부위 태그 · 종류·장비 · 주/보조 근육 */}
+      {rows.length > 0 ? (
+        <div class="card ex-list">
+          {rows.map(({ e, g }) => {
+            const m = s.meta.get(e.id);
+            return (
+              <div class="list-item ex-row" key={e.id} role="button" aria-label={e.name_ko} onClick={() => go(`#/exercises/${encodeURIComponent(e.id)}`)}>
+                <GradeBadge g={g} />
+                <div class="grow">
+                  <div class="ex-name">{e.name_ko}{m?.favorite && <Icon name="star" size={14} class="ex-fav" />}{m?.excluded && <span class="pill"> 제외됨</span>}</div>
+                  <div class="row wrap ex-tags"><span class="tag">{e.part}</span><span class="sub small">{e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.guide.length ? ` · 자세 포인트 ${e.guide.length}` : ''}</span></div>
+                  {e.muscles.length > 0 && <div class="muscles">{muscleText(e.muscles)}</div>}
+                </div>
+                <Icon name="chevron" size={16} class="card-more" />
               </div>
-            </div>
-          );
-        })}
-        {!rows.length && <div class="empty">검색 결과가 없어요</div>}
-      </div>
+            );
+          })}
+        </div>
+      ) : <Empty label="검색 결과 없음" text="검색 결과가 없어요" hint="다른 이름·초성으로 찾거나 필터를 풀어 보세요" />}
       {adding && <AddCustom s={s} onClose={() => setAdding(false)} />}
     </main>
   );
@@ -108,13 +120,13 @@ function AddCustom({ s, onClose }: { s: AppState; onClose: () => void }) {
   return (
     <Sheet title="운동 직접 추가" onClose={onClose}>
       <label>이름</label><input value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} aria-label="운동 이름" />
-      {exists && <p class="small" style={{ color: 'var(--warn)' }}>같은 이름의 운동이 이미 있어요</p>}
+      {exists && <p class="small t-warn">같은 이름의 운동이 이미 있어요</p>}
       <label>부위</label><select value={part} onChange={(e) => setPart((e.target as HTMLSelectElement).value as Part)} aria-label="부위">{PARTS.map((p) => <option key={p}>{p}</option>)}</select>
       <div class="grid2">
         <div><label>종류</label><select value={mech} onChange={(e) => setMech((e.target as HTMLSelectElement).value as Mechanics)} aria-label="종류"><option value="compound">다관절</option><option value="isolation">단관절</option></select></div>
         <div><label>장비</label><select value={eq} onChange={(e) => setEq((e.target as HTMLSelectElement).value as Equipment)} aria-label="장비">{EQUIPMENT.map((x) => <option key={x} value={x}>{EQUIPMENT_LABEL[x]}</option>)}</select></div>
       </div>
-      <label class="row"><input type="checkbox" checked={uni} onChange={() => setUni(!uni)} style={{ width: '24px', minHeight: '24px' }} /> 한쪽씩 하는 운동</label>
+      <label class="row"><input type="checkbox" class="ck24" checked={uni} onChange={() => setUni(!uni)} /> 한쪽씩 하는 운동</label>
       <p class="sub small">직접 추가한 운동은 영상 등급이 없어 "B 추정"으로 시작해요. 상세 화면에서 내 등급을 바꿀 수 있어요.</p>
       <button class="primary big" disabled={!name.trim() || exists} onClick={async () => {
         const id = newId('custom').replace(/-/g, '_');
@@ -135,15 +147,26 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
   const hist = exerciseHistory(historyOf(s), e.id, e, s.bodyweight);
   const best = hist.reduce((mx, h) => Math.max(mx, h.best1RM ?? 0), 0);
   const title = (vid: string) => sourceVideos.find((v) => v.video_id === vid)?.title ?? vid;
+  const lastH = hist[hist.length - 1];
+  const lastW = lastH?.maxWeight ?? lastH?.bestSet?.weight;
+  const lastDate = lastH ? `${Number(lastH.date.slice(5, 7))}/${Number(lastH.date.slice(8))}` : undefined;
   return (
     <main>
-      <button class="ghost" onClick={() => history.back()} aria-label="뒤로">← 뒤로</button>
-      <div class="row"><GradeBadge g={g} /><h1 class="grow" style={{ margin: '4px 0' }}>{e.name_ko}</h1></div>
+      <ScreenHeader back={{ label: '뒤로', onClick: () => history.back(), aria: '뒤로' }} />
+      <div class="row ex-title"><GradeBadge g={g} /><h1 class="grow">{e.name_ko}</h1></div>
       <p class="sub">{e.part} · {e.mechanics === 'compound' ? '다관절' : '단관절'} · {e.equipment.map((x) => EQUIPMENT_LABEL[x]).join(', ')}{e.unilateral ? ' · 한쪽씩' : ''}{e.heavy ? ' · 무거운 운동' : ''}</p>
       <p class="sub small">{muscleText(e.muscles)} · 묶음: {families[e.family] ?? '직접 추가'}{e.aliases?.length ? ` · 다른 이름: ${e.aliases.join(', ')}` : ''}</p>
       {e.note && <p class="sub small">메모: {e.note}</p>}
-      <div class="row wrap" style={{ marginTop: '8px' }}>
-        <button class={`chip ${m?.favorite ? 'on' : ''}`} aria-pressed={!!m?.favorite} onClick={() => setMeta(e.id, { favorite: !m?.favorite })}>{m?.favorite ? '★ 즐겨찾기' : '☆ 즐겨찾기'}</button>
+      {/* D-055 3단계: 내 기록 숫자 3개 (추정 1RM = Epley, 12회 이하 · 최근 무게 · 해 본 횟수(운동 번수, 반복 횟수 아님)) */}
+      <section class="card ex-metrics" aria-label="내 기록 요약">
+        <div class="metrics3">
+          <Metric label="추정 1RM" value={best > 0 ? best : undefined} unit="kg" status={best > 0 ? 'Epley 추정' : '아직 없음'} />
+          <Metric label="최근 무게" value={lastW !== undefined ? lastW : undefined} unit="kg" status={lastDate ? lastDate : '아직 없음'} />
+          <Metric label="해 본 횟수" value={hist.length || undefined} unit="번" status={hist.length ? '운동한 날 기준' : '아직 없음'} />
+        </div>
+      </section>
+      <div class="row wrap ex-actions">
+        <button class={`chip ${m?.favorite ? 'on' : ''}`} aria-pressed={!!m?.favorite} onClick={() => setMeta(e.id, { favorite: !m?.favorite })}><Icon name={m?.favorite ? 'star' : 'starLine'} size={16} />즐겨찾기</button>
         <button class={`chip ${m?.excluded ? 'on' : ''}`} aria-pressed={!!m?.excluded} onClick={() => setMeta(e.id, { excluded: !m?.excluded })}>{m?.excluded ? '플랜에서 제외됨' : '플랜에서 제외'}</button>
       </div>
       <label>내 등급 (플랜에서 영상 등급보다 우선)</label>
@@ -159,14 +182,14 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
           <div class="row"><span class="badge video">{x.value}</span><span class="grow">{x.purpose_part} 목적{x.purpose_note ? ` · ${x.purpose_note}` : ''}{x.sub_goal_only ? ' (세부 목표 전용)' : ''}</span></div>
           <div class="pill">수준: {x.levels.length ? x.levels.join('·') : LEVELS.join('·')}{x.target ? ` · 대상: ${x.target}` : ''}{x.primary_topic === false ? ' · 참고용' : ''}</div>
           {x.why && <p class="small">{x.why}</p>}
-          {x.video_id && <a href={videoUrl(x.video_id, x.timestamp)} target="_blank" rel="noopener">▶ {title(x.video_id)} ({x.timestamp})</a>}
+          {x.video_id && <a class="video-link" href={videoUrl(x.video_id, x.timestamp)} target="_blank" rel="noopener"><Icon name="video" size={18} />{title(x.video_id)} ({x.timestamp})</a>}
         </div>
       ))}
       {e.guide.length > 0 && <h2>자세 포인트</h2>}
       {e.guide.map((x, i) => (
         <div class="card" key={i}>
           <p class="small">{x.text}</p>
-          <a class="small" href={videoUrl(x.video_id, x.timestamp)} target="_blank" rel="noopener">▶ {x.timestamp} 영상 보기</a>
+          <a class="small video-link" href={videoUrl(x.video_id, x.timestamp)} target="_blank" rel="noopener"><Icon name="video" size={16} />{x.timestamp} 영상 보기</a>
         </div>
       ))}
       <h2>내 기록</h2>
@@ -181,14 +204,15 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
       {hist.length > 0 && (
         <div class="card">
           {[...hist].reverse().slice(0, 10).map((h) => (
-            <div class="row between small" key={h.workoutId} style={{ minHeight: '32px' }}>
+            <div class="row between small hist-row" key={h.workoutId}>
               <span>{h.date.slice(5).replace('-', '/')}</span>
               <span>{h.sets}세트{h.bestSet ? ` · 최고 ${h.bestSet.weight}kg×${h.bestSet.reps}` : ''}{h.seconds ? ` · ${h.seconds}초` : ''}</span>
               <span class="sub">{h.volume ? `${Math.round(h.volume).toLocaleString()}kg` : ''}</span>
             </div>
           ))}
         </div>
-      )}      {'custom' in e && <button class="danger" onClick={async () => { if (await askConfirm({ title: '직접 추가한 운동을 지울까요?', message: '운동 기록은 남아요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'custom', e.id)); go('#/exercises'); } }}>이 운동 삭제</button>}
+      )}
+      {'custom' in e && <button class="danger" onClick={async () => { if (await askConfirm({ title: '직접 추가한 운동을 지울까요?', message: '운동 기록은 남아요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'custom', e.id)); go('#/exercises'); } }}>이 운동 삭제</button>}
     </main>
   );
 }

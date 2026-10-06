@@ -10,6 +10,8 @@ import type { Workout } from '../../core/session';
 import { targetReps } from '../../core/time';
 import { toLocalInput, fromLocalInput, durationMin, setTimes, moveStart, patchSet, patchSetByKey, keyOf, withKeys, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, EDIT_LIMITS } from '../../core/workoutEdit';
 import { go } from '../nav';
+import { HeadButtons, BackButton } from '../header';
+import { Icon } from '../icons';
 import { askConfirm } from '../confirm';
 
 /**
@@ -83,7 +85,11 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
   const onStart = (v: string) => { setStartText(v); const iso = fromLocalInput(v); if (iso) setDraft((d) => moveStart(d, iso)); };
   return (
     <main>
-      <button class="ghost" onClick={() => void cancel()}>← 취소</button>
+      <div class="scr-backrow">
+        <BackButton label="취소" aria="수정 취소하고 돌아가기" onClick={() => void cancel()} />
+        {/* 설정 버튼은 두지 않음: 이 화면은 취소/저장으로만 떠남 (고친 내용을 모르고 떠나지 않게) */}
+        <HeadButtons settings={false} />
+      </div>
       <h1>운동 기록 수정</h1>
       <label>운동 이름</label>
       <input aria-label="운동 이름" maxLength={EDIT_LIMITS.nameMax} value={draft.name} onInput={(e) => { const v = (e.target as HTMLInputElement).value; setDraft((d) => ({ ...d, name: v })); }} />
@@ -121,7 +127,7 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
                     : <NumInput integer label={`${nm} 횟수`} suffix="" pendingKey={`ed-${key}-r`} value={x.reps} onChange={(v) => setDraft((d) => patchSetByKey(d, key, { reps: v }))} />}
                   <NumInput integer label={`${nm} RIR`} suffix="" pendingKey={`ed-${key}-i`} value={x.rir} onChange={(v) => setDraft((d) => patchSetByKey(d, key, { rir: v }))} />
                   <label class="ck"><input type="checkbox" aria-label={`${nm} 완료`} checked={x.done} onChange={(e) => { const c = (e.target as HTMLInputElement).checked; setDraft((d) => patchSetByKey(d, key, { done: c })); }} /></label>
-                  <button class="ghost" aria-label={`${nm} 지우기`} onClick={() => void act((d) => { const z = d.blocks[bi]?.items[ii]?.sets.findIndex((q) => keyOf(q) === key) ?? -1; return z >= 0 ? deleteSet(d, bi, ii, z) : d; })}>✕</button>
+                  <button class="ghost" aria-label={`${nm} 지우기`} onClick={() => void act((d) => { const z = d.blocks[bi]?.items[ii]?.sets.findIndex((q) => keyOf(q) === key) ?? -1; return z >= 0 ? deleteSet(d, bi, ii, z) : d; })}><Icon name="close" size={18} /></button>
                 </div>
               );
             })}

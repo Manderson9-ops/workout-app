@@ -24,6 +24,17 @@ export function bodyweightOn(entries: BodyweightEntry[], date: string): number |
   return best?.kg;
 }
 
+/**
+ * 운동의 날짜·주 시작일 (0.9.3 성능 관문, 기록 1,000회): 여러 집계가 운동마다 날짜를 다시 계산하지 않게 운동 객체별로 기억.
+ * startedAt 이 바뀌면 다시 계산 (객체를 고쳐 써도 안전)
+ */
+const dayCache = new WeakMap<Workout, { at: string; date: string; week: string }>();
+function dayOf(w: Workout): { date: string; week: string } {
+  let c = dayCache.get(w);
+  if (!c || c.at !== w.startedAt) { const date = localDate(w.startedAt); c = { at: w.startedAt, date, week: weekStart(date) }; dayCache.set(w, c); }
+  return c;
+}
+
 const workSets = (sets: SetLog[]) => sets.filter((s) => s.done && !s.warmup);
 
 /** 세트 하나의 무게 (맨몸 운동이고 무게가 비었으면 체중) */
@@ -59,6 +70,26 @@ export function exerciseHistory(workouts: Workout[], exerciseId: string, ex: Exe
 }
 
 export interface WorkoutSummary { id: string; name: string; date: string; durationSec: number; plannedSec?: number; workSets: number; volume: number; parts: Partial<Record<Part, number>> }
+
+export interface PvaRow { label: string; plannedMin: number; actualMin: number }
+/** 분 표시: 10분 미만은 소수 한 자리(짧은 운동이 0으로 사라지지 않게), 그 이상은 정수 */
+export function minutesLabel(sec: number): number { const m = sec / 60; return m < 10 ? Math.round(m * 10) / 10 : Math.round(m); }
+/**
+ * 예상 대비 실제 그래프 막대 (오래된 것 → 최근). plannedVsActual 과 같은 운동만 센다(예상 있음, 시간 > 0, 완료 세트 > 0).
+ * 같은 날 운동이 여러 번이면 라벨 뒤에 순번(10/7 ②)을 붙여 겹치지 않게 한다. sums 는 최신순.
+ */
+export function plannedVsActualRows(sums: WorkoutSummary[], last = 8): PvaRow[] {
+  const xs = sums.filter((x) => x.plannedSec && x.durationSec > 0 && x.workSets > 0).slice(0, last).reverse();
+  const perDate = new Map<string, number>();
+  for (const x of xs) perDate.set(x.date, (perDate.get(x.date) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  const circ = '①②③④⑤⑥⑦⑧⑨';
+  return xs.map((x) => {
+    const k = (seen.get(x.date) ?? 0) + 1; seen.set(x.date, k);
+    const md = `${Number(x.date.slice(5, 7))}/${Number(x.date.slice(8))}`;
+    return { label: (perDate.get(x.date)! > 1 ? `${md} ${circ[k - 1] ?? k}` : md), plannedMin: minutesLabel(x.plannedSec!), actualMin: minutesLabel(x.durationSec) };
+  });
+}
 
 export function summarize(w: Workout, byId: Map<string, Exercise>, bw: BodyweightEntry[] = []): WorkoutSummary {
   const date = localDate(w.startedAt);
@@ -102,6 +133,16 @@ export function durText(sec: number): string {
   return m % 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m / 60}시간`;
 }
 
+/** durText 를 숫자·단위 쌍으로 (큰 숫자 + 작은 단위 표시용, D-055). 글자를 이으면 durText 와 같음(띄어쓰기 제외) */
+export function durParts(sec: number): [number, string][] {
+  const s = Math.max(0, Math.round(sec));
+  if (s === 0) return [[0, '분']];
+  if (s < 60) return [[s, '초']];
+  const m = Math.round(s / 60);
+  if (m < 60) return [[m, '분']];
+  return m % 60 ? [[Math.floor(m / 60), '시간'], [m % 60, '분']] : [[m / 60, '시간']];
+}
+
 /** 통계에 셈하는 운동: 끝났고 완료한 작업 세트가 하나 이상 (D-054). 세트 0개 운동은 기록 목록에만 흐리게 보임 */
 export function isCountedWorkout(w: Workout): boolean {
   return !!w.endedAt && w.blocks.some((b) => b.items.some((i) => workSets(i.sets).length > 0));
@@ -115,8 +156,8 @@ export function weekSummary(workouts: Workout[], byId: Map<string, Exercise>, we
   const ws = weekStart(weekStartDate);
   for (const w of workouts) {
     if (!isCountedWorkout(w)) continue;
-    const date = localDate(w.startedAt);
-    if (weekStart(date) !== ws || (throughDate && date > throughDate)) continue;
+    const { date, week } = dayOf(w);
+    if (week !== ws || (throughDate && date > throughDate)) continue;
     const s = summarize(w, byId, bw);
     out.count++; out.sets += s.workSets; out.volume += s.volume; out.durationSec += s.durationSec; out.days.add(date);
   }
@@ -164,7 +205,7 @@ export function weeklyPartSets(workouts: Workout[], byId: Map<string, Exercise>,
   return starts.map((week) => {
     const parts = Object.fromEntries(PARTS.map((p) => [p, 0])) as Record<Part, number>;
     for (const w of workouts) {
-      if (!w.endedAt || weekStart(localDate(w.startedAt)) !== week) continue;
+      if (!w.endedAt || dayOf(w).week !== week) continue;
       for (const b of w.blocks) for (const it of b.items) {
         const ex = byId.get(it.exerciseId);
         if (ex) parts[ex.part] += workSets(it.sets).length;
@@ -172,6 +213,25 @@ export function weeklyPartSets(workouts: Workout[], byId: Map<string, Exercise>,
     }
     return { week, parts, total: PARTS.reduce((s, p) => s + parts[p], 0) };
   });
+}
+
+/**
+ * 기록 탭 부위 창 (D-055 3단계, Fitbod 식): 그 주(일~토)에 그 부위(운동의 주 부위)로 한 운동·작업 세트·최고 세트.
+ * weeklyPartSets 와 같은 기준 (끝난 운동, 완료한 작업 세트, 웜업 제외) → 막대 숫자와 합이 같음
+ */
+export interface PartWeekRow { date: string; workoutId: string; workoutName: string; exerciseId: string; name: string; sets: number; best?: string }
+export function partWeekDetail(workouts: Workout[], byId: Map<string, Exercise>, weekStartDate: string, part: Part): PartWeekRow[] {
+  const out: PartWeekRow[] = [];
+  for (const w of workouts) {
+    if (!w.endedAt || weekStart(localDate(w.startedAt)) !== weekStartDate) continue;
+    for (const b of w.blocks) for (const it of b.items) {
+      const ex = byId.get(it.exerciseId);
+      const n = workSets(it.sets).length;
+      if (!ex || ex.part !== part || !n) continue;
+      out.push({ date: localDate(w.startedAt), workoutId: w.id, workoutName: w.name, exerciseId: it.exerciseId, name: ex.name_ko, sets: n, ...(bestSetLabel(it.sets) ? { best: bestSetLabel(it.sets)! } : {}) });
+    }
+  }
+  return out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
 /** 달력: 그 달의 날짜별 운동 수 (끝난 운동) */
@@ -187,7 +247,7 @@ export function monthDays(workouts: Workout[], year: number, month: number): Map
 
 /** 연속 운동 주 (이번 주 포함, 한 번이라도 운동한 주가 이어진 수) */
 export function weekStreak(workouts: Workout[], today: string): number {
-  const weeks = new Set(workouts.filter(isCountedWorkout).map((w) => weekStart(localDate(w.startedAt))));
+  const weeks = new Set(workouts.filter(isCountedWorkout).map((w) => dayOf(w).week));
   let n = 0;
   let cur = weekStart(today);
   if (!weeks.has(cur)) { const [y, m, d] = cur.split('-').map(Number); cur = localDate(new Date(y!, m! - 1, d! - 7)); } // 이번 주는 아직 안 했어도 끊긴 것 아님
@@ -266,7 +326,7 @@ export function weeklyTotals(workouts: Workout[], byId: Map<string, Exercise>, t
   const out = new Map(starts.map((w) => [w, { week: w, volume: 0, sets: 0, count: 0 }]));
   for (const w of workouts) {
     if (!isCountedWorkout(w)) continue;
-    const row = out.get(weekStart(localDate(w.startedAt)));
+    const row = out.get(dayOf(w).week);
     if (!row) continue;
     const s = summarize(w, byId, bw);
     row.volume += s.volume; row.sets += s.workSets; row.count++;

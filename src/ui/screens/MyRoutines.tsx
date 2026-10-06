@@ -14,7 +14,9 @@ import { routineUse, routineParts, sortRoutines, filterRoutines, sinceText } fro
 import type { RoutineSort } from '../../core/routineList';
 import type { Part } from '../../core/types';
 import { newId } from '../../db/db';
-import { minutes } from '../components';
+import { minutes, MenuSheet, Empty } from '../components';
+import { Icon } from '../icons';
+import { ScreenHeader } from '../header';
 import { go, setEditReturn } from '../nav';
 import { askChoice, askConfirm } from '../confirm';
 import { lsGet, lsSet } from '../appName';
@@ -34,7 +36,7 @@ type Toast = { text: string; undo?: () => Promise<void> } | null;
 /**
  * mode: 'home' = 최근 3개 + "모두 보기", 'all' = 전체(검색·정렬·숨긴 루틴), 'pick' = 운동 탭에서 고르기(시작·편집, 지우기 없음)
  */
-export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | 'pick' }) {
+export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | 'all' | 'pick'; /** 홈 "다음 운동"에 나온 루틴 (카드에 표시만) */ nextId?: string }) {
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
   const nameOf = (id: string) => byId.get(id)?.name_ko ?? id;
@@ -76,6 +78,9 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
     else if (pick === 'alt') await removeForever(r);
   };
 
+  const [menu, setMenu] = useState<Routine | null>(null);
+  const edit = (r: Routine) => { setEditReturn(mode === 'pick' ? '#/workout' : '#/'); go(`#/routine/${encodeURIComponent(r.id)}`); };
+
   const card = (r: Routine, isHidden = false) => {
     const u = use.get(r.id);
     const parts = partsOf(r);
@@ -85,7 +90,7 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
       <div class={`card routine-card${isHidden ? ' is-hidden' : ''}`} key={r.id} role="group" aria-label={`루틴 ${r.name}`}>
         <div class="row between" style={{ alignItems: 'flex-start' }}>
           <div class="grow">
-            <h3 class="routine-name">{r.name}</h3>
+            <h3 class="routine-name">{r.name}</h3>{r.id === nextId && <span class="chip-s acc next-tag">다음 운동</span>}
             <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>
           </div>
           <div class="routine-when sub small" role="note" aria-label={u ? `마지막으로 한 날 ${when}, 총 ${u.count}회` : '아직 안 한 루틴'}
@@ -99,14 +104,15 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
           {isHidden ? <>
             <button class="grow" onClick={async () => { await setRoutineHidden(r.id, false); setToast({ text: `「${r.name}」 루틴을 다시 보이게 했어요` }); }} aria-label={`${r.name} 다시 보이기`}>다시 보이기</button>
             <button class="danger" onClick={async () => { if (await askConfirm({ title: '루틴을 완전히 지울까요?', message: `「${r.name}」 · 되돌릴 수 없어요. 운동 기록은 남아요.`, ok: '완전 삭제', danger: true })) await removeForever(r); }} aria-label={`${r.name} 완전 삭제`}>완전 삭제</button>
-          </> : items.length ? <>
-            <button class="primary grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}>▶ 시작</button>
-            <button onClick={() => { setEditReturn(mode === 'pick' ? '#/workout' : '#/'); go(`#/routine/${encodeURIComponent(r.id)}`); }} aria-label={`${r.name} 편집`}>편집</button>
-            {mode !== 'pick' && <button class="ghost" onClick={() => void remove(r)} aria-label={`${r.name} 지우기`}>지우기</button>}
           </> : <>
-            {/* 운동이 없는 루틴: 시작 대신 운동 넣기 */}
-            <button class="grow" onClick={() => { setEditReturn(mode === 'pick' ? '#/workout' : '#/'); go(`#/routine/${encodeURIComponent(r.id)}`); }} aria-label={`${r.name} 운동 넣기`}>+ 운동 넣기</button>
-            {mode !== 'pick' && <button class="ghost" onClick={() => void remove(r)} aria-label={`${r.name} 지우기`}>지우기</button>}
+            {items.length
+              ? <button class="primary grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}><Icon name="play" size={18} />시작</button>
+              /* 운동이 없는 루틴: 시작 대신 운동 넣기 */
+              : <button class="grow" onClick={() => edit(r)} aria-label={`${r.name} 운동 넣기`}>+ 운동 넣기</button>}
+            {/* 운동 탭(고르기)은 편집만 바로 (D-053), 홈·내 루틴은 ⋯ 안에 편집·지우기 (D-055) */}
+            {mode === 'pick'
+              ? items.length > 0 && <button onClick={() => edit(r)} aria-label={`${r.name} 편집`}>편집</button>
+              : <button class="icon-btn round" onClick={() => setMenu(r)} aria-label={`${r.name} 메뉴`} aria-haspopup="dialog"><Icon name="more" /></button>}
           </>}
         </div>
       </div>
@@ -119,7 +125,7 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
         <div class="routine-tools">
           {showSearch && <div class="row search-row">
             <input placeholder="루틴·운동·부위 검색 (초성 가능)" value={q} aria-label="루틴 검색" onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
-            {q && <button class="ghost" aria-label="검색어 지우기" onClick={() => setQ('')}>✕</button>}
+            {q && <button class="ghost icon-btn" aria-label="검색어 지우기" onClick={() => setQ('')}><Icon name="close" size={18} /></button>}
           </div>}
           {showSort && <div class="row wrap" role="group" aria-label="정렬" style={{ marginTop: '6px' }}>
             {(Object.keys(SORT_LABEL) as RoutineSort[]).map((k) => <button key={k} class={`chip ${sort === k ? 'on' : ''}`} aria-pressed={sort === k} onClick={() => setSort(k)}>{SORT_LABEL[k]}</button>)}
@@ -127,24 +133,27 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
         </div>
       )}
       {!visible.length && (
-        <div class="empty">
-          <p>{hidden.length ? `보이는 루틴이 없어요 (숨긴 루틴 ${hidden.length}개)` : '아직 루틴이 없어요.'}</p>
-          {!hidden.length && <p class="small">플랜 만들기에서 부위·시간을 고르면 자동으로 짜 드려요.</p>}
+        <Empty label="루틴 없음" text={hidden.length ? `보이는 루틴이 없어요 (숨긴 루틴 ${hidden.length}개)` : '아직 루틴이 없어요'}
+          hint={hidden.length ? undefined : '플랜 만들기에서 부위·시간을 고르면 자동으로 짜 드려요'}>
           {hidden.length > 0 && mode !== 'all' && <button onClick={() => go('#/routines?hidden')}>숨긴 루틴 보기</button>}
-          {mode === 'all' && !hidden.length && <div class="row" style={{ justifyContent: 'center' }}><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button><button onClick={() => void newRoutine()}>+ 직접 만들기</button></div>}
-        </div>
+          {!hidden.length && <><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button><button onClick={() => void newRoutine()}>+ 직접 만들기</button></>}
+        </Empty>
       )}
-      {visible.length > 0 && !shown.length && <div class="empty">"{q}"에 맞는 루틴이 없어요</div>}
+      {visible.length > 0 && !shown.length && <Empty label="검색 결과 없음" text={`"${q}"에 맞는 루틴이 없어요`} hint="다른 이름·부위로 찾아보세요" />}
       <div class="wide-cards">{shown.map((r) => card(r))}</div>
       {mode === 'home' && visible.length > 0 && (sorted.length > 3 || hidden.length > 0) && (
         <button class="big" onClick={() => go('#/routines')}>내 루틴 모두 보기 ({visible.length}개{hidden.length ? ` · 숨김 ${hidden.length}개` : ''})</button>
       )}
       {mode === 'all' && hidden.length > 0 && (
         <div style={{ marginTop: '12px' }}>
-          <button class="ghost" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}>{showHidden ? '▾' : '▸'} 숨긴 루틴 {hidden.length}개</button>
+          <button class="ghost" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}><Icon name="chevron" size={16} class={`rot${showHidden ? ' open' : ''}`} />숨긴 루틴 {hidden.length}개</button>
           {showHidden && <div class="wide-cards">{sortRoutines(hidden, use, 'name').map((r) => card(r, true))}</div>}
         </div>
       )}
+      {menu && <MenuSheet title={menu.name} onClose={() => setMenu(null)} items={[
+        { label: '편집', aria: `${menu.name} 편집`, run: () => edit(menu) },
+        { label: '지우기…', aria: `${menu.name} 지우기`, danger: true, run: () => void remove(menu) },
+      ]} />}
       {/* 결과 알림: 화면 아래 고정, 숨기기는 [되돌리기] (7초 뒤 사라짐) */}
       <div class="sr-only" role="status" aria-live="polite">{toast?.text ?? ''}</div>
       {toast && (
@@ -161,8 +170,9 @@ export function RoutineList({ s, mode }: { s: AppState; mode: 'home' | 'all' | '
 export function RoutinesScreen({ s }: { s: AppState }) {
   return (
     <main>
-      <button class="ghost back" onClick={() => go('#/')}>‹ 홈</button>
-      <div class="row between"><h1>내 루틴</h1><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜</button></div></div>
+      <ScreenHeader back={{ label: '홈', onClick: () => go('#/') }} title="내 루틴">
+        <div class="row head-actions"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜</button></div>
+      </ScreenHeader>
       <RoutineList s={s} mode="all" />
     </main>
   );

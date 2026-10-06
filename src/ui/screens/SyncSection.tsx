@@ -7,6 +7,7 @@ import { tombKey } from '../../core/syncStamp';
 import type { Conflict } from '../../db/sync';
 import { IS_PREVIEW } from '../appName';
 import { askConfirm } from '../confirm';
+import { Icon } from '../icons';
 
 /** 충돌 비교 정보: 이 기기 / 서버 */
 function compare(c: Conflict): string {
@@ -31,8 +32,8 @@ export function SyncBadge() {
   if (st.phase === 'off') return null;
   const text = st.phase === 'syncing' ? '동기화 중…' : st.phase === 'error' ? `동기화 안 됨 · ${syncErrorText(st.error)}` : st.pending ? `보낼 것 ${st.pending}건` : `동기화됨 · ${ago(st.lastOkAt)}`;
   return (
-    <div role="status" aria-label="동기화 상태" class="small" style={{ position: 'fixed', top: 'calc(env(safe-area-inset-top) + 2px)', right: '8px', zIndex: 25, padding: '2px 8px', borderRadius: '10px', background: 'var(--card2)', color: st.phase === 'error' ? 'var(--warn)' : 'var(--sub)', pointerEvents: 'none' }}>
-      {st.phase === 'error' ? '⚠ ' : '⇅ '}{text}
+    <div role="status" aria-label="동기화 상태" class={`sync-line${st.phase === 'error' ? ' t-warn' : ''}`}>
+      <Icon name={st.phase === 'error' ? 'alert' : 'sync'} size={14} />{text}
     </div>
   );
 }
@@ -97,7 +98,7 @@ export function SyncSection({ s }: { s: AppState }) {
       )}
       {on && (
         <>
-          <p class="small">{st.phase === 'syncing' ? '동기화 중…' : st.phase === 'error' ? `⚠ ${syncErrorText(st.error)}` : `동기화됨 · ${ago(st.lastOkAt)}`}{st.pending ? ` · 보낼 것 ${st.pending}건` : ''}</p>
+          <p class="small">{st.phase === 'syncing' ? '동기화 중…' : st.phase === 'error' ? `오류: ${syncErrorText(st.error)}` : `동기화됨 · ${ago(st.lastOkAt)}`}{st.pending ? ` · 보낼 것 ${st.pending}건` : ''}</p>
           <div class="row wrap">
             <button class="primary" disabled={st.phase === 'syncing'} onClick={() => void syncNow('manual')}>지금 동기화</button>
             <button class="danger" onClick={async () => { if (await askConfirm({ title: '동기화를 끌까요?', message: '이 기기 기록은 그대로 남아요.', ok: '끄기', danger: true })) { await disableSync(); setOn(false); } }}>끄기</button>

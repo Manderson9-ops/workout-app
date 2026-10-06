@@ -11,7 +11,7 @@ export function SendStatus() {
   const st = useSendState();
   if (st.phase === 'idle') return null;
   const text = st.phase === 'sending' ? 'PC로 보내는 중… 잠시 앱을 닫지 마세요'
-    : st.phase === 'sent' ? `PC로 보냄 ✓ (${when(st.at)})`
+    : st.phase === 'sent' ? `PC로 보냄 · ${when(st.at)}`
     : `PC로 못 보냈어요: ${st.error}. 다음에 앱을 열 때 다시 보내요`;
   return <p role="status" aria-label="PC로 보내기 상태" class="card small" style={{ color: st.phase === 'failed' ? 'var(--warn)' : st.phase === 'sent' ? 'var(--ok)' : 'var(--text)' }}>{text}</p>;
 }

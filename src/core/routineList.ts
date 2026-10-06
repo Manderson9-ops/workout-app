@@ -6,6 +6,31 @@ import type { Routine, Workout } from './session';
 import type { Part } from './types';
 import { PARTS } from './types';
 import { matchesQuery } from './search';
+import { localDate } from './stats';
+
+export type NextReason = 'oldest' | 'never' | 'doneToday';
+export interface NextPick { routine: Routine; reason: NextReason; lastAt?: string }
+/**
+ * 홈 "다음 운동" 고르기 (D-055 앱 판단, 근거 없는 운동 이론이 아니라 돌려 가며 하기 위한 규칙):
+ * 1) 운동이 들어 있는 루틴만 (숨긴 루틴은 부르는 쪽에서 뺀)
+ * 2) 오늘 한 루틴은 빼고, 한 적 있는 루틴 중 가장 오래전에 한 것 (돌아가며 하기)
+ * 3) 그런 루틴이 없으면 아직 안 한 루틴 중 가장 최근에 만들거나 고친 것 (안 한 루틴은 안 쓰는 초안일 수 있어 뒤로)
+ * 4) 모두 오늘 했으면 가장 최근에 한 루틴 + "오늘 이미 했어요"
+ * today = 이 기기 지역 날짜 (YYYY-MM-DD)
+ */
+export function pickNextRoutine(list: readonly Routine[], use: Map<string, RoutineUse>, today: string): NextPick | undefined {
+  const withItems = list.filter((r) => r.blocks.some((b) => b.items.length > 0));
+  if (!withItems.length) return undefined;
+  const lastOf = (r: Routine) => use.get(r.id)?.lastAt;
+  const byName = (a: Routine, b: Routine) => a.name.localeCompare(b.name, 'ko') || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const notToday = withItems.filter((r) => { const l = lastOf(r); return !l || localDate(l) !== today; });
+  const done = notToday.filter((r) => lastOf(r)).sort((a, b) => (lastOf(a)! < lastOf(b)! ? -1 : lastOf(a)! > lastOf(b)! ? 1 : byName(a, b)));
+  if (done[0]) return { routine: done[0], reason: 'oldest', lastAt: lastOf(done[0]) };
+  const never = notToday.filter((r) => !lastOf(r)).sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : byName(a, b)));
+  if (never[0]) return { routine: never[0], reason: 'never' };
+  const recent = [...withItems].sort((a, b) => (lastOf(a)! < lastOf(b)! ? 1 : lastOf(a)! > lastOf(b)! ? -1 : byName(a, b)))[0]!;
+  return { routine: recent, reason: 'doneToday', lastAt: lastOf(recent) };
+}
 
 export type RoutineSort = 'recent' | 'name' | 'short';
 export interface RoutineUse { lastAt?: string; count: number }

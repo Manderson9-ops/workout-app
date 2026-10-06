@@ -114,14 +114,15 @@ export function BodyMap({ sel, onPart }: { sel: Partial<Record<Part, Priority>>;
 }
 
 /** 읽기 전용 열 지도 (D-054): 부위별 세트 수를 색 단계로. 앞·뒤 그림을 나란히 (누르는 동작 없음) */
-export function BodyHeat({ sets }: { sets: Record<Part, number> }) {
+/** onPart: 그림의 부위를 누르면 (기록 탭: 그 부위 이번 주 운동 창). 키보드·화면 읽기는 옆 막대 버튼으로 같은 동작 */
+export function BodyHeat({ sets, onPart }: { sets: Record<Part, number>; onPart?: (p: Part) => void }) {
   const summary = (Object.keys(sets) as Part[]).filter((p) => sets[p] > 0).map((p) => `${p} ${sets[p]}세트`).join(', ') || '세트 없음';
   return (
-    <div class="bodyheat" data-testid="bodyheat" role="group" aria-label={`부위별 세트 열 지도: ${summary}`}>
+    <div class={`bodyheat${onPart ? ' tap' : ''}`} data-testid="bodyheat" role="group" aria-label={`부위별 세트 열 지도: ${summary}`}>
       <div class="heat-pair">
         {(['front', 'back'] as Side[]).map((x) => (
           <figure key={x} class="heat-fig">
-            <Figure side={x} sel={{}} heat={sets} />
+            <Figure side={x} sel={{}} heat={sets} onPart={onPart} />
             <figcaption class="sub small" aria-hidden="true">{x === 'front' ? '앞' : '뒤'}</figcaption>
           </figure>
         ))}

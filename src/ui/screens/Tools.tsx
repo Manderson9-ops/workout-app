@@ -2,6 +2,8 @@ import { lsGet, lsSet, lsRemove } from '../appName';
 import { useState } from 'preact/hooks';
 import { plateCalc, oneRMTable, ONE_RM_MAX_REPS, PLATE_MAX_KG } from '../../core/stats';
 import { NumInput, Sheet } from '../components';
+import { ScreenHeader } from '../header';
+import { go } from '../nav';
 
 const BARS = [20, 15, 10, 0];
 const PLATES = [25, 20, 15, 10, 5, 2.5, 1.25];
@@ -62,7 +64,7 @@ export function OneRMCalculator() {
 export function ToolsScreen() {
   return (
     <main>
-      <h1>도구</h1>
+      <ScreenHeader back={{ label: '설정', onClick: () => go('#/settings') }} title="도구" />
       <h2>원판 계산기</h2>
       <PlateCalculator />
       <h2>1RM 계산기</h2>

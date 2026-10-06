@@ -13,6 +13,7 @@ import type { Part } from '../../core/types';
 import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts, stepItemSets, stepItemReps } from '../../core/routineEdit';
 import { startRoutine } from '../actions';
 import { go, editReturnTo } from '../nav';
+import { HeadButtons, BackButton } from '../header';
 import { SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX, rangeText, ROUND_REST_MIN, ROUND_REST_MAX, ROUND_REST_STEP, TRANSITION_MIN, TRANSITION_MAX, TRANSITION_STEP } from '../../core/planEdit';
 
 const KIND_LABEL: Record<RoutineBlock['kind'], string> = { single: '일반', superset: '슈퍼세트', compound: '컴파운드 세트' };
@@ -77,7 +78,10 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
   const partOf = (b: RoutineBlock) => new Set(b.items.map((i) => byId.get(i.exerciseId)?.part));
   return (
     <main>
-      <button class="ghost" onClick={() => go(editReturnTo())}>{editReturnTo() === '#/workout' ? '← 운동' : '← 홈'}</button>
+      <div class="scr-backrow">
+        <BackButton label={editReturnTo() === '#/workout' ? '운동' : '홈'} onClick={() => go(editReturnTo())} />
+        <HeadButtons />
+      </div>
       <label>루틴 이름</label>
       <input value={r.name} aria-label="루틴 이름" onInput={(e) => setR({ ...r, name: (e.target as HTMLInputElement).value })} />
       <p class="sub small">예상 {mmss(est)} {r.warmupSec ? `(웜업 ${Math.round(r.warmupSec / 60)}분 포함)` : ''}</p>

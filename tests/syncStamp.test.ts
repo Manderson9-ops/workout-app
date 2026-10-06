@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildSw } from '../tools/sw_build';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -217,7 +218,7 @@ describe('지우기는 softDelete로만 (빠뜨린 곳 찾기)', () => {
 
 describe('서비스 워커 캐시: 자기 앞머리만 지움 (D-031)', () => {
   const run = async (scope: string, keys: string[]) => {
-    const src = readFileSync('public/sw.js', 'utf8');
+    const src = buildSw(readFileSync('src/sw.template.js', 'utf8'), 'v2') /* 빌드 이름 'v2' 로 만든 sw.js (D-055: 틀에서 빌드) */;
     const deleted: string[] = []; const handlers: Record<string, (e: unknown) => void> = {};
     const self = { registration: { scope }, addEventListener: (n: string, h: (e: unknown) => void) => { handlers[n] = h; }, clients: { claim: async () => undefined }, skipWaiting: () => undefined };
     const caches = { keys: async () => keys, delete: async (k: string) => { deleted.push(k); return true; }, open: async () => ({ addAll: async () => undefined, put: async () => undefined }), match: async () => undefined };
@@ -231,7 +232,7 @@ describe('서비스 워커 캐시: 자기 앞머리만 지움 (D-031)', () => {
     expect(await run('https://x.github.io/workout-app/', ['workout-app-v1', 'workout-app:v1', 'workout-app:v2', 'workout-app-next:v1', 'other'])).toEqual(['workout-app-v1', 'workout-app:v1']);
   });
   it('설치 때 화면을 새로 받아 assets까지 미리 담음', async () => {
-    const src = readFileSync('public/sw.js', 'utf8');
+    const src = buildSw(readFileSync('src/sw.template.js', 'utf8'), 'v2') /* 빌드 이름 'v2' 로 만든 sw.js (D-055: 틀에서 빌드) */;
     const added: string[] = []; const handlers: Record<string, (e: unknown) => void> = {};
     const html = '<script type="module" src="/workout-app/assets/index-AB.js"></script><link rel="stylesheet" href="/workout-app/assets/index-CD.css">';
     const cache = { addAll: async (xs: (string | Request)[]) => { for (const x of xs) added.push(typeof x === 'string' ? x : `${x.url}|${x.cache}`); }, match: async () => new Response(html), put: async () => undefined };
