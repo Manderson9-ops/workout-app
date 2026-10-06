@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { skipReloadFor, waitingDecision, wheresOf, visits, clearVisited, dotTargets, displayVersion, cmpVersion, entriesSince, whatsNewDecision, whatsNewLines, buildVersionInfo, parseVersionInfo, tabOfPath, previousVersion, koDate } from '../src/core/changelog';
+import { isFirstInstall, controllerChangeAction, skipReloadFor, waitingDecision, wheresOf, visits, clearVisited, dotTargets, displayVersion, cmpVersion, entriesSince, whatsNewDecision, whatsNewLines, buildVersionInfo, parseVersionInfo, tabOfPath, previousVersion, koDate } from '../src/core/changelog';
 import type { ChangelogEntry } from '../src/core/changelog';
 import { APP_VERSION } from '../src/core/version';
 
@@ -105,3 +105,26 @@ describe('D-055 3차 지적: 조용한 교체 뒤 새로 고침 건너뛰기는 
     expect(skipReloadFor(a, null)).toBe(false);
   });
 });
+
+describe('0.9.3 검토 R1: 처음 설치 판단과 controllerchange 때 할 일', () => {
+  it('처음 설치 = 화면을 맡은 워커도 활성 워커도 없을 때만', () => {
+    expect(isFirstInstall({ controlled: false, hasActive: false })).toBe(true); // 처음 방문 (설치 중이어도)
+    expect(isFirstInstall({ controlled: false, hasActive: true })).toBe(false); // Shift+새로 고침: 화면만 안 맡음
+    expect(isFirstInstall({ controlled: true, hasActive: true })).toBe(false); // 보통 다시 열기
+  });
+  it('처음 설치: 첫 맡기는 건너뛰고, 그 뒤 [지금 적용] 교체는 새로 고침 (한 번만)', () => {
+    const s = { quiet: false, firstInstall: true, firstClaimed: false, reloaded: false };
+    expect(controllerChangeAction(s)).toBe('skip-first');
+    expect(controllerChangeAction({ ...s, firstClaimed: true })).toBe('reload');
+    expect(controllerChangeAction({ ...s, firstClaimed: true, reloaded: true })).toBe('none');
+  });
+  it('화면은 안 맡았지만 활성 워커가 있던 경우: 처음 설치가 아니므로 [지금 적용]의 첫 교체부터 새로 고침', () => {
+    const firstInstall = isFirstInstall({ controlled: false, hasActive: true });
+    expect(controllerChangeAction({ quiet: false, firstInstall, firstClaimed: false, reloaded: false })).toBe('reload');
+  });
+  it('조용히 바꾼 그 워커면 언제나 건너뜀', () => {
+    expect(controllerChangeAction({ quiet: true, firstInstall: false, firstClaimed: false, reloaded: false })).toBe('skip-quiet');
+    expect(controllerChangeAction({ quiet: true, firstInstall: true, firstClaimed: false, reloaded: false })).toBe('skip-quiet');
+  });
+});
+

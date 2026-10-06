@@ -7,7 +7,7 @@
  * - [나중에] = 이번 실행 동안만 숨김 (다음에 앱을 열면 다시 보임)
  */
 import { useEffect, useState } from 'preact/hooks';
-import { parseVersionInfo, cmpVersion, waitingDecision, skipReloadFor } from '../core/changelog';
+import { parseVersionInfo, cmpVersion, waitingDecision, skipReloadFor, isFirstInstall, controllerChangeAction } from '../core/changelog';
 import type { VersionInfo } from '../core/changelog';
 import { APP_VERSION } from '../core/version';
 import { scopedKey } from './appName';
@@ -112,7 +112,9 @@ export function registerServiceWorker(): void {
       try {
         // 처음 설치(이 화면을 맡은 워커가 아직 없음)면 워커가 화면을 맡아도 새로 고치지 않음 (0.9.3): 화면은 이미 최신이고,
         // 등록을 첫 화면 뒤로 옮겨서 새로 고침이 사용 도중(첫 탭 직후 등)에 일어나 입력을 잃을 수 있으므로
-        const firstInstall = !navigator.serviceWorker.controller;
+        // 활성 워커가 이미 있으면(예: Shift+새로 고침으로 화면만 안 맡은 상태) 처음 설치가 아님 (검토 R1)
+        const before = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL).catch(() => undefined);
+        const firstInstall = isFirstInstall({ controlled: !!navigator.serviceWorker.controller, hasActive: !!before?.active });
         reg = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`);
         const r = reg;
         const track = (w: ServiceWorker | null) => {
@@ -125,9 +127,10 @@ export function registerServiceWorker(): void {
         let firstClaimed = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           // 조용한 교체: 화면을 맡은 워커가 조용히 바꾼 그 워커일 때만 새로 고치지 않음 (쓰는 도중 갑자기 새로 고침 없음)
-          if (skipReloadFor(quietWorker, navigator.serviceWorker.controller)) { quietWorker = null; return; }
-          if (firstInstall && !firstClaimed) { firstClaimed = true; return; } // 처음 설치 때 한 번은 새로 고치지 않음 (그 뒤 교체는 예전대로 새로 고침)
-          if (!reloaded) { reloaded = true; location.reload(); }
+          const act = controllerChangeAction({ quiet: skipReloadFor(quietWorker, navigator.serviceWorker.controller), firstInstall, firstClaimed, reloaded });
+          if (act === 'skip-quiet') quietWorker = null;
+          else if (act === 'skip-first') firstClaimed = true; // 처음 설치 때 한 번은 새로 고치지 않음 (그 뒤 교체는 예전대로 새로 고침)
+          else if (act === 'reload') { reloaded = true; location.reload(); }
         });
       } catch { reg = null; /* 등록 실패해도 앱은 동작 */ }
     }

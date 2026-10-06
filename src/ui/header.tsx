@@ -27,12 +27,14 @@ export function BackButton({ label, onClick, aria }: { label: string; onClick: (
   return <button class="ghost back" onClick={onClick} aria-label={aria}><Icon name="back" size={20} />{label}</button>;
 }
 
-export function ScreenHeader({ title, eyebrow, back, children, titleClass }: {
+export function ScreenHeader({ title, eyebrow, back, children, titleClass, actions }: {
   title?: ComponentChildren; eyebrow?: string;
   /** 뒤로 버튼 (글자, 누르면 할 일) */
   back?: { label: string; onClick: () => void; aria?: string };
   /** 제목 아래 줄 (버튼 등) */
   children?: ComponentChildren; titleClass?: string;
+  /** 제목 줄 오른쪽 원형 버튼 앞에 더할 버튼 (예: 종목의 [+ 직접 추가]) */
+  actions?: ComponentChildren;
 }) {
   return (
     <header class="scr-head">
@@ -48,6 +50,7 @@ export function ScreenHeader({ title, eyebrow, back, children, titleClass }: {
             {eyebrow && <p class="eyebrow">{eyebrow}</p>}
             <h1 class={titleClass}>{title}</h1>
           </div>
+          {actions}
           {!back && <HeadButtons />}
         </div>
       )}

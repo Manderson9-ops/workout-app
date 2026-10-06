@@ -59,6 +59,28 @@ export function skipReloadFor<T>(quiet: T | null | undefined, controller: T | nu
   return quiet != null && controller != null && quiet === controller;
 }
 
+/**
+ * 처음 설치인지 (0.9.3 검토 R1): 이 화면을 맡은 워커도, 이미 활성인 워커도 없을 때만.
+ * Shift+새로 고침처럼 화면은 안 맡았지만 활성 워커가 있으면 처음 설치가 아님 (그 뒤 [지금 적용]은 새로 고쳐야 함).
+ * 설치 중(installing)이거나 대기(waiting)만 있고 활성이 없으면 아직 처음 설치.
+ */
+export function isFirstInstall(s: { controlled: boolean; hasActive: boolean }): boolean {
+  return !s.controlled && !s.hasActive;
+}
+
+/**
+ * controllerchange 때 할 일 (0.9.3 검토 R1):
+ * - 'skip-quiet': 조용히 바꾼 그 워커 → 새로 고치지 않음
+ * - 'skip-first': 처음 설치의 첫 맡기(claim) → 새로 고치지 않음 (화면은 이미 최신)
+ * - 'reload': 새 버전으로 교체 → 새로 고침 (한 번만)
+ * - 'none': 이미 새로 고치는 중
+ */
+export function controllerChangeAction(s: { quiet: boolean; firstInstall: boolean; firstClaimed: boolean; reloaded: boolean }): 'skip-quiet' | 'skip-first' | 'reload' | 'none' {
+  if (s.quiet) return 'skip-quiet';
+  if (s.firstInstall && !s.firstClaimed) return 'skip-first';
+  return s.reloaded ? 'none' : 'reload';
+}
+
 /** 시트에 보일 줄 (최신 먼저, 최대 max 줄). 잘렸으면 more = 남은 줄 수 */
 export function whatsNewLines(list: readonly ChangelogEntry[], max = 8): { entries: { e: ChangelogEntry; lines: string[] }[]; more: number } {
   let left = max; let total = 0;

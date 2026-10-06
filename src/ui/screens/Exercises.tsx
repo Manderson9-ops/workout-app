@@ -59,7 +59,7 @@ export function Exercises({ s }: { s: AppState }) {
     .sort((a, b) => GRADES.indexOf(a.g.value) - GRADES.indexOf(b.g.value) || (a.g.estimated ? 1 : 0) - (b.g.estimated ? 1 : 0) || a.e.name_ko.localeCompare(b.e.name_ko));
   return (
     <main>
-      <ScreenHeader title="운동 종목"><div class="row head-actions"><button onClick={() => setAdding(true)}>+ 직접 추가</button></div></ScreenHeader>
+      <ScreenHeader title="운동 종목" actions={<button class="icon-btn round head-add" aria-label="운동 직접 추가" title="운동 직접 추가" onClick={() => setAdding(true)}><Icon name="plus" /></button>} />
       <input placeholder="검색 (초성 가능: ㄹㅍㄷ, 별칭: 사레레)" value={q} aria-label="운동 검색" onInput={(e) => { const v = (e.target as HTMLInputElement).value; setQ(v); remember({ q: v }); }} />
       <div class="row wrap filter-row">
         <button class={`chip ${!part ? 'on' : ''}`} onClick={() => { setPart(undefined); remember({ part: undefined }); }}>전체</button>

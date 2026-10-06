@@ -28,20 +28,32 @@ self.addEventListener('install', (e) => {
   }));
 });
 self.addEventListener('message', (e) => { if (e.data === 'skipWaiting') self.skipWaiting(); });
+// 나머지 묶음 채우기 (검토 R2): activate 의 waitUntil 밖에서 (활성화·화면 맡기·fetch 를 막지 않게).
+// 활성화가 끝나면 한 번 시작하고, 워커가 그 전에 멈췄으면 다음 fetch 때 이어서 (fetch 응답은 기다리지 않음). 한 번에 하나만
+let filling = null;
+let filled = false;
+function fillRest() {
+  if (filled) return Promise.resolve();
+  filling ??= caches.open(CACHE).then(async (c) => {
+    const want = ASSETS.map((a) => new URL(a, self.registration.scope).href);
+    const have = new Set((await c.keys()).map((r) => r.url));
+    const missing = want.filter((u) => !have.has(u));
+    if (missing.length) await c.addAll(missing);
+    filled = true;
+  }).catch(() => { /* 못 담은 것은 다음 기회에 */ }).finally(() => { filling = null; });
+  return filling;
+}
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && OWN(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim())
-    .then(() => caches.open(CACHE)).then(async (c) => {
-      const want = ASSETS.map((a) => new URL(a, self.registration.scope).href);
-      const have = new Set((await c.keys()).map((r) => r.url));
-      const missing = want.filter((u) => !have.has(u));
-      if (missing.length) await c.addAll(missing);
-    }).catch(() => { /* 못 담은 것은 처음 열 때 담김 */ }));
+  const done = caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && OWN(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim());
+  e.waitUntil(done);
+  done.then(() => setTimeout(() => { void fillRest(); }, 1000), () => undefined);
 });
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   // version.json (D-055): 항상 네트워크로만 (저장하면 새 버전 안내가 옛 내용을 보여 줌). 앱도 cache:'no-store' 로 읽음
   if (new URL(req.url).pathname.endsWith('/version.json')) return;
+  if (!filled) e.waitUntil(fillRest()); // 응답과 따로 (워커가 살아 있게만, 응답은 기다리지 않음)
   if (req.mode === 'navigate') {
     e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('./', copy)); return res; })
       .catch(() => caches.match('./')));

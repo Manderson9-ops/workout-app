@@ -53,7 +53,7 @@ function LoadError() {
   return (
     <main>
       <div class="card" role="alert">
-        <p>화면을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.</p>
+        <p>화면을 불러오지 못했어요. 새 버전이 나왔거나 인터넷이 끊겼을 수 있어요</p>
         <button class="primary" onClick={() => location.reload()}>다시 시도</button>
       </div>
     </main>

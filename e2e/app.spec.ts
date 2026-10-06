@@ -698,7 +698,7 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
 });
 test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본 휴식', async ({ page }) => {
   await page.getByRole('link', { name: '종목' }).click();
-  await page.getByRole('button', { name: '+ 직접 추가' }).click();
+  await page.getByRole('button', { name: '운동 직접 추가' }).click(); // 제목 줄 원형 + 버튼 (0.9.3 검토)
   await page.getByLabel('운동 이름').fill('우리 헬스장 로우 머신');
   await page.getByLabel('부위').selectOption('등');
   await page.getByLabel('종류').selectOption('compound');
@@ -2430,5 +2430,25 @@ test('0.9.3 성능 관문: 화면을 나눠 받아도 한 번 연 뒤에는 인�
   await page.getByRole('link', { name: '플랜' }).click();
   await expect(page.getByRole('region', { name: '1단계 부위·우선순위' })).toBeVisible();
   await context.setOffline(false);
+});
+
+test.describe('0.9.3 검토: 나눠 받는 화면을 못 받으면', () => {
+  test.use({ serviceWorkers: 'block' }); // 서비스 워커 저장본이 아니라 네트워크 실패를 흉내
+  test('"새 버전이 나왔거나 인터넷이 끊겼을 수 있어요" + [다시 시도], 다시 받을 수 있게 되면 다시 시도로 열림 (다시 시도 단계는 Chromium 만)', async ({ page, browserName }) => {
+    const chunk = '**/assets/Stats-*.js';
+    await page.route(chunk, (r) => r.fulfill({ status: 404, body: 'not found', headers: { 'cache-control': 'no-store' } }));
+    await page.reload(); // 새 문서 (이전 문서가 미리 받아 둔 묶음 없이)
+    await expect(page.getByRole('heading', { name: '오늘' })).toBeVisible();
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    const alert = page.getByRole('alert').filter({ hasText: '화면을 불러오지 못했어요' });
+    await expect(alert).toContainText('새 버전이 나왔거나 인터넷이 끊겼을 수 있어요');
+    await checkScreen(page, '81-lazy-load-error');
+    await expect(alert.getByRole('button', { name: '다시 시도' })).toBeVisible();
+    // Playwright WebKit 은 한 번 실패한 모듈 묶음을 새로 고침 뒤에도 다시 요청하지 않음 (요청 자체가 안 나감, 도구 쪽 동작으로 보임) → 다시 시도 단계는 Chromium 만
+    if (browserName === 'webkit') return;
+    await page.unroute(chunk);
+    await alert.getByRole('button', { name: '다시 시도' }).click();
+    await expect(page.getByTestId('this-week')).toBeVisible();
+  });
 });
 

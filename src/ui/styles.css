@@ -647,3 +647,4 @@ button.chip.full { width: 100%; }
 .skel-bar.w40 { width: 40%; } .skel-bar.w60 { width: 60%; } .skel-bar.w80 { width: 80%; }
 @media (prefers-reduced-motion: no-preference) { .skel .skel-bar { animation: skel-pulse 1.2s ease-in-out infinite alternate; } }
 @keyframes skel-pulse { from { opacity: .55; } to { opacity: 1; } }
+.scr-titlerow > .head-add { flex: none; margin-top: 2px; }
