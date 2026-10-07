@@ -89,6 +89,11 @@ export function startDiag(): void {
 export let lastHiddenAt = 0;
 export let lastVisibleAt = 0;
 
+/** 휴식 끝 진동에 쓴 방법 (D-056): switch(iOS 햅틱)·vibrate·none, 늦게 돌아와서 건너뛴 것은 late. 개인 정보 없음 */
+export function diagHaptic(m: 'switch' | 'vibrate' | 'none' | 'late'): void {
+  diag('haptic', { m, ok: m === 'switch' || m === 'vibrate' });
+}
+
 /** 휴식 끝을 알린 순간: 예정 시각보다 얼마나 늦었나. 운동 화면 밖이었거나 앱이 숨겨졌던 경우는 측정에서 뺌 (classifyTimerEnd) */
 export function diagTimerEnd(endsAt: number, soundOn: boolean, audio: string, screenShownAt: number): void {
   const now = Date.now();
