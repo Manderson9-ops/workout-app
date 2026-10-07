@@ -2472,7 +2472,10 @@ test.describe('D-056 휴식 끝 진동', () => {
     const y0 = await page.evaluate(() => window.scrollY);
     await btn.click();
     const res = page.getByTestId('alert-test-result');
-    await expect(res).toContainText(/진동 방식: (iOS 햅틱|진동|진동 지원 안 함\(화면 깜빡임만\))/);
+    await expect(res).toContainText(/iOS 햅틱을 시도했어요 · 떨렸는지 직접 확인해 주세요|진동 방식: 진동|진동 방식: 진동 지원 안 함\(화면 깜빡임만\)/);
+    await expect(res).toContainText('아이폰 진동은 버튼을 누르지 않은 순간이라 안 올 수 있어요');
+    await expect(guide).toContainText('애플 제한으로 진동이 안 올 수 있어요');
+    await expect(grp).not.toContainText('그때는 진동으로 알려요'); // 진동을 약속하는 옛 문구 없음 (검토 R1)
     await expect(res).toContainText('무음 스위치를 확인하세요');
     await expect(res).toContainText('운동 중에는 휴식이 끝나면 자동으로');
     await page.waitForTimeout(400); // 나머지 두 번 누르기(120ms 간격)까지
@@ -2486,14 +2489,15 @@ test.describe('D-056 휴식 끝 진동', () => {
     await checkScreen(page, '82-settings-alert');
   });
 
-  test('휴식: 첫 휴식에 안내 한 줄(닫기), 10초 전 짧게 1번·끝에 3번 진동(한 번만), 늦게 돌아오면 진동 안 함', async ({ page }) => {
+  test('휴식: 첫 휴식에 안내 한 줄(닫기), 10초 전 짧게 1번·끝에 3번 진동(한 번만), 늦게 돌아오면 진동 안 함', async ({ page, browserName }) => {
     await page.addInitScript(() => { (window as HW).__wkTest = true; });
     await page.reload();
     await makeRoutine(page, ['이두'], '30분');
     await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
     await page.getByRole('button', { name: '현재 세트 완료' }).click();
     const hint = page.getByRole('note', { name: '휴식 알림 안내' });
-    await expect(hint).toHaveText('무음 모드면 소리 대신 진동으로 알려요');
+    // 진동 이야기는 진동 켬 + 방법이 있을 때만 (Chromium = vibrate, Playwright WebKit = 없음)
+    await expect(hint).toHaveText(browserName === 'chromium' ? '무음 모드면 알림음 대신 진동·화면 깜빡임으로 알려요' : '무음 모드면 알림음이 안 나요 · 벨소리 모드로 두면 음악 위로 들려요');
     await checkScreen(page, '83-rest-hint');
     const calls = () => page.evaluate(() => ((window as HW).__hapticCalls ?? []).map((c) => c.pulses));
     const shift = (ms: number) => page.evaluate((m) => { const w = window as HW; w.__dn ??= Date.now.bind(Date); const o = w.__dn; Date.now = () => o() + m; }, ms);
@@ -2529,6 +2533,78 @@ test.describe('D-056 휴식 끝 진동', () => {
     await expect(hint).toBeVisible();
     await hint.getByRole('button', { name: '안내 닫기' }).click();
     await expect(hint).toHaveCount(0);
+  });
+});
+
+test.describe('D-056 검토: 진동 끔·소리 끔, 실험 알림', () => {
+  type NW = Window & { __wkTest?: boolean; __hapticCalls?: { pulses: number }[]; __notifyCalls?: { title: string; body: string }[]; __dn?: () => number };
+  const shift = (page: Page, ms: number) => page.evaluate((m) => { const w = window as NW; w.__dn ??= Date.now.bind(Date); const o = w.__dn; Date.now = () => o() + m; }, ms);
+  const restTotal = async (page: Page) => Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
+
+  test('진동 끔이면 첫 휴식 안내는 벨소리 이야기, 소리 끔 + 진동 켬이면 10초 전 진동은 그대로', async ({ page }) => {
+    await page.addInitScript(() => { (window as NW).__wkTest = true; });
+    await page.getByRole('link', { name: '설정', exact: true }).click();
+    const grp = page.getByRole('region', { name: '소리·화면' });
+    await grp.getByRole('button', { name: '휴식 끝 진동 켬' }).click();
+    await makeRoutine(page, ['이두'], '30분');
+    await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    await expect(page.getByRole('note', { name: '휴식 알림 안내' })).toHaveText('무음 모드면 알림음이 안 나요 · 벨소리 모드로 두면 음악 위로 들려요');
+    // 소리 끔 + 진동 켬
+    await page.getByRole('link', { name: '설정', exact: true }).click();
+    await grp.getByRole('button', { name: '휴식 끝 진동 끔' }).click();
+    await grp.getByRole('button', { name: '소리 켬' }).click();
+    await page.reload(); // 새 문서에서 __wkTest 다시
+    await page.getByRole('link', { name: '운동', exact: true }).click();
+    const total = await restTotal(page);
+    await shift(page, (total - 5) * 1000);
+    await expect.poll(() => page.evaluate(() => ((window as NW).__hapticCalls ?? []).map((c) => c.pulses))).toEqual([1]);
+  });
+
+  test('실험 알림: 켜면 권한을 묻고, [알림 시험]·휴식 끝에 한 번 보냄, 늦게 돌아오면 안 보냄 (Chromium, 권한 허용) / WebKit 은 안내만', async ({ page, context, browserName }) => {
+    const sec = page.getByRole('region', { name: '휴식 끝 알림으로 받기 (실험)' });
+    if (browserName !== 'chromium') {
+      await page.getByRole('link', { name: '설정', exact: true }).click();
+      await expect(sec).toBeVisible();
+      await expect(sec.getByTestId('notify-perm')).toBeVisible(); // 켜기 버튼 또는 "쓸 수 없어요" 안내
+      return;
+    }
+    await context.grantPermissions(['notifications']);
+    // 헤드리스 Chromium 은 권한을 줘도 Notification.permission 이 'denied' 로 보임 (permissions.query 는 granted) → 시험에서만 허용으로 보이게
+    await page.addInitScript(() => { (window as NW).__wkTest = true; Object.defineProperty(Notification, 'permission', { get: () => 'granted', configurable: true }); Notification.requestPermission = async () => 'granted'; });
+    await page.reload();
+    await page.getByRole('link', { name: '설정', exact: true }).click();
+    await expect(sec).toContainText('홈 화면에 추가한 앱에서만');
+    await sec.getByRole('button', { name: '휴식 끝 알림 끔' }).click();
+    await expect(sec.getByRole('button', { name: '휴식 끝 알림 켬' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(sec.getByTestId('notify-perm')).toHaveText('알림 허용됨');
+    await sec.getByRole('button', { name: '알림 시험', exact: true }).click();
+    await expect(sec.getByTestId('notify-result')).toContainText(/알림을 보냈어요|보내지 못했어요/);
+    await checkScreen(page, '84-settings-notify');
+    const calls = () => page.evaluate(() => ((window as NW).__notifyCalls ?? []).map((c) => `${c.title}|${c.body}`));
+    expect(await calls()).toEqual(['알림 시험|배너·진동이 왔나요?']);
+    // 휴식 끝 → 한 번
+    await makeRoutine(page, ['이두'], '30분');
+    await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    const t1 = await restTotal(page);
+    await shift(page, (t1 + 1) * 1000);
+    await expect(page.locator('.rest-pill.end')).toBeVisible();
+    await expect.poll(async () => (await calls()).filter((c) => c.startsWith('휴식 끝|'))).toHaveLength(1);
+    expect((await calls()).find((c) => c.startsWith('휴식 끝|'))).toMatch(/^휴식 끝\|다음: /);
+    await page.waitForTimeout(600);
+    expect((await calls()).filter((c) => c.startsWith('휴식 끝|'))).toHaveLength(1);
+    // 늦게 돌아옴 → 안 보냄
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    const t2 = await restTotal(page);
+    await shift(page, (t1 + 1 + t2 + 30) * 1000);
+    await expect(page.locator('.rest-pill.end')).toBeVisible();
+    await page.waitForTimeout(500);
+    expect((await calls()).filter((c) => c.startsWith('휴식 끝|'))).toHaveLength(1);
+    // 끄면 다시 끔
+    await page.getByRole('link', { name: '설정', exact: true }).click();
+    await sec.getByRole('button', { name: '휴식 끝 알림 켬' }).click();
+    await expect(sec.getByRole('button', { name: '휴식 끝 알림 끔' })).toBeVisible();
   });
 });
 

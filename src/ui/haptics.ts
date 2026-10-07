@@ -32,6 +32,17 @@ export const pickMethod = (env: { hasSwitch: boolean; hasVibrate: boolean }): Ha
 /** 휴식 끝 진동을 지금 해도 되는지 (늦게 돌아왔으면 건너뜀) */
 export const buzzOnTime = (endsAt: number, now: number, grace = LATE_GRACE_MS): boolean => now - endsAt <= grace;
 export const METHOD_LABEL: Record<HapticMethod, string> = { switch: 'iOS 햅틱', vibrate: '진동', none: '진동 지원 안 함(화면 깜빡임만)' };
+/** [소리·진동 시험] 결과 중 진동 부분 (D-056 검토 R1: 아이폰은 떨렸는지 사용자가 확인) */
+export const testResultText = (m: HapticMethod): string => (m === 'switch' ? 'iOS 햅틱을 시도했어요 · 떨렸는지 직접 확인해 주세요' : m === 'vibrate' ? '진동 방식: 진동' : '진동 방식: 진동 지원 안 함(화면 깜빡임만)');
+/**
+ * 첫 휴식 안내 한 줄 (D-056 검토 R2): 진동 이야기는 진동 켬 + 이 기기에 방법이 있을 때만.
+ * 아이폰(스위치)은 타이머 진동이 안 올 수 있어 약속하지 않음
+ */
+export function restHintText(on: boolean, m: HapticMethod): string {
+  if (on && m === 'vibrate') return '무음 모드면 알림음 대신 진동·화면 깜빡임으로 알려요';
+  if (on && m === 'switch') return '무음 모드면 알림음이 안 나요 · 아이폰은 진동도 안 올 수 있어요';
+  return '무음 모드면 알림음이 안 나요 · 벨소리 모드로 두면 음악 위로 들려요';
+}
 
 /** 진동에 필요한 브라우저 기능 (시험에서 가짜로 바꿔 끼움) */
 export interface HapticEnv {

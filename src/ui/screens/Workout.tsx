@@ -27,7 +27,9 @@ import { softDelete } from '../../db/db';
 
 import { unlockAudio, wasAlerted, markAlerted, audioState, playEndSound, playWarnSound } from '../device';
 import { diagTimerEnd, diagHaptic } from '../diag';
-import { haptic, hapticOn, buzzOnTime } from '../haptics';
+import { haptic, hapticOn, buzzOnTime, hapticMethod, restHintText } from '../haptics';
+import { notifyOn, notifyPermission, showAppNotification } from '../notify';
+import { shouldNotify, restNotifyBody } from '../../core/notify';
 import { lsGet, lsSet } from '../appName';
 
 /** D-056 휴식 안내를 본 기기 (이 기기만) */
@@ -55,6 +57,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const shownAt = useRef(Date.now());
   // D-056: 이 기기에서 처음 휴식이 시작될 때 한 번 "무음 모드면 소리 대신 진동" 안내 (그 휴식 동안만, 닫을 수 있음)
   const [hintFor, setHintFor] = useState<number | null>(null);
+  /** 알림 본문용 다음 세트 이름 (아래에서 계산한 값을 효과에서 씀) */
+  const nextRef = useRef('');
   const restId = w?.timer?.startedAt;
   useEffect(() => {
     if (restId === undefined || lsGet(REST_HINT_KEY)) return;
@@ -116,8 +120,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   useEffect(() => {
     if (!w?.timer) { setEnded(false); return; }
     const key = w.timer.endsAt;
-    // 10초 전: 알림음 한 번 + (진동 켬이면) 짧게 한 번. 10초 전 알림은 예전처럼 "소리 켬"일 때 기능 (D-056)
-    if (rem <= 10 && rem > 0 && warned.current !== key) { warned.current = key; if (s.settings.soundOn) { playWarnSound(); if (hapticOn()) haptic(1); } }
+    // 10초 전: (소리 켬) 알림음 한 번, (진동 켬) 짧게 한 번. 소리와 진동은 따로 (D-056 검토 R3)
+    if (rem <= 10 && rem > 0 && warned.current !== key) { warned.current = key; if (s.settings.soundOn) playWarnSound(); if (hapticOn()) haptic(1); }
     if (rem === 0 && !wasAlerted(key)) {
       markAlerted(key); setEnded(true);
       diagTimerEnd(key, s.settings.soundOn, audioState(), shownAt.current);
@@ -127,6 +131,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         if (buzzOnTime(key, Date.now())) diagHaptic(haptic(3));
         else diagHaptic('late');
       }
+      // 실험: 시스템 알림 (켜 두고 허용했을 때, 이 휴식에 한 번, 늦지 않았을 때). 앱이 뒤에 있어도 시도 (타이머가 느려져 늦을 수 있음)
+      if (shouldNotify({ on: notifyOn(), permission: notifyPermission(), endsAt: key, now: Date.now(), sentFor: null })) void showAppNotification('휴식 끝', restNotifyBody(nextRef.current));
     }
   }, [rem, w?.timer?.endsAt]);
 
@@ -268,6 +274,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const curSetLabel = cur && curItem ? (curItem.sets[cur.set]!.warmup ? '웜업' : `${curItem.sets.slice(0, cur.set + 1).filter((z) => !z.warmup).length}세트`) : '';
   const curLetter = cur && w.blocks[cur.block]!.kind !== 'single' ? `${String.fromCharCode(65 + cur.item)}. ` : '';
   const nextText = cur && curItem ? `${curLetter}${nameOf(curItem.exerciseId)} ${curSetLabel}` : '';
+  nextRef.current = nextText;
   const menuItem = menu ? w.blocks[menu.b]?.items[menu.i] : undefined;
 
   return (
@@ -351,7 +358,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" class="err-line"><Icon name="alert" size={18} />{finishErr}</p><button class="ghost icon-btn" aria-label="알림 닫기" onClick={() => setFinishError(null)}><Icon name="close" size={18} /></button></div>}
         {timerOn && w.timer && hintFor === w.timer.startedAt && (
           <div class="rest-hint" role="note" aria-label="휴식 알림 안내">
-            <Icon name="info" size={18} /><span class="grow">무음 모드면 소리 대신 진동으로 알려요</span>
+            <Icon name="info" size={18} /><span class="grow">{restHintText(hapticOn(), hapticMethod())}</span>
             <button class="ghost icon-btn" aria-label="안내 닫기" onClick={() => setHintFor(null)}><Icon name="close" size={18} /></button>
           </div>
         )}

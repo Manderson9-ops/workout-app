@@ -6,16 +6,16 @@
  *  - measured: 앱이 직접 잰 값 (타이머 오차, 앱 전환, 오류 등)
  *  - proxy: 대신 보는 값. 실제 결과는 실기기 체크리스트로 확인 (소리 재생 = 소리 장치 상태, 화면 꺼짐 방지 = 요청 성공)
  */
-export const DIAG_KINDS = ['start', 'timer', 'audio', 'wake', 'vis', 'input', 'plan', 'error', 'backup', 'send', 'haptic'] as const;
+export const DIAG_KINDS = ['start', 'timer', 'audio', 'wake', 'vis', 'input', 'plan', 'error', 'backup', 'send', 'haptic', 'notify'] as const;
 export type DiagKind = (typeof DIAG_KINDS)[number];
 
 export const DIAG_LABEL: Record<DiagKind, string> = {
   start: '앱 시작', timer: '휴식 타이머', audio: '소리', wake: '화면 꺼짐 방지', vis: '앱 전환',
-  input: '입력 저장', plan: '플랜 생성', error: '오류', backup: '백업', send: 'PC로 보내기', haptic: '휴식 끝 진동',
+  input: '입력 저장', plan: '플랜 생성', error: '오류', backup: '백업', send: 'PC로 보내기', haptic: '휴식 끝 진동', notify: '휴식 끝 알림(실험)',
 };
 export const DIAG_TRUST: Record<DiagKind, 'measured' | 'proxy'> = {
   start: 'measured', timer: 'measured', audio: 'proxy', wake: 'proxy', vis: 'measured',
-  input: 'measured', plan: 'measured', error: 'measured', backup: 'measured', send: 'measured', haptic: 'proxy',
+  input: 'measured', plan: 'measured', error: 'measured', backup: 'measured', send: 'measured', haptic: 'proxy', notify: 'proxy',
 };
 
 /** 한 건 (약 100바이트). t=시각, k=종류, d=기기 ID(짧게), m=짧은 설명, v=숫자 값(ms 등), ok=성공 여부 */
@@ -87,6 +87,8 @@ export interface DiagSummary {
   send: { ok: number; failed: number };
   /** D-056 휴식 끝 진동 방법별 횟수 (late = 늦게 돌아와 건너뜀) */
   haptic: { switch: number; vibrate: number; none: number; late: number };
+  /** D-056 실험 알림: 보낸 수, 실패(막힘·지원 안 함·오류) 수, 허용 받은 수 */
+  notify: { shown: number; failed: number; granted: number };
   lastStart?: string;
 }
 
@@ -110,6 +112,7 @@ export function summarizeDiag(list: DiagEntry[], device?: string): DiagSummary {
     errors: [...new Set(by('error').map((e) => e.m ?? ''))].slice(0, 20),
     backup: { ok: by('backup').filter((e) => e.ok !== false).length, failed: by('backup').filter((e) => e.ok === false).length },
     send: { ok: by('send').filter((e) => e.ok === true).length, failed: by('send').filter((e) => e.ok === false).length },
+    notify: { shown: by('notify').filter((e) => e.m === 'shown').length, failed: by('notify').filter((e) => e.ok === false).length, granted: by('notify').filter((e) => e.m === 'granted').length },
     haptic: { switch: by('haptic').filter((e) => e.m === 'switch').length, vibrate: by('haptic').filter((e) => e.m === 'vibrate').length, none: by('haptic').filter((e) => e.m === 'none').length, late: by('haptic').filter((e) => e.m === 'late').length },
     ...(by('start').length ? { lastStart: by('start')[by('start').length - 1]!.m } : {}),
   };
@@ -131,6 +134,7 @@ export function verdicts(s: DiagSummary): { item: string; text: string; level: '
   if (s.audio.n) out.push({ item: '2~4 소리', text: `소리 재생 시도 ${s.audio.n}번 중 소리 장치가 꺼져 있던 것 ${s.audio.notRunning}번. 실제로 들렸는지는 기록으로 알 수 없음 (체크리스트·화면 녹화로 확인)`, level: s.audio.notRunning ? 'warn' : 'info' });
   const hz = s.haptic;
   if (hz.switch + hz.vibrate + hz.none + hz.late) out.push({ item: '2~4 진동', text: `휴식 끝 진동 시도: iOS 햅틱 ${hz.switch}번, 진동 ${hz.vibrate}번, 지원 안 함 ${hz.none}번, 늦게 돌아와 건너뜀 ${hz.late}번. 실제로 떨렸는지는 기록으로 알 수 없음 (체크리스트로 확인)`, level: hz.none && !hz.switch && !hz.vibrate ? 'warn' : 'info' });
+  if (s.notify.shown || s.notify.failed || s.notify.granted) out.push({ item: '2~4 알림(실험)', text: `휴식 끝 알림 보냄 ${s.notify.shown}번, 실패 ${s.notify.failed}번, 허용 ${s.notify.granted}번. 배너·진동이 실제로 보였는지는 기록으로 알 수 없음`, level: s.notify.failed && !s.notify.shown ? 'warn' : 'info' });
   if (s.wake.requested || s.wake.failed) out.push({ item: '5~6 화면 꺼짐 방지', text: `요청 ${s.wake.requested}번, 실패 ${s.wake.failed}번, 풀림 ${s.wake.released}번. 요청이 성공해도 실제로 화면이 켜져 있었는지는 체크리스트로 확인`, level: s.wake.failed ? 'warn' : 'info' });
   if (s.input.flushedBeforeAction) out.push({ item: '8 입력 후 바로 완료', text: `입력하자마자 버튼을 눌러 먼저 저장한 경우 ${s.input.flushedBeforeAction}번 (정상 동작)`, level: 'ok' });
   if (s.plan.n) out.push({ item: '11 플랜 속도', text: `플랜 생성 ${s.plan.n}번, 가장 오래 걸린 것 ${s.plan.maxMs}ms`, level: s.plan.maxMs <= 1000 ? 'ok' : 'warn' });

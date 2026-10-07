@@ -48,6 +48,16 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(done);
   done.then(() => setTimeout(() => { void fillRest(); }, 1000), () => undefined);
 });
+// D-056 실험: 휴식 끝 알림을 누르면 앱(운동 화면)으로
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || '#/workout', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+    const c = cs.find((x) => x.url.startsWith(self.registration.scope));
+    if (c) return c.focus().then((f) => (f && 'navigate' in f ? f.navigate(url) : f)).catch(() => c.focus());
+    return self.clients.openWindow(url);
+  }));
+});
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
