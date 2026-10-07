@@ -1,8 +1,10 @@
 import { lsGet, lsSet, lsRemove, scopedKey } from '../appName';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState, useMemo } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import type { AppState } from '../store';
 import { catalog, templates } from '../catalog';
+import { historyOf } from '../store';
+import { recoveryByPart, busyParts, agoText, topicJosa } from '../../core/recovery';
 import { generatePlan } from '../../core/planner';
 import { diag } from '../diag';
 import type { Plan, PlanBlock, PlanItem, PlanRequest, Priority, Grouping } from '../../core/planner';
@@ -57,6 +59,9 @@ export function recompute(plan: Plan, all: BuiltExercise[]): Plan {
 export function PlanBuilder({ s }: { s: AppState }) {
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
+  // D-057: 고른 부위 중 회복 중으로 추정되는 부위 안내 (막지 않음)
+  const recNow = Math.floor(Date.now() / 60_000);
+  const rec = useMemo(() => recoveryByPart(historyOf(s), byId, Date.now()), [s.workouts, all, recNow]);
   const [f, setF] = useState<Form>(loadForm);
   // 만든 플랜은 다른 화면에 다녀와도 남도록 sessionStorage에 보관
   const [plan, setPlanRaw] = useState<Plan | null>(() => { try { return JSON.parse(sessionStorage.getItem(scopedKey(PLAN_KEY)) ?? 'null'); } catch { return null; } });
@@ -237,6 +242,9 @@ export function PlanBuilder({ s }: { s: AppState }) {
           return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => openPart(p)} aria-pressed={!!pr} aria-haspopup="dialog" aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
         })}
       </div>
+      {busyParts(rec, PARTS.filter((p) => f.parts[p])).map((r) => (
+        <p key={r.part} class="rec-note" role="note" data-testid="plan-rec-note"><Icon name="info" size={18} /><span>{topicJosa(r.part)} {agoText(r.elapsedH)}에 했어요 · 회복 추정 약 {r.remainingH}시간 남음 (앱 판단 추정, 막지 않아요)</span></p>
+      ))}
       {partSheet && <PartSheet part={partSheet} pr={f.parts[partSheet]} onPick={(x) => setPriority(partSheet, x)}
         onRemove={() => { if (f.parts[partSheet]) togglePart(partSheet); setPartSheet(null); }} onClose={() => setPartSheet(null)} />}
       <label>분할 템플릿으로 채우기 (선택)</label>

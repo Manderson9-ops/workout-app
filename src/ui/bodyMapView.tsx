@@ -69,7 +69,8 @@ const VIEW: Record<Side, string> = { front: '0 80 724 1290', back: '724 80 724 1
 /** 세트 수 → 색 단계 (D-054): 0 없음, 1~4 연함, 5~9 보통, 10+ 진함 */
 export function heatBucket(n: number): 0 | 1 | 2 | 3 { return n >= 10 ? 3 : n >= 5 ? 2 : n >= 1 ? 1 : 0; }
 
-function Figure({ side, sel, onPart, heat }: { side: Side; sel: Partial<Record<Part, Priority>>; onPart?: (p: Part) => void; heat?: Record<Part, number> }) {
+/** tone: 부위별 색 이름 (회복 상태 그림 D-057: busy·almost·ok, 없으면 꺼짐). heat 와 같이 읽기용 */
+function Figure({ side, sel, onPart, heat, tone }: { side: Side; sel: Partial<Record<Part, Priority>>; onPart?: (p: Part) => void; heat?: Record<Part, number>; tone?: Partial<Record<Part, string>> }) {
   const shapes: BodyShape[] = side === 'front' ? BODY_FRONT : BODY_BACK;
   const map = SLUG_PART[side];
   return (
@@ -78,14 +79,14 @@ function Figure({ side, sel, onPart, heat }: { side: Side; sel: Partial<Record<P
       onClick={onPart ? (e) => { const p = partAt(e.clientX, e.clientY); if (p) onPart(p); } : undefined}>
       <path d={side === 'front' ? OUTLINE_FRONT : OUTLINE_BACK} class="bm-outline" />
       {/* 누르는 영역(투명)은 근육 아래: 근육을 누르면 그 근육의 부위, 근육 사이 빈 곳을 누르면 영역의 부위 */}
-      {!heat && HITS[side].map(([part, boxes]) => boxes.map((b, k) => (
+      {!heat && !tone && HITS[side].map(([part, boxes]) => boxes.map((b, k) => (
         <rect key={part + k} x={b[0]} y={b[1]} width={b[2] - b[0]} height={b[3] - b[1]} class="bm-hit" data-part={part} />
       )))}
       {shapes.map((s) => {
         const part = map[s.slug];
         const pr = part ? sel[part] : undefined;
         return s.d.map((d, k) => (
-          <path key={s.slug + k} d={d} data-vis={part} class={part ? `bm-muscle${heat ? ' h-' + heatBucket(heat[part] ?? 0) : pr ? ' p-' + pr : ''}` : 'bm-deco'} />
+          <path key={s.slug + k} d={d} data-vis={part} class={part ? `bm-muscle${tone ? (tone[part] ? ' rc-' + tone[part] : '') : heat ? ' h-' + heatBucket(heat[part] ?? 0) : pr ? ' p-' + pr : ''}` : 'bm-deco'} />
         ));
       })}
     </svg>
@@ -129,6 +130,28 @@ export function BodyHeat({ sets, onPart }: { sets: Record<Part, number>; onPart?
       </div>
       <div class="bm-legend sub small" aria-hidden="true">
         <span><i class="lg-h0" />0</span><span><i class="lg-h1" />1~4</span><span><i class="lg-h2" />5~9</span><span><i class="lg-h3" />10+</span><span>세트</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * D-057 회복 상태 그림 (읽기 전용, 앞·뒤 나란히). 색만으로 전하지 않음: 옆 목록에 상태 글(회복 중·거의·회복됨)과 남은 시간
+ * tones: 부위별 'busy' | 'almost' | 'ok'
+ */
+export function BodyRecovery({ tones, label }: { tones: Partial<Record<Part, 'busy' | 'almost' | 'ok'>>; label: string }) {
+  return (
+    <div class="bodyheat" data-testid="body-recovery" role="img" aria-label={label}>
+      <div class="heat-pair">
+        {(['front', 'back'] as Side[]).map((x) => (
+          <figure key={x} class="heat-fig">
+            <Figure side={x} sel={{}} tone={tones} />
+            <figcaption class="sub small" aria-hidden="true">{x === 'front' ? '앞' : '뒤'}</figcaption>
+          </figure>
+        ))}
+      </div>
+      <div class="bm-legend sub small" aria-hidden="true">
+        <span><i class="lg-rc-busy" />회복 중</span><span><i class="lg-rc-almost" />거의</span><span><i class="lg-rc-ok" />회복됨</span><span><i class="lg-h0" />기록 없음</span>
       </div>
     </div>
   );

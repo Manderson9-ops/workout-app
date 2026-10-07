@@ -29,6 +29,8 @@ const RoutineEditor = lazyScreen(() => withFull(import('./screens/RoutineEditor'
 const Stats = lazyScreen(() => withFull(import('./screens/Stats')).then((m) => m.Stats), '기록');
 const WorkoutDetail = lazyScreen(() => withFull(import('./screens/Stats')).then((m) => m.WorkoutDetail));
 const WorkoutEdit = lazyScreen(() => withFull(import('./screens/WorkoutEdit')).then((m) => m.WorkoutEdit));
+const RecoveryTips = lazyScreen(() => import('./screens/Recovery').then((m) => m.RecoveryTips), '회복 팁');
+const RecoveryPapers = lazyScreen(() => import('./screens/Recovery').then((m) => m.RecoveryPapers), '근거 논문');
 const ToolsScreen = lazyScreen(() => import('./screens/Tools').then((m) => m.ToolsScreen), '도구');
 
 export function useHash(): string {
@@ -111,6 +113,8 @@ export function App() {
   else if (path.startsWith('/stats/w/')) screen = <WorkoutDetail s={s} id={decodeURIComponent(path.slice(9))} />;
   else if (path.startsWith('/stats')) screen = <Stats s={s} />;
   else if (path.startsWith('/tools')) screen = <ToolsScreen />;
+  else if (path.startsWith('/recovery/papers')) screen = <RecoveryPapers key={path} query={path.split('?')[1] ?? ''} />;
+  else if (path.startsWith('/recovery')) screen = <RecoveryTips s={s} />;
   else if (path.startsWith('/routines')) screen = <RoutinesScreen s={s} />;
   else if (path.startsWith('/routine/')) screen = <RoutineEditor key={path} s={s} id={decodeURIComponent(path.slice(9))} />;
   else screen = <Home s={s} />;

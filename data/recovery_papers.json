@@ -1,0 +1,904 @@
+{
+ "source": "docs/research/recovery_papers.json · 운동회복_논문DB.md (D-057)",
+ "generated": "2026-10-07",
+ "papers": [
+  {
+   "id": "R-01",
+   "authors": "Thomas K, Brownstein CG, Dent J, Parker P, Goodall S, Howatson G",
+   "year": 2018,
+   "title": "Neuromuscular Fatigue and Recovery after Heavy Resistance, Jump, and Sprint Training",
+   "journal": "Medicine & Science in Sports & Exercise",
+   "doi": "10.1249/MSS.0000000000001733",
+   "pmid": "30067591",
+   "url": "https://doi.org/10.1249/MSS.0000000000001733",
+   "type": "통제 실험(교차)",
+   "evidence_level": "B",
+   "topics": [
+    "회복 시간 경과",
+    "신경근 피로"
+   ],
+   "key_findings": [
+    "백스쿼트 10×5 @80%1RM 후 피로는 72시간에 해소(점프 세션은 48시간)",
+    "대퇴사두 수축력(potentiated twitch) 저하는 모든 세션 후 48시간 지속",
+    "수의적 활성(중추) 저하는 근력 세션 후 48시간까지, 피로의 주원인은 중추가 아닌 근육(말초)"
+   ],
+   "citation_count": 75,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-02",
+   "authors": "Bartolomei S, Sadres E, Church DD, et al.",
+   "year": 2017,
+   "title": "Comparison of the recovery response from high-intensity and high-volume resistance exercise in trained men",
+   "journal": "European Journal of Applied Physiology",
+   "doi": "10.1007/s00421-017-3598-9",
+   "pmid": "28447186",
+   "url": "https://doi.org/10.1007/s00421-017-3598-9",
+   "type": "무작위 교차 실험",
+   "evidence_level": "B",
+   "topics": [
+    "회복 시간 경과",
+    "볼륨",
+    "근손상 지표"
+   ],
+   "key_findings": [
+    "고볼륨(8×10) 세션 후 등척성 최대근력(MVIC)이 72시간 후에도 저하, 고강도(8×3)는 차이 없음",
+    "고볼륨이 30분 후 점프 파워·등속 토크 저하가 더 큼",
+    "CK·LDH·미오글로빈은 두 프로토콜 모두 상승"
+   ],
+   "citation_count": 94,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-03",
+   "authors": "Morán-Navarro R, Pérez CE, Mora-Rodríguez R, et al.",
+   "year": 2017,
+   "title": "Time course of recovery following resistance training leading or not to failure",
+   "journal": "European Journal of Applied Physiology",
+   "doi": "10.1007/s00421-017-3725-7",
+   "pmid": "28965198",
+   "url": "https://doi.org/10.1007/s00421-017-3725-7",
+   "type": "교차 실험",
+   "evidence_level": "B",
+   "topics": [
+    "실패 훈련",
+    "회복 시간 경과"
+   ],
+   "key_findings": [
+    "실패까지 3×10(10)은 같은 총량의 6×5(10)보다 급성 저하가 큼",
+    "비실패 프로토콜(3×5, 6×5)은 24~48시간 사이 회복이 유의하게 빠름",
+    "CK 등 지표상 실패 훈련은 회복을 24~48시간 늦춤"
+   ],
+   "citation_count": 169,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-04",
+   "authors": "Pareja-Blanco F, Rodríguez-Rosell D, Sánchez-Medina L, et al.",
+   "year": 2017,
+   "title": "Acute and delayed response to resistance exercise leading or not leading to muscle failure",
+   "journal": "Clinical Physiology and Functional Imaging",
+   "doi": "10.1111/cpf.12348",
+   "pmid": "26970332",
+   "url": "https://doi.org/10.1111/cpf.12348",
+   "type": "교차 실험",
+   "evidence_level": "B",
+   "topics": [
+    "실패 훈련",
+    "회복 시간 경과"
+   ],
+   "key_findings": [
+    "3×12(실패) vs 3×6(절반): 세트 내 속도 손실 벤치 65% vs 26%, 스쿼트 44% vs 20%",
+    "실패 조건은 점프 높이 저하가 48시간까지 지속, CK는 48시간에 더 높음",
+    "가능 반복수의 절반만 하면 피로가 줄고 회복이 빨라짐"
+   ],
+   "citation_count": 94,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-05",
+   "authors": "Pareja-Blanco F, Villalba-Fernández A, Cornejo-Daza PJ, et al.",
+   "year": 2019,
+   "title": "Time Course of Recovery Following Resistance Exercise with Different Loading Magnitudes and Velocity Loss in the Set",
+   "journal": "Sports (Basel)",
+   "doi": "10.3390/sports7030059",
+   "pmid": "30836680",
+   "url": "https://doi.org/10.3390/sports7030059",
+   "type": "교차 실험",
+   "evidence_level": "B",
+   "topics": [
+    "회복 시간 경과",
+    "실패 근접도",
+    "부하"
+   ],
+   "key_findings": [
+    "속도 손실 40%(실패에 가까움)·60%1RM 조합이 가장 큰 피로·느린 회복",
+    "60%1RM 조건은 점프 높이 저하가 24시간까지 지속",
+    "낮은 속도 손실(20%)·높은 부하(80%)는 피로가 적고 회복이 빠름"
+   ],
+   "citation_count": 48,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-06",
+   "authors": "Damas F, Phillips SM, Libardi CA, et al.",
+   "year": 2016,
+   "title": "Resistance training-induced changes in integrated myofibrillar protein synthesis are related to hypertrophy only after attenuation of muscle damage",
+   "journal": "Journal of Physiology",
+   "doi": "10.1113/JP272472",
+   "pmid": "27219125",
+   "url": "https://doi.org/10.1113/JP272472",
+   "type": "종단 실험(단일군, 생검)",
+   "evidence_level": "C",
+   "topics": [
+    "근손상",
+    "반복 세션 효과",
+    "근단백질 합성"
+   ],
+   "key_findings": [
+    "근손상(Z-band streaming)은 훈련 1주차가 최대, 3주차 감소, 10주차 최소",
+    "1주차의 높은 근단백질 합성은 근비대와 무관, 3·10주차 합성은 근비대와 강한 상관(r≈0.9)",
+    "운동 후 24·48시간 측정: 낯선 운동 초기에는 손상 회복에 자원이 쓰임"
+   ],
+   "citation_count": 292,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-07",
+   "authors": "Chen TC, Lin KY, Chen HL, Lin MJ, Nosaka K",
+   "year": 2011,
+   "title": "Comparison in eccentric exercise-induced muscle damage among four limb muscles",
+   "journal": "European Journal of Applied Physiology",
+   "doi": "10.1007/s00421-010-1648-7",
+   "pmid": "20852880",
+   "url": "https://doi.org/10.1007/s00421-010-1648-7",
+   "type": "교차 실험",
+   "evidence_level": "B",
+   "topics": [
+    "근육군 차이",
+    "근손상",
+    "DOMS"
+   ],
+   "key_findings": [
+    "최대 eccentric 5×6 후 5일 추적: 팔꿈치 굽힘·폄근이 무릎 굽힘·폄근보다 모든 손상 지표 변화가 큼",
+    "무릎 폄근(대퇴사두)이 가장 적고, 무릎 굽힘근(햄스트링)은 대퇴사두보다 큼",
+    "일상 사용 빈도가 손상 민감도 차이와 관련된 것으로 해석"
+   ],
+   "citation_count": 250,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-08",
+   "authors": "Chen TC, Yang TJ, Huang MJ, et al.",
+   "year": 2019,
+   "title": "Damage and the repeated bout effect of arm, leg, and trunk muscles induced by eccentric resistance exercises",
+   "journal": "Scandinavian Journal of Medicine & Science in Sports",
+   "doi": "10.1111/sms.13388",
+   "pmid": "30663816",
+   "url": "https://doi.org/10.1111/sms.13388",
+   "type": "실험(반복 측정)",
+   "evidence_level": "B",
+   "topics": [
+    "근육군 차이",
+    "반복 세션 효과",
+    "DOMS"
+   ],
+   "key_findings": [
+    "MVC는 1일째 16~57%, 4일째에도 13~49% 저하",
+    "근력 저하는 팔(이두·삼두)·가슴이 가장 크고, 햄스트링이 대퇴사두·종아리·척추기립근보다 큼",
+    "근육통(DOMS)은 팔(이두·삼두)과 척추기립근이 다른 근육보다 큼",
+    "2주 뒤 같은 운동 반복 시 모든 근육에서 손상이 비슷하게 크게 감소(반복 세션 효과)"
+   ],
+   "citation_count": 82,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-09",
+   "authors": "Schoenfeld BJ, Ogborn D, Krieger JW",
+   "year": 2016,
+   "title": "Effects of Resistance Training Frequency on Measures of Muscle Hypertrophy: A Systematic Review and Meta-Analysis",
+   "journal": "Sports Medicine",
+   "doi": "10.1007/s40279-016-0543-8",
+   "pmid": "27102172",
+   "url": "https://doi.org/10.1007/s40279-016-0543-8",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "근육별 빈도"
+   ],
+   "key_findings": [
+    "높은 빈도의 근비대 효과크기 0.49 vs 낮은 빈도 0.30 (P=0.002)",
+    "볼륨을 맞춘 조건에서 주 2회가 주 1회보다 우세",
+    "주 3회가 2회보다 나은지는 불확실"
+   ],
+   "citation_count": 272,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-10",
+   "authors": "Grgic J, Schoenfeld BJ, Davies TB, Lazinica B, Krieger JW, Pedisic Z",
+   "year": 2018,
+   "title": "Effect of Resistance Training Frequency on Gains in Muscular Strength: A Systematic Review and Meta-Analysis",
+   "journal": "Sports Medicine",
+   "doi": "10.1007/s40279-018-0872-x",
+   "pmid": "29470825",
+   "url": "https://doi.org/10.1007/s40279-018-0872-x",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "근육별 빈도",
+    "근력"
+   ],
+   "key_findings": [
+    "주 1·2·3·4회 이상 효과크기 0.74·0.82·0.93·1.08",
+    "볼륨을 맞추면 빈도 효과 없음(p=0.421) → 빈도는 볼륨을 늘리는 수단",
+    "다관절·상체·여성·젊은 층에서 빈도 효과 유의"
+   ],
+   "citation_count": 288,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-11",
+   "authors": "Schoenfeld BJ, Grgic J, Krieger J",
+   "year": 2019,
+   "title": "How many times per week should a muscle be trained to maximize muscle hypertrophy? A systematic review and meta-analysis of studies examining the effects of resistance training frequency",
+   "journal": "Journal of Sports Sciences",
+   "doi": "10.1080/02640414.2018.1555906",
+   "pmid": "30558493",
+   "url": "https://doi.org/10.1080/02640414.2018.1555906",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "근육별 빈도"
+   ],
+   "key_findings": [
+    "볼륨을 맞추면 빈도에 따른 근비대 차이 없음",
+    "훈련자·상체·하체로 나눠도 차이 없음",
+    "볼륨 비동일 연구에서는 높은 빈도가 유리하나 주 1회 vs 3회 이상 차이는 작음"
+   ],
+   "citation_count": 144,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-12",
+   "authors": "Schoenfeld BJ, Pope ZK, Benik FM, et al.",
+   "year": 2016,
+   "title": "Longer Interset Rest Periods Enhance Muscle Strength and Hypertrophy in Resistance-Trained Men",
+   "journal": "Journal of Strength and Conditioning Research",
+   "doi": "10.1519/JSC.0000000000001272",
+   "pmid": "26605807",
+   "url": "https://doi.org/10.1519/JSC.0000000000001272",
+   "type": "RCT",
+   "evidence_level": "B",
+   "topics": [
+    "세트 간 휴식"
+   ],
+   "key_findings": [
+    "휴식 3분 그룹이 1분 그룹보다 스쿼트·벤치 1RM 증가가 큼",
+    "대퇴 앞쪽 근두께 증가도 3분이 큼, 삼두는 경향(p=0.06)",
+    "3×8~12RM, 7종목, 주 3회 전신"
+   ],
+   "citation_count": 157,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-13",
+   "authors": "Grgic J, Lazinica B, Mikulic P, Krieger JW, Schoenfeld BJ",
+   "year": 2017,
+   "title": "The effects of short versus long inter-set rest intervals in resistance training on measures of muscle hypertrophy: A systematic review",
+   "journal": "European Journal of Sport Science",
+   "doi": "10.1080/17461391.2017.1340524",
+   "pmid": "28641044",
+   "url": "https://doi.org/10.1080/17461391.2017.1340524",
+   "type": "체계적 문헌고찰(메타분석 없음)",
+   "evidence_level": "A",
+   "topics": [
+    "세트 간 휴식"
+   ],
+   "key_findings": [
+    "짧은(≤60초)·긴(>60초) 휴식 모두 근비대에 유효",
+    "훈련자 대상의 민감한 측정 연구에서는 긴 휴식이 유리할 가능성"
+   ],
+   "citation_count": 104,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-14",
+   "authors": "Grgic J, Schoenfeld BJ, Skrepnik M, Davies TB, Mikulic P",
+   "year": 2018,
+   "title": "Effects of Rest Interval Duration in Resistance Training on Measures of Muscular Strength: A Systematic Review",
+   "journal": "Sports Medicine",
+   "doi": "10.1007/s40279-017-0788-x",
+   "pmid": "28933024",
+   "url": "https://doi.org/10.1007/s40279-017-0788-x",
+   "type": "체계적 문헌고찰",
+   "evidence_level": "A",
+   "topics": [
+    "세트 간 휴식",
+    "근력"
+   ],
+   "key_findings": [
+    "60초 미만 휴식으로도 근력 향상 가능",
+    "훈련자의 근력 극대화에는 2분 초과 휴식 권장",
+    "비훈련자는 60~120초면 충분"
+   ],
+   "citation_count": 134,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-15",
+   "authors": "Singer A, Wolf M, Generoso L, et al.",
+   "year": 2024,
+   "title": "Give it a rest: a systematic review with Bayesian meta-analysis on the effect of inter-set rest interval duration on muscle hypertrophy",
+   "journal": "Frontiers in Sports and Active Living",
+   "doi": "10.3389/fspor.2024.1429789",
+   "pmid": "39205815",
+   "url": "https://doi.org/10.3389/fspor.2024.1429789",
+   "type": "체계적 문헌고찰·베이지안 메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "세트 간 휴식"
+   ],
+   "key_findings": [
+    "짧은 휴식 SMD 0.48 vs 긴 휴식 0.56 (겹침 큼)",
+    "60초 초과 휴식에서 작은 근비대 이득(팔 0.13, 대퇴 0.17)",
+    "90초를 넘으면 근비대 차이 뚜렷하지 않음; 실패 여부는 이 관계를 바꾸지 않음"
+   ],
+   "citation_count": 9,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-16",
+   "authors": "Knowles OE, Drinkwater EJ, Urwin CS, Lamon S, Aisbett B",
+   "year": 2018,
+   "title": "Inadequate sleep and muscle strength: Implications for resistance training",
+   "journal": "Journal of Science and Medicine in Sport",
+   "doi": "10.1016/j.jsams.2018.01.012",
+   "pmid": "29422383",
+   "url": "https://doi.org/10.1016/j.jsams.2018.01.012",
+   "type": "체계적 문헌고찰",
+   "evidence_level": "A",
+   "topics": [
+    "수면"
+   ],
+   "key_findings": [
+    "하룻밤 완전 수면 박탈은 근력에 영향 작음",
+    "여러 밤 연속 수면 제한은 다관절 운동 근력을 낮추나 단관절은 영향 적음",
+    "카페인·그룹 운동·깨어난 지 오래되기 전 운동이 대응 전략"
+   ],
+   "citation_count": 115,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-17",
+   "authors": "Craven J, McCartney D, Desbrow B, et al.",
+   "year": 2022,
+   "title": "Effects of Acute Sleep Loss on Physical Performance: A Systematic and Meta-Analytical Review",
+   "journal": "Sports Medicine",
+   "doi": "10.1007/s40279-022-01706-y",
+   "pmid": "35708888",
+   "url": "https://doi.org/10.1007/s40279-022-01706-y",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "수면"
+   ],
+   "key_findings": [
+    "수면 6시간 이하 시 운동 수행 평균 -7.56% (95%CI -11.9~-3.13)",
+    "깨어 있던 시간 1시간마다 약 0.4%씩 수행 감소(박탈·늦은 기상 제한)",
+    "오후 운동은 일관되게 저하, 오전 운동은 대체로 영향 적음"
+   ],
+   "citation_count": 127,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-18",
+   "authors": "Lamon S, Morabito A, Arentson-Lantz E, et al.",
+   "year": 2021,
+   "title": "The effect of acute sleep deprivation on skeletal muscle protein synthesis and the hormonal environment",
+   "journal": "Physiological Reports",
+   "doi": "10.14814/phy2.14660",
+   "pmid": "33400856",
+   "url": "https://doi.org/10.14814/phy2.14660",
+   "type": "무작위 교차 실험",
+   "evidence_level": "B",
+   "topics": [
+    "수면",
+    "근단백질 합성"
+   ],
+   "key_findings": [
+    "하룻밤 완전 수면 박탈로 식후 근단백질 합성 18% 감소",
+    "코르티솔 21% 증가, 테스토스테론 24% 감소",
+    "단백질 분해 지표는 차이 없음"
+   ],
+   "citation_count": 110,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-19",
+   "authors": "Morton RW, Murphy KT, McKellar SR, et al.",
+   "year": 2018,
+   "title": "A systematic review, meta-analysis and meta-regression of the effect of protein supplementation on resistance training-induced gains in muscle mass and strength in healthy adults",
+   "journal": "British Journal of Sports Medicine",
+   "doi": "10.1136/bjsports-2017-097608",
+   "pmid": "28698222",
+   "url": "https://doi.org/10.1136/bjsports-2017-097608",
+   "type": "체계적 문헌고찰·메타분석·메타회귀",
+   "evidence_level": "A",
+   "topics": [
+    "단백질"
+   ],
+   "key_findings": [
+    "단백질 보충 시 1RM +2.49 kg, 제지방 +0.30 kg 추가",
+    "총 단백질 1.62 g/kg/일(95%CI 1.03~2.20)을 넘으면 제지방 추가 이득 없음(분절회귀 p=0.079, 본문 확인)",
+    "나이가 많을수록 효과 감소, 훈련자에게 더 효과적(+0.75 kg)"
+   ],
+   "citation_count": 962,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-20",
+   "authors": "Jäger R, Kerksick CM, Campbell BI, et al.",
+   "year": 2017,
+   "title": "International Society of Sports Nutrition Position Stand: protein and exercise",
+   "journal": "Journal of the International Society of Sports Nutrition",
+   "doi": "10.1186/s12970-017-0177-8",
+   "pmid": "28642676",
+   "url": "https://doi.org/10.1186/s12970-017-0177-8",
+   "type": "입장문(position stand)",
+   "evidence_level": "A",
+   "topics": [
+    "단백질",
+    "타이밍"
+   ],
+   "key_findings": [
+    "하루 1.4~2.0 g/kg이면 대부분 충분, 감량기 훈련자는 2.3~3.1 g/kg 필요할 수 있음",
+    "1회 0.25 g/kg 또는 20~40 g, 류신 700~3000 mg, 3~4시간 간격 균등 분배",
+    "운동 전·후 모두 효과, 동화 효과는 최소 24시간 지속; 취침 전 카제인 30~40 g이 야간 합성 증가"
+   ],
+   "citation_count": 943,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-21",
+   "authors": "Schoenfeld BJ, Aragon AA",
+   "year": 2018,
+   "title": "How much protein can the body use in a single meal for muscle-building? Implications for daily protein distribution",
+   "journal": "Journal of the International Society of Sports Nutrition",
+   "doi": "10.1186/s12970-018-0215-1",
+   "pmid": "29497353",
+   "url": "https://doi.org/10.1186/s12970-018-0215-1",
+   "type": "서술적 리뷰",
+   "evidence_level": "C",
+   "topics": [
+    "단백질",
+    "분배"
+   ],
+   "key_findings": [
+    "한 끼 20 g 초과도 일부는 근육 합성에 쓰임",
+    "끼니당 0.4 g/kg × 최소 4끼 → 하루 1.6 g/kg 이상",
+    "상한 2.2 g/kg/일이면 끼니당 최대 0.55 g/kg"
+   ],
+   "citation_count": 103,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-22",
+   "authors": "Dupuy O, Douzi W, Theurot D, Bosquet L, Dugué B",
+   "year": 2018,
+   "title": "An Evidence-Based Approach for Choosing Post-exercise Recovery Techniques to Reduce Markers of Muscle Damage, Soreness, Fatigue, and Inflammation: A Systematic Review With Meta-Analysis",
+   "journal": "Frontiers in Physiology",
+   "doi": "10.3389/fphys.2018.00403",
+   "pmid": "29755363",
+   "url": "https://doi.org/10.3389/fphys.2018.00403",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "회복 수단",
+    "마사지",
+    "냉각",
+    "능동 회복"
+   ],
+   "key_findings": [
+    "능동 회복·마사지·압박복·냉수/대조욕·냉동요법이 DOMS를 감소(g -2.26~-0.40)",
+    "마사지가 DOMS·피로감 감소에 가장 효과적",
+    "CK SMD -0.37, IL-6 -0.36, CRP -0.38 감소"
+   ],
+   "citation_count": 382,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-23",
+   "authors": "Davis HL, Alabed S, Chico TJA",
+   "year": 2020,
+   "title": "Effect of sports massage on performance and recovery: a systematic review and meta-analysis",
+   "journal": "BMJ Open Sport & Exercise Medicine",
+   "doi": "10.1136/bmjsem-2019-000614",
+   "pmid": "32426160",
+   "url": "https://doi.org/10.1136/bmjsem-2019-000614",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "마사지"
+   ],
+   "key_findings": [
+    "마사지는 근력·점프·스프린트·지구력·피로를 개선한다는 근거 없음",
+    "유연성과 DOMS는 작지만 유의한 개선"
+   ],
+   "citation_count": 167,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-24",
+   "authors": "Machado AF, Ferreira PH, Micheletti JK, et al.",
+   "year": 2016,
+   "title": "Can Water Temperature and Immersion Time Influence the Effect of Cold Water Immersion on Muscle Soreness? A Systematic Review and Meta-Analysis",
+   "journal": "Sports Medicine",
+   "doi": "10.1007/s40279-015-0431-7",
+   "pmid": "26581833",
+   "url": "https://doi.org/10.1007/s40279-015-0431-7",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "냉수욕",
+    "DOMS"
+   ],
+   "key_findings": [
+    "냉수욕은 수동 휴식보다 근육통을 약간 더 줄임(즉시 MD 0.29, 지연 MD 0.32)",
+    "수온 11~15°C, 11~15분이 가장 좋은 결과"
+   ],
+   "citation_count": 217,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-25",
+   "authors": "Roberts LA, Raastad T, Markworth JF, et al.",
+   "year": 2015,
+   "title": "Post-exercise cold water immersion attenuates acute anabolic signalling and long-term adaptations in muscle to strength training",
+   "journal": "Journal of Physiology",
+   "doi": "10.1113/JP270570",
+   "pmid": "26174323",
+   "url": "https://doi.org/10.1113/JP270570",
+   "type": "RCT + 급성 실험",
+   "evidence_level": "B",
+   "topics": [
+    "냉수욕",
+    "근비대 저해"
+   ],
+   "key_findings": [
+    "12주(주 2회) 매 세션 후 10분 냉수욕 그룹은 근력·근육량 증가가 능동 회복 그룹보다 작음",
+    "능동 회복 그룹만 등속 일량 19%, II형 섬유 단면적 17%, 근핵 수 26% 증가",
+    "냉수욕은 24~48시간 위성세포·p70S6K 신호를 둔화"
+   ],
+   "citation_count": 202,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-26",
+   "authors": "Fyfe JJ, Broatch JR, Trewin AJ, et al.",
+   "year": 2019,
+   "title": "Cold water immersion attenuates anabolic signaling and skeletal muscle fiber hypertrophy, but not strength gain, following whole-body resistance training",
+   "journal": "Journal of Applied Physiology",
+   "doi": "10.1152/japplphysiol.00127.2019",
+   "pmid": "31513450",
+   "url": "https://doi.org/10.1152/japplphysiol.00127.2019",
+   "type": "RCT",
+   "evidence_level": "B",
+   "topics": [
+    "냉수욕",
+    "근비대 저해"
+   ],
+   "key_findings": [
+    "매 세션 후 10°C 15분 냉수욕: II형 섬유 단면적 증가가 둔화(ES -1.37)",
+    "1RM 레그프레스 증가는 두 그룹 비슷(근력은 저해 안 됨)",
+    "근비대가 목표라면 운동 직후 냉수욕은 피하라고 결론"
+   ],
+   "citation_count": 52,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-27",
+   "authors": "Piñero A, Burke R, Augustin F, et al.",
+   "year": 2024,
+   "title": "Throwing cold water on muscle growth: A systematic review with meta-analysis of the effects of postexercise cold water immersion on resistance training-induced hypertrophy",
+   "journal": "European Journal of Sport Science",
+   "doi": "10.1002/ejsc.12074",
+   "url": "https://doi.org/10.1002/ejsc.12074",
+   "type": "체계적 문헌고찰·베이지안 메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "냉수욕",
+    "근비대 저해"
+   ],
+   "key_findings": [
+    "저항운동만: 근비대 SMD 0.36, 냉수욕 병행: 0.14",
+    "비교 효과 cSMD -0.22 (95%CrI -0.47~0.04), 냉수욕이 근비대를 줄일 확률 95.7%",
+    "훈련 상태에 따른 차이는 뚜렷하지 않음"
+   ],
+   "citation_count": 12,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-28",
+   "authors": "Vieira AF, Umpierre D, Teodoro JL, et al.",
+   "year": 2021,
+   "title": "Effects of Resistance Training Performed to Failure or Not to Failure on Muscle Strength, Hypertrophy, and Power Output: A Systematic Review With Meta-Analysis",
+   "journal": "Journal of Strength and Conditioning Research",
+   "doi": "10.1519/JSC.0000000000003936",
+   "pmid": "33555822",
+   "url": "https://doi.org/10.1519/JSC.0000000000003936",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "실패 훈련"
+   ],
+   "key_findings": [
+    "최대근력은 실패/비실패 차이 없음(SMD -0.08), 볼륨 비동일 시 비실패가 유리(-0.34)",
+    "근비대는 전체로는 실패 우세(SMD 0.75)이나 볼륨을 맞추면 차이 없음",
+    "파워는 볼륨 비동일 시 비실패가 유리(-0.61)"
+   ],
+   "citation_count": 65,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-29",
+   "authors": "Grgic J, Schoenfeld BJ, Orazem J, Sabol F",
+   "year": 2022,
+   "title": "Effects of resistance training performed to repetition failure or non-failure on muscular strength and hypertrophy: A systematic review and meta-analysis",
+   "journal": "Journal of Sport and Health Science",
+   "doi": "10.1016/j.jshs.2021.01.007",
+   "pmid": "33497853",
+   "url": "https://doi.org/10.1016/j.jshs.2021.01.007",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "실패 훈련"
+   ],
+   "key_findings": [
+    "근력 ES -0.09, 근비대 ES 0.22 → 유의차 없음",
+    "볼륨 비동일 시 비실패가 근력에 유리(ES -0.32)",
+    "훈련자 하위분석에서는 실패가 근비대에 약간 유리(ES 0.15)"
+   ],
+   "citation_count": 171,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-30",
+   "authors": "Refalo MC, Helms ER, Trexler ET, Hamilton DL, Fyfe JJ",
+   "year": 2023,
+   "title": "Influence of Resistance Training Proximity-to-Failure on Skeletal Muscle Hypertrophy: A Systematic Review with Meta-analysis",
+   "journal": "Sports Medicine",
+   "doi": "10.1007/s40279-022-01784-y",
+   "pmid": "36334240",
+   "url": "https://doi.org/10.1007/s40279-022-01784-y",
+   "type": "체계적 문헌고찰·메타분석",
+   "evidence_level": "A",
+   "topics": [
+    "실패 근접도",
+    "RIR"
+   ],
+   "key_findings": [
+    "어떤 정의든 세트 실패가 비실패보다 근비대 미미하게 우세(ES 0.19, p=0.045)",
+    "순간 근실패 vs 비실패만 보면 차이 없음(ES 0.12)",
+    "속도 손실 >25% vs 20~25% 차이 없음 → 실패 근접도와 근비대는 비선형일 가능성"
+   ],
+   "citation_count": 55,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-31",
+   "authors": "Refalo MC, Helms ER, Robinson ZP, Hamilton DL, Fyfe JJ",
+   "year": 2024,
+   "title": "Similar muscle hypertrophy following eight weeks of resistance training to momentary muscular failure or with repetitions-in-reserve in resistance-trained individuals",
+   "journal": "Journal of Sports Sciences",
+   "doi": "10.1080/02640414.2024.2321021",
+   "pmid": "38393985",
+   "url": "https://doi.org/10.1080/02640414.2024.2321021",
+   "type": "RCT(개인 내 다리 무작위)",
+   "evidence_level": "B",
+   "topics": [
+    "RIR",
+    "실패 훈련",
+    "피로"
+   ],
+   "key_findings": [
+    "대퇴사두 두께 증가: 실패 0.181 cm vs 1~2 RIR 0.182 cm (사실상 동일)",
+    "실패 그룹이 반복수·속도 손실(급성 신경근 피로)이 일관되게 큼",
+    "1~2 RIR로도 비슷한 볼륨 누적 가능"
+   ],
+   "citation_count": 29,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-32",
+   "authors": "Robinson ZP, Pelland JC, Remmert JF, et al.",
+   "year": 2024,
+   "title": "Exploring the Dose-Response Relationship Between Estimated Resistance Training Proximity to Failure, Strength Gain, and Muscle Hypertrophy: A Series of Meta-Regressions",
+   "journal": "Sports Medicine",
+   "doi": "10.1007/s40279-024-02069-2",
+   "pmid": "38970765",
+   "url": "https://doi.org/10.1007/s40279-024-02069-2",
+   "type": "메타회귀(탐색적)",
+   "evidence_level": "A",
+   "topics": [
+    "RIR",
+    "실패 근접도"
+   ],
+   "key_findings": [
+    "근력 증가는 추정 RIR과 거의 무관(넓은 RIR 범위에서 비슷)",
+    "근비대는 실패에 가까울수록(RIR 낮을수록) 증가하는 음의 기울기",
+    "RIR을 연구 설명으로 추정한 탐색적 분석이라 정확한 관계는 불확실"
+   ],
+   "citation_count": 58,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-33",
+   "authors": "Coleman M, Burke R, Augustin F, et al.",
+   "year": 2024,
+   "title": "Gaining more from doing less? The effects of a one-week deload period during supervised resistance training on muscular adaptations",
+   "journal": "PeerJ",
+   "doi": "10.7717/peerj.16777",
+   "pmid": "38274324",
+   "url": "https://doi.org/10.7717/peerj.16777",
+   "type": "RCT",
+   "evidence_level": "B",
+   "topics": [
+    "디로드"
+   ],
+   "key_findings": [
+    "9주 중간 1주 완전 휴식(디로드): 하체 근비대·지구력·파워는 연속 훈련과 차이 없음",
+    "하체 등척성·동적 근력은 연속 훈련 그룹이 더 향상",
+    "연속 훈련 그룹이 훈련 준비도 설문에서 약간 우세"
+   ],
+   "citation_count": 10,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-34",
+   "authors": "Bell L, Strafford BW, Coleman M, Androulakis Korakakis P, Nolan D",
+   "year": 2023,
+   "title": "Integrating Deloading into Strength and Physique Sports Training Programmes: An International Delphi Consensus Approach",
+   "journal": "Sports Medicine - Open",
+   "doi": "10.1186/s40798-023-00633-0",
+   "pmid": "37730925",
+   "url": "https://doi.org/10.1186/s40798-023-00633-0",
+   "type": "델파이 합의(전문가 의견)",
+   "evidence_level": "C",
+   "topics": [
+    "디로드"
+   ],
+   "key_findings": [
+    "합의 정의: 디로드 = 생리·심리 피로를 줄이고 회복과 다음 훈련 준비를 위한 훈련 스트레스 감소 기간",
+    "138개 진술을 4개 영역 설계 원칙으로 정리"
+   ],
+   "citation_count": 16,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-35",
+   "authors": "Rogerson D, Nolan D, Androulakis Korakakis P, Immonen V, Wolf M, Bell L",
+   "year": 2024,
+   "title": "Deloading Practices in Strength and Physique Sports: A Cross-sectional Survey",
+   "journal": "Sports Medicine - Open",
+   "doi": "10.1186/s40798-024-00691-y",
+   "pmid": "38499934",
+   "url": "https://doi.org/10.1186/s40798-024-00691-y",
+   "type": "횡단 설문",
+   "evidence_level": "C",
+   "topics": [
+    "디로드"
+   ],
+   "key_findings": [
+    "디로드 기간 6.4±1.7일, 5.6±2.3주마다",
+    "볼륨(세트·반복) 감소, 부하 감소, RIR 증가; 빈도와 종목은 유지",
+    "정체·근육통·관절 통증 시 실시, 48%는 마사지·스트레칭·폼롤링 병행"
+   ],
+   "citation_count": 6,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-36",
+   "authors": "Pancar Z, Ilhan MT, Darendeli MK, et al.",
+   "year": 2026,
+   "title": "Effects of deload periods in resistance training on muscle hypertrophy and strength endurance in untrained young men using a randomized within subject design",
+   "journal": "Scientific Reports",
+   "doi": "10.1038/s41598-026-40612-5",
+   "pmid": "41730991",
+   "url": "https://doi.org/10.1038/s41598-026-40612-5",
+   "type": "무작위 개인 내 설계",
+   "evidence_level": "B",
+   "topics": [
+    "디로드"
+   ],
+   "key_findings": [
+    "4·8주차에 주 1회·2세트로 줄인 디로드 팔다리 vs 연속 훈련(주 2회 6~8세트): 근두께와 10RM(근지구력) 증가 차이 없음 (1RM 최대근력은 측정 안 함)",
+    "조건 간 효과 작음(ηp² 0.001~0.076), 모든 차이 95%CI가 0 포함"
+   ],
+   "citation_count": 0,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-37",
+   "authors": "Hayes EJ, Stevenson E, Sayer AA, Granic A, Hurst C",
+   "year": 2023,
+   "title": "Recovery from Resistance Exercise in Older Adults: A Systematic Scoping Review",
+   "journal": "Sports Medicine - Open",
+   "doi": "10.1186/s40798-023-00597-1",
+   "pmid": "37395837",
+   "url": "https://doi.org/10.1186/s40798-023-00597-1",
+   "type": "체계적 스코핑 리뷰",
+   "evidence_level": "C",
+   "topics": [
+    "연령"
+   ],
+   "key_findings": [
+    "고령자 근손상·회복 연구 27개는 프로토콜이 제각각이고 결과가 일관되지 않음",
+    "여성 자료 부족",
+    "현재 자료로는 고령자 회복 시간 권고를 명확히 할 수 없음"
+   ],
+   "citation_count": 20,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  },
+  {
+   "id": "R-38",
+   "authors": "Nuckols GL, Overpeck CA, Hanson ED, Battaglini CL",
+   "year": 2026,
+   "title": "The effects of biological sex on fatigue during and recovery from resistance exercise",
+   "journal": "PeerJ",
+   "doi": "10.7717/peerj.20542",
+   "pmid": "41527566",
+   "url": "https://doi.org/10.7717/peerj.20542",
+   "type": "비교 실험(성별 비무작위)",
+   "evidence_level": "C",
+   "topics": [
+    "성별"
+   ],
+   "key_findings": [
+    "75%1RM 5회 세트(휴식 90초)를 실패까지: 여성 58.3회 vs 남성 29.6회",
+    "72시간 동안 근육통·추정 1RM 회복 속도는 성별 차이 없음",
+    "여성의 많은 반복은 세트 간 휴식 중 빠른 회복 때문으로 해석"
+   ],
+   "citation_count": 0,
+   "citation_source": "Semantic Scholar Graph API (api.semanticscholar.org/graph/v1)",
+   "citation_checked": "2026-10-08"
+  }
+ ]
+}

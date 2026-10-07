@@ -93,7 +93,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
           const on = st.equipment.includes(e);
           return <button key={e} class={`chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => put({ equipment: on ? st.equipment.filter((x) => x !== e) : [...st.equipment, e] as Equipment[] })}>{on && <Icon name="check" size={14} />}{EQUIPMENT_LABEL[e]}</button>;
         })}</div>
-        <label>기본 휴식 (새로 추가하는 운동과 운동 사이에 사용. 플랜·루틴 블록마다 따로 바꿀 수 있어요)</label>
+        <label>기본 휴식 (새로 추가하는 운동과 운동 사이에 사용. 플랜·루틴 블록마다 따로 바꿀 수 있어요)<a class="ev-link" href={`#/recovery/papers?topic=${encodeURIComponent('세트 간 휴식')}`} aria-label="세트 간 휴식 근거 논문">근거</a></label>
         {([['compound', '다관절 세트 간'], ['isolation', '단관절 세트 간'], ['round', '묶음 라운드 후'], ['between', '운동 사이'], ['transition', '묶음 안 전환']] as const).map(([k, lab]) => (
           <div class="row rest-row" key={k}>
             <span class="grow">{lab}</span>
@@ -179,6 +179,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
 
       <SetGroup title="앱 정보·도구">
         <button onClick={() => go('#/tools')}>원판 계산기 · 1RM 계산기</button>
+        <button onClick={() => go('#/recovery')}>회복 팁 · 근거 논문</button>
         <p class="sub small"><a href={`${import.meta.env.BASE_URL}THIRD_PARTY_LICENSES.txt`} target="_blank" rel="noopener" class="license-link">오픈소스 고지</a> (인체 근육 그림: react-native-body-highlighter, MIT)</p>
         <p class="sub small">앱 버전 {APP_VERSION}{IS_PREVIEW ? ' · 미리 보기 판 (본판과 데이터 분리)' : ''}</p>
       </SetGroup>
