@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import papersFile from '../data/recovery_papers.json';
 import rulesFile from '../data/recovery_rules.json';
-import { recoveryByPart, estimateHours, statusOf, sortedRecovery, recoveryLine, agoText, busyParts, CAP_H, topicJosa } from '../src/core/recovery';
-import { byCitation, byRecent, topicsOf, filterPapers, labelKinds, shortRef, paperHref, proteinTarget } from '../src/core/recoveryData';
+import { recoveryByPart, estimateHours, statusOf, sortedRecovery, recoveryLine, agoText, busyParts, CAP_H, topicJosa, splitRecent, evidenceIds } from '../src/core/recovery';
+import { byCitation, byRecent, topicsOf, filterPapers, labelKinds, shortRef, paperHref, proteinTarget, isWeakLabel } from '../src/core/recoveryData';
 import type { Paper, Rule } from '../src/core/recoveryData';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Part } from '../src/core/types';
@@ -136,3 +136,31 @@ describe('D-057 근거 DB 데이터', () => {
     expect(proteinTarget(75)).toEqual({ target: 120, low: 105, high: 165 });
   });
 });
+
+describe('D-057 검토 F4·F6·메모', () => {
+  const end = '2026-10-08T10:00:00.000Z';
+  const t0 = Date.parse(end);
+  it('최근 14일 안에 한 부위만 목록에, 나머지는 기록 없는 부위', () => {
+    const old = wk('old', '2026-09-20T10:00:00.000Z', [['row', n(4)]]);
+    const neu = wk('new', end, [['squat', n(3)]]);
+    const { recent, staleParts } = splitRecent(sortedRecovery(recoveryByPart([old, neu], byId, t0 + H)));
+    expect(recent.map((r) => r.part)).toEqual(['하체']);
+    expect(staleParts).toContain('등');
+    expect(staleParts).not.toContain('하체');
+    // 정확히 14일은 포함, 넘으면 빠짐
+    const edge = recoveryByPart([wk('e', end, [['bench', n(3)]])], byId, t0 + 14 * 24 * H);
+    expect(splitRecent([...edge.values()]).recent).toHaveLength(1);
+    expect(splitRecent([...recoveryByPart([wk('e', end, [['bench', n(3)]])], byId, t0 + 14 * 24 * H + 1).values()]).recent).toHaveLength(0);
+  });
+  it('근거 ID는 실제로 쓴 규칙에서 (중복 없이 번호 순)', () => {
+    const papersOf = (id: string) => (rulesFile.rules as Rule[]).find((r) => r.id === id)!.papers;
+    expect(evidenceIds(['AR-01', 'AR-05', 'AR-19'], papersOf)).toEqual({ rules: ['AR-01', 'AR-05', 'AR-19'], papers: ['R-01', 'R-02', 'R-03', 'R-07', 'R-08', 'R-23'] });
+    expect(evidenceIds(['AR-01', 'AR-02', 'AR-01'], papersOf).papers).toEqual(['R-01', 'R-02', 'R-03', 'R-04', 'R-05']);
+  });
+  it('라벨에 약한·약함이 있으면 근거 약함', () => {
+    const rules = rulesFile.rules as Rule[];
+    expect(rules.filter((r) => isWeakLabel(r.label)).map((r) => r.id)).toEqual(expect.arrayContaining(['AR-12', 'AR-16']));
+    expect(isWeakLabel(rules.find((r) => r.id === 'AR-11')!.label)).toBe(false);
+  });
+});
+

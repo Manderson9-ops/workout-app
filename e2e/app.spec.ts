@@ -2646,6 +2646,8 @@ test.describe('D-057 회복', () => {
     const sets = Number((await sheet.textContent())!.match(/하체 작업 세트 (\d+)개/)![1]);
     expect(left).toBe(sets >= 10 ? 72 : 48); // 방금 끝냄: 기본 48, 10세트 이상 72 (실패 세트 없음)
     await expect(sheet).toContainText('실패 세트(RIR 0 기록) 0개');
+    await expect(sheet).toContainText('등 근육을 측정한 연구는 없음'); // 규칙의 주의·상충 (검토 F1)
+    await expect(card.getByTestId('rec-evidence')).toContainText(sets >= 10 ? '규칙 AR-01·AR-03·AR-05·AR-19' : '규칙 AR-01·AR-05·AR-19'); // 쓴 규칙에서 만듦 (검토 F4)
     await expect(sheet.getByText('AR-01', { exact: true })).toBeVisible();
     await expect(sheet.getByRole('link', { name: 'AR-01 근거 논문 3편 보기' })).toHaveAttribute('href', '#/recovery/papers?rule=AR-01');
     await expect(sheet.locator('.lbl-chip.research').first()).toHaveText('연구 근거');
@@ -2671,6 +2673,11 @@ test.describe('D-057 회복', () => {
     await page.getByRole('link', { name: '홈', exact: true }).click();
     await expect(page.getByTestId('home-recovery')).toContainText('회복됨: 하체');
     await expect(page.getByTestId('next-rec-note')).toHaveCount(0);
+    // 15일 뒤: 최근 14일 기록 없음 → 목록·홈 줄에서 빠지고 "기록 없는 부위"로 (검토 F6)
+    await shiftH(page, 15 * 24);
+    await expect(page.getByTestId('home-recovery')).toHaveCount(0);
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await expect(card).toContainText('최근 14일 안에 한 운동이 없어요');
     await unshift(page);
   });
 
@@ -2685,8 +2692,10 @@ test.describe('D-057 회복', () => {
     await page.getByTestId('recovery-card').getByRole('link', { name: /회복 팁·근거/ }).click();
     await expect(page).toHaveURL(/#\/recovery$/);
     await expect(page.getByTestId('tip-AR-11')).toContainText('체중을 기록하면 계산해 드려요');
-    await expect(page.getByTestId('tip-AR-13')).toContainText('이 DB 범위에서는 운동 몇 시간 뒤 냉수욕 근거가 없어요');
-    await expect(page.getByTestId('tip-AR-16').locator('.lbl-chip')).toHaveText(['앱 판단 추정']);
+    await expect(page.getByTestId('tip-AR-13')).toContainText('이 DB 범위에서는 근거 없음'); // 데이터 문구 그대로, 같은 문장 두 번 없음 (검토 F3)
+    expect(((await page.getByTestId('tip-AR-13').textContent())!.match(/이 DB 범위에서는/g) ?? []).length).toBe(1);
+    await expect(page.getByTestId('tip-AR-16').locator('.lbl-chip')).toHaveText(['앱 판단 추정', '근거 약함']);
+    await expect(page.getByTestId('tip-AR-12').locator('.lbl-chip.weak')).toHaveText('근거 약함');
     await expect(page.getByTestId('tip-AR-09')).not.toContainText('7.6');
     for (const id of ['AR-04', 'AR-09', 'AR-10', 'AR-11', 'AR-12', 'AR-13', 'AR-14', 'AR-15', 'AR-16']) await expect(page.getByTestId(`tip-${id}`)).toBeVisible();
     // 체중 75kg → 120g (105~165)
@@ -2717,6 +2726,11 @@ test.describe('D-057 회복', () => {
     await page.getByRole('group', { name: '주제로 거르기' }).getByRole('button', { name: /^세트 간 휴식 \d+$/ }).click();
     await expect(page.getByTestId('paper-count')).toHaveText(/^\d+편 · 주제 세트 간 휴식$/);
     await checkScreen(page, '90-recovery-papers');
+    // 주소로 바로 열고 [뒤로] → 앱 밖이 아니라 기록 탭으로 (검토 메모)
+    await page.goto('./#/recovery/papers?rule=AR-07');
+    await page.reload();
+    await page.getByRole('button', { name: '뒤로' }).click();
+    await expect(page).toHaveURL(/#\/stats$/);
     // 규칙으로 거르기
     await page.goto('./#/recovery/papers?rule=AR-07');
     await expect(page.getByTestId('rule-filter')).toContainText('AR-07');

@@ -6,7 +6,9 @@ import { useState } from 'preact/hooks';
 import papersFile from '../../../data/recovery_papers.json';
 import type { AppState } from '../store';
 import type { Paper, Rule } from '../../core/recoveryData';
-import { byCitation, byRecent, topicsOf, filterPapers, labelKinds, shortRef, paperHref, proteinTarget } from '../../core/recoveryData';
+import { byCitation, byRecent, topicsOf, filterPapers, shortRef, paperHref, proteinTarget } from '../../core/recoveryData';
+import { LabelChips } from './RecoveryCard';
+import { backOr } from '../nav';
 import { RULES, ruleById } from '../recoveryDb';
 import { ScreenHeader } from '../header';
 import { Metric } from '../components';
@@ -14,7 +16,8 @@ import { Icon } from '../icons';
 
 const PAPERS = (papersFile as { papers: Paper[] }).papers;
 const paperById = new Map(PAPERS.map((p) => [p.id, p]));
-const back = { label: '뒤로', onClick: () => history.back(), aria: '뒤로' };
+/** 주소로 바로 열었으면 앱 밖으로 나가지 않게 기록 탭으로 (검토 메모) */
+const back = { label: '뒤로', onClick: () => backOr('#/stats'), aria: '뒤로' };
 
 /** 팁 카드 (D-057 app_use=팁: AR-04, AR-09~16). 제목은 앱이 붙인 한 줄 요약 */
 export const TIP_TITLES: Record<string, string> = {
@@ -28,12 +31,7 @@ export const TIP_TITLES: Record<string, string> = {
   'AR-15': '세트는 1~3회 남기고 (RIR 1~3)',
   'AR-16': '디로드 (가볍게 하는 주) 제안',
 };
-/** 단정하지 않게 (D-057 2차 검증): "근거 없음" → "이 DB 범위에서는 근거가 없어요" */
-const soften = (s: string) => s.replace('운동 몇 시간 뒤 냉수욕의 영향은 근거 없음', '이 DB 범위에서는 운동 몇 시간 뒤 냉수욕 근거가 없어요');
 
-function LabelChips({ r }: { r: Rule }) {
-  return <>{labelKinds(r.label).map((k) => <span key={k} class={`lbl-chip ${k === '연구 근거' ? 'research' : 'app'}`}>{k}</span>)}</>;
-}
 function RefChips({ r }: { r: Rule }) {
   return (
     <div class="ref-chips" aria-label={`${r.id} 근거 논문`}>
@@ -65,12 +63,11 @@ export function RecoveryTips({ s }: { s: AppState }) {
       {tips.map((r) => (
         <section class="card tip-card" key={r.id} aria-label={TIP_TITLES[r.id]} data-testid={`tip-${r.id}`}>
           <h2>{TIP_TITLES[r.id]}</h2>
-          <div class="rule-head"><span class="sub small">{r.id}</span><LabelChips r={r} /></div>
+          <div class="rule-head"><span class="sub small">{r.id}</span><LabelChips label={r.label} /></div>
           {r.id === 'AR-11' && <ProteinBox s={s} />}
-          <p>{soften(r.text)}</p>
-          {r.id === 'AR-13' && <p class="sub small">이 DB 범위에서는 운동 몇 시간 뒤 냉수욕 근거가 없어요. 시합·통증 관리 목적이면 써도 돼요.</p>}
+          <p>{r.text}</p>
           <p class="sub small">라벨: {r.label}</p>
-          {r.conflict && <p class="sub small"><strong>주의·상충:</strong> {soften(r.conflict)}</p>}
+          {r.conflict && <p class="sub small"><strong>주의·상충:</strong> {r.conflict}</p>}
           <RefChips r={r} />
         </section>
       ))}
@@ -115,8 +112,8 @@ export function RecoveryPapers({ query }: { query: string }) {
       <p class="sub small">운동 회복 연구 {PAPERS.length}편 (저항운동). 인용 수는 Semantic Scholar 한 곳 기준이라 Google Scholar 와 다를 수 있어요.</p>
       {rule && (
         <div class="rule-box" data-testid="rule-filter">
-          <div class="rule-head"><strong>{rule.id}</strong><LabelChips r={rule} /><a class="ev-link small" href="#/recovery/papers">모두 보기</a></div>
-          <p class="small">{soften(rule.text)}</p>
+          <div class="rule-head"><strong>{rule.id}</strong><LabelChips label={rule.label} /><a class="ev-link small" href="#/recovery/papers">모두 보기</a></div>
+          <p class="small">{rule.text}</p>
         </div>
       )}
       <div class="seg sort-seg" role="group" aria-label="정렬">

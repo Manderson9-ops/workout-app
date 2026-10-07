@@ -110,6 +110,20 @@ export function agoText(elapsedH: number): string {
   return `${Math.floor(elapsedH / 24)}일 전`;
 }
 
+/** 최근 days일 안에 한 부위만 보이고, 나머지는 "최근 기록 없는 부위"로 (D-057 검토 F6) */
+export const RECENT_DAYS = 14;
+export function splitRecent(list: readonly PartRecovery[], days = RECENT_DAYS): { recent: PartRecovery[]; staleParts: Part[] } {
+  const recent = list.filter((r) => r.elapsedH <= days * 24);
+  const have = new Set(recent.map((r) => r.part));
+  return { recent, staleParts: PARTS.filter((p) => !have.has(p)) };
+}
+/** 쓴 규칙들의 근거 논문 ID (중복 없이, 번호 순) — 카드 아래 근거 표시 (검토 F4) */
+export function evidenceIds(ruleIds: readonly string[], papersOf: (id: string) => readonly string[]): { rules: string[]; papers: string[] } {
+  const rules = [...new Set(ruleIds)].sort();
+  const papers = [...new Set(rules.flatMap((id) => papersOf(id)))].sort((a, b) => Number(a.slice(2)) - Number(b.slice(2)));
+  return { rules, papers };
+}
+
 /** 은/는 (마지막 글자 받침): 가슴은, 하체는 */
 export function topicJosa(word: string): string {
   const c = word.charCodeAt(word.length - 1);

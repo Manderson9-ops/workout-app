@@ -25,7 +25,7 @@
   /* 요일 색 (D-054): 일요일 빨강, 토요일 파랑 */
   --sun: #f87171; --sat: #60a5fa;
   /* 몸 그림·우선순위·열 지도 (D-055 3단계 토큰화): 꺼짐 → 낮음 → 보통 → 높음 (밝을수록 높음), 위 글자 */
-  --rec-busy: #fb923c; --rec-almost: #facc15; --rec-ok: #4ade80; --on-rec: #1a1205; /* D-057 회복 상태 (글·아이콘과 함께, 색만으로 전하지 않음) */
+  --rec-busy: #3d5f8f; --on-rec-busy: #eaf2ff; --rec-almost: #7fa8d6; --on-rec-almost: #0b1220; --rec-ok: #2dd4bf; --on-rec-ok: #042420; /* D-057 회복 상태: 차분한 파랑(회복 중)·옅은 파랑(거의)·청록(회복됨, 완료 초록 --ok 와 다름). 글·아이콘과 함께, 색만으로 전하지 않음 (검토 F5) */
   --map-off: #383e4b; --map-1: #4a72b8; --map-2: #5b9cf6; --map-3: #b9dcff; --map-glow: rgba(147, 197, 253, .6);
   --on-map-light: #0b1220; --on-map-light-sub: #1e293b; --on-map-dark-sub: #e6eeff;
   --map-body: #12151c; --map-outline: #525a6b; --map-deco: #3a414f; --hover-veil: rgba(255, 255, 255, .06);
@@ -670,10 +670,10 @@ button.chip.full { width: 100%; }
 .rec-row { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-btn); text-align: left; color: var(--text); }
 .rec-row .rec-part { font-weight: 700; min-width: 64px; }
 .rec-row .rec-left { margin-left: auto; color: var(--sub); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.rc-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); font-size: 13px; font-weight: 700; color: var(--on-rec); white-space: nowrap; }
-.rc-chip.busy { background: var(--rec-busy); } .rc-chip.almost { background: var(--rec-almost); } .rc-chip.ok { background: var(--rec-ok); }
+.rc-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.rc-chip.busy { background: var(--rec-busy); color: var(--on-rec-busy); } .rc-chip.almost { background: var(--rec-almost); color: var(--on-rec-almost); } .rc-chip.ok { background: var(--rec-ok); color: var(--on-rec-ok); }
 .rec-note { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; padding: 8px 10px; border-radius: var(--r-btn); background: var(--card2); color: var(--text); font-size: 14px; }
-.rec-note .icon { color: var(--rec-busy); flex: none; margin-top: 2px; }
+.rec-note .icon { color: var(--sub); flex: none; margin-top: 2px; }
 .rec-home { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
 .rec-home .rec-txt { font-size: 14px; }
 .rule-box { padding: 10px 12px; margin: 8px 0; border-radius: var(--r-btn); background: var(--card2); }
@@ -694,3 +694,6 @@ button.chip.full { width: 100%; }
 .ref-chips a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: var(--r-pill); background: var(--card3); color: var(--text); text-decoration: none; font-size: 13px; }
 .tip-card h2 { font-size: 17px; margin: 0 0 6px; }
 .ev-link { margin-left: 6px; color: var(--acc-text); display: inline-flex; align-items: center; min-height: 44px; }
+.lbl-chip.weak { color: var(--sub); border: 1px dotted var(--line); }
+.rec-stale { margin: 4px 0 8px; }
+.rec-stale > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--sub); font-size: 14px; }

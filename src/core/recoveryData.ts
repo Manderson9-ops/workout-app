@@ -31,6 +31,9 @@ export function labelKinds(label: string): ('연구 근거' | '앱 판단 추정
   return (['연구 근거', '앱 판단 추정'] as const).filter((k) => label.includes(k));
 }
 
+/** 라벨에 근거가 약하다는 말("약한"·"약함")이 있는지 → "근거 약함" 배지 (검토 메모) */
+export const isWeakLabel = (label: string): boolean => /약한|약함/.test(label);
+
 /** 논문 짧은 이름: "Thomas 2018" */
 export const shortRef = (p: Pick<Paper, 'authors' | 'year'>): string => `${p.authors.split(',')[0]!.trim().split(' ')[0]} ${p.year}`;
 

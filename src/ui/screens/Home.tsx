@@ -21,7 +21,7 @@ import { RemoteCards } from './RemoteCards';
 import { WorkoutCardWithMenu } from './WorkoutCard';
 import { softDelete } from '../../db/db';
 import { catalog } from '../catalog';
-import { recoveryByPart, sortedRecovery, recoveryLine, busyParts } from '../../core/recovery';
+import { recoveryByPart, sortedRecovery, recoveryLine, busyParts, splitRecent } from '../../core/recovery';
 import type { PartRecovery } from '../../core/recovery';
 import { minutes, mmss, Card, Metric, Empty, Delta } from '../components';
 import { Icon } from '../icons';
@@ -127,7 +127,7 @@ export function Home({ s }: { s: AppState }) {
   // D-057 회복 상태 한 줄 (추정, 분 단위로 다시 계산)
   const nowMin = Math.floor(Date.now() / 60_000);
   const rec = useMemo(() => recoveryByPart(history, byId, Date.now()), [history, byId, nowMin]);
-  const recText = recoveryLine(sortedRecovery(rec));
+  const recText = recoveryLine(splitRecent(sortedRecovery(rec)).recent); // 최근 14일 안에 한 부위만 (검토 F6)
   const today = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
   return (
     <main class="home">
