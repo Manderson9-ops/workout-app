@@ -1964,13 +1964,13 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
   await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.2 바뀐 점'); // 0.9.3(2줄) + 0.9.2(5줄) + 0.9.1(1줄) = 8줄
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.3 바뀐 점'); // 0.9.4(3줄) + 0.9.3(2줄) + 0.9.2(3줄) = 8줄
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
   await checkScreen(page, '65-whats-new');
   await sheet.getByRole('button', { name: /^모두 보기/ }).click();
-  await expect(sheet.locator('.wn-lines li')).toHaveCount(22); // 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(25); // 0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
@@ -2005,7 +2005,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.3(2줄) + 0.9.2(5줄) + 0.9.1(1줄) = 8줄, 0.9.0 은 [모두 보기]
+  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.4(3줄) + 0.9.3(2줄) + 0.9.2(3줄) = 8줄, 0.9.1·0.9.0 은 [모두 보기]
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   const gear = page.getByRole('link', { name: '설정', exact: true });
@@ -2449,6 +2449,86 @@ test.describe('0.9.3 검토: 나눠 받는 화면을 못 받으면', () => {
     await page.unroute(chunk);
     await alert.getByRole('button', { name: '다시 시도' }).click();
     await expect(page.getByTestId('this-week')).toBeVisible();
+  });
+});
+
+test.describe('D-056 휴식 끝 진동', () => {
+  type HW = Window & { __wkTest?: boolean; __hapticCalls?: { pulses: number; method: string }[]; __dn?: () => number };
+  test('설정: 휴식 끝 진동 켜기/끄기(이 기기만), [소리·진동 시험] 결과 글, 숨긴 스위치는 초점·스크롤에 영향 없음, 안내 카드', async ({ page }) => {
+    await page.getByRole('link', { name: '설정', exact: true }).click();
+    const grp = page.getByRole('region', { name: '소리·화면' });
+    await grp.getByRole('button', { name: '휴식 끝 진동 켬' }).click();
+    await expect(grp.getByRole('button', { name: '휴식 끝 진동 끔' })).toHaveAttribute('aria-pressed', 'false');
+    await page.reload();
+    await expect(grp.getByRole('button', { name: '휴식 끝 진동 끔' })).toBeVisible();
+    await grp.getByRole('button', { name: '휴식 끝 진동 끔' }).click();
+    await expect(grp.getByRole('button', { name: '휴식 끝 진동 켬' })).toHaveAttribute('aria-pressed', 'true');
+    const guide = grp.getByRole('region', { name: '음악 들으며 휴식 알림 받기' });
+    await expect(guide.locator('li')).toHaveCount(4);
+    await expect(guide).toContainText('사운드 및 햅틱');
+    // 시험 버튼: 누른 버튼에 초점이 그대로, 스크롤 그대로
+    const btn = grp.getByRole('button', { name: '소리·진동 시험' });
+    await btn.scrollIntoViewIfNeeded();
+    const y0 = await page.evaluate(() => window.scrollY);
+    await btn.click();
+    const res = page.getByTestId('alert-test-result');
+    await expect(res).toContainText(/진동 방식: (iOS 햅틱|진동|진동 지원 안 함\(화면 깜빡임만\))/);
+    await expect(res).toContainText('무음 스위치를 확인하세요');
+    await expect(res).toContainText('운동 중에는 휴식이 끝나면 자동으로');
+    await page.waitForTimeout(400); // 나머지 두 번 누르기(120ms 간격)까지
+    // 초점은 브라우저 기본(누른 버튼, WebKit 은 body) 그대로, 숨긴 스위치·라벨로 가지 않음
+    const ae = await page.evaluate(() => { const el = document.activeElement as HTMLElement | null; return { inBox: !!el?.closest('.haptic-box'), tag: el?.tagName, text: el?.tagName === 'BUTTON' ? el.textContent : '' }; });
+    expect(ae.inBox).toBe(false);
+    expect(ae.tag === 'BODY' || ae.text === '소리·진동 시험').toBe(true);
+    expect(await page.evaluate(() => window.scrollY)).toBe(y0);
+    await noHorizontalScroll(page);
+    await btn.focus();
+    await checkScreen(page, '82-settings-alert');
+  });
+
+  test('휴식: 첫 휴식에 안내 한 줄(닫기), 10초 전 짧게 1번·끝에 3번 진동(한 번만), 늦게 돌아오면 진동 안 함', async ({ page }) => {
+    await page.addInitScript(() => { (window as HW).__wkTest = true; });
+    await page.reload();
+    await makeRoutine(page, ['이두'], '30분');
+    await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    const hint = page.getByRole('note', { name: '휴식 알림 안내' });
+    await expect(hint).toHaveText('무음 모드면 소리 대신 진동으로 알려요');
+    await checkScreen(page, '83-rest-hint');
+    const calls = () => page.evaluate(() => ((window as HW).__hapticCalls ?? []).map((c) => c.pulses));
+    const shift = (ms: number) => page.evaluate((m) => { const w = window as HW; w.__dn ??= Date.now.bind(Date); const o = w.__dn; Date.now = () => o() + m; }, ms);
+    const total = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
+    await shift((total - 5) * 1000);
+    await expect.poll(calls).toEqual([1]); // 10초 전 짧게
+    await shift((total + 1) * 1000);
+    await expect(page.locator('.rest-pill.end')).toBeVisible();
+    await expect.poll(calls).toEqual([1, 3]); // 끝에 3번
+    await page.waitForTimeout(800);
+    expect(await calls()).toEqual([1, 3]); // 다시 울리지 않음
+    await page.reload();
+    await expect(page.locator('.rest-pill.end, .rest-pill')).toHaveCount(1);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => ((window as HW).__hapticCalls ?? []).length)).toBe(0); // 새로 고쳐도 같은 휴식 끝은 다시 안 울림
+    // 안내는 이 기기 처음 휴식에만
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    await expect(page.getByLabel(/휴식 남은 시간 \d+초/)).toBeVisible();
+    await expect(hint).toHaveCount(0);
+    // 늦게 돌아옴: 끝난 지 30초 지나서 화면을 봄 → 진동 안 함 (소리·깜빡임은 그대로)
+    const t2 = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
+    await shift((t2 + 30) * 1000);
+    await expect(page.locator('.rest-pill.end')).toBeVisible();
+    await page.waitForTimeout(500);
+    expect((await calls()).filter((p) => p === 3)).toEqual([]);
+  });
+
+  test('안내 한 줄은 닫을 수 있음', async ({ page }) => {
+    await makeRoutine(page, ['등'], '30분');
+    await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    const hint = page.getByRole('note', { name: '휴식 알림 안내' });
+    await expect(hint).toBeVisible();
+    await hint.getByRole('button', { name: '안내 닫기' }).click();
+    await expect(hint).toHaveCount(0);
   });
 });
 

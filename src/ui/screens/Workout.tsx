@@ -25,8 +25,13 @@ import { go } from '../nav';
 import { RoutineList } from './MyRoutines';
 import { softDelete } from '../../db/db';
 
-import { unlockAudio, beep, wasAlerted, markAlerted, audioState } from '../device';
-import { diagTimerEnd } from '../diag';
+import { unlockAudio, wasAlerted, markAlerted, audioState, playEndSound, playWarnSound } from '../device';
+import { diagTimerEnd, diagHaptic } from '../diag';
+import { haptic, hapticOn, buzzOnTime } from '../haptics';
+import { lsGet, lsSet } from '../appName';
+
+/** D-056 휴식 안내를 본 기기 (이 기기만) */
+export const REST_HINT_KEY = 'hint.restSilent';
 import { sendNow } from '../autoSend';
 import { syncNow } from '../sync';
 import { remoteActiveOf } from '../store';
@@ -48,6 +53,13 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [menu, setMenu] = useState<{ b: number; i: number } | null>(null);
   /** 운동 화면이 뜬 시각 (휴식이 끝날 때 이 화면에 있었는지 판정용, 진단) */
   const shownAt = useRef(Date.now());
+  // D-056: 이 기기에서 처음 휴식이 시작될 때 한 번 "무음 모드면 소리 대신 진동" 안내 (그 휴식 동안만, 닫을 수 있음)
+  const [hintFor, setHintFor] = useState<number | null>(null);
+  const restId = w?.timer?.startedAt;
+  useEffect(() => {
+    if (restId === undefined || lsGet(REST_HINT_KEY)) return;
+    lsSet(REST_HINT_KEY, '1'); setHintFor(restId);
+  }, [restId]);
   // PC 키보드: Ctrl+Enter(맥 ⌘+Enter) = 현재 세트 완료 (D-030)
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -104,11 +116,17 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   useEffect(() => {
     if (!w?.timer) { setEnded(false); return; }
     const key = w.timer.endsAt;
-    if (rem <= 10 && rem > 0 && warned.current !== key) { warned.current = key; if (s.settings.soundOn) beep(660, 120); }
+    // 10초 전: 알림음 한 번 + (진동 켬이면) 짧게 한 번. 10초 전 알림은 예전처럼 "소리 켬"일 때 기능 (D-056)
+    if (rem <= 10 && rem > 0 && warned.current !== key) { warned.current = key; if (s.settings.soundOn) { playWarnSound(); if (hapticOn()) haptic(1); } }
     if (rem === 0 && !wasAlerted(key)) {
       markAlerted(key); setEnded(true);
       diagTimerEnd(key, s.settings.soundOn, audioState(), shownAt.current);
-      if (s.settings.soundOn) { beep(880, 180); beep(880, 180, 0.3); beep(1175, 350, 0.6); }
+      if (s.settings.soundOn) playEndSound();
+      // 휴식 끝 진동 3번 (D-056). 다른 앱에 있다가 늦게 돌아왔으면(끝난 지 5초 넘음) 진동하지 않음
+      if (hapticOn()) {
+        if (buzzOnTime(key, Date.now())) diagHaptic(haptic(3));
+        else diagHaptic('late');
+      }
     }
   }, [rem, w?.timer?.endsAt]);
 
@@ -331,6 +349,12 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       {/* 아래 도크 하나 (D-055 2단계): 휴식 중 = [고리·남은 시간·다음] [−15] [+15] [건너뛰기] [✓ 현재 세트 완료], 아닐 때 = 넓은 완료 버튼 한 줄 */}
       <div class={`timer dock${w.timer && rem === 0 ? ' end flash' : ''}`} role="timer" aria-live="polite">
         {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" class="err-line"><Icon name="alert" size={18} />{finishErr}</p><button class="ghost icon-btn" aria-label="알림 닫기" onClick={() => setFinishError(null)}><Icon name="close" size={18} /></button></div>}
+        {timerOn && w.timer && hintFor === w.timer.startedAt && (
+          <div class="rest-hint" role="note" aria-label="휴식 알림 안내">
+            <Icon name="info" size={18} /><span class="grow">무음 모드면 소리 대신 진동으로 알려요</span>
+            <button class="ghost icon-btn" aria-label="안내 닫기" onClick={() => setHintFor(null)}><Icon name="close" size={18} /></button>
+          </div>
+        )}
         {timerOn && w.timer ? (
           <div class={`rest-pill${rem === 0 ? ' end' : ''}`}>
             <svg class="ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true" data-fraction={ring.fraction.toFixed(3)}>

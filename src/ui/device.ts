@@ -56,6 +56,10 @@ export function beep(freq: number, ms: number, when = 0): void {
   o.start(t); o.stop(t + ms / 1000 + 0.05);
 }
 
+/** 휴식 끝 알림음 (세 번) · 10초 전 알림음 (한 번). 운동 화면과 설정의 [소리·진동 시험]이 같은 소리를 씀 */
+export function playEndSound(): void { beep(880, 180); beep(880, 180, 0.3); beep(1175, 350, 0.6); }
+export function playWarnSound(): void { beep(660, 120); }
+
 /** 앱 전체에서 한 번: 여러 종류의 탭으로 오디오를 깨우고, 앱으로 돌아오면 다시 깨움 */
 export function useAudioUnlock(soundOn = true): void {
   setSoundEnabled(soundOn);
