@@ -2463,8 +2463,16 @@ test.describe('D-056 휴식 끝 진동', () => {
     await expect(grp.getByRole('button', { name: '휴식 끝 진동 끔' })).toBeVisible();
     await grp.getByRole('button', { name: '휴식 끝 진동 끔' }).click();
     await expect(grp.getByRole('button', { name: '휴식 끝 진동 켬' })).toHaveAttribute('aria-pressed', 'true');
-    const guide = grp.getByRole('region', { name: '음악 들으며 휴식 알림 받기' });
+    // 안내는 접혀 있음 (검토 S4): 요약 줄 44px, 누르면 펼침. 켜기·시험 버튼은 늘 보임
+    const guide = grp.getByTestId('guide-music');
+    await expect(guide).not.toHaveAttribute('open', '');
+    await expect(guide.locator('li').first()).toBeHidden();
+    const sum = guide.locator('summary');
+    expect((await sum.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await sum.click();
+    await expect(guide).toHaveAttribute('open', '');
     await expect(guide.locator('li')).toHaveCount(4);
+    await expect(grp.getByRole('button', { name: '소리·진동 시험' })).toBeVisible();
     await expect(guide).toContainText('사운드 및 햅틱');
     // 시험 버튼: 누른 버튼에 초점이 그대로, 스크롤 그대로
     const btn = grp.getByRole('button', { name: '소리·진동 시험' });
@@ -2574,6 +2582,8 @@ test.describe('D-056 검토: 진동 끔·소리 끔, 실험 알림', () => {
     await page.addInitScript(() => { (window as NW).__wkTest = true; Object.defineProperty(Notification, 'permission', { get: () => 'granted', configurable: true }); Notification.requestPermission = async () => 'granted'; });
     await page.reload();
     await page.getByRole('link', { name: '설정', exact: true }).click();
+    await expect(sec.getByTestId('guide-notify')).not.toHaveAttribute('open', '');
+    await sec.getByTestId('guide-notify').locator('summary').click();
     await expect(sec).toContainText('홈 화면에 추가한 앱에서만');
     await sec.getByRole('button', { name: '휴식 끝 알림 끔' }).click();
     await expect(sec.getByRole('button', { name: '휴식 끝 알림 켬' })).toHaveAttribute('aria-pressed', 'true');

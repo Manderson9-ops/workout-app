@@ -7,10 +7,12 @@
 import { lsGet, lsSet, lsRemove } from './appName';
 import { diag } from './diag';
 import type { NotifyPermission } from '../core/notify';
+import { isIosLike } from '../core/notify';
 
 export const NOTIFY_KEY = 'notify.restEnd';
 export const notifySupported = (): boolean => typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator;
 export const notifyPermission = (): NotifyPermission => (notifySupported() ? (Notification.permission as NotifyPermission) : 'unsupported');
+export const onIos = (): boolean => isIosLike(navigator.userAgent, navigator.maxTouchPoints ?? 0);
 export const notifyOn = (): boolean => lsGet(NOTIFY_KEY) === '1';
 export function setNotifyOff(): void { lsRemove(NOTIFY_KEY); }
 
@@ -30,14 +32,15 @@ type TestWin = Window & { __wkTest?: boolean; __notifyCalls?: { title: string; b
 
 /** 알림 하나 보내기. 'shown' | 'error' | 'unsupported' | 'denied' */
 export async function showAppNotification(title: string, body: string, tag = 'rest-end'): Promise<'shown' | 'error' | 'unsupported' | 'denied'> {
-  const w = window as TestWin;
-  if (w.__wkTest) (w.__notifyCalls ??= []).push({ title, body, t: Date.now() });
   if (!notifySupported()) { diag('notify', { m: 'unsupported', ok: false }); return 'unsupported'; }
   if (Notification.permission !== 'granted') { diag('notify', { m: 'denied', ok: false }); return 'denied'; }
   const opts = { body, tag, renotify: true, silent: false, icon: `${import.meta.env.BASE_URL}icons/icon-192.png`, data: { url: '#/workout' } } as NotificationOptions;
   try {
     // 서비스 워커가 준비될 때까지 (최대 3초). 없으면 일반 알림 시도 (아이폰은 안 됨)
     const reg = await Promise.race([navigator.serviceWorker.ready, new Promise<null>((r) => setTimeout(() => r(null), 3000))]);
+    // 시험 기록은 지원·허용을 통과하고 실제로 보내기 바로 전에만 (검토 S2)
+    const w = window as TestWin;
+    if (w.__wkTest) (w.__notifyCalls ??= []).push({ title, body, t: Date.now() });
     if (reg) await reg.showNotification(title, opts);
     else new Notification(title, opts);
     diag('notify', { m: 'shown', ok: true });

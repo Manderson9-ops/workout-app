@@ -49,13 +49,24 @@ self.addEventListener('activate', (e) => {
   done.then(() => setTimeout(() => { void fillRest(); }, 1000), () => undefined);
 });
 // D-056 실험: 휴식 끝 알림을 누르면 앱(운동 화면)으로
+/* notify-target:start */
+// 알림을 누르면 갈 곳 (순수 함수, tests/swBuild.test.ts 가 이 부분만 떼어 시험): 같은 앱(범위)의 열린 창이 있으면 그 창(첫 번째)을 앞으로 + 주소 이동, 없으면 새 창.
+// 주소는 알림 data.url(같은 범위 안의 것만, 아니면 #/workout) 기준
+function notifyTarget(scope, dataUrl, clientUrls) {
+  let url = new URL('#/workout', scope).href;
+  try { if (dataUrl) { const u = new URL(dataUrl, scope).href; if (u.startsWith(scope)) url = u; } } catch { /* 이상한 주소면 운동 화면 */ }
+  const index = clientUrls.findIndex((x) => typeof x === 'string' && x.startsWith(scope));
+  return { url, index };
+}
+/* notify-target:end */
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const url = new URL((e.notification.data && e.notification.data.url) || '#/workout', self.registration.scope).href;
+  const scope = self.registration.scope;
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
-    const c = cs.find((x) => x.url.startsWith(self.registration.scope));
-    if (c) return c.focus().then((f) => (f && 'navigate' in f ? f.navigate(url) : f)).catch(() => c.focus());
-    return self.clients.openWindow(url);
+    const t = notifyTarget(scope, e.notification.data && e.notification.data.url, cs.map((x) => x.url));
+    const c = t.index >= 0 ? cs[t.index] : null;
+    if (c) return c.focus().then((f) => (f && 'navigate' in f ? f.navigate(t.url) : f)).catch(() => c.focus());
+    return self.clients.openWindow(t.url);
   }));
 });
 self.addEventListener('fetch', (e) => {

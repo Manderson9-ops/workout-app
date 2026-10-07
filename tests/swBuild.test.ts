@@ -38,3 +38,23 @@ describe('설치 때 미리 담을 빌드 파일 목록 (0.9.3 화면 나눠 받
   });
 });
 
+describe('D-056 알림 누르면 갈 곳 (sw.template.js notifyTarget)', () => {
+  const src = readFileSync('src/sw.template.js', 'utf8');
+  const body = src.slice(src.indexOf('/* notify-target:start */'), src.indexOf('/* notify-target:end */'));
+  const notifyTarget = new Function(`${body}; return notifyTarget;`)() as (scope: string, dataUrl: unknown, clients: unknown[]) => { url: string; index: number };
+  const S = 'https://x.github.io/workout-app/';
+  it('열린 같은 앱 창이 있으면 그 창, 없으면 새 창', () => {
+    expect(notifyTarget(S, '#/workout', ['https://x.github.io/workout-app-next/#/', `${S}#/stats`])).toEqual({ url: `${S}#/workout`, index: 1 });
+    expect(notifyTarget(S, '#/workout', ['https://x.github.io/workout-app-next/'])).toEqual({ url: `${S}#/workout`, index: -1 });
+    expect(notifyTarget(S, undefined, [])).toEqual({ url: `${S}#/workout`, index: -1 });
+  });
+  it('다른 곳 주소·이상한 값은 운동 화면으로', () => {
+    expect(notifyTarget(S, 'https://evil.example/', []).url).toBe(`${S}#/workout`);
+    expect(notifyTarget(S, '#/settings', []).url).toBe(`${S}#/settings`);
+    expect(notifyTarget(S, 'http://[bad', []).url).toBe(`${S}#/workout`);
+  });
+  it('빌드한 sw.js 에도 그대로 들어감', () => {
+    expect(buildSw(src, 'v1')).toContain('function notifyTarget(scope, dataUrl, clientUrls)');
+  });
+});
+

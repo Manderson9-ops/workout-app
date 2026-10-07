@@ -1,19 +1,17 @@
 import { describe, it, expect } from 'vitest';
-import { shouldNotify, restNotifyBody, permissionText } from '../src/core/notify';
+import { shouldNotify, restNotifyBody, permissionText, deniedText, delayedResultText, isIosLike } from '../src/core/notify';
 import { restHintText, testResultText } from '../src/ui/haptics';
 import { summarizeDiag, verdicts } from '../src/core/diag';
 import type { DiagEntry } from '../src/core/diag';
 
 describe('D-056 실험 알림: 보낼지 판단', () => {
-  const base = { on: true, permission: 'granted' as const, endsAt: 10_000, now: 10_000, sentFor: null };
+  const base = { on: true, permission: 'granted' as const, endsAt: 10_000, now: 10_000 };
   it('켜 둠 + 허용 + 이 휴식에 처음 + 늦지 않음일 때만', () => {
     expect(shouldNotify(base)).toBe(true);
     expect(shouldNotify({ ...base, on: false })).toBe(false);
     expect(shouldNotify({ ...base, permission: 'denied' })).toBe(false);
     expect(shouldNotify({ ...base, permission: 'default' })).toBe(false);
     expect(shouldNotify({ ...base, permission: 'unsupported' })).toBe(false);
-    expect(shouldNotify({ ...base, sentFor: 10_000 })).toBe(false); // 같은 휴식 두 번 안 보냄
-    expect(shouldNotify({ ...base, sentFor: 5_000 })).toBe(true);
     expect(shouldNotify({ ...base, now: 15_000 })).toBe(true); // 5초까지
     expect(shouldNotify({ ...base, now: 15_001 })).toBe(false); // 늦게 돌아옴
   });
@@ -46,3 +44,21 @@ describe('D-056 검토 R1·R2: 정직한 문구', () => {
     expect(verdicts(s).find((x) => x.item === '2~4 알림(실험)')!.text).toContain('보냄 2번');
   });
 });
+
+describe('D-056 검토 S1: 10초 뒤 시험 결과·막힘 안내', () => {
+  it('실제로 걸린 초, 15초 넘으면 이유', () => {
+    expect(delayedResultText(10_200)).toMatch(/^10초 뒤 보냈어요\. /);
+    expect(delayedResultText(15_000)).not.toContain('화면을 잠그면');
+    expect(delayedResultText(42_600)).toMatch(/^43초 뒤 보냈어요 · 화면을 잠그면 아이폰이 앱을 멈춰 늦어져요/);
+  });
+  it('막혔을 때: 아이폰은 설정 앱 → 알림 → 앱 이름, 그 밖은 브라우저 사이트 설정', () => {
+    expect(deniedText(true)).toContain('아이폰 설정 앱 → 알림 → 이 앱 이름');
+    expect(deniedText(false)).toContain('사이트 설정');
+    expect(permissionText('denied', false)).toBe(deniedText(false));
+    expect(isIosLike('Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X)')).toBe(true);
+    expect(isIosLike('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5)).toBe(true);
+    expect(isIosLike('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0)).toBe(false);
+    expect(isIosLike('Mozilla/5.0 (Linux; Android 15)')).toBe(false);
+  });
+});
+

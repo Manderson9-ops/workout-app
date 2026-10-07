@@ -20,8 +20,8 @@ import { displayVersion } from '../../core/changelog';
 import { IS_PREVIEW } from '../appName';
 import { audioMode, setAudioMode, unlockAudio, playEndSound } from '../device';
 import { haptic, hapticOn, setHapticOn, hapticMethod, METHOD_LABEL, testResultText } from '../haptics';
-import { notifySupported, notifyPermission, notifyOn, enableNotify, setNotifyOff, showAppNotification } from '../notify';
-import { permissionText } from '../../core/notify';
+import { notifySupported, notifyPermission, notifyOn, enableNotify, setNotifyOff, showAppNotification, onIos } from '../notify';
+import { permissionText, deniedText, delayedResultText } from '../../core/notify';
 import type { NotifyPermission } from '../../core/notify';
 import type { AudioMode } from '../device';
 
@@ -62,15 +62,17 @@ export function SettingsScreen({ s }: { s: AppState }) {
   const testNotify = async (delay: number) => {
     if (delay) {
       setNMsg('10초 뒤에 알림을 보내요. 지금 다른 앱으로 가거나 화면을 잠가 보세요 (앱이 뒤에 있으면 늦거나 안 올 수 있어요)');
-      setTimeout(() => { void showAppNotification('알림 시험', '10초 뒤 알림이에요. 배너·진동이 왔나요?', 'rest-test').then((r) => setNMsg(notifyResult(r, true))); }, 10_000);
+      // 실제로 걸린 시간을 보여 줌 (화면을 잠그면 아이폰이 앱을 멈춰 타이머가 늦어짐)
+      const t0 = Date.now();
+      setTimeout(() => { void showAppNotification('알림 시험', '10초 뒤 알림이에요. 배너·진동이 왔나요?', 'rest-test').then((r) => setNMsg(r === 'shown' ? delayedResultText(Date.now() - t0) : notifyResult(r))); }, 10_000);
       return;
     }
     const r = await showAppNotification('알림 시험', '배너·진동이 왔나요?', 'rest-test');
-    setNMsg(notifyResult(r, false));
+    setNMsg(notifyResult(r));
   };
-  const notifyResult = (r: string, later: boolean) => r === 'shown'
-    ? `알림을 보냈어요${later ? ' (10초 뒤)' : ''}. 배너가 보였는지, 무음 모드에서 진동이 왔는지 직접 확인해 주세요`
-    : r === 'denied' ? '알림이 막혀 있어요. 아이폰 설정 앱 → 알림 → 이 앱에서 허용으로 바꿔 주세요'
+  const notifyResult = (r: string) => r === 'shown'
+    ? '알림을 보냈어요. 배너가 보였는지, 무음 모드에서 진동이 왔는지 직접 확인해 주세요'
+    : r === 'denied' ? deniedText(onIos())
     : r === 'unsupported' ? '이 브라우저에서는 알림을 쓸 수 없어요' : '알림을 보내지 못했어요 (진단 기록에 남겼어요)';
   // D-055 검토 7: 새 기능이 앱 정보 화면이면 이 줄에 "새" (점은 앱 정보를 열어야 지워짐)
   const aboutNew = hasNewDot('#/settings/about');
@@ -130,27 +132,30 @@ export function SettingsScreen({ s }: { s: AppState }) {
         <p class="sub small">{am === 'mix'
           ? '음악을 멈추지 않고 알림음이 음악 위로 울려요. 단, 아이폰 무음 모드(무음 스위치)에서는 휴식 끝 알림음이 안 나요 (실기기 확인). 아이폰은 진동도 안 올 수 있어요.'
           : '무음 모드에서도 알림음이 나지만, 앱을 누르면 다른 앱 음악이 멈춰요 (0.8.4까지의 동작).'}</p>
-        <section class="alert-guide" aria-label="음악 들으며 휴식 알림 받기">
-          <h3>음악 들으며 휴식 알림 받기</h3>
+        <details class="alert-guide" data-testid="guide-music">
+          <summary>음악 들으며 휴식 알림 받기</summary>
           <ol>
             <li>가장 확실: 아이폰 옆 무음 스위치를 벨소리 쪽으로 (음악 위로 알림음이 울려요)</li>
             <li>무음으로 두면 알림음이 안 나요. 안드로이드는 진동이 오고, 아이폰은 애플 제한으로 진동이 안 올 수 있어요 → [소리·진동 시험]과 아래 "휴식 끝 알림으로 받기(실험)"로 확인</li>
             <li>진동이 없으면: 아이폰 설정 앱 → 사운드 및 햅틱 → 시스템 햅틱 켜기</li>
             <li>"앱 소리 우선"을 고르면 무음에서도 소리가 나지만 음악이 멈춰요</li>
           </ol>
-        </section>
-        <section class="alert-guide" aria-label="휴식 끝 알림으로 받기 (실험)">
+        </details>
+        <section class="alert-notify" aria-label="휴식 끝 알림으로 받기 (실험)">
           <h3>휴식 끝 알림으로 받기 (실험)</h3>
           {notifySupported() ? (
             <>
-              <p class="sub small">휴식이 끝나면 아이폰 알림(배너)을 보내요. 알림은 무음 모드에서도 진동할 수 있고 음악을 멈추지 않아요. 될지는 기기마다 달라 시험해 보세요. 아이폰은 홈 화면에 추가한 앱에서만 돼요. 앱이 뒤에 있으면 늦거나 안 올 수 있어요 (서버 없이 보내서).</p>
               <div class="row wrap">
                 <button class={`chip ${nOn ? 'on' : ''}`} aria-pressed={nOn} onClick={() => void toggleNotify()}>휴식 끝 알림 {nOn ? '켬' : '끔'}</button>
                 <button disabled={nPerm !== 'granted'} onClick={() => void testNotify(0)}>알림 시험</button>
                 <button disabled={nPerm !== 'granted'} onClick={() => void testNotify(10)}>10초 뒤 알림 시험</button>
               </div>
-              <p class="sub small" data-testid="notify-perm">{permissionText(nPerm)}</p>
+              <p class="sub small" data-testid="notify-perm">{permissionText(nPerm, onIos())}</p>
               {nMsg && <p class="sub small" role="status" data-testid="notify-result">{nMsg}</p>}
+              <details class="alert-guide" data-testid="guide-notify">
+                <summary>알림(실험) 자세히</summary>
+                <p class="sub small">휴식이 끝나면 아이폰 알림(배너)을 보내요. 알림은 무음 모드에서도 진동할 수 있고 음악을 멈추지 않아요. 될지는 기기마다 달라 시험해 보세요. 아이폰은 홈 화면에 추가한 앱에서만 돼요. 앱이 뒤에 있으면 늦거나 안 올 수 있어요 (서버 없이 보내서). [10초 뒤 알림 시험]을 누르고 화면을 잠가 보면 실제로 몇 초 뒤에 왔는지 알려 줘요.</p>
+              </details>
             </>
           ) : <p class="sub small" data-testid="notify-perm">{permissionText('unsupported')}</p>}
         </section>

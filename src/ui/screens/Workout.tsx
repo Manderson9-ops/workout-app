@@ -132,7 +132,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
         else diagHaptic('late');
       }
       // 실험: 시스템 알림 (켜 두고 허용했을 때, 이 휴식에 한 번, 늦지 않았을 때). 앱이 뒤에 있어도 시도 (타이머가 느려져 늦을 수 있음)
-      if (shouldNotify({ on: notifyOn(), permission: notifyPermission(), endsAt: key, now: Date.now(), sentFor: null })) void showAppNotification('휴식 끝', restNotifyBody(nextRef.current));
+      if (shouldNotify({ on: notifyOn(), permission: notifyPermission(), endsAt: key, now: Date.now() })) void showAppNotification('휴식 끝', restNotifyBody(nextRef.current));
     }
   }, [rem, w?.timer?.endsAt]);
 
