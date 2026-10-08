@@ -21,6 +21,8 @@ import { RemoteCards } from './RemoteCards';
 import { WorkoutCardWithMenu } from './WorkoutCard';
 import { softDelete } from '../../db/db';
 import { catalog } from '../catalog';
+import { recoveryByPart, sortedRecovery, recoveryLine, busyParts, splitRecent } from '../../core/recovery';
+import type { PartRecovery } from '../../core/recovery';
 import { minutes, mmss, Card, Metric, Empty, Delta } from '../components';
 import { Icon } from '../icons';
 import { ScreenHeader } from '../header';
@@ -88,7 +90,7 @@ function nextReason(p: NextPick): string {
   return '오늘 이미 했어요';
 }
 
-function NextWorkoutCard({ s, pick }: { s: AppState; pick: NextPick }) {
+function NextWorkoutCard({ s, pick, rec }: { s: AppState; pick: NextPick; rec: Map<Part, PartRecovery> }) {
   const r = pick.routine;
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
@@ -100,6 +102,9 @@ function NextWorkoutCard({ s, pick }: { s: AppState; pick: NextPick }) {
       {parts.length > 0 && <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>}
       <p class={`next-why ${pick.reason === 'doneToday' ? 't-sub' : 't-acc'}`}>{nextReason(pick)}</p>
       <p class="sub next-meta">운동 {items.length}개{r.estimatedSec ? ` · 약 ${minutes(r.estimatedSec)}` : ''}</p>
+      {busyParts(rec, parts).length > 0 && (
+        <p class="rec-note" role="note" data-testid="next-rec-note"><Icon name="info" size={18} /><span>회복 중으로 추정: {busyParts(rec, parts).map((x) => `${x.part}(약 ${x.remainingH}시간)`).join(', ')}. 가볍게 하거나 다른 부위를 먼저 해도 돼요</span></p>
+      )}
       <button class="primary big" onClick={() => startRoutine(s, r)} aria-label={`다음 운동으로 시작: ${r.name}`}><Icon name="play" size={20} />시작</button>
     </Card>
   );
@@ -119,6 +124,10 @@ export function Home({ s }: { s: AppState }) {
     const visible = s.routines.filter((r) => !hiddenIds.has(r.id));
     return { history, recent, byId, next: pickNextRoutine(visible, routineUse(history), day) };
   }, [all, s.workouts, s.settings.homeHidden, s.settings.routineHidden, s.routines, day]);
+  // D-057 회복 상태 한 줄 (추정, 분 단위로 다시 계산)
+  const nowMin = Math.floor(Date.now() / 60_000);
+  const rec = useMemo(() => recoveryByPart(history, byId, Date.now()), [history, byId, nowMin]);
+  const recText = recoveryLine(splitRecent(sortedRecovery(rec)).recent); // 최근 14일 안에 한 부위만 (검토 F6)
   const today = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
   return (
     <main class="home">
@@ -153,7 +162,7 @@ export function Home({ s }: { s: AppState }) {
       <div class="wide-cards">
         <ThisWeekCard s={s} />
         {!active && (next
-          ? <NextWorkoutCard s={s} pick={next} />
+          ? <NextWorkoutCard s={s} pick={next} rec={rec} />
           : !s.routines.length && (
             <Empty title="다음 운동" text="아직 루틴이 없어요" hint="플랜 만들기에서 부위·시간을 고르면 자동으로 짜 드려요">
               <button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button>
@@ -161,6 +170,11 @@ export function Home({ s }: { s: AppState }) {
             </Empty>
           ))}
       </div>
+      {recText && (
+        <a class="card rec-home" href="#/stats" data-testid="home-recovery" aria-label={`회복 상태 (추정): ${recText}. 자세히 보기`}>
+          <Icon name="sync" size={20} /><span class="grow rec-txt"><span class="sub small">회복 (추정) </span>{recText}</span><Icon name="chevron" size={18} />
+        </a>
+      )}
       {/* 백업 알림은 오늘의 숫자·다음 운동 아래 작은 알림으로 (D-055 검토 A3) */}
       {backupDue(s.settings.lastBackupAt, history.length, Date.now()) && <BackupBanner s={s} />}
       {s.routines.length > 0 ? (

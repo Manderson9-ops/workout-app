@@ -10,6 +10,8 @@ import { PARTS } from '../../core/types';
 import type { Exercise, Part } from '../../core/types';
 import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
+import { recoveryByPart } from '../../core/recovery';
+import { RecoveryCard } from './RecoveryCard';
 import { LineChart, BarChart, PairBarChart } from '../charts';
 import { NumInput, Empty, Metric, Delta, Sheet } from '../components';
 import { ScreenHeader } from '../header';
@@ -180,6 +182,9 @@ export function Stats({ s }: { s: AppState }) {
     const totals = weeklyTotals(done, byId, today, 8, s.bodyweight);
     return { byId, done, wById, sorted, sumOf, take, totals, pva: plannedVsActual(take(10, timed)), pvaRows: plannedVsActualRows(take(8, timed)) };
   }, [all, s.workouts, s.bodyweight, today]);
+  // D-057 회복 상태: 분 단위로 다시 계산 (앱은 1초마다 다시 그림)
+  const nowMin = Math.floor(Date.now() / 60_000);
+  const rec = useMemo(() => recoveryByPart(done, byId, Date.now()), [done, byId, nowMin]);
   const [ym, setYm] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; });
   const [day, setDay] = useState<number | null>(null);
   const hiddenSet = new Set(s.settings.homeHidden ?? []); // 홈에서 뺀 기록 표시 (D-040)
@@ -206,6 +211,7 @@ export function Stats({ s }: { s: AppState }) {
     <main>
       <ScreenHeader title="기록" />
       <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
+      <RecoveryCard m={rec} />
       <PartSets done={done} byId={byId} today={today} />
 
       <h2>운동 기록</h2>

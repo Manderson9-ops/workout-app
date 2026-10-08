@@ -25,6 +25,7 @@
   /* 요일 색 (D-054): 일요일 빨강, 토요일 파랑 */
   --sun: #f87171; --sat: #60a5fa;
   /* 몸 그림·우선순위·열 지도 (D-055 3단계 토큰화): 꺼짐 → 낮음 → 보통 → 높음 (밝을수록 높음), 위 글자 */
+  --rec-busy: #3d5f8f; --on-rec-busy: #eaf2ff; --rec-almost: #7fa8d6; --on-rec-almost: #0b1220; --rec-ok: #2dd4bf; --on-rec-ok: #042420; /* D-057 회복 상태: 차분한 파랑(회복 중)·옅은 파랑(거의)·청록(회복됨, 완료 초록 --ok 와 다름). 글·아이콘과 함께, 색만으로 전하지 않음 (검토 F5) */
   --map-off: #383e4b; --map-1: #4a72b8; --map-2: #5b9cf6; --map-3: #b9dcff; --map-glow: rgba(147, 197, 253, .6);
   --on-map-light: #0b1220; --on-map-light-sub: #1e293b; --on-map-dark-sub: #e6eeff;
   --map-body: #12151c; --map-outline: #525a6b; --map-deco: #3a414f; --hover-veil: rgba(255, 255, 255, .06);
@@ -187,9 +188,9 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 
 /* D-047: 인체 근육 그림 (react-native-body-highlighter, MIT) + 우선순위 창 */
 .bodymap { display: flex; flex-direction: column; align-items: center; margin: 6px 0 4px; }
-.bodymap .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 22px; overflow: hidden; margin-bottom: 6px; }
-.bodymap .seg button { min-height: 44px; min-width: 72px; border: 0; border-radius: 0; background: transparent; color: var(--sub); font-weight: 600; }
-.bodymap .seg button.on { background: var(--acc-fill); color: var(--on-acc); }
+.bodymap .seg, .seg.sort-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 22px; overflow: hidden; margin-bottom: 6px; }
+.bodymap .seg button, .seg.sort-seg button { min-height: 44px; min-width: 72px; border: 0; border-radius: 0; background: transparent; color: var(--sub); font-weight: 600; }
+.bodymap .seg button.on, .seg.sort-seg button.on { background: var(--acc-fill); color: var(--on-acc); }
 .bodymap-svg { width: min(240px, 62vw); height: auto; display: block; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 .bm-outline { fill: var(--map-body); stroke: var(--map-outline); stroke-width: 3; stroke-linejoin: round; pointer-events: none; }
 .bm-deco { fill: var(--map-deco); pointer-events: none; }
@@ -662,3 +663,37 @@ button.chip.full { width: 100%; }
 .alert-notify h3 { margin: 0 0 6px; font-size: 15px; }
 .alert-guide ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; color: var(--sub); }
 .alert-test { margin-top: 8px; }
+/* ===== D-057 회복 ===== */
+.bm-muscle.rc-busy { fill: var(--rec-busy); } .bm-muscle.rc-almost { fill: var(--rec-almost); } .bm-muscle.rc-ok { fill: var(--rec-ok); }
+.bm-legend .lg-rc-busy { background: var(--rec-busy); } .bm-legend .lg-rc-almost { background: var(--rec-almost); } .bm-legend .lg-rc-ok { background: var(--rec-ok); }
+.rec-list { display: grid; gap: 6px; margin: 8px 0; }
+.rec-row { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-btn); text-align: left; color: var(--text); }
+.rec-row .rec-part { font-weight: 700; min-width: 64px; }
+.rec-row .rec-left { margin-left: auto; color: var(--sub); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rc-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); font-size: 13px; font-weight: 700; white-space: nowrap; }
+.rc-chip.busy { background: var(--rec-busy); color: var(--on-rec-busy); } .rc-chip.almost { background: var(--rec-almost); color: var(--on-rec-almost); } .rc-chip.ok { background: var(--rec-ok); color: var(--on-rec-ok); }
+.rec-note { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; padding: 8px 10px; border-radius: var(--r-btn); background: var(--card2); color: var(--text); font-size: 14px; }
+.rec-note .icon { color: var(--sub); flex: none; margin-top: 2px; }
+.rec-home { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+.rec-home .rec-txt { font-size: 14px; }
+.rule-box { padding: 10px 12px; margin: 8px 0; border-radius: var(--r-btn); background: var(--card2); }
+.rule-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.lbl-chip { display: inline-flex; padding: 1px 8px; border-radius: var(--r-pill); font-size: 12px; font-weight: 700; border: 1px solid var(--line); }
+.lbl-chip.research { color: var(--acc-text); border-color: var(--acc); }
+.lbl-chip.app { color: var(--sub); border: 1px dashed var(--est); }
+.ev-badge { display: inline-flex; min-width: 28px; justify-content: center; padding: 1px 8px; border-radius: var(--r-pill); font-size: 12px; font-weight: 800; background: var(--card3); color: var(--text); }
+.paper { margin: 10px 0; }
+.paper-title { font-weight: 700; margin: 4px 0; }
+.paper-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.paper details > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--acc-text); }
+.paper details ul { margin: 0 0 6px; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; }
+.ext-link { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; color: var(--acc-text); }
+.topic-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.topic-row .chip { flex: none; }
+.ref-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ref-chips a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: var(--r-pill); background: var(--card3); color: var(--text); text-decoration: none; font-size: 13px; }
+.tip-card h2 { font-size: 17px; margin: 0 0 6px; }
+.ev-link { margin-left: 6px; color: var(--acc-text); display: inline-flex; align-items: center; min-height: 44px; }
+.lbl-chip.weak { color: var(--sub); border: 1px dotted var(--line); }
+.rec-stale { margin: 4px 0 8px; }
+.rec-stale > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--sub); font-size: 14px; }

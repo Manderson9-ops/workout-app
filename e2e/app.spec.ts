@@ -1964,13 +1964,13 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
   await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.3 바뀐 점'); // 0.9.4(3줄) + 0.9.3(2줄) + 0.9.2(3줄) = 8줄
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.4 바뀐 점'); // 0.9.5(3줄) + 0.9.4(3줄) + 0.9.3(2줄) = 8줄
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
   await checkScreen(page, '65-whats-new');
   await sheet.getByRole('button', { name: /^모두 보기/ }).click();
-  await expect(sheet.locator('.wn-lines li')).toHaveCount(25); // 0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(28); // 0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
@@ -2005,7 +2005,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.4(3줄) + 0.9.3(2줄) + 0.9.2(3줄) = 8줄, 0.9.1·0.9.0 은 [모두 보기]
+  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.5(3줄) + 0.9.4(3줄) + 0.9.3(2줄) = 8줄, 0.9.2 이전은 [모두 보기]
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   const gear = page.getByRole('link', { name: '설정', exact: true });
@@ -2615,6 +2615,130 @@ test.describe('D-056 검토: 진동 끔·소리 끔, 실험 알림', () => {
     await page.getByRole('link', { name: '설정', exact: true }).click();
     await sec.getByRole('button', { name: '휴식 끝 알림 켬' }).click();
     await expect(sec.getByRole('button', { name: '휴식 끝 알림 끔' })).toBeVisible();
+  });
+});
+
+test.describe('D-057 회복', () => {
+  type RW = Window & { __dn?: () => number };
+  const shiftH = (page: Page, h: number) => page.evaluate((ms) => { const w = window as RW; w.__dn ??= Date.now.bind(Date); const o = w.__dn; Date.now = () => o() + ms; }, h * 3_600_000);
+  const unshift = (page: Page) => page.evaluate(() => { const w = window as RW; if (w.__dn) Date.now = w.__dn; });
+
+  test('하체를 많이 하면 기록 탭 회복 중(남은 시간)·설명 창, 80시간 뒤 회복됨 · 홈 한 줄·다음 운동 안내 · 플랜 안내', async ({ page }) => {
+    await makeRoutine(page, ['하체'], '60분');
+    await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
+    const done = page.getByRole('button', { name: '현재 세트 완료' });
+    await expect(done).toBeVisible(); // 운동 화면(나눠 받는 묶음)이 뜰 때까지
+    for (let i = 0; i < 16 && (await done.count()); i++) {
+      const kg = page.locator('.set-row.current input[aria-label$=" 무게"]');
+      if ((await kg.count()) && !(await kg.first().inputValue())) await kg.first().fill('40');
+      await done.click();
+    }
+    await endWorkout(page);
+    // 기록 탭: 하체 회복 중, 약 N시간 남음 → 누르면 설명 창
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    const card = page.getByTestId('recovery-card');
+    await expect(card).toContainText('추정 · 앱 기준');
+    const row = card.getByRole('button', { name: /^하체 회복 중, 약 \d+시간 남음, 자세히$/ });
+    await expect(row).toBeVisible();
+    const left = Number((await row.getAttribute('aria-label'))!.match(/약 (\d+)시간/)![1]);
+    await row.click();
+    const sheet = page.getByRole('dialog', { name: '하체 회복 추정' });
+    const sets = Number((await sheet.textContent())!.match(/하체 작업 세트 (\d+)개/)![1]);
+    expect(left).toBe(sets >= 10 ? 72 : 48); // 방금 끝냄: 기본 48, 10세트 이상 72 (실패 세트 없음)
+    await expect(sheet).toContainText('실패 세트(RIR 0 기록) 0개');
+    await expect(sheet).toContainText('등 근육을 측정한 연구는 없음'); // 규칙의 주의·상충 (검토 F1)
+    await expect(card.getByTestId('rec-evidence')).toContainText(sets >= 10 ? '규칙 AR-01·AR-03·AR-05·AR-19' : '규칙 AR-01·AR-05·AR-19'); // 쓴 규칙에서 만듦 (검토 F4)
+    await expect(sheet.getByText('AR-01', { exact: true })).toBeVisible();
+    await expect(sheet.getByRole('link', { name: 'AR-01 근거 논문 3편 보기' })).toHaveAttribute('href', '#/recovery/papers?rule=AR-01');
+    await expect(sheet.locator('.lbl-chip.research').first()).toHaveText('연구 근거');
+    await checkScreen(page, '85-recovery-sheet');
+    await page.keyboard.press('Escape');
+    await checkScreen(page, '86-recovery-card');
+    // 홈: 한 줄 + 다음 운동(같은 하체 루틴) 안내
+    await page.getByRole('link', { name: '홈', exact: true }).click();
+    await expect(page.getByTestId('home-recovery')).toContainText(`회복 중: 하체(약 ${left}시간)`);
+    await expect(page.getByTestId('home-recovery')).toHaveAttribute('href', '#/stats');
+    await expect(page.getByTestId('next-rec-note')).toContainText('회복 중으로 추정: 하체(약');
+    await checkScreen(page, '87-home-recovery');
+    // 플랜: 하체를 고르면 안내 (막지 않음)
+    await page.getByRole('link', { name: '플랜' }).click();
+    if (await page.getByRole('button', { name: '하체 선택 안 함' }).count()) await pickPart(page, '하체');
+    await expect(page.getByTestId('plan-rec-note')).toContainText(/하체는 (방금|약 \d+시간 전)에 했어요 · 회복 추정 약 \d+시간 남음/);
+    await expect(page.getByRole('button', { name: '플랜 만들기', exact: true })).toBeEnabled();
+    await checkScreen(page, '88-plan-recovery-note');
+    // 80시간 뒤: 회복됨, 홈 안내 사라짐
+    await shiftH(page, 80);
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await expect(card.getByRole('button', { name: '하체 회복됨, 회복됨, 자세히' })).toBeVisible();
+    await page.getByRole('link', { name: '홈', exact: true }).click();
+    await expect(page.getByTestId('home-recovery')).toContainText('회복됨: 하체');
+    await expect(page.getByTestId('next-rec-note')).toHaveCount(0);
+    // 15일 뒤: 최근 14일 기록 없음 → 목록·홈 줄에서 빠지고 "기록 없는 부위"로 (검토 F6)
+    await shiftH(page, 15 * 24);
+    await expect(page.getByTestId('home-recovery')).toHaveCount(0);
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await expect(card).toContainText('최근 14일 안에 한 운동이 없어요');
+    await unshift(page);
+  });
+
+  test('기록 없음: 회복 카드는 빈 안내, 홈 한 줄 없음', async ({ page }) => {
+    await expect(page.getByTestId('home-recovery')).toHaveCount(0);
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await expect(page.getByTestId('recovery-card')).toContainText('아직 회복을 추정할 운동이 없어요');
+  });
+
+  test('회복 팁: 체중이 없으면 안내, 기록하면 단백질 1.6 g/kg 계산 · 근거 논문: 인용순·최신순·주제·규칙 거르기·DOI 링크', async ({ page }) => {
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await page.getByTestId('recovery-card').getByRole('link', { name: /회복 팁·근거/ }).click();
+    await expect(page).toHaveURL(/#\/recovery$/);
+    await expect(page.getByTestId('tip-AR-11')).toContainText('체중을 기록하면 계산해 드려요');
+    await expect(page.getByTestId('tip-AR-13')).toContainText('이 DB 범위에서는 근거 없음'); // 데이터 문구 그대로, 같은 문장 두 번 없음 (검토 F3)
+    expect(((await page.getByTestId('tip-AR-13').textContent())!.match(/이 DB 범위에서는/g) ?? []).length).toBe(1);
+    await expect(page.getByTestId('tip-AR-16').locator('.lbl-chip')).toHaveText(['앱 판단 추정', '근거 약함']);
+    await expect(page.getByTestId('tip-AR-12').locator('.lbl-chip.weak')).toHaveText('근거 약함');
+    await expect(page.getByTestId('tip-AR-09')).not.toContainText('7.6');
+    for (const id of ['AR-04', 'AR-09', 'AR-10', 'AR-11', 'AR-12', 'AR-13', 'AR-14', 'AR-15', 'AR-16']) await expect(page.getByTestId(`tip-${id}`)).toBeVisible();
+    // 체중 75kg → 120g (105~165)
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await page.getByLabel('체중', { exact: true }).fill('75');
+    await page.getByRole('button', { name: '기록', exact: true }).click();
+    await page.goto('./#/recovery');
+    const pb = page.getByTestId('protein-box');
+    await expect(pb).toContainText('120g');
+    await expect(pb).toContainText('105g');
+    await expect(pb).toContainText('~165g');
+    await checkScreen(page, '89-recovery-tips');
+    // 근거 논문: 38편, 인용순 → 최신순
+    await page.getByRole('link', { name: /근거 논문 전체 보기/ }).click();
+    await expect(page.getByTestId('paper-count')).toHaveText(/^(\d+)편$/);
+    expect(Number((await page.getByTestId('paper-count').textContent())!.match(/\d+/)![0])).toBeGreaterThanOrEqual(10);
+    const cites = async () => (await page.getByTestId('cite').allTextContents()).map((x) => Number(x.match(/인용 ([\d,]+)/)![1]!.replace(/,/g, '')));
+    const c = await cites();
+    for (let i = 1; i < c.length; i++) expect(c[i - 1]!).toBeGreaterThanOrEqual(c[i]!);
+    await page.getByRole('button', { name: '최신순' }).click();
+    await expect(page.getByRole('button', { name: '최신순' })).toHaveAttribute('aria-pressed', 'true');
+    const years = (await page.getByTestId('paper').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')!))).map((x) => Number(x.match(/(\d{4})$/)![1]));
+    for (let i = 1; i < years.length; i++) expect(years[i - 1]!).toBeGreaterThanOrEqual(years[i]!);
+    const doi = page.getByTestId('paper').first().getByRole('link', { name: /^DOI / });
+    await expect(doi).toHaveAttribute('target', '_blank');
+    await expect(doi).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(doi).toHaveAttribute('href', /^https:\/\/doi\.org\//);
+    await page.getByRole('group', { name: '주제로 거르기' }).getByRole('button', { name: /^세트 간 휴식 \d+$/ }).click();
+    await expect(page.getByTestId('paper-count')).toHaveText(/^\d+편 · 주제 세트 간 휴식$/);
+    await checkScreen(page, '90-recovery-papers');
+    // 주소로 바로 열고 [뒤로] → 앱 밖이 아니라 기록 탭으로 (검토 메모)
+    await page.goto('./#/recovery/papers?rule=AR-07');
+    await page.reload();
+    await page.getByRole('button', { name: '뒤로' }).click();
+    await expect(page).toHaveURL(/#\/stats$/);
+    // 규칙으로 거르기
+    await page.goto('./#/recovery/papers?rule=AR-07');
+    await expect(page.getByTestId('rule-filter')).toContainText('AR-07');
+    await expect(page.getByTestId('paper-count')).toHaveText('4편');
+    // 설정 기본 휴식 옆 "근거" → 세트 간 휴식 논문
+    await page.goto('./#/settings');
+    await page.getByRole('link', { name: '세트 간 휴식 근거 논문' }).click();
+    await expect(page.getByTestId('paper-count')).toHaveText(/^\d+편 · 주제 세트 간 휴식$/);
   });
 });
 
