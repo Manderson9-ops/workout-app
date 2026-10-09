@@ -8,6 +8,9 @@
  * 값마다 여러 줄 글. 한 줄 = "시작 날짜 | 값 [| 끝 날짜] [| 수면 단계]" (구분은 탭 또는 |)
  * 날짜: ISO 8601(권장), 단축어 한국어 기본 형식("2026. 10. 8. 오전 11:24", "2026년 10월 8일 오전 11:24:05"), 2026-10-08 11:24:05.
  * 시간대가 없으면 한국 시간(+09:00)으로 본다.
+ * D-061 (iOS 27 "설명으로 만들기"로 AI 가 만든 단축어): 칸 이름이 한국어·대문자(심박, HeartRate …)거나, 값이 목록(글 또는
+ * {date, value, endDate, unit} 사전)이거나, 한 줄 안에서 날짜가 뒤에 있거나("128 BPM, 2026-10-09T22:53:05+09:00"),
+ * 시각만 있는("오후 10:53" → 오늘 한국 시간, approx 로 셈) 것도 읽는다. 건너뛴 줄이 있으면 응답에 hint(이유)를 붙인다.
  *
  * 저장(동기화 기록 표 'health', 서버만 씀, 기기는 읽기만):
  *  hr-YYYY-MM-DD   {type:'hr', day, t0(그날 0시 ms), p:[초,심박, 초,심박 ...]}  초 = 그날 0시부터, 5초 단위로 같은 칸이면 나중 값
@@ -74,10 +77,10 @@ export function parseDate(text: string): number | undefined {
     return base - off;
   }
   // 한국어·숫자 형식: 2026. 10. 8. 오전 11:24 / 2026년 10월 8일 오후 11:24:05 / 2026/10/08 23:10 / 2026-10-08 23:10
-  const ko = /^(\d{4})\s*(?:\.|년|\/|-)\s*(\d{1,2})\s*(?:\.|월|\/|-)\s*(\d{1,2})\s*(?:\.|일)?\s*(?:\(?[월화수목금토일]\)?\s*)?(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(오전|오후|AM|PM)?$/i.exec(s);
+  const ko = /^(\d{4})\s*(?:\.|년|\/|-)\s*(\d{1,2})\s*(?:\.|월|\/|-)\s*(\d{1,2})\s*(?:\.|일)?\s*(?:,?\s*\(?[월화수목금토일](?:요일)?\)?,?\s*)?(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(오전|오후|AM|PM)?$/i.exec(s);
   if (ko) return kstMs(+ko[1]!, +ko[2]!, +ko[3]!, to24(+ko[5]!, ko[4] || ko[8]), +ko[6]!, +(ko[7] || 0));
   // 영어: Oct 8, 2026 at 11:24 AM / October 8, 2026, 11:24:05 PM
-  const en = /^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4}),?\s*(?:at\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(s);
+  const en = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4}),?\s*(?:at\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(s);
   if (en && MONTHS[en[1]!.toLowerCase()]) return kstMs(+en[3]!, MONTHS[en[1]!.toLowerCase()]!, +en[2]!, to24(+en[4]!, en[7]), +en[5]!, +(en[6] || 0));
   return undefined;
 }
@@ -111,47 +114,190 @@ export function parseStage(text: string): SleepStage | undefined {
 
 const RANGE: Record<HealthField, [number, number]> = { hr: [25, 250], energy: [0, 2000], sleep: [0, 0], rhr: [25, 150], hrv: [1, 300] };
 
-/** 여러 줄 글 → 샘플. 못 읽은 줄은 개수만 (skipped). 미래(+1일)·너무 옛날(-400일) 날짜도 건너뜀 */
-export function parseLines(field: HealthField, text: unknown, nowMs: number): { samples: Sample[]; skipped: number } {
+/** 줄 안에서 찾은 날짜 (위치·근사 여부) */
+interface Found { ms: number; a: number; b: number; approx?: boolean }
+const DATE_RES: RegExp[] = [
+  /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2})?/g,
+  /\d{4}\s*(?:\.|년|\/)\s*\d{1,2}\s*(?:\.|월|\/)\s*\d{1,2}\s*(?:\.|일)?(?:,?\s*\(?[월화수목금토일](?:요일)?\)?,?)?\s*(?:오전|오후|AM|PM)?\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:오전|오후|AM|PM))?/gi,
+  /(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4},?\s*(?:at\s+)?\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?/gi,
+];
+/** 줄 안 모든 날짜 (앞에서부터). 날짜가 하나도 없으면 시각만("오후 10:53", "22:53")을 오늘 한국 시간으로 (approx) */
+export function findDates(line: string, nowMs: number): Found[] {
+  const s = String(line || '').replace(/\u202f|\u00a0/g, ' ');
+  const out: Found[] = [];
+  for (const re of DATE_RES) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s))) {
+      const a = m.index, b = a + m[0].length;
+      if (out.some((x) => a < x.b && b > x.a)) continue;
+      const ms = parseDate(m[0].trim());
+      if (ms !== undefined) out.push({ ms, a, b });
+    }
+  }
+  if (!out.length) {
+    const tm = /(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(오전|오후|AM|PM))?/i.exec(s);
+    if (tm) {
+      const h = to24(+tm[2]!, tm[1] || tm[5]);
+      const day = kstDayStart(kstDay(nowMs));
+      if (h <= 23 && +tm[3]! <= 59) {
+        let ms = day + ((h * 60 + +tm[3]!) * 60 + +(tm[4] || 0)) * 1000;
+        if (ms > nowMs + 10 * 60000) ms -= DAY_MS; // 아직 안 온 시각이면 어제
+        out.push({ ms, a: tm.index, b: tm.index + tm[0].length, approx: true });
+      }
+    }
+  }
+  return out.sort((x, y) => x.a - y.a);
+}
+/** 건너뛴 이유: date 날짜 없음/못 읽음, range 미래·너무 옛날, value 값 없음·범위 밖(수면은 끝·단계 없음) */
+export interface SkipWhy { date: number; range: number; value: number }
+
+/** 여러 줄 글 → 샘플. 못 읽은 줄은 개수만 (skipped, 이유는 why). 미래(+1일)·너무 옛날(-400일) 날짜도 건너뜀 */
+export function parseLines(field: HealthField, text: unknown, nowMs: number): { samples: Sample[]; skipped: number; why: SkipWhy; approx: number } {
   const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const samples: Sample[] = [];
-  let skipped = 0;
+  const why: SkipWhy = { date: 0, range: 0, value: 0 };
+  let approx = 0;
+  const r = RANGE[field];
   for (const line of lines) {
     const parts = line.split(/\t|\s*\|\s*/).map((x) => x.trim()).filter((x) => x !== '');
-    const t = parseDate(parts[0] || '');
-    if (t === undefined || t > nowMs + DAY_MS || t < nowMs - 400 * DAY_MS) { skipped++; continue; }
+    let t = parseDate(parts[0] || '');
+    let rest: string[]; let endText: string | undefined; let isApprox = false;
+    if (t !== undefined && parts.length > 1) {
+      rest = parts.slice(1);
+    } else {
+      // 첫 칸이 날짜가 아님: 줄 안 어디든 날짜를 찾고 나머지에서 값 (D-061)
+      const ds = findDates(line, nowMs);
+      if (!ds.length) { why.date++; continue; }
+      t = ds[0]!.ms; isApprox = !!ds[0]!.approx;
+      let left = ''; let pos = 0;
+      for (const d of ds) { left += line.slice(pos, d.a) + ' | '; pos = d.b; }
+      left += line.slice(pos);
+      rest = left.split(/\t|\s*[|,;]\s*/).map((x) => x.trim()).filter((x) => x !== '');
+      if (ds[1]) endText = line.slice(ds[1].a, ds[1].b);
+    }
+    if (t > nowMs + DAY_MS || t < nowMs - 400 * DAY_MS) { why.range++; continue; }
     if (field === 'sleep') {
       // 수면: 시작 | (단계 또는 값) | 끝 | (단계)  — 순서가 섞여도 날짜인 칸 = 끝, 단계 글인 칸 = 단계
-      let end: number | undefined; let stage: SleepStage | undefined;
-      for (const p of parts.slice(1)) {
+      let end: number | undefined = endText !== undefined ? parseDate(endText.trim()) : undefined; let stage: SleepStage | undefined;
+      for (const p of rest) {
         const d = parseDate(p);
         if (d !== undefined) { if (end === undefined) end = d; continue; }
         const st = parseStage(p);
         if (st !== undefined && stage === undefined) stage = st;
       }
       // 단계 글이 없으면 숫자 값(0~5, HealthKit 수면 분석 값)으로
-      if (stage === undefined) { const num = parts.slice(1).find((p) => /^\d$/.test(p) && HK_SLEEP[Number(p)] !== undefined); if (num !== undefined) stage = HK_SLEEP[Number(num)]; }
-      if (end === undefined || end <= t || end - t > DAY_MS || stage === undefined) { skipped++; continue; }
+      if (stage === undefined) { const num = rest.find((p) => /^\d$/.test(p) && HK_SLEEP[Number(p)] !== undefined); if (num !== undefined) stage = HK_SLEEP[Number(num)]; }
+      if (end === undefined || end <= t || end - t > DAY_MS || stage === undefined) { why.value++; continue; }
       samples.push({ t, v: 0, end, stage });
+      if (isApprox) approx++;
       continue;
     }
-    const raw = parseNumber(parts[1] || '');
+    // 값: 날짜가 아닌 첫 칸의 숫자
+    const vText = rest.find((p) => parseDate(p) === undefined && parseNumber(p) !== undefined) || '';
+    const raw = parseNumber(vText);
     // 활동 에너지를 킬로줄로 쓰는 아이폰 설정이면 kcal 로 바꿈 (D-058 검토 G3)
-    const v = raw !== undefined && field === 'energy' && isKJ(parts[1] || '') ? Math.round((raw / KJ_PER_KCAL) * 10) / 10 : raw;
-    const r = RANGE[field];
-    if (v === undefined || v < r[0] || v > r[1]) { skipped++; continue; }
+    const v = raw !== undefined && field === 'energy' && isKJ(vText) ? Math.round((raw / KJ_PER_KCAL) * 10) / 10 : raw;
+    if (v === undefined || v < r[0] || v > r[1]) { why.value++; continue; }
     let end: number | undefined;
-    if (parts[2] !== undefined) { const d = parseDate(parts[2]); if (d !== undefined && d >= t && d - t <= DAY_MS) end = d; }
+    const eText = endText !== undefined ? endText.trim() : rest.find((p) => parseDate(p) !== undefined);
+    if (eText !== undefined) { const d = parseDate(eText); if (d !== undefined && d >= t && d - t <= DAY_MS) end = d; }
     samples.push(end === undefined ? { t, v } : { t, v, end });
+    if (isApprox) approx++;
   }
-  return { samples, skipped };
+  return { samples, skipped: why.date + why.range + why.value, why, approx };
+}
+
+/** 건너뛴 줄 이유 → 한국어 안내 (응답 hint) */
+export function skipHint(why: SkipWhy, received: number, lines: number): string | undefined {
+  if (!lines) return '보낸 값이 비어 있어요. 단축어의 hr·energy(심박·에너지) 칸에 건강 샘플이 들어갔는지, 건강 접근을 허용했는지, 그 시간에 애플워치 기록이 있는지 확인하세요';
+  const n = why.date + why.range + why.value;
+  if (!n) return undefined;
+  const out: string[] = [];
+  if (why.date) out.push(`날짜를 못 읽은 줄 ${why.date}개 (각 줄에 시작 날짜를 ISO 8601 형식으로 넣어 주세요)`);
+  if (why.value) out.push(`값을 못 읽은 줄 ${why.value}개 (숫자 값이 없거나 범위 밖, 수면은 종료 날짜·수면 단계 필요)`);
+  if (why.range) out.push(`날짜가 미래이거나 400일보다 오래된 줄 ${why.range}개`);
+  return `${received}개 받음, ${n}줄 건너뜀: ${out.join(' · ')}`;
+}
+
+// ---------- D-061 AI 가 만든 단축어의 여러 모양 ----------
+const nk = (k: string) => String(k).toLowerCase().replace(/[\s\-·.]/g, '').split('_').join('');
+const FIELD_ALIAS: Record<string, HealthField> = {
+  hr: 'hr', heartrate: 'hr', heartrates: 'hr', heart: 'hr', bpm: 'hr', 심박: 'hr', 심박수: 'hr',
+  energy: 'energy', activeenergy: 'energy', activeenergyburned: 'energy', activecalories: 'energy', calories: 'energy', 에너지: 'energy', 활동에너지: 'energy', 활동칼로리: 'energy', 칼로리: 'energy',
+  sleep: 'sleep', sleepanalysis: 'sleep', 수면: 'sleep', 수면분석: 'sleep',
+  rhr: 'rhr', restingheartrate: 'rhr', 안정심박: 'rhr', 안정심박수: 'rhr', 안정시심박수: 'rhr',
+  hrv: 'hrv', heartratevariability: 'hrv', 심박변이: 'hrv', 심박변이도: 'hrv',
+};
+const TOP_ALIAS: Record<string, string> = { op: 'op', key: 'key', 키: 'key', kind: 'kind', 종류: 'kind', type: 'kind' };
+function pick(o: Record<string, unknown>, names: string[]): unknown {
+  for (const k of Object.keys(o)) if (names.indexOf(nk(k)) >= 0) return o[k];
+  return undefined;
+}
+const asText = (x: unknown) => (x === undefined || x === null ? '' : typeof x === 'object' ? '' : String(x));
+/** 사전 하나 → "시작 | 값 단위 | 끝 | 단계" 한 줄 */
+function objLine(o: Record<string, unknown>): string {
+  const start = asText(pick(o, ['date', 'startdate', 'start', 'starttime', 'time', 'timestamp', '시작', '시작날짜', '날짜']));
+  const val = asText(pick(o, ['value', 'quantity', 'qty', 'bpm', 'kcal', 'ms', '값']));
+  const unit = asText(pick(o, ['unit', '단위']));
+  const end = asText(pick(o, ['enddate', 'end', 'endtime', '종료', '종료날짜', '끝']));
+  const stage = asText(pick(o, ['stage', 'category', '단계', '수면단계']));
+  return [start, (val + (unit && !/[a-z가-힣]/i.test(val) ? ' ' + unit : '')).trim(), end, stage !== val ? stage : ''].filter((x) => x !== '').join(' | ');
+}
+/** 칸 값(글·목록·사전·JSON 글) → 여러 줄 글 */
+export function valueText(v: unknown, depth = 0): string {
+  if (v === undefined || v === null || depth > 3) return '';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if ((s.charAt(0) === '[' || s.charAt(0) === '{') && s.length < 4000000) { try { return valueText(JSON.parse(s), depth + 1); } catch (e) { return v; } }
+    return v;
+  }
+  if (Array.isArray(v)) return v.map((x) => (x && typeof x === 'object' && !Array.isArray(x) ? objLine(x as Record<string, unknown>) : valueText(x, depth + 1))).filter((x) => x.trim() !== '').join('\n');
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    if (pick(o, ['date', 'startdate', 'start', 'value', '시작', '값']) !== undefined) return objLine(o);
+    const arr = Object.keys(o).map((k) => o[k]).find((x) => Array.isArray(x));
+    return arr ? valueText(arr, depth + 1) : '';
+  }
+  return '';
+}
+/** 맨 위 칸 이름만 고침 (Key·OP·Kind·키·종류 → key·op·kind, 키 앞뒤 빈칸). 동기화 요청도 지나가므로 다른 칸은 그대로 */
+export function normalizeTop(j: Record<string, unknown>): Record<string, unknown> {
+  if (!j || typeof j !== 'object') return j;
+  let out = j;
+  for (const k of Object.keys(j)) {
+    const a = TOP_ALIAS[nk(k)];
+    if (a && a !== k && out[a] === undefined) { if (out === j) out = Object.assign({}, j); out[a] = j[k]; }
+  }
+  if (typeof out.key === 'string' && out.key !== out.key.trim()) { if (out === j) out = Object.assign({}, j); out.key = (out.key as string).trim(); }
+  if (typeof out.op === 'string' && out.op !== out.op.toLowerCase().trim()) { if (out === j) out = Object.assign({}, j); out.op = (out.op as string).toLowerCase().trim(); }
+  return out;
+}
+/** 건강 요청 → { kind, hr, energy, sleep, rhr, hrv } 여러 줄 글 (칸 이름·값 모양을 가리지 않음) */
+export function normalizeHealthReq(req: HealthReq): { kind: string; fields: Record<HealthField, string> } {
+  const top = normalizeTop(req as Record<string, unknown>);
+  const fields = { hr: '', energy: '', sleep: '', rhr: '', hrv: '' } as Record<HealthField, string>;
+  const add = (o: Record<string, unknown>) => {
+    for (const k of Object.keys(o)) {
+      const f = FIELD_ALIAS[nk(k)];
+      if (!f) continue;
+      const txt = valueText(o[k]);
+      if (txt.trim()) fields[f] = fields[f] ? fields[f] + '\n' + txt : txt;
+    }
+  };
+  add(top);
+  for (const k of ['samples', 'data', 'health']) { const x = top[k]; if (x && typeof x === 'object' && !Array.isArray(x)) add(x as Record<string, unknown>); else if (typeof x === 'string' && x.trim().charAt(0) === '{') { try { add(JSON.parse(x) as Record<string, unknown>); } catch (e) { /* 무시 */ } } }
+  const kr = String(top.kind ?? 'workout').toLowerCase().trim();
+  const kind = /canary/.test(kr) ? 'canary' : /daily|하루|day/.test(kr) ? 'daily' : 'workout';
+  return { kind, fields };
 }
 
 // ---------- 서버 저장 (기록 표 'health') ----------
 export interface HRec { table: string; id: string; data?: Record<string, unknown>; deleted?: boolean; hlc: string; dev: string; rev: number }
 export interface HState { rev: number; recs: Record<string, HRec> }
 export interface HealthReq { kind?: string; samples?: Record<string, unknown>; [k: string]: unknown }
-export type IngestResult = { ok: true; received: number; skipped: number; stored: string[] } | { ok: false; error: string };
+export type IngestResult = { ok: true; received: number; skipped: number; stored: string[]; hint?: string; approx?: number } | { ok: false; error: string };
 
 const hlcOf = (ms: number) => String(Math.floor(ms)).padStart(13, '0') + '.0000.srv';
 const keyOf = (id: string) => HEALTH_TABLE + '/' + id;
@@ -193,19 +339,24 @@ export function asleepMinutes(seg: readonly number[]): number {
 
 /** 단축어 요청 하나 반영 (state 를 제자리에서 바꿈). kind:'canary' 는 읽기만 하고 canary 기록 하나만 씀 */
 export function ingestHealth(state: HState, req: HealthReq, nowMs: number): IngestResult {
-  const src = (req.samples && typeof req.samples === 'object' ? req.samples : req) as Record<string, unknown>;
+  const norm = normalizeHealthReq(req);
+  const src = norm.fields;
   let lines = 0;
-  for (const f of HEALTH_FIELDS) lines += String(src[f] ?? '').split(/\r?\n/).filter((l) => l.trim()).length;
+  for (const f of HEALTH_FIELDS) lines += src[f].split(/\r?\n/).filter((l) => l.trim()).length;
   if (lines > MAX_LINES) return { ok: false, error: 'too_many' };
   const parsed = {} as Record<HealthField, Sample[]>;
-  let received = 0, skipped = 0;
+  let received = 0, skipped = 0, approx = 0;
+  const why: SkipWhy = { date: 0, range: 0, value: 0 };
   for (const f of HEALTH_FIELDS) {
     const r = parseLines(f, src[f], nowMs);
-    parsed[f] = r.samples; received += r.samples.length; skipped += r.skipped;
+    parsed[f] = r.samples; received += r.samples.length; skipped += r.skipped; approx += r.approx;
+    why.date += r.why.date; why.range += r.why.range; why.value += r.why.value;
   }
+  const hint = skipHint(why, received, lines);
+  const extra = (o: { ok: true; received: number; skipped: number; stored: string[] }): IngestResult => { const x: IngestResult = o; if (hint) x.hint = hint; if (approx) x.approx = approx; return x; };
   const rx = new Date(nowMs).toISOString();
-  const kind = String(req.kind || 'workout');
-  if (kind === 'canary') { put(state, 'canary', { id: 'canary', type: 'canary', at: rx, received, skipped }, nowMs); return { ok: true, received, skipped, stored: ['canary'] }; }
+  const kind = norm.kind;
+  if (kind === 'canary') { put(state, 'canary', { id: 'canary', type: 'canary', at: rx, received, skipped }, nowMs); return extra({ ok: true, received, skipped, stored: ['canary'] }); }
   const cutoff = kstDay(nowMs - RAW_KEEP_DAYS * DAY_MS);
   const touched = new Map<string, Record<string, unknown>>();
   const get = (id: string, init: () => Record<string, unknown>) => {
@@ -286,7 +437,7 @@ export function ingestHealth(state: HState, req: HealthReq, nowMs: number): Inge
     if (r.table !== HEALTH_TABLE || r.deleted || !/^(hr|en|sl)-\d{4}-\d{2}-\d{2}$/.test(r.id)) continue;
     if (r.id.slice(3) < cutoff) { state.rev += 1; state.recs[k] = { table: HEALTH_TABLE, id: r.id, deleted: true, hlc: hlcOf(nowMs), dev: 'srv', rev: state.rev }; }
   }
-  return { ok: true, received, skipped, stored: stored.sort() };
+  return extra({ ok: true, received, skipped, stored: stored.sort() });
 }
 
 // ---------- D-059 운동별 애플워치 요약 (지우지 않음) ----------

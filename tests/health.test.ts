@@ -74,7 +74,7 @@ describe('D-058 서버 저장: 날짜 묶음·중복 없애기·정리', () => {
   it('심박은 날짜별 기록 하나, 5초 칸·같은 시작이면 하나, 정렬, 받은 개수·건너뛴 개수', () => {
     const s = st();
     const r1 = ingestHealth(s, { kind: 'workout', samples: { hr: ['2026-10-08T11:24:01+09:00 | 120', '2026-10-08T11:24:03+09:00 | 121', '2026-10-08T11:24:10+09:00 | 130', 'x'].join('\n') } }, NOW);
-    expect(r1).toEqual({ ok: true, received: 3, skipped: 1, stored: ['hr-2026-10-08'] });
+    expect(r1).toMatchObject({ ok: true, received: 3, skipped: 1, stored: ['hr-2026-10-08'] });
     const d = rec(s, 'hr-2026-10-08').data!;
     expect(d.t0).toBe(kstDayStart('2026-10-08'));
     expect(d.p).toEqual([41040, 121, 41050, 130]); // 11:24:00 칸(01·03 → 나중 값 121), 11:24:10
@@ -111,7 +111,7 @@ describe('D-058 서버 저장: 날짜 묶음·중복 없애기·정리', () => {
     expect(RAW_KEEP_DAYS).toBe(120);
     expect(ingestHealth(s, { kind: 'daily', hr: Array.from({ length: MAX_LINES + 1 }, () => '2026-10-08T11:00:00+09:00 | 70').join('\n') }, NOW)).toEqual({ ok: false, error: 'too_many' });
     const before = Object.keys(s.recs).length;
-    expect(ingestHealth(s, { kind: 'canary', hr: '2026-10-08T11:00:00+09:00 | 70\nbad' }, NOW)).toEqual({ ok: true, received: 1, skipped: 1, stored: ['canary'] });
+    expect(ingestHealth(s, { kind: 'canary', hr: '2026-10-08T11:00:00+09:00 | 70\nbad' }, NOW)).toMatchObject({ ok: true, received: 1, skipped: 1, stored: ['canary'] });
     expect(Object.keys(s.recs).length).toBe(before + 1);
   });
   it('크기: 하루 내내 5초마다(17,280개) 넣어도 기록 하나 약 170KB 이하', () => {
