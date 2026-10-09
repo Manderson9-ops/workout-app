@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { timeText, dateText, dayText, dateTimeText, sinceText, agoText, weekRangeText, headerDateText, fullText, fullDateText, axisText, toDate, daysAgo } from '../src/core/dateText';
+import { timeRangeText, timeText, dateText, dayText, dateTimeText, sinceText, agoText, weekRangeText, headerDateText, fullText, fullDateText, axisText, toDate, daysAgo } from '../src/core/dateText';
 
 // 고정 시각: 2026-10-08(목) 오전 11:24 현지. 현지 생성자만 써서 시험 PC 시간대와 상관없게
 const L = (y: number, mo: number, d: number, h = 0, mi = 0, s = 0) => new Date(y, mo - 1, d, h, mi, s);
@@ -56,6 +56,12 @@ describe('D-060 날짜·시각 표시 규칙 (core/dateText)', () => {
     expect(agoText(L(2026, 10, 8, 11, 23, 30), NOW)).toBe('방금');
     expect(agoText(L(2026, 10, 8, 11, 0), NOW)).toBe('24분 전');
     expect(agoText(L(2026, 10, 8, 9, 10), NOW)).toBe('오늘 오전 9:10');
+  });
+  it('시각 범위: 같은 오전/오후는 한 번, 바뀌면 둘 다, 날이 바뀌면 날짜 (검토 E4)', () => {
+    expect(timeRangeText(L(2026, 10, 7, 19, 5), L(2026, 10, 7, 20, 5), NOW)).toBe('오후 7:05~8:05');
+    expect(timeRangeText(L(2026, 10, 7, 11, 30), L(2026, 10, 7, 12, 40), NOW)).toBe('오전 11:30~오후 12:40');
+    expect(timeRangeText(L(2026, 10, 7, 23, 30), L(2026, 10, 8, 0, 40), NOW)).toBe('오후 11:30~10월 8일(목) 오전 12:40');
+    expect(timeRangeText(L(2025, 12, 31, 23, 30), L(2026, 1, 1, 0, 40), NOW)).toBe('오후 11:30~1월 1일(목) 오전 12:40');
   });
   it('주 범위: 같은 달·다른 달·다른 해', () => {
     expect(weekRangeText('2026-10-04', NOW)).toBe('10월 4일~10일');

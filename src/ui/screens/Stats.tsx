@@ -24,7 +24,7 @@ import { HOME_HIDDEN_LABEL } from '../../core/session';
 import { go } from '../nav';
 import { askConfirm } from '../confirm';
 import { Icon } from '../icons';
-import { axisText, weekRangeText, dateText, dateTimeText, timeText, fullText, fullDateText } from '../../core/dateText';
+import { axisText, weekRangeText, dateText, dateTimeText, timeRangeText, fullText, fullDateText } from '../../core/dateText';
 
 const WD = ['일', '월', '화', '수', '목', '금', '토']; // 주는 일요일 시작 (D-054)
 const ymd = (d: string) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y!, m! - 1, dd!); };
@@ -242,7 +242,7 @@ export function Stats({ s }: { s: AppState }) {
             const dt = dateOf(n);
             return (
               <button key={n} class={`cal-day ${wdClass((lead + i) % 7)} ${dt === today ? 'is-today' : ''} ${dt > today ? 'future' : ''} ${day === n ? 'sel' : ''}`}
-                aria-label={`${ym.m}월 ${n}일${c ? ` 운동 ${c}회` : ''}`} aria-pressed={day === n} disabled={!c}
+                aria-label={`${fullDateText(dt)}${c ? `, 운동 ${c}회` : ''}`} aria-pressed={day === n} disabled={!c}
                 onClick={() => setDay(day === n ? null : n)}>
                 <span>{n}</span>{c ? <i class="dot" /> : null}
               </button>
@@ -335,7 +335,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
   return (
     <main>
       <ScreenHeader back={{ label: '기록', onClick: () => go('#/stats') }} title={w.name} />
-      <p class="sub" aria-label={`${fullText(w.startedAt)}부터 ${durText(sum.durationSec)}`}>{dateTimeText(w.startedAt, Date.now(), { relative: false })}{w.endedAt ? `~${timeText(w.endedAt)}` : ''} · {durText(sum.durationSec)}{sum.plannedSec ? ` (예상 ${durText(sum.plannedSec)})` : ''}</p>
+      <p class="sub" aria-label={`${fullText(w.startedAt)}부터 ${durText(sum.durationSec)}`}>{w.endedAt ? `${dateText(w.startedAt, Date.now())} ${timeRangeText(w.startedAt, w.endedAt, Date.now())}` : dateTimeText(w.startedAt, Date.now(), { relative: false })} · {durText(sum.durationSec)}{sum.plannedSec ? ` (예상 ${durText(sum.plannedSec)})` : ''}</p>
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
       {w.editedAt && <p class="sub small">{dateTimeText(w.editedAt, Date.now())}에 고침</p>}
       {w.memo && <p class="memo-line"><Icon name="note" size={16} />{w.memo}</p>}

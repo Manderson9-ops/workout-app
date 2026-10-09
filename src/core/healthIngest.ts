@@ -333,10 +333,18 @@ function finishedWorkouts(state: HState): WLike[] {
   }
   return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
+/** 운동 시간 [a,b] 에 걸친 날 중 원본(prefix-날짜) 기록이 없거나 지워진 날이 있는지 (120일 정리 등) */
+function rawMissing(state: HState, prefix: string, a: number, b: number, lookback: number): boolean {
+  for (let d = kstDayStart(kstDay(a - lookback)); d <= b; d += DAY_MS) if (!cur(state, prefix + kstDay(d))) return true;
+  return false;
+}
 /**
- * 운동 하나의 요약을 다시 계산해 저장. 바뀐 게 없으면 쓰지 않음.
- * 시간이 같은데 새 계산의 심박 개수가 더 적으면(원본 일부가 정리됨) 저장된 값을 그대로 둠 (나빠지지 않게).
- * 시간이 바뀌었으면(운동 고치기) 새 계산으로 바꿈. 심박·칼로리가 둘 다 없고 저장된 것도 없으면 만들지 않음
+ * 운동 하나의 요약을 다시 계산해 저장. 바뀐 게 없으면 쓰지 않음. 나빠지지 않게 (D-059, 검토 E1):
+ * - 새 계산이 심박 0개·칼로리 없음인데 저장된 요약이 있으면: 시간이 같으면 그대로, 시간을 고쳤으면 값은 두고
+ *   시간만 새로 + stale:true (원본이 정리돼 다시 셀 수 없음)
+ * - 시간이 같고 새 심박 개수가 더 적으면 저장된 심박 값 유지
+ * - 저장된 kcal 보다 새 kcal 이 없거나 작은데 그 시간의 에너지 원본이 빠져 있으면 저장된 kcal 유지
+ * - 심박·칼로리가 둘 다 없고 저장된 것도 없으면 만들지 않음
  */
 export function refreshSummary(state: HState, w: WLike, nowMs: number): boolean {
   const id = 'ws-' + w.id;
@@ -344,16 +352,28 @@ export function refreshSummary(state: HState, w: WLike, nowMs: number): boolean 
   const a = Date.parse(w.startedAt), b = Date.parse(w.endedAt);
   const s = windowSummary((rid) => cur(state, rid) as RowLike | undefined, a, b);
   const sameTime = !!old && old.startedAt === w.startedAt && old.endedAt === w.endedAt;
-  if (!old && !s.hrN && s.kcal === undefined) return false;
-  if (sameTime) {
-    const oldN = typeof old!.hrN === 'number' ? (old!.hrN as number) : 0;
-    if (s.hrN < oldN) return false;
-    if (s.hrN === oldN && s.hrAvg === old!.hrAvg && s.hrMax === old!.hrMax && (s.kcal ?? (old!.kcal as number | undefined)) === old!.kcal) return false;
-    if (s.kcal === undefined && typeof old!.kcal === 'number') s.kcal = old!.kcal as number; // 에너지 원본만 정리된 경우
+  const empty = !s.hrN && !s.kcal;
+  if (!old && empty) return false;
+  const base: Record<string, unknown> = { id, type: 'ws', workoutId: w.id, startedAt: w.startedAt, endedAt: w.endedAt, src: 'watch', computedAt: new Date(nowMs).toISOString() };
+  if (old && empty) {
+    if (sameTime) return false;
+    const keep: Record<string, unknown> = { ...base };
+    for (const k of ['hrN', 'hrAvg', 'hrMax', 'kcal']) if (old[k] !== undefined) keep[k] = old[k];
+    keep.stale = true;
+    put(state, id, keep, nowMs);
+    return true;
   }
-  const data: Record<string, unknown> = { id, type: 'ws', workoutId: w.id, startedAt: w.startedAt, endedAt: w.endedAt, hrN: s.hrN, src: 'watch', computedAt: new Date(nowMs).toISOString() };
-  if (s.hrAvg !== undefined) { data.hrAvg = s.hrAvg; data.hrMax = s.hrMax; }
-  if (s.kcal !== undefined) data.kcal = s.kcal;
+  const oldN = old && typeof old.hrN === 'number' ? (old.hrN as number) : 0;
+  const oldK = old && typeof old.kcal === 'number' ? (old.kcal as number) : undefined;
+  let hrN = s.hrN, hrAvg = s.hrAvg, hrMax = s.hrMax, kcal = s.kcal;
+  if (sameTime && hrN < oldN) { hrN = oldN; hrAvg = old!.hrAvg as number | undefined; hrMax = old!.hrMax as number | undefined; }
+  let stale = false;
+  if (oldK !== undefined && (kcal === undefined || kcal < oldK) && (sameTime || kcal === undefined) && rawMissing(state, 'en-', a, b, DAY_MS)) { kcal = oldK; stale = !sameTime; }
+  if (sameTime && hrN === oldN && hrAvg === old!.hrAvg && hrMax === old!.hrMax && kcal === oldK && !old!.stale) return false;
+  const data: Record<string, unknown> = { ...base, hrN };
+  if (hrAvg !== undefined) { data.hrAvg = hrAvg; data.hrMax = hrMax; }
+  if (kcal !== undefined) data.kcal = kcal;
+  if (stale) data.stale = true;
   put(state, id, data, nowMs);
   return true;
 }

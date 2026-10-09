@@ -304,9 +304,31 @@ describe('D-059 운동별 애플워치 요약 (ws-운동ID, 지우지 않음)', 
     s.recs['health/hr-2026-10-08'] = { ...s.recs['health/hr-2026-10-08']!, deleted: true };
     expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:00:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(false);
     expect(rec(s, 'ws-w1').data!.hrAvg).toBe(130);
-    // 시간을 고침 → 새 계산(원본 없음 → 개수 0)으로 바뀜
+    // 시간을 고쳤는데 원본이 정리돼 다시 셀 수 없음 → 값은 두고 시간만 새로 + stale (검토 E1)
     expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:15:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(true);
-    expect(rec(s, 'ws-w1').data).toMatchObject({ hrN: 0, startedAt: '2026-10-08T10:15:00+09:00' });
+    expect(rec(s, 'ws-w1').data).toMatchObject({ hrN: 2, hrAvg: 130, hrMax: 140, startedAt: '2026-10-08T10:15:00+09:00', stale: true });
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:15:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(false); // 다시 해도 그대로
+  });
+  it('칼로리만 있는 운동: 에너지 원본이 정리되면 저장된 kcal 유지, 원본이 있으면 새 값으로 (검토 E1)', () => {
+    const s = base();
+    ingestHealth(s, { kind: 'workout', energy: '2026-10-08T10:00:00+09:00 | 30 kcal | 2026-10-08T10:30:00+09:00' }, NOW);
+    expect(rec(s, 'ws-w1').data).toMatchObject({ hrN: 0, kcal: 30 });
+    const r0 = s.rev;
+    s.recs['health/en-2026-10-08'] = { ...s.recs['health/en-2026-10-08']!, deleted: true };
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:00:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(false);
+    expect(s.rev).toBe(r0);
+    expect(rec(s, 'ws-w1').data!.kcal).toBe(30);
+    // 시간을 고쳤고 원본 없음 → kcal 유지 + stale
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:20:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(true);
+    expect(rec(s, 'ws-w1').data).toMatchObject({ kcal: 30, stale: true, startedAt: '2026-10-08T10:20:00+09:00' });
+  });
+  it('원본이 남아 있으면 시간을 고친 새 계산으로 (작아져도) 바꾸고 stale 없음', () => {
+    const s = base();
+    ingestHealth(s, { kind: 'workout', hr: hrLines, energy: '2026-10-08T10:00:00+09:00 | 30 kcal | 2026-10-08T10:30:00+09:00' }, NOW);
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:15:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(true);
+    const d = rec(s, 'ws-w1').data!;
+    expect(d).toMatchObject({ hrN: 1, hrAvg: 140, kcal: 15 });
+    expect(d.stale).toBeUndefined();
   });
   it('120일 정리는 원본만, 요약(ws)은 남음', () => {
     const s = base();

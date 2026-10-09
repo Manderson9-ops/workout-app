@@ -87,6 +87,17 @@ export function agoText(t: When, now: When): string {
   return dateTimeText(t, now);
 }
 
+/**
+ * 시각 범위 (검토 E4): 같은 날·같은 오전/오후면 뒤의 오전/오후 생략 "오후 7:05~8:05",
+ * 오전/오후가 바뀌면 둘 다 "오전 11:30~오후 12:40", 날짜가 바뀌면 뒤에 날짜 "오후 11:30~10월 9일(금) 오전 12:40"
+ */
+export function timeRangeText(a: When, b: When, now: When): string {
+  const x = toDate(a), y = toDate(b);
+  if (daysAgo(x, y) !== 0) return `${timeText(x)}~${dateText(y, now)} ${timeText(y)}`;
+  const end = timeText(y);
+  return (x.getHours() < 12) === (y.getHours() < 12) ? `${timeText(x)}~${end.slice(3)}` : `${timeText(x)}~${end}`;
+}
+
 /** 주 범위 (시작=일요일 'YYYY-MM-DD'): "10월 4일~10일", "9월 28일~10월 4일", 다른 해는 "2025년 12월 28일~2026년 1월 3일" */
 export function weekRangeText(ws: When, now: When): string {
   const a = toDate(ws);

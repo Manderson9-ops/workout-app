@@ -891,7 +891,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await expect(page.locator('.daydot.did')).toHaveAttribute('aria-label', /운동함/);
   await expect(page.getByText(/이번 달 1회/)).toBeVisible();
   const d = new Date();
-  const todayBtn = page.getByRole('button', { name: `${d.getMonth() + 1}월 ${d.getDate()}일 운동 1회` });
+  const todayBtn = page.getByRole('button', { name: `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일, 운동 1회` }); // 검토 E5 전체 형태
   await expect(todayBtn).toBeEnabled();
   await todayBtn.click();
   await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
@@ -2885,7 +2885,7 @@ test.describe('D-060 날짜·시각 표시 (고정 시각, 한국 시간)', () =
     await page.locator('h3.wk-head').first().scrollIntoViewIfNeeded();
     await p8(page, 'p8-stats');
     await page.locator('main .wcard').first().click();
-    await expect(page.locator('main p.sub').first()).toContainText('10월 7일(수) 오후 7:05~오후 8:05 · 1시간');
+    await expect(page.locator('main p.sub').first()).toContainText('10월 7일(수) 오후 7:05~8:05 · 1시간'); // 검토 E4 같은 오후는 한 번
     await p8(page, 'p8-detail');
     await page.goto('./#/settings/watch');
     await expect(page.getByTestId('watch-status')).toContainText('마지막으로 받음 오늘 오전 11:00');
