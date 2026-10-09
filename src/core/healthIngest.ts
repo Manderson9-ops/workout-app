@@ -10,7 +10,8 @@
  * 시간대가 없으면 한국 시간(+09:00)으로 본다.
  * D-061 (iOS 27 "설명으로 만들기"로 AI 가 만든 단축어): 칸 이름이 한국어·대문자(심박, HeartRate …)거나, 값이 목록(글 또는
  * {date, value, endDate, unit} 사전)이거나, 한 줄 안에서 날짜가 뒤에 있거나("128 BPM, 2026-10-09T22:53:05+09:00"),
- * 시각만 있는("오후 10:53" → 오늘 한국 시간, approx 로 셈) 것도 읽는다. 건너뛴 줄이 있으면 응답에 hint(이유)를 붙인다.
+ * 두 자리 연도("26. 10. 9. 오후 10:20")·연도 없는("10월 9일 오후 10:20") 날짜도 읽는다. 시각만 있는 줄과 읽지 못한 날짜 조각이
+ * 남은 줄은 저장하지 않는다(틀린 날·틀린 값 방지, 검토 P1~P3). 건너뛴 줄이 있으면 응답에 hint(이유)를 붙인다.
  *
  * 저장(동기화 기록 표 'health', 서버만 씀, 기기는 읽기만):
  *  hr-YYYY-MM-DD   {type:'hr', day, t0(그날 0시 ms), p:[초,심박, 초,심박 ...]}  초 = 그날 0시부터, 5초 단위로 같은 칸이면 나중 값
@@ -62,7 +63,7 @@ function kstMs(y: number, mo: number, d: number, h: number, mi: number, s: numbe
 }
 
 /** 날짜 글 → ms (못 읽으면 undefined) */
-export function parseDate(text: string): number | undefined {
+export function parseDate(text: string, nowMs: number = Date.now()): number | undefined {
   const s = String(text || '').replace(/\u202f|\u00a0/g, ' ').trim();
   if (!s) return undefined;
   // ISO 8601: 2026-10-08T11:24:05+09:00 / Z / 시간대 없음(한국 시간)
@@ -76,12 +77,27 @@ export function parseDate(text: string): number | undefined {
     const off = (m[1] === '-' ? -1 : 1) * (+m[2]! * 60 + +m[3]!) * 60000;
     return base - off;
   }
+  const TAIL = '\\s*(?:,?\\s*\\(?[월화수목금토일](?:요일)?\\)?,?\\s*)?(오전|오후|AM|PM)?\\s*(\\d{1,2}):(\\d{2})(?::(\\d{2}))?\\s*(오전|오후|AM|PM)?$';
   // 한국어·숫자 형식: 2026. 10. 8. 오전 11:24 / 2026년 10월 8일 오후 11:24:05 / 2026/10/08 23:10 / 2026-10-08 23:10
-  const ko = /^(\d{4})\s*(?:\.|년|\/|-)\s*(\d{1,2})\s*(?:\.|월|\/|-)\s*(\d{1,2})\s*(?:\.|일)?\s*(?:,?\s*\(?[월화수목금토일](?:요일)?\)?,?\s*)?(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(오전|오후|AM|PM)?$/i.exec(s);
+  const ko = new RegExp('^(\\d{4})\\s*(?:\\.|년|\\/|-)\\s*(\\d{1,2})\\s*(?:\\.|월|\\/|-)\\s*(\\d{1,2})\\s*(?:\\.|일)?' + TAIL, 'i').exec(s);
   if (ko) return kstMs(+ko[1]!, +ko[2]!, +ko[3]!, to24(+ko[5]!, ko[4] || ko[8]), +ko[6]!, +(ko[7] || 0));
+  // 두 자리 연도 (아이폰 한국어 "짧은" 날짜): 26. 10. 9. 오후 10:20 → 2026 (마침표·년 구분만, 빗금은 순서가 모호해 안 읽음)
+  const ko2 = new RegExp('^(\\d{2})\\s*(?:\\.|년)\\s*(\\d{1,2})\\s*(?:\\.|월)\\s*(\\d{1,2})\\s*(?:\\.|일)' + TAIL, 'i').exec(s);
+  if (ko2) return kstMs(2000 + +ko2[1]!, +ko2[2]!, +ko2[3]!, to24(+ko2[5]!, ko2[4] || ko2[8]), +ko2[6]!, +(ko2[7] || 0));
+  // 연도 없음: 10월 9일 오후 10:20 → 올해 (하루 넘게 미래가 되면 작년)
+  const md = new RegExp('^(\\d{1,2})\\s*월\\s*(\\d{1,2})\\s*일' + TAIL, 'i').exec(s);
+  if (md) {
+    const y = +kstDay(nowMs).slice(0, 4);
+    const at = (yy: number) => kstMs(yy, +md[1]!, +md[2]!, to24(+md[4]!, md[3] || md[7]), +md[5]!, +(md[6] || 0));
+    const v = at(y);
+    return v !== undefined && v > nowMs + DAY_MS ? at(y - 1) : v;
+  }
   // 영어: Oct 8, 2026 at 11:24 AM / October 8, 2026, 11:24:05 PM
   const en = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4}),?\s*(?:at\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(s);
   if (en && MONTHS[en[1]!.toLowerCase()]) return kstMs(+en[3]!, MONTHS[en[1]!.toLowerCase()]!, +en[2]!, to24(+en[4]!, en[7]), +en[5]!, +(en[6] || 0));
+  // 영어 일·월·연: 9 Oct 2026 22:20 / Fri, 9 October 2026 at 10:20 PM
+  const en2 = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?,?\s+(\d{4}),?\s*(?:at\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(s);
+  if (en2 && MONTHS[en2[2]!.toLowerCase()]) return kstMs(+en2[3]!, MONTHS[en2[2]!.toLowerCase()]!, +en2[1]!, to24(+en2[4]!, en2[7]), +en2[5]!, +(en2[6] || 0));
   return undefined;
 }
 
@@ -114,14 +130,19 @@ export function parseStage(text: string): SleepStage | undefined {
 
 const RANGE: Record<HealthField, [number, number]> = { hr: [25, 250], energy: [0, 2000], sleep: [0, 0], rhr: [25, 150], hrv: [1, 300] };
 
-/** 줄 안에서 찾은 날짜 (위치·근사 여부) */
-interface Found { ms: number; a: number; b: number; approx?: boolean }
+/** 줄 안에서 찾은 날짜 (위치) */
+interface Found { ms: number; a: number; b: number }
+const TIME_TAIL = '\\s*(?:오전|오후|AM|PM)?\\s*\\d{1,2}:\\d{2}(?::\\d{2})?(?:\\s*(?:오전|오후|AM|PM))?';
+const WD_KO = '(?:,?\\s*\\(?[월화수목금토일](?:요일)?\\)?,?)?';
 const DATE_RES: RegExp[] = [
   /\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2})?/g,
-  /\d{4}\s*(?:\.|년|\/)\s*\d{1,2}\s*(?:\.|월|\/)\s*\d{1,2}\s*(?:\.|일)?(?:,?\s*\(?[월화수목금토일](?:요일)?\)?,?)?\s*(?:오전|오후|AM|PM)?\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:오전|오후|AM|PM))?/gi,
+  new RegExp('\\d{4}\\s*(?:\\.|년|\\/)\\s*\\d{1,2}\\s*(?:\\.|월|\\/)\\s*\\d{1,2}\\s*(?:\\.|일)?' + WD_KO + TIME_TAIL, 'gi'),
+  new RegExp('\\b\\d{2}\\s*(?:\\.|년)\\s*\\d{1,2}\\s*(?:\\.|월)\\s*\\d{1,2}\\s*(?:\\.|일)' + WD_KO + TIME_TAIL, 'gi'),
+  new RegExp('\\d{1,2}\\s*월\\s*\\d{1,2}\\s*일' + WD_KO + TIME_TAIL, 'gi'),
   /(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?[A-Za-z]{3,9}\.?\s+\d{1,2},?\s+\d{4},?\s*(?:at\s+)?\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?/gi,
+  /(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?\d{1,2}\s+[A-Za-z]{3,9}\.?,?\s+\d{4},?\s*(?:at\s+)?\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)?/gi,
 ];
-/** 줄 안 모든 날짜 (앞에서부터). 날짜가 하나도 없으면 시각만("오후 10:53", "22:53")을 오늘 한국 시간으로 (approx) */
+/** 줄 안 모든 날짜 (앞에서부터). 시각만 있는 것("오후 10:53")은 날짜로 보지 않음 (D-061 검토 P2·P3: 틀린 날에 저장되지 않게) */
 export function findDates(line: string, nowMs: number): Found[] {
   const s = String(line || '').replace(/\u202f|\u00a0/g, ' ');
   const out: Found[] = [];
@@ -131,58 +152,52 @@ export function findDates(line: string, nowMs: number): Found[] {
     while ((m = re.exec(s))) {
       const a = m.index, b = a + m[0].length;
       if (out.some((x) => a < x.b && b > x.a)) continue;
-      const ms = parseDate(m[0].trim());
+      const ms = parseDate(m[0].trim(), nowMs);
       if (ms !== undefined) out.push({ ms, a, b });
-    }
-  }
-  if (!out.length) {
-    const tm = /(오전|오후|AM|PM)?\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*(오전|오후|AM|PM))?/i.exec(s);
-    if (tm) {
-      const h = to24(+tm[2]!, tm[1] || tm[5]);
-      const day = kstDayStart(kstDay(nowMs));
-      if (h <= 23 && +tm[3]! <= 59) {
-        let ms = day + ((h * 60 + +tm[3]!) * 60 + +(tm[4] || 0)) * 1000;
-        if (ms > nowMs + 10 * 60000) ms -= DAY_MS; // 아직 안 온 시각이면 어제
-        out.push({ ms, a: tm.index, b: tm.index + tm[0].length, approx: true });
-      }
     }
   }
   return out.sort((x, y) => x.a - y.a);
 }
-/** 건너뛴 이유: date 날짜 없음/못 읽음, range 미래·너무 옛날, value 값 없음·범위 밖(수면은 끝·단계 없음) */
-export interface SkipWhy { date: number; range: number; value: number }
+/** 날짜 표시(년·월·일, "26. 10. 9." 같은 마침표 연속, 달 이름, ISO 날짜, 빗금 날짜)가 있는 글 → 값으로 쓰지 않음 */
+export const hasDateMark = (s: string) => /\d\s*년|\d\s*월|\d\s*일|\d+\s*\.\s*\d+\s*\.|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b|\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\/\d{1,2}/i.test(s);
+const TIME_ONLY = /(?:오전|오후|AM|PM)?\s*\d{1,2}:\d{2}/i;
+/** 건너뛴 이유: date 날짜 없음/못 읽음(날짜 조각이 남음 포함), time 날짜 없이 시각만, range 미래·너무 옛날, value 값 없음·범위 밖(수면은 끝·단계 없음) */
+export interface SkipWhy { date: number; time: number; range: number; value: number }
 
 /** 여러 줄 글 → 샘플. 못 읽은 줄은 개수만 (skipped, 이유는 why). 미래(+1일)·너무 옛날(-400일) 날짜도 건너뜀 */
-export function parseLines(field: HealthField, text: unknown, nowMs: number): { samples: Sample[]; skipped: number; why: SkipWhy; approx: number } {
+export function parseLines(field: HealthField, text: unknown, nowMs: number): { samples: Sample[]; skipped: number; why: SkipWhy } {
   const lines = String(text ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const samples: Sample[] = [];
-  const why: SkipWhy = { date: 0, range: 0, value: 0 };
-  let approx = 0;
+  const why: SkipWhy = { date: 0, time: 0, range: 0, value: 0 };
   const r = RANGE[field];
   for (const line of lines) {
     const parts = line.split(/\t|\s*\|\s*/).map((x) => x.trim()).filter((x) => x !== '');
-    let t = parseDate(parts[0] || '');
-    let rest: string[]; let endText: string | undefined; let isApprox = false;
+    let t = parseDate(parts[0] || '', nowMs);
+    let rest: string[]; let endText: string | undefined;
     if (t !== undefined && parts.length > 1) {
       rest = parts.slice(1);
     } else {
-      // 첫 칸이 날짜가 아님: 줄 안 어디든 날짜를 찾고 나머지에서 값 (D-061)
+      // 첫 칸이 날짜가 아님: 줄 안에서 날짜를 찾고, 날짜를 뺀 나머지에서 값 (D-061)
       const ds = findDates(line, nowMs);
-      if (!ds.length) { why.date++; continue; }
-      t = ds[0]!.ms; isApprox = !!ds[0]!.approx;
+      // 시각만 있는 줄(날짜 표시·네 자리 연도 없음)은 따로 셈 → hint 가 "날짜 형식을 ISO 8601로" 안내
+      if (!ds.length) { if (TIME_ONLY.test(line) && !hasDateMark(line) && !/\d{4}/.test(line)) why.time++; else why.date++; continue; }
       let left = ''; let pos = 0;
       for (const d of ds) { left += line.slice(pos, d.a) + ' | '; pos = d.b; }
       left += line.slice(pos);
+      // 읽지 못한 날짜 조각이 남아 있으면(예: 모르는 형식) 값을 고르지 않고 건너뜀 (검토 P1)
+      if (hasDateMark(left)) { why.date++; continue; }
+      t = ds[0]!.ms;
       rest = left.split(/\t|\s*[|,;]\s*/).map((x) => x.trim()).filter((x) => x !== '');
       if (ds[1]) endText = line.slice(ds[1].a, ds[1].b);
     }
     if (t > nowMs + DAY_MS || t < nowMs - 400 * DAY_MS) { why.range++; continue; }
     if (field === 'sleep') {
       // 수면: 시작 | (단계 또는 값) | 끝 | (단계)  — 순서가 섞여도 날짜인 칸 = 끝, 단계 글인 칸 = 단계
-      let end: number | undefined = endText !== undefined ? parseDate(endText.trim()) : undefined; let stage: SleepStage | undefined;
+      let end: number | undefined = endText !== undefined ? parseDate(endText.trim(), nowMs) : undefined; let stage: SleepStage | undefined;
       for (const p of rest) {
-        const d = parseDate(p);
+        const d = parseDate(p, nowMs);
         if (d !== undefined) { if (end === undefined) end = d; continue; }
+        if (hasDateMark(p)) continue;
         const st = parseStage(p);
         if (st !== undefined && stage === undefined) stage = st;
       }
@@ -190,33 +205,32 @@ export function parseLines(field: HealthField, text: unknown, nowMs: number): { 
       if (stage === undefined) { const num = rest.find((p) => /^\d$/.test(p) && HK_SLEEP[Number(p)] !== undefined); if (num !== undefined) stage = HK_SLEEP[Number(num)]; }
       if (end === undefined || end <= t || end - t > DAY_MS || stage === undefined) { why.value++; continue; }
       samples.push({ t, v: 0, end, stage });
-      if (isApprox) approx++;
       continue;
     }
-    // 값: 날짜가 아닌 첫 칸의 숫자
-    const vText = rest.find((p) => parseDate(p) === undefined && parseNumber(p) !== undefined) || '';
+    // 값: 날짜 표시가 없는 첫 칸의 숫자 (검토 P1: 날짜 조각을 값으로 읽지 않음)
+    const vText = rest.find((p) => parseDate(p, nowMs) === undefined && !hasDateMark(p) && !TIME_ONLY.test(p) && parseNumber(p) !== undefined) || '';
     const raw = parseNumber(vText);
     // 활동 에너지를 킬로줄로 쓰는 아이폰 설정이면 kcal 로 바꿈 (D-058 검토 G3)
     const v = raw !== undefined && field === 'energy' && isKJ(vText) ? Math.round((raw / KJ_PER_KCAL) * 10) / 10 : raw;
     if (v === undefined || v < r[0] || v > r[1]) { why.value++; continue; }
     let end: number | undefined;
-    const eText = endText !== undefined ? endText.trim() : rest.find((p) => parseDate(p) !== undefined);
-    if (eText !== undefined) { const d = parseDate(eText); if (d !== undefined && d >= t && d - t <= DAY_MS) end = d; }
+    const eText = endText !== undefined ? endText.trim() : rest.find((p) => parseDate(p, nowMs) !== undefined);
+    if (eText !== undefined) { const d = parseDate(eText, nowMs); if (d !== undefined && d >= t && d - t <= DAY_MS) end = d; }
     samples.push(end === undefined ? { t, v } : { t, v, end });
-    if (isApprox) approx++;
   }
-  return { samples, skipped: why.date + why.range + why.value, why, approx };
+  return { samples, skipped: why.date + why.time + why.range + why.value, why };
 }
 
 /** 건너뛴 줄 이유 → 한국어 안내 (응답 hint) */
 export function skipHint(why: SkipWhy, received: number, lines: number): string | undefined {
   if (!lines) return '보낸 값이 비어 있어요. 단축어의 hr·energy(심박·에너지) 칸에 건강 샘플이 들어갔는지, 건강 접근을 허용했는지, 그 시간에 애플워치 기록이 있는지 확인하세요';
-  const n = why.date + why.range + why.value;
+  const n = why.date + why.time + why.range + why.value;
   if (!n) return undefined;
   const out: string[] = [];
-  if (why.date) out.push(`날짜를 못 읽은 줄 ${why.date}개 (각 줄에 시작 날짜를 ISO 8601 형식으로 넣어 주세요)`);
-  if (why.value) out.push(`값을 못 읽은 줄 ${why.value}개 (숫자 값이 없거나 범위 밖, 수면은 종료 날짜·수면 단계 필요)`);
-  if (why.range) out.push(`날짜가 미래이거나 400일보다 오래된 줄 ${why.range}개`);
+  if (why.date) out.push(`날짜를 못 읽음 ${why.date}줄 (각 줄 맨 앞에 시작 날짜를 ISO 8601 형식으로)`);
+  if (why.time) out.push(`날짜 없이 시각만 있어요 ${why.time}줄 — 단축어에서 날짜 형식을 ISO 8601로`);
+  if (why.value) out.push(`값을 못 읽음 ${why.value}줄 (값은 단위 없이 숫자만, 범위 밖이거나 수면은 종료 날짜·수면 단계 필요)`);
+  if (why.range) out.push(`날짜가 미래이거나 400일보다 오래됨 ${why.range}줄`);
   return `${received}개 받음, ${n}줄 건너뜀: ${out.join(' · ')}`;
 }
 
@@ -297,7 +311,7 @@ export function normalizeHealthReq(req: HealthReq): { kind: string; fields: Reco
 export interface HRec { table: string; id: string; data?: Record<string, unknown>; deleted?: boolean; hlc: string; dev: string; rev: number }
 export interface HState { rev: number; recs: Record<string, HRec> }
 export interface HealthReq { kind?: string; samples?: Record<string, unknown>; [k: string]: unknown }
-export type IngestResult = { ok: true; received: number; skipped: number; stored: string[]; hint?: string; approx?: number } | { ok: false; error: string };
+export type IngestResult = { ok: true; received: number; skipped: number; stored: string[]; hint?: string } | { ok: false; error: string };
 
 const hlcOf = (ms: number) => String(Math.floor(ms)).padStart(13, '0') + '.0000.srv';
 const keyOf = (id: string) => HEALTH_TABLE + '/' + id;
@@ -345,15 +359,15 @@ export function ingestHealth(state: HState, req: HealthReq, nowMs: number): Inge
   for (const f of HEALTH_FIELDS) lines += src[f].split(/\r?\n/).filter((l) => l.trim()).length;
   if (lines > MAX_LINES) return { ok: false, error: 'too_many' };
   const parsed = {} as Record<HealthField, Sample[]>;
-  let received = 0, skipped = 0, approx = 0;
-  const why: SkipWhy = { date: 0, range: 0, value: 0 };
+  let received = 0, skipped = 0;
+  const why: SkipWhy = { date: 0, time: 0, range: 0, value: 0 };
   for (const f of HEALTH_FIELDS) {
     const r = parseLines(f, src[f], nowMs);
-    parsed[f] = r.samples; received += r.samples.length; skipped += r.skipped; approx += r.approx;
-    why.date += r.why.date; why.range += r.why.range; why.value += r.why.value;
+    parsed[f] = r.samples; received += r.samples.length; skipped += r.skipped;
+    why.date += r.why.date; why.time += r.why.time; why.range += r.why.range; why.value += r.why.value;
   }
   const hint = skipHint(why, received, lines);
-  const extra = (o: { ok: true; received: number; skipped: number; stored: string[] }): IngestResult => { const x: IngestResult = o; if (hint) x.hint = hint; if (approx) x.approx = approx; return x; };
+  const extra = (o: { ok: true; received: number; skipped: number; stored: string[] }): IngestResult => { const x: IngestResult = o; if (hint) x.hint = hint; return x; };
   const rx = new Date(nowMs).toISOString();
   const kind = norm.kind;
   if (kind === 'canary') { put(state, 'canary', { id: 'canary', type: 'canary', at: rx, received, skipped }, nowMs); return extra({ ok: true, received, skipped, stored: ['canary'] }); }

@@ -2821,6 +2821,8 @@ test.describe('D-058 애플워치 연동', () => {
     await page.reload();
     const card = page.getByTestId('describe-card');
     await expect(card).toContainText('iOS 27: 설명으로 만들기 (가장 쉬움)');
+    await expect(card.getByTestId('describe-untested')).toHaveText('실기기 시험 전');
+    await expect(card.getByTestId('describe-ai-note')).toContainText('Apple Intelligence가 처리해요');
     // 클립보드 대신 기록 (두 엔진 공통)
     await page.evaluate(() => { const w = window as Window & { __copied?: string[] }; w.__copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (x: string) => { w.__copied!.push(x); } } }); });
     const copied = () => page.evaluate(() => (window as Window & { __copied?: string[] }).__copied ?? []);

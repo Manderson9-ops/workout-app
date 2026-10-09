@@ -34,7 +34,8 @@ function DescribeCard({ cfg }: { cfg: { url: string; key: string } | null | unde
   const btn = (id: PromptId, label: string) => <button class={id === 'A' ? 'primary' : ''} disabled={!cfg} onClick={() => void copyPrompt(id)}>{label}</button>;
   return (
     <section class="card" aria-label="iOS 27 설명으로 만들기" data-testid="describe-card">
-      <div class="card-head"><span class="card-title grow">iOS 27: 설명으로 만들기 (가장 쉬움)</span></div>
+      <div class="card-head"><span class="card-title grow">iOS 27: 설명으로 만들기 (가장 쉬움)</span><span class="chip-s" data-testid="describe-untested">실기기 시험 전</span></div>
+      <p class="sub small" data-testid="describe-ai-note">붙여 넣은 설명(키 포함)은 Apple Intelligence가 처리해요 (일부는 Apple 서버 모델을 쓸 수 있음). 걱정되면 아래 "손으로 만들기"를 쓰세요.</p>
       <div class="row wrap" role="group" aria-label="설명 글 언어">
         <button aria-pressed={lang === 'ko'} class={`chip${lang === 'ko' ? ' on' : ''}`} onClick={() => setLang('ko')}>한국어</button>
         <button aria-pressed={lang === 'en'} class={`chip${lang === 'en' ? ' on' : ''}`} onClick={() => setLang('en')}>English</button>
@@ -49,7 +50,7 @@ function DescribeCard({ cfg }: { cfg: { url: string; key: string } | null | unde
       </ol>
       {fail && <p class="small" role="alert">{fail}</p>}
       <details>
-        <summary class="small">설명으로 자동화가 안 만들어지면 (손으로 4번 누르기)</summary>
+        <summary class="small">설명으로 자동화가 안 만들어지면 (손으로 4번 누르기 · iOS 27 위치는 미확인)</summary>
         <ol class="watch-steps small">{AUTOMATION_MANUAL[lang].map((x) => <li key={x}>{x}</li>)}</ol>
       </details>
       <details>
