@@ -20,6 +20,8 @@ function doPost(e) {
     var j; try { j = JSON.parse(body); } catch (x) { j = null; }
     // D-058: 아이폰 단축어는 폼(a=b&c=d)으로 보낼 수도 있음 → 애플워치 받기만 폼 허용
     if (!j) { j = HealthIngest.readHealthBody(body, (e && e.parameter) || undefined); if (!j || (j.op !== 'health' && !j.kind)) return out_({ ok: false, error: 'not_json' }); }
+    // D-061: AI 가 만든 단축어는 Key·OP·Kind·키·종류 처럼 보낼 수 있음 → 맨 위 칸 이름만 고침
+    if (j && typeof j === 'object' && !Array.isArray(j)) j = HealthIngest.normalizeTop(j);
     var key = PropertiesService.getScriptProperties().getProperty('KEY');
     if (!key || !j || j.key !== key) return out_({ ok: false, error: 'bad_key' });
     if (j.op === 'health' || (!j.op && j.kind && !j.file)) return out_(health_(j));

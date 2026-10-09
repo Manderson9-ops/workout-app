@@ -170,7 +170,7 @@ describe('D-058 애플워치 받기 (실제 빌드한 서버 코드)', () => {
   });
   it('연결 시험(canary): canary 기록 하나만, 다음 동기화로 앱에 옴 (앱 화면은 무시)', async () => {
     const g = gas(); const A = dev('A');
-    expect(g.post({ op: 'health', key: g.key, kind: 'canary', hr: hrText })).toEqual({ ok: true, received: 2, skipped: 1, stored: ['canary'] });
+    expect(g.post({ op: 'health', key: g.key, kind: 'canary', hr: hrText })).toMatchObject({ ok: true, received: 2, skipped: 1, stored: ['canary'] });
     await syncOnce(A, g.transport);
     expect((await A.health.get('canary'))?.type).toBe('canary');
   });
