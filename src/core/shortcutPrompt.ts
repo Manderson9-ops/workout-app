@@ -16,25 +16,55 @@ export const PLACEHOLDER: Record<PromptLang, PromptCfg> = {
 export const DAILY_TIME = '22:30';
 export const NAME = { A: { ko: '운동 기록 보내기', en: 'Send Workout Health' }, B: { ko: '하루 건강 보내기', en: 'Send Daily Health' } } as const;
 
+/**
+ * 실기기 결과(2026-10-09, iOS 27 한국어): 변수 이름('심박')을 쓰라고 하면 AI 가 "변수 설정"을 빠뜨려 본문이 빈 글로 감.
+ * 그래서 변수를 쓰지 않고, 자료 종류마다 [찾기 → 반복 → 새로운 줄로 합치기 → 바로 다음 URL 보내기]를 한 묶음으로 둔다
+ * (본문 값 = 바로 앞 동작의 결과). 소스 필터도 뺌(전에 0건 원인, 서버가 같은 시각은 하나로 합침 — 앱 판단).
+ */
+interface Seg { ko: string; en: string; field: string; end?: boolean; stage?: boolean }
+export const SEG_A: Seg[] = [
+  { ko: '심박수', en: 'Heart Rate', field: 'hr' },
+  { ko: '활동 에너지', en: 'Active Energy', field: 'energy', end: true },
+];
+export const SEG_B: Seg[] = [
+  { ko: '심박수', en: 'Heart Rate', field: 'hr' },
+  { ko: '활동 에너지', en: 'Active Energy', field: 'energy', end: true },
+  { ko: '수면 분석', en: 'Sleep Analysis', field: 'sleep', end: true, stage: true },
+  { ko: '안정 시 심박수', en: 'Resting Heart Rate', field: 'rhr' },
+  { ko: '심박 변이도', en: 'Heart Rate Variability', field: 'hrv' },
+];
+const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒㉓㉔㉕';
+
+function segKo(s: Seg, i: number, n: number, c: PromptCfg, kind: string, range: string, show: boolean): string {
+  const k = (j: number) => CIRCLED.charAt(i * 5 + j);
+  const line = s.end ? "'포맷된 시작일 | 반복 항목의 값 | 포맷된 종료일'" : "'포맷된 시작일 | 반복 항목의 값'";
+  return [
+    `[${i + 1}/${n} ${s.ko}]`,
+    `${k(0)} 건강 샘플 찾기: ${s.ko}, 시작일이 ${range} 이내, 오래된 순, 제한 없음 (소스 필터 없음).`,
+    `${k(1)} 각 항목 반복: 반복 항목의 시작일${s.end ? '과 종료일' : ''}을 ISO 8601(시간 포함) 형식으로 포맷(가능하면)하고, ${line} 텍스트를 만든다. 값은 반복 항목의 값 그대로.`,
+    `${k(2)} 반복 결과를 새로운 줄로 합친다.`,
+    `${k(3)} 바로 다음에 URL의 콘텐츠 가져오기: ${c.url}, 방법 POST, 요청 본문 JSON: op=health, key=${c.key}, kind=${kind}, ${s.field}=${k(2)}의 합쳐진 텍스트(바로 앞 동작의 결과).`,
+    show ? `${k(4)} 응답을 결과 보기로 보여 준다.` : `${k(4)} 결과 보기 없이 다음으로.`,
+  ].join('\n');
+}
+function segEn(s: Seg, i: number, n: number, c: PromptCfg, kind: string, range: string, show: boolean): string {
+  const k = (j: number) => `${i * 5 + j + 1})`;
+  const line = s.end ? "'Formatted Start Date | Repeat Item Value | Formatted End Date'" : "'Formatted Start Date | Repeat Item Value'";
+  return [
+    `[${i + 1}/${n} ${s.en}]`,
+    `${k(0)} Find Health Samples: ${s.en}, Start Date in the ${range}, oldest first, no limit (no source filter).`,
+    `${k(1)} Repeat with Each: format the Repeat Item's Start Date${s.end ? ' and End Date' : ''} as ISO 8601 including time (if possible), and make the text ${line}. Use the Repeat Item's value as is.`,
+    `${k(2)} Combine the Repeat Results with New Lines.`,
+    `${k(3)} Right after that, Get Contents of URL ${c.url}, Method POST, Request Body JSON: op=health, key=${c.key}, kind=${kind}, ${s.field}=the combined text from step ${i * 5 + 3} (the output of the action right before).`,
+    show ? `${k(4)} Show the response with Show Result.` : `${k(4)} No Show Result, continue.`,
+  ].join('\n');
+}
+const HEAD_KO = '변수 설정 동작은 쓰지 말고, 각 동작은 바로 앞 동작의 결과를 쓰게 해 줘. 순서대로:';
+const HEAD_EN = 'Do not use any Set Variable actions; each action must use the output of the action right before it. Steps in order:';
+
 function ko(id: PromptId, c: PromptCfg): string {
-  if (id === 'A') return [
-    `'${NAME.A.ko}'라는 단축어를 만들어 줘. 순서대로:`,
-    `1) 건강 샘플 찾기: 종류 심박수, 시작 날짜가 최근 4시간 이내, 소스는 Apple Watch, 시작 날짜 오래된 순으로 정렬, 제한 없음.`,
-    `2) 찾은 각 샘플마다 반복: '시작 날짜 | 값' 형식의 텍스트 한 줄을 만들어. 시작 날짜는 ISO 8601 형식(시간 포함), 값은 단위 없이 숫자만. 반복 결과를 줄바꿈으로 결합해서 변수 '심박'에 저장.`,
-    `3) 건강 샘플 찾기: 종류 활동 에너지, 시작 날짜가 최근 4시간 이내, 시작 날짜 오래된 순. 각 샘플마다 '시작 날짜 | 값 | 종료 날짜' 한 줄(날짜는 ISO 8601, 시간 포함)을 만들어 줄바꿈으로 결합해 변수 '에너지'에 저장.`,
-    `4) URL의 콘텐츠 가져오기: URL ${c.url}, 방법 POST, 요청 본문 JSON, 필드는 op = health, key = ${c.key}, kind = workout, hr = 변수 '심박', energy = 변수 '에너지' (모두 텍스트).`,
-    `5) 받은 응답을 결과 보기로 보여 줘.`,
-  ].join('\n');
-  if (id === 'B') return [
-    `'${NAME.B.ko}'라는 단축어를 만들어 줘. 순서대로:`,
-    `1) 건강 샘플 찾기: 심박수, 시작 날짜가 최근 1일 이내, 시작 날짜 오래된 순. 각 샘플마다 '시작 날짜 | 값' 한 줄(날짜는 ISO 8601, 시간 포함, 값은 단위 없이 숫자만)을 만들어 줄바꿈으로 결합해 변수 '심박'에 저장.`,
-    `2) 활동 에너지도 최근 1일, 각 샘플마다 '시작 날짜 | 값 | 종료 날짜' 한 줄로 결합해 변수 '에너지'에 저장.`,
-    `3) 수면 분석 최근 1일, 각 샘플마다 '시작 날짜 | 값 | 종료 날짜' 한 줄(값은 수면 단계)로 결합해 변수 '수면'에 저장.`,
-    `4) 안정 시 심박수 최근 1일, '시작 날짜 | 값' 줄로 결합해 변수 '안정심박'에 저장.`,
-    `5) 심박 변이도 최근 1일, '시작 날짜 | 값' 줄로 결합해 변수 'HRV'에 저장.`,
-    `6) URL의 콘텐츠 가져오기: URL ${c.url}, 방법 POST, 요청 본문 JSON, 필드는 op = health, key = ${c.key}, kind = daily, hr = '심박', energy = '에너지', sleep = '수면', rhr = '안정심박', hrv = 'HRV' (모두 텍스트).`,
-    `7) 받은 응답을 결과 보기로 보여 줘.`,
-  ].join('\n');
+  if (id === 'A') return [`'${NAME.A.ko}' 단축어를 만들어 줘. ${HEAD_KO}`, ...SEG_A.map((s, i) => segKo(s, i, SEG_A.length, c, 'workout', '최근 4시간', i === SEG_A.length - 1))].join('\n');
+  if (id === 'B') return [`'${NAME.B.ko}' 단축어를 만들어 줘. ${HEAD_KO}`, ...SEG_B.map((s, i) => segKo(s, i, SEG_B.length, c, 'daily', '최근 1일', i === SEG_B.length - 1))].join('\n');
   return [
     `개인용 자동화 두 개를 만들어 줘.`,
     `1) Apple Watch에서 운동이 끝나면 '${NAME.A.ko}' 단축어를 실행. 실행 전에 묻지 않고 바로 실행, 실행 시 알림 끄기.`,
@@ -43,24 +73,8 @@ function ko(id: PromptId, c: PromptCfg): string {
 }
 
 function en(id: PromptId, c: PromptCfg): string {
-  if (id === 'A') return [
-    `Create a shortcut named '${NAME.A.en}'. Steps in order:`,
-    `1) Find Health Samples where Type is Heart Rate, Start Date is in the last 4 hours, Source is Apple Watch, sorted by Start Date oldest first, no limit.`,
-    `2) Repeat with each sample: make a text line 'Start Date | Value', with Start Date formatted as ISO 8601 including time and Value as a number only, without unit. Combine the repeat results with new lines and save to variable 'hr'.`,
-    `3) Find Health Samples where Type is Active Energy, Start Date in the last 4 hours, oldest first. For each sample make a line 'Start Date | Value | End Date' (ISO 8601 dates with time), combine with new lines and save to variable 'energy'.`,
-    `4) Get Contents of URL ${c.url} with Method POST and Request Body JSON with fields op = health, key = ${c.key}, kind = workout, hr = variable 'hr', energy = variable 'energy' (all as text).`,
-    `5) Show the response with Show Result.`,
-  ].join('\n');
-  if (id === 'B') return [
-    `Create a shortcut named '${NAME.B.en}'. Steps in order:`,
-    `1) Find Health Samples of Heart Rate with Start Date in the last 1 day, oldest first. For each sample make a line 'Start Date | Value' (ISO 8601 with time, Value as a number only without unit), combine with new lines and save to variable 'hr'.`,
-    `2) Same for Active Energy in the last 1 day, lines 'Start Date | Value | End Date', save to variable 'energy'.`,
-    `3) Same for Sleep Analysis in the last 1 day, lines 'Start Date | Value | End Date' where Value is the sleep stage, save to variable 'sleep'.`,
-    `4) Same for Resting Heart Rate in the last 1 day, lines 'Start Date | Value', save to variable 'rhr'.`,
-    `5) Same for Heart Rate Variability in the last 1 day, lines 'Start Date | Value', save to variable 'hrv'.`,
-    `6) Get Contents of URL ${c.url} with Method POST and Request Body JSON with fields op = health, key = ${c.key}, kind = daily, hr, energy, sleep, rhr, hrv from the variables above (all as text).`,
-    `7) Show the response with Show Result.`,
-  ].join('\n');
+  if (id === 'A') return [`Create a shortcut named '${NAME.A.en}'. ${HEAD_EN}`, ...SEG_A.map((s, i) => segEn(s, i, SEG_A.length, c, 'workout', 'last 4 hours', i === SEG_A.length - 1))].join('\n');
+  if (id === 'B') return [`Create a shortcut named '${NAME.B.en}'. ${HEAD_EN}`, ...SEG_B.map((s, i) => segEn(s, i, SEG_B.length, c, 'daily', 'last 1 day', i === SEG_B.length - 1))].join('\n');
   return [
     `Create two personal automations.`,
     `1) When an Apple Watch workout ends, run the shortcut '${NAME.A.en}'. Run immediately without asking, notify when run off.`,

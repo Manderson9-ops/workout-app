@@ -4,7 +4,7 @@
  * - 하루: 어젯밤 수면(잠든 시간 합), 안정 심박, HRV (참고용 · 회복 계산에는 안 씀)
  */
 import type { Workout } from './session';
-import { kstDay, kstDayStart } from './healthIngest';
+import { kstDay, kstDayStart, kcalNoOverlap, enIntervals } from './healthIngest';
 
 export interface HealthRow { id: string; type: string; day?: string; t0?: number; p?: number[]; seg?: number[]; rhr?: number; hrv?: number; hrvN?: number; sleepMin?: number; rx?: string; [k: string]: unknown }
 export interface WorkoutWatch { avg?: number; max?: number; n: number; kcal?: number }
@@ -39,24 +39,16 @@ export function workoutHeart(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: re
   return n ? { avg: Math.round(sum / n), max, n } : { n: 0 };
 }
 
-/** 운동 시간과 겹치는 활동 에너지 합 (kcal, 겹친 비율만큼). 없으면 undefined */
+/** 운동 시간과 겹치는 활동 에너지 합 (kcal, 소스 겹침 정리: 시간 조각마다 가장 큰 kcal/초, 검토 E1). 없으면 undefined */
 export function activeKcal(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: readonly HealthRow[], nowMs = Date.now()): number | undefined {
   const a = Date.parse(w.startedAt), b = w.endedAt ? Date.parse(w.endedAt) : nowMs;
   if (!(b > a)) return undefined;
   const m = byId(rows);
-  let total = 0, any = false;
+  const iv: [number, number, number][] = [];
   // 샘플이 전날에서 시작해 걸칠 수 있어 하루 앞도 봄
-  for (const day of daysBetween(a - DAY_MS, b)) {
-    const r = m.get(`en-${day}`);
-    if (!r || !Array.isArray(r.p) || typeof r.t0 !== 'number') continue;
-    for (let i = 0; i + 2 < r.p.length; i += 3) {
-      const s = r.t0 + r.p[i]! * 1000, dur = r.p[i + 1]! * 1000, kcal = r.p[i + 2]! / 10;
-      if (dur <= 0) { if (s >= a && s <= b) { total += kcal; any = true; } continue; }
-      const ov = Math.min(b, s + dur) - Math.max(a, s);
-      if (ov > 0) { total += kcal * (ov / dur); any = true; }
-    }
-  }
-  return any ? Math.round(total) : undefined;
+  for (const day of daysBetween(a - DAY_MS, b)) for (const x of enIntervals(m.get(`en-${day}`))) iv.push(x);
+  const k = kcalNoOverlap(iv, a, b);
+  return k === undefined ? undefined : Math.round(k);
 }
 
 /** 서버가 저장한 운동별 요약(ws-운동ID, D-059) → 화면 값 */
