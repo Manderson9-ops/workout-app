@@ -1133,9 +1133,12 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
 });
 
 test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 그대로, 지우기는 지움 표시', async ({ page }) => {
-  // 앱이 연 저장소를 닫고 지운 뒤, 0.3.0(v3)과 같은 구조로 직접 만들어 기록을 넣음
+  // 앱이 연 저장소를 닫고 지운 뒤, 0.3.0(v3)과 같은 구조로 직접 만들어 기록을 넣음.
+  // 앱 화면에서 하면 앱(Dexie)이 지운 직후 저장소를 v6(60)으로 다시 열어 v3(30) 열기가 VersionError 로 실패할 수 있음 (D-058 검토 T1, 전체 실행 때만 나던 경쟁)
+  // → 앱이 없는 같은 출처 파일(version.json)로 옮겨 앱 연결을 끊고, 지우기가 끝날 때(onsuccess)까지 기다림
+  await page.goto('./version.json');
   await page.evaluate(async () => {
-    await new Promise<void>((res) => { const r = indexedDB.deleteDatabase('workout-app'); r.onsuccess = () => res(); r.onerror = () => res(); r.onblocked = () => res(); });
+    await new Promise<void>((res, rej) => { const r = indexedDB.deleteDatabase('workout-app'); r.onsuccess = () => res(); r.onerror = () => rej(r.error); });
     await new Promise<void>((res, rej) => {
       const o = indexedDB.open('workout-app', 30);
       o.onupgradeneeded = () => {
@@ -1158,7 +1161,7 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
       o.onerror = () => rej(o.error);
     });
   });
-  await page.reload();
+  await page.goto('./#/');
   await expect(page.getByRole('heading', { name: '예전 루틴' })).toBeVisible();
   await page.getByRole('link', { name: '설정' }).click();
   await expect(page.getByRole('button', { name: '상급' })).toHaveAttribute('aria-pressed', 'true');
@@ -2802,7 +2805,12 @@ test.describe('D-058 애플워치 연동', () => {
     const st = page.getByTestId('watch-status');
     await expect(st).toContainText('심박');
     await expect(st).toContainText('마지막으로 받음');
-    await expect(st).toContainText('최근 7일 3개');
+    await expect(st).toContainText('최근 7일 받은 기록 3번');
+    await expect(page.getByTestId('watch-delay')).toContainText('심박은 몇 분~몇 시간 늦게 들어올 수 있어요');
+    await expect(page.getByTestId('watch-key-warn')).toContainText('공유');
+    // 이름 칸이 세로로 갈라지지 않음 (한 줄 높이)
+    const lab = st.locator('.watch-row > span').first();
+    expect((await lab.boundingBox())!.height).toBeLessThan(30);
     await checkScreen(page, '94-watch-status');
   });
 });

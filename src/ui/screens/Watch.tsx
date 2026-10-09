@@ -40,10 +40,11 @@ export function WatchScreen({ s }: { s: AppState }) {
         ) : status.map((x) => (
           <div class="watch-row small" key={x.kind}>
             <span>{x.label}</span>
-            <span class="sub">{x.lastRx ? `마지막으로 받음 ${when(x.lastRx)} · 최근 7일 ${Math.round(x.recent).toLocaleString()}개` : '아직 없음'}</span>
+            <span class="sub">{x.lastRx ? `마지막으로 받음 ${when(x.lastRx)} · 최근 7일 받은 기록 ${Math.round(x.recent).toLocaleString()}번` : '아직 없음'}</span>
           </div>
         ))}
         {canary && typeof canary.at === 'string' && <p class="sub small">연결 시험 기록: {when(canary.at)}</p>}
+        <p class="sub small" data-testid="watch-delay">심박은 몇 분~몇 시간 늦게 들어올 수 있어요. 아이폰이 잠겨 있으면 건강 기록을 읽지 못해 운동 직후 보내기가 0건일 수 있는데, 밤 23시 "하루 건강 보내기"가 최근 24시간 심박·에너지를 다시 보내 그날 운동 카드에 채워져요.</p>
       </section>
 
       <section class="card" aria-label="단축어에 넣을 주소와 키">
@@ -58,6 +59,7 @@ export function WatchScreen({ s }: { s: AppState }) {
             {msg && <p class="sub small" role="status">{msg}</p>}
           </>
         ) : <p class="small">먼저 설정 → 동기화·백업에서 "PC ↔ 폰 동기화"(또는 PC로 자동 보내기)를 연결하세요. 같은 주소·키를 써요.</p>}
+        <p class="rec-note small" role="note" data-testid="watch-key-warn"><Icon name="lock" size={18} /><span>단축어 안에 키가 들어가요. 이 단축어는 다른 사람에게 <b>공유하거나 화면을 캡처해 보내지 마세요</b>. 공유했다면 키를 바꾸세요: PC에서 Apps Script 편집기 → setup 실행 → 새 설정.txt 를 모든 기기 앱(설정 → 동기화)에 다시 연결 → 단축어의 key 값도 새로</span></p>
       </section>
 
       <section class="card" aria-label="단축어 만들기 요약">

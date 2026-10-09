@@ -5,11 +5,14 @@ import { parseDate, parseNumber, parseStage, parseLines, ingestHealth, readHealt
 import type { HState } from '../src/core/healthIngest';
 import { workoutHeart, activeKcal, watchFor, watchLine, lastNight, nightLine, watchStatus, hm } from '../src/core/health';
 import type { HealthRow } from '../src/core/health';
-import { emptyState, handleSync } from '../src/core/syncMerge';
+import { emptyState, handleSync, replaceState } from '../src/core/syncMerge';
+import { SYNC_TABLES } from '../src/core/syncStamp';
+import { parseBackup as parseBackupV095 } from './fixtures/backup_v0_9_5';
 import type { ServerState } from '../src/core/syncMerge';
 import { WorkoutDB, exportAll, importAll } from '../src/db/db';
 import { makeBackup, parseBackup } from '../src/core/backup';
 import { Clock, memoryClockStore } from '../src/core/hlc';
+import { planToRoutine } from '../src/core/session';
 
 const NOW = Date.parse('2026-10-08T14:00:00+09:00');
 const iso = (s: string) => Date.parse(s);
@@ -232,3 +235,46 @@ describe('D-058 앱 계산: 운동 심박·칼로리, 어젯밤', () => {
     expect(s.find((x) => x.kind === 'sleep')!.recent).toBe(0);
   });
 });
+
+describe('D-058 검토 G3: 킬로줄·숫자 수면 값', () => {
+  it('활동 에너지 kJ·킬로줄 → kcal (÷4.184), kcal 는 그대로', () => {
+    const r = parseLines('energy', ['2026-10-08T11:00:00+09:00 | 418.4 kJ', '2026-10-08T11:01:00+09:00 | 41.84 킬로줄', '2026-10-08T11:02:00+09:00 | 10 kcal', '2026-10-08T11:03:00+09:00 | 1,046 kJ'].join('\n'), NOW);
+    expect(r.samples.map((s) => s.v)).toEqual([100, 10, 10, 250]);
+  });
+  it('수면 값이 숫자(0~5, HealthKit 수면 분석)면 단계로: 0 침대 1 잠 2 깨어 3 코어 4 깊은 5 렘, 그 밖 숫자는 건너뜀', () => {
+    const line = (v: string) => `2026-10-08T01:00:00+09:00 | ${v} | 2026-10-08T02:00:00+09:00`;
+    const r = parseLines('sleep', ['0', '1', '2', '3', '4', '5', '7'].map(line).join('\n'), NOW);
+    expect(r.samples.map((s) => s.stage)).toEqual([5, 0, 4, 1, 2, 3]);
+    expect(r.skipped).toBe(1);
+    // 글 단계가 있으면 글이 먼저
+    expect(parseLines('sleep', '2026-10-08T01:00:00+09:00 | 3 | 2026-10-08T02:00:00+09:00 | 깊은 수면', NOW).samples[0]!.stage).toBe(2);
+  });
+});
+
+describe('D-058 검토 T2: 바꾸기 뒤 health 유지 · 옛 앱이 새 백업 읽기', () => {
+  it('앱의 "서버까지 이 백업으로 바꾸기"(앱이 아는 표만) 뒤에도 health 는 남고, 새 앱은 epoch 가 바뀌어 전체(health 포함)를 다시 받음', () => {
+    const s0 = emptyState();
+    ingestHealth(s0 as unknown as HState, { kind: 'daily', hr: '2026-10-08T11:00:00+09:00 | 70' }, NOW);
+    s0.recs['routines/r1'] = { table: 'routines', id: 'r1', data: { id: 'r1', name: '옛' }, hlc: '1', dev: 'A', rev: ++s0.rev };
+    const s1 = replaceState(s0, [{ table: 'routines', id: 'r2', data: { id: 'r2', name: '백업' }, hlc: '2', dev: 'A', rev: 1 }], [...SYNC_TABLES]);
+    expect(Object.keys(s1.recs).sort()).toEqual(['health/hr-2026-10-08', 'routines/r2']);
+    expect(s1.epoch).toBe(s0.epoch + 1);
+    const r = handleSync(s1, { op: 'sync', schema: 1, epoch: s0.epoch, since: s0.rev, muts: [], healthSince: s0.rev }, NOW);
+    expect(r.ok && r.full).toBe(true);
+    expect(r.ok && r.health!.map((x) => x.id)).toEqual(['hr-2026-10-08']);
+    expect(r.ok && r.changes.map((x) => x.id)).toEqual(['r2']);
+  });
+  it('0.9.5 앱의 parseBackup(5d1f175 그대로) 이 health 칸이 든 새 백업을 읽음 (health 는 무시)', async () => {
+    const db = new WorkoutDB(`bkold-${Math.random()}`, { clock: new Clock(memoryClockStore()), deviceId: () => 'A' });
+    await db.health.put({ id: 'hr-2026-10-08', type: 'hr', day: '2026-10-08', t0: kstDayStart('2026-10-08'), p: [41040, 121] });
+    await db.routines.put(planToRoutine('r1', '등', '2026-10-08T01:00:00.000Z', [{ kind: 'single', items: [{ exerciseId: 'a', name: 'A', part: '등', sets: 3, reps: 8, grade: 'S', gradeSource: 'VIDEO', estimated: false, substituted: false, locked: false, why: '', rank: 0 }], restSec: 90, timeSec: 0 }], 900));
+    const text = JSON.stringify(makeBackup(await exportAll(db), '0.9.6-preview', new Date(NOW).toISOString()));
+    expect(JSON.parse(text).data.health).toHaveLength(1);
+    const old = parseBackupV095(text);
+    expect(old.ok ? 'ok' : old.error).toBe('ok');
+    expect(parseBackup(text).ok).toBe(true);
+    expect(old.ok && old.file.data.routines.map((r) => r.id)).toEqual(['r1']);
+    db.close();
+  });
+});
+

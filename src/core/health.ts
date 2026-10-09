@@ -16,7 +16,9 @@ function daysBetween(a: number, b: number): string[] {
   for (let d = kstDayStart(kstDay(a)); d <= b; d += DAY_MS) out.push(kstDay(d));
   return out;
 }
-const byId = (rows: readonly HealthRow[]) => new Map(rows.map((r) => [r.id, r]));
+/** 행 ID 표 (같은 배열이면 한 번만 만듦: 기록 탭은 1초마다 다시 그림, D-058 검토 G4) */
+const idxCache = new WeakMap<readonly HealthRow[], Map<string, HealthRow>>();
+const byId = (rows: readonly HealthRow[]) => { let m = idxCache.get(rows); if (!m) { m = new Map(rows.map((r) => [r.id, r])); idxCache.set(rows, m); } return m; };
 
 /** 운동 시간 안 심박 (startedAt~endedAt, 끝이 없으면 지금까지) */
 export function workoutHeart(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: readonly HealthRow[], nowMs = Date.now()): { avg?: number; max?: number; n: number } {

@@ -88,6 +88,12 @@ export function parseNumber(text: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/** 단축어가 수면 '값'을 숫자로 줄 때 (HKCategoryValueSleepAnalysis): 0 침대, 1 잠(구분 없음), 2 깨어 있음, 3 코어, 4 깊은, 5 렘 → 이 앱 번호 */
+export const HK_SLEEP: Record<number, SleepStage> = { 0: 5, 1: 0, 2: 4, 3: 1, 4: 2, 5: 3 };
+/** 킬로줄 표시 (kJ, 킬로줄) → kcal 로 바꿈 */
+export const KJ_PER_KCAL = 4.184;
+const isKJ = (s: string) => /kj\b|킬로줄/i.test(s);
+
 /** 수면 단계 글 → 번호 (못 읽으면 undefined) */
 export function parseStage(text: string): SleepStage | undefined {
   const s = String(text || '').toLowerCase();
@@ -121,11 +127,15 @@ export function parseLines(field: HealthField, text: unknown, nowMs: number): { 
         const st = parseStage(p);
         if (st !== undefined && stage === undefined) stage = st;
       }
+      // 단계 글이 없으면 숫자 값(0~5, HealthKit 수면 분석 값)으로
+      if (stage === undefined) { const num = parts.slice(1).find((p) => /^\d$/.test(p) && HK_SLEEP[Number(p)] !== undefined); if (num !== undefined) stage = HK_SLEEP[Number(num)]; }
       if (end === undefined || end <= t || end - t > DAY_MS || stage === undefined) { skipped++; continue; }
       samples.push({ t, v: 0, end, stage });
       continue;
     }
-    const v = parseNumber(parts[1] || '');
+    const raw = parseNumber(parts[1] || '');
+    // 활동 에너지를 킬로줄로 쓰는 아이폰 설정이면 kcal 로 바꿈 (D-058 검토 G3)
+    const v = raw !== undefined && field === 'energy' && isKJ(parts[1] || '') ? Math.round((raw / KJ_PER_KCAL) * 10) / 10 : raw;
     const r = RANGE[field];
     if (v === undefined || v < r[0] || v > r[1]) { skipped++; continue; }
     let end: number | undefined;

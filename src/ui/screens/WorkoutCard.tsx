@@ -2,7 +2,7 @@
  * 끝낸 운동 카드 (D-054 기록 탭 카드, D-055: 홈 "최근 운동"도 같은 카드). 누르면 기록 상세.
  * 홈에서는 오른쪽 위에 ⋯(수정·삭제) 버튼이 붙음 (WorkoutCardWithMenu).
  */
-import { useState } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import type { Exercise } from '../../core/types';
 import { PARTS } from '../../core/types';
 import type { Workout } from '../../core/session';
@@ -25,7 +25,7 @@ export const timeLabel = (iso: string) => {
 
 export function WorkoutCard({ x, w, byId, hidden, withMenu, health }: { x: WorkoutSummary; w: Workout | undefined; byId: Map<string, Exercise>; hidden: boolean; withMenu?: boolean; health?: readonly HealthRow[] }) {
   // D-058: 애플워치 기록이 이 운동 시간과 겹칠 때만 한 줄
-  const watch = w && health?.length ? watchFor(w, health) : undefined;
+  const watch = useMemo(() => (w && health?.length ? watchFor(w, health) : undefined), [w, health]);
   const diff = x.plannedSec ? x.durationSec - x.plannedSec : undefined;
   const lines = w ? exerciseLines(w, byId) : [];
   const parts = PARTS.filter((p) => (x.parts[p] ?? 0) > 0);

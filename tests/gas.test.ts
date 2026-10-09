@@ -201,3 +201,38 @@ describe('D-058 연결 시험 스크립트 (tools/watch_canary.mjs) 를 가짜 �
   });
 });
 
+describe('D-058 검토 G4: 기록 파일에 120일 health(약 3MB) 가 있을 때 서버 시간', () => {
+  it('파일 읽기·합치기·쓰기 시간 (옛 앱 동기화 + health 받기)', async () => {
+    const g = gas(); const A = dev('A');
+    await A.routines.put(R('r1', '루틴')); await syncOnce(A, g.transport);
+    const file = g.dbFolder()!.files.find((f) => f.name === 'records.json')!;
+    const state = JSON.parse(file.content);
+    const now = Date.now();
+    const day = (ms: number) => { const d = new Date(ms + 9 * 3600000); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
+    for (let i = 0; i < 120; i++) {
+      const dd = day(now - i * 86400000); const p = dd.split('-').map(Number); const t0 = Date.UTC(p[0]!, p[1]! - 1, p[2]!) - 9 * 3600000;
+      const hr: number[] = []; for (let k = 0; k < 1000; k++) hr.push(k * 80, 60 + (k % 90));
+      const en: number[] = []; for (let k = 0; k < 1440; k++) en.push(k * 60, 60, 12 + (k % 30));
+      for (const [id, data] of [[`hr-${dd}`, { id: `hr-${dd}`, type: 'hr', day: dd, t0, p: hr }], [`en-${dd}`, { id: `en-${dd}`, type: 'energy', day: dd, t0, p: en }]] as const) {
+        state.rev += 1; state.recs[`health/${id}`] = { table: 'health', id, data, hlc: '0', dev: 'srv', rev: state.rev };
+      }
+    }
+    file.content = JSON.stringify(state);
+    g.props.set('HINT', 'pending');
+    const mb = file.content.length / 1024 / 1024;
+    const t1 = performance.now();
+    const old = g.post({ key: g.key, op: 'sync', schema: 1, epoch: state.epoch, since: 0, muts: [{ mid: 'x:routines:r9:1', table: 'routines', id: 'r9', hlc: '0000000000001.0000.x', dev: 'x', data: { id: 'r9', name: 'n', blocks: [] } }] });
+    const syncMs = performance.now() - t1;
+    const t2 = performance.now();
+    const ing = g.post({ op: 'health', key: g.key, kind: 'workout', hr: Array.from({ length: 720 }, (_, k) => `${new Date(now - k * 5000).toISOString()} | 120`).join('\n') });
+    const ingMs = performance.now() - t2;
+    console.log(`G4 측정: 기록 파일 ${mb.toFixed(2)}MB · 옛 앱 동기화(읽기+합치기+쓰기) ${syncMs.toFixed(0)}ms · health 받기(720줄) ${ingMs.toFixed(0)}ms`);
+    expect(old.ok).toBe(true);
+    expect(old.changes.some((c: { table: string }) => c.table === 'health')).toBe(false);
+    expect(ing.ok).toBe(true);
+    expect(mb).toBeGreaterThan(2.5);
+    expect(syncMs).toBeLessThan(5000);
+    expect(ingMs).toBeLessThan(5000);
+  });
+});
+
