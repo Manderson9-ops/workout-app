@@ -41,11 +41,12 @@ function DescribeCard({ cfg }: { cfg: { url: string; key: string } | null | unde
         <button aria-pressed={lang === 'en'} class={`chip${lang === 'en' ? ' on' : ''}`} onClick={() => setLang('en')}>English</button>
       </div>
       {!cfg && <p class="small">먼저 설정 → 동기화·백업에서 "PC ↔ 폰 동기화"(또는 PC로 자동 보내기)를 연결하세요. 복사하는 글에 같은 주소·키가 들어가요.</p>}
+      <p class="rec-note small" role="note" data-testid="describe-delete-old"><Icon name="info" size={18} /><span>예전에 만든 "{NAME.A[lang]}"·"{NAME.B[lang]}" 단축어가 있으면 <b>먼저 지우세요</b>. 새 설명은 변수 없이 자료 종류마다(심박 → 보내기, 에너지 → 보내기 …) 따로 보내는 모양이에요.</span></p>
       <ol class="watch-steps">
         <li>단축어 A "{NAME.A[lang]}" 설명을 복사
           <div class="row wrap">{btn('A', '단축어 A 설명 복사')}</div></li>
-        <li>단축어 앱 → 오른쪽 위 ＋ → 설명 칸을 길게 눌러 <b>붙여넣기</b> → 완료(보내기). 만들어지면 ▶ 실행 → 건강 접근 <b>허용</b></li>
-        <li>결과에 "ok":true 가 나오면 단축어 B "{NAME.B[lang]}"도 같은 방법으로, 그다음 자동화(운동이 끝날 때·매일 {DAILY_TIME})도 같은 방법으로
+        <li>단축어 앱 → 오른쪽 위 ＋ → 설명 칸을 길게 눌러 <b>붙여넣기</b> → 완료(보내기). 만들어지면 순서가 "건강 샘플 찾기 → 반복 → 새로운 줄로 합치기 → URL의 콘텐츠 가져오기"(심박 한 번, 활동 에너지 한 번)인지 보고 ▶ 실행 → 건강 접근 <b>허용</b></li>
+        <li>결과 2개(심박·에너지)에 "ok":true 와 "received" 숫자가 나오면 단축어 B "{NAME.B[lang]}"도 같은 방법으로, 그다음 자동화(운동이 끝날 때·매일 {DAILY_TIME})도 같은 방법으로
           <div class="row wrap">{btn('B', '단축어 B 설명 복사')}{btn('auto', '자동화 설명 복사')}</div></li>
       </ol>
       {fail && <p class="small" role="alert">{fail}</p>}
@@ -117,9 +118,8 @@ export function WatchScreen({ s }: { s: AppState }) {
       <section class="card" aria-label="단축어 만들기 요약">
         <div class="card-head"><span class="card-title grow">손으로 만들기 (대안)</span></div>
         <ol class="watch-steps">
-          <li>단축어 앱 → 새 단축어 "운동 기록 보내기": 건강 샘플 찾기(심박, 최근 4시간, 소스 = 내 Apple Watch) → 반복(각 항목) 안에 텍스트 "시작 날짜(ISO 8601) | 값" → 텍스트 결합(새로운 줄)</li>
-          <li>같은 방법으로 활동 에너지(시작 날짜 | 값 | 종료 날짜)</li>
-          <li>URL의 콘텐츠 가져오기: 위 주소, 방법 POST, 요청 본문 JSON — op=health, key=키, kind=workout, hr, energy</li>
+          <li>단축어 앱 → 새 단축어 "운동 기록 보내기": 건강 샘플 찾기(심박수, 최근 4시간, 오래된 순) → 반복(각 항목) 안에 텍스트 "시작일(ISO 8601) | 값" → 텍스트 결합(새로운 줄) → 바로 다음 URL의 콘텐츠 가져오기: 위 주소, POST, JSON — op=health, key=키, kind=workout, hr=결합된 텍스트</li>
+          <li>그 아래에 같은 방법으로 활동 에너지(시작일 | 값 | 종료일) → 또 한 번 URL 보내기, energy=결합된 텍스트 (변수 없이 종류마다 따로 보내요)</li>
           <li>"하루 건강 보내기"(최근 24시간 + 수면 분석·안정 시 심박수·심박 변이도)도 같은 방법, kind=daily</li>
           <li>자동화 → 개인용 자동화: "Apple Watch 운동" 끝날 때 → 운동 기록 보내기 (즉시 실행, 실행 시 알림 끄기) / "특정 시간" 매일 {DAILY_TIME} → 하루 건강 보내기</li>
         </ol>
@@ -134,7 +134,7 @@ export function WatchScreen({ s }: { s: AppState }) {
           <li>위 "심박 · 마지막으로 받음" 시각이 방금으로 바뀌면 성공. 운동 직후라면 그 운동 카드에 평균 심박이 보여요</li>
         </ol>
         <button class="primary" disabled={!cfg || sync.phase === 'syncing'} onClick={() => void syncNow('watch').then(() => setMsg('받아 왔어요'))}><Icon name="sync" size={18} />지금 받기</button>
-        <p class="sub small">건강 기록은 내 구글 드라이브의 동기화 파일(sync/db)에만 저장돼요. 공개 저장소·진단 기록에는 들어가지 않아요. 단축어가 보낸 응답에 "received" 0이면 날짜 형식이나 소스 거르기를 확인하세요.</p>
+        <p class="sub small">건강 기록은 내 구글 드라이브의 동기화 파일(sync/db)에만 저장돼요. 공개 저장소·진단 기록에는 들어가지 않아요. 단축어가 보낸 응답에 "received" 0이면 함께 온 "hint" 안내(빈 값·날짜 형식 등)를 확인하세요.</p>
       </section>
     </main>
   );

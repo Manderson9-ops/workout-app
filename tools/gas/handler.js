@@ -138,12 +138,30 @@ function health_(j) {
     var state = loaded.state;
     snapshot_(folder, loaded.file);
     var r = HealthIngest.ingestHealth(state, j, Date.now());
+    debugShape_(folder, j, r);
     if (!r.ok) return r;
     setHint_('pending');
     save_(folder, loaded.file, state);
     setHint_(state.epoch + ':' + state.rev);
     return r;
   } finally { lock.releaseLock(); }
+}
+
+/** 진단: 단축어가 보낸 모양을 드라이브 db 폴더 health_debug.json 에 남김 (키는 빼고, 값은 앞 400자만). 마지막 1건만 덮어씀 */
+function debugShape_(folder, j, r) {
+  try {
+    var shape = {};
+    Object.keys(j || {}).forEach(function (k) {
+      if (/^key$/i.test(k)) return;
+      var v = j[k];
+      var t = Array.isArray(v) ? 'array' : typeof v;
+      var s = typeof v === 'string' ? v : JSON.stringify(v);
+      shape[k] = { type: t, length: s ? s.length : 0, head: s ? s.slice(0, 400) : '' };
+    });
+    var text = JSON.stringify({ at: new Date().toISOString(), result: { ok: r && r.ok, received: r && r.received, skipped: r && r.skipped, hint: r && r.hint }, fields: shape }, null, 2);
+    var it = folder.getFilesByName('health_debug.json');
+    if (it.hasNext()) it.next().setContent(text); else folder.createFile('health_debug.json', text, 'application/json');
+  } catch (e) { /* 진단 실패는 무시 */ }
 }
 
 /** "서버까지 이 백업으로 바꾸기": 먼저 스냅숏, epoch를 올려 다른 기기가 다시 받게 (rev는 줄지 않음) */

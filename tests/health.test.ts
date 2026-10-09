@@ -376,3 +376,41 @@ describe('D-059 운동별 애플워치 요약 (ws-운동ID, 지우지 않음)', 
   });
 });
 
+describe('D-061 실기기 뒤 설명 글: 자료 종류마다 따로 보냄 (칸 하나짜리 POST)', () => {
+  const rec = (s: HState, id: string) => s.recs['health/' + id];
+  it('하루 보내기를 5번(심박·에너지·수면·안정 심박·HRV) 나눠 보내도 하루 요약(dy-)이 합쳐짐, 다른 칸을 지우지 않음', () => {
+    const s: HState = { rev: 1, recs: {} };
+    const r1 = ingestHealth(s, { op: 'health', kind: 'daily', hr: '2026-10-08T07:00:00+09:00 | 60' }, NOW);
+    expect(r1).toMatchObject({ ok: true, received: 1, skipped: 0, stored: ['hr-2026-10-08'] });
+    expect('hint' in r1).toBe(false); // 다른 칸이 없어도 hint 없음
+    expect(ingestHealth(s, { kind: 'daily', energy: '2026-10-08T07:00:00+09:00 | 3 | 2026-10-08T07:05:00+09:00' }, NOW)).toMatchObject({ ok: true, received: 1, stored: ['en-2026-10-08'] });
+    const sl = ['2026-10-07T23:30:00+09:00 | 코어 | 2026-10-08T02:00:00+09:00', '2026-10-08T02:00:00+09:00 | 깊은 수면 | 2026-10-08T03:00:00+09:00', '2026-10-08T03:00:00+09:00 | 깨어 있음 | 2026-10-08T03:10:00+09:00'].join('\n');
+    expect(ingestHealth(s, { kind: 'daily', sleep: sl }, NOW)).toMatchObject({ ok: true, received: 3, stored: ['dy-2026-10-08', 'sl-2026-10-08'] });
+    expect(rec(s, 'dy-2026-10-08')!.data).toMatchObject({ sleepMin: 210 });
+    ingestHealth(s, { kind: 'daily', rhr: '2026-10-08T08:00:00+09:00 | 55' }, NOW);
+    ingestHealth(s, { kind: 'daily', hrv: '2026-10-08T06:00:00+09:00 | 40\n2026-10-08T06:30:00+09:00 | 50' }, NOW);
+    expect(rec(s, 'dy-2026-10-08')!.data).toMatchObject({ sleepMin: 210, rhr: 55, hrv: 45, hrvN: 2 });
+    // 원본도 그대로
+    expect((rec(s, 'hr-2026-10-08')!.data!.p as number[]).length).toBe(2);
+    expect((rec(s, 'en-2026-10-08')!.data!.p as number[]).length).toBe(3);
+    // 같은 수면을 다시 보내도 (자동화가 두 번 돌아도) 합이 늘지 않음
+    ingestHealth(s, { kind: 'daily', sleep: sl }, NOW);
+    expect(rec(s, 'dy-2026-10-08')!.data!.sleepMin).toBe(210);
+  });
+  it('운동 보내기를 심박·에너지 따로: 에너지만 온 POST 도 받고, 운동별 요약(ws)은 두 번째에 kcal 이 더해짐', () => {
+    const s: HState = { rev: 1, recs: {} };
+    s.recs['workouts/w1'] = { table: 'workouts', id: 'w1', data: { id: 'w1', startedAt: '2026-10-08T10:00:00+09:00', endedAt: '2026-10-08T11:00:00+09:00', blocks: [] }, hlc: '1', dev: 'A', rev: 1 };
+    ingestHealth(s, { kind: 'workout', hr: '2026-10-08T10:10:00+09:00 | 120\n2026-10-08T10:20:00+09:00 | 140' }, NOW);
+    expect(rec(s, 'ws-w1')!.data).toMatchObject({ hrAvg: 130, hrN: 2 });
+    expect(rec(s, 'ws-w1')!.data!.kcal).toBeUndefined();
+    const r = ingestHealth(s, { kind: 'workout', energy: '2026-10-08T10:00:00+09:00 | 30 | 2026-10-08T10:30:00+09:00' }, NOW);
+    expect(r).toMatchObject({ ok: true, received: 1, skipped: 0 });
+    expect(rec(s, 'ws-w1')!.data).toMatchObject({ hrAvg: 130, hrN: 2, kcal: 30 });
+  });
+  it('빈 칸 하나만 온 POST (실기기 첫 결과: hr="" ) → 받은 것 0, 안내 hint', () => {
+    const r = ingestHealth({ rev: 1, recs: {} }, { op: 'health', kind: 'workout', hr: '' }, NOW);
+    expect(r).toMatchObject({ ok: true, received: 0, skipped: 0 });
+    expect((r as { hint: string }).hint).toContain('보낸 값이 비어 있어요');
+  });
+});
+

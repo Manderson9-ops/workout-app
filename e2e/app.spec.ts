@@ -1967,13 +1967,13 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
   await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.7 바뀐 점'); // 0.9.8(3줄) + 0.9.7(2줄) + 0.9.6(3줄) = 8줄
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.8 바뀐 점'); // 0.9.9(3줄) + 0.9.8(3줄) + 0.9.7(2줄) = 8줄
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
   await checkScreen(page, '65-whats-new');
   await sheet.getByRole('button', { name: /^모두 보기/ }).click();
-  await expect(sheet.locator('.wn-lines li')).toHaveCount(36); // 0.9.8 3줄 + 0.9.7 2줄 + 0.9.6·0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(39); // 0.9.9·0.9.8 3줄 + 0.9.7 2줄 + 0.9.6·0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
@@ -2008,7 +2008,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.8(3줄) + 0.9.7(2줄) + 0.9.6(3줄) = 8줄, 0.9.5 이전은 [모두 보기]
+  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.9(3줄) + 0.9.8(3줄) + 0.9.7(2줄) = 8줄, 0.9.6 이전은 [모두 보기]
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   const gear = page.getByRole('link', { name: '설정', exact: true });
@@ -2823,6 +2823,7 @@ test.describe('D-058 애플워치 연동', () => {
     await expect(card).toContainText('iOS 27: 설명으로 만들기 (가장 쉬움)');
     await expect(card.getByTestId('describe-untested')).toHaveText('실기기 시험 전');
     await expect(card.getByTestId('describe-ai-note')).toContainText('Apple Intelligence가 처리해요');
+    await expect(card.getByTestId('describe-delete-old')).toContainText('먼저 지우세요');
     // 클립보드 대신 기록 (두 엔진 공통)
     await page.evaluate(() => { const w = window as Window & { __copied?: string[] }; w.__copied = []; Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (x: string) => { w.__copied!.push(x); } } }); });
     const copied = () => page.evaluate(() => (window as Window & { __copied?: string[] }).__copied ?? []);
@@ -2833,7 +2834,7 @@ test.describe('D-058 애플워치 연동', () => {
     const c1 = await copied();
     expect(c1).toHaveLength(3);
     expect(c1[0]).toContain(KEY); expect(c1[0]).toContain(URL_); expect(c1[0]).toContain("'운동 기록 보내기'");
-    expect(c1[1]).toContain('kind = daily'); expect(c1[1]).toContain(KEY);
+    expect(c1[1]).toContain('kind=daily'); expect(c1[1]).toContain(KEY);
     expect(c1[2]).toContain('22:30'); expect(c1[2]).not.toContain(KEY);
     await card.getByRole('button', { name: 'English' }).click();
     await expect(card.getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
