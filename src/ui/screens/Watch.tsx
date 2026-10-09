@@ -46,7 +46,7 @@ function DescribeCard({ cfg }: { cfg: { url: string; key: string } | null | unde
         <li>단축어 A "{NAME.A[lang]}" 설명을 복사
           <div class="row wrap">{btn('A', '단축어 A 설명 복사')}</div></li>
         <li>단축어 앱 → 오른쪽 위 ＋ → 설명 칸을 길게 눌러 <b>붙여넣기</b> → 완료(보내기). 만들어지면 순서가 "건강 샘플 찾기 → 반복 → 새로운 줄로 합치기 → URL의 콘텐츠 가져오기"(심박 한 번, 활동 에너지 한 번)인지 보고 ▶ 실행 → 건강 접근 <b>허용</b></li>
-        <li>결과 2개(심박·에너지)에 "ok":true 와 "received" 숫자가 나오면 단축어 B "{NAME.B[lang]}"도 같은 방법으로, 그다음 자동화(운동이 끝날 때·매일 {DAILY_TIME})도 같은 방법으로
+        <li>마지막 결과(에너지)에 "ok":true 와 "received" 숫자가 나오면 단축어 B "{NAME.B[lang]}"도 같은 방법으로, 그다음 자동화(운동이 끝날 때·매일 {DAILY_TIME})도 같은 방법으로
           <div class="row wrap">{btn('B', '단축어 B 설명 복사')}{btn('auto', '자동화 설명 복사')}</div></li>
       </ol>
       {fail && <p class="small" role="alert">{fail}</p>}
@@ -58,7 +58,7 @@ function DescribeCard({ cfg }: { cfg: { url: string; key: string } | null | unde
         <summary class="small">복사되는 글 미리 보기 (주소·키는 자리 표시)</summary>
         {(['A', 'B', 'auto'] as PromptId[]).map((id) => <pre key={id} class="prompt-pre small" data-testid={`prompt-${id}`}>{previewPrompt(id, lang)}</pre>)}
       </details>
-      <p class="sub small">설명으로 만들기는 Apple Intelligence가 켜진 아이폰에서, 지원하는 언어로만 돼요. 한국어로 잘 안 만들어지면 English로 바꿔 복사해 보세요. 만들어진 단축어가 조금 달라도 서버가 여러 형식(목록·날짜 모양)을 읽어요. 결과에 "hint"가 나오면 그 안내를 보세요. 매일 {DAILY_TIME}은 23시보다 폰이 잠겨 있지 않을 때가 많아 고른 시각이에요 (앱 판단).</p>
+      <p class="sub small">설명으로 만들기는 Apple Intelligence가 켜진 아이폰에서, 지원하는 언어로만 돼요. 잘 안 만들어지면 아래 "손으로 만들기 (대안)"대로 만들어 주세요. 만들어진 단축어가 조금 달라도 서버가 여러 형식(목록·날짜 모양)을 읽어요. 결과에 "hint"가 나오면 그 안내를 보세요. 매일 {DAILY_TIME}은 23시보다 폰이 잠겨 있지 않을 때가 많아 고른 시각이에요 (앱 판단).</p>
     </section>
   );
 }

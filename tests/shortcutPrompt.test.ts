@@ -69,10 +69,13 @@ describe('D-061 단축어 설명 글 (iOS 27 설명으로 만들기, 실기기 �
     for (const w of ['심박수', '활동 에너지', '수면 분석', '안정 시 심박수', '심박 변이도', 'hr=', 'energy=', 'sleep=', 'rhr=', 'hrv=', '최근 1일']) expect(b).toContain(w);
     expect(buildPrompt('A', 'ko')).toContain('최근 4시간');
   });
-  it('결과 보기: A 는 보낼 때마다(2번), B 는 마지막 한 번', () => {
-    expect(count(buildPrompt('A', 'ko'), '응답을 결과 보기로 보여 준다')).toBe(2);
+  it('결과 보기: A·B 모두 맨 끝에 한 번 (마지막 응답), 반복 안 지시', () => {
+    expect(count(buildPrompt('A', 'ko'), '응답을 결과 보기로 보여 준다')).toBe(1);
+    expect(lines(buildPrompt('A', 'ko')).pop()).toContain('응답을 결과 보기로 보여 준다');
+    expect(buildPrompt('A', 'ko')).toContain('값은 반복 항목의 값 그대로');
+    expect(buildPrompt('A', 'ko')).toContain('포맷(가능하면)');
     expect(count(buildPrompt('B', 'ko'), '응답을 결과 보기로 보여 준다')).toBe(1);
-    expect(count(buildPrompt('A', 'en'), 'Show the response with Show Result')).toBe(2);
+    expect(count(buildPrompt('A', 'en'), 'Show the response with Show Result')).toBe(1);
     expect(count(buildPrompt('B', 'en'), 'Show the response with Show Result')).toBe(1);
   });
   it('글 길이 (자리 표시 기준, 보고용 상한)', () => {

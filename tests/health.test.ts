@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
-import { refreshSummary, backfillSummaries, afterWorkoutMuts, windowSummary } from '../src/core/healthIngest';
+import { refreshSummary, backfillSummaries, afterWorkoutMuts, windowSummary, kcalNoOverlap, debugShapeOf, WS_CALC_VERSION } from '../src/core/healthIngest';
 import { parseDate, parseNumber, parseStage, parseLines, ingestHealth, readHealthBody, kstDay, kstDayStart, asleepMinutes, sleepDay, RAW_KEEP_DAYS, MAX_LINES } from '../src/core/healthIngest';
 import type { HState } from '../src/core/healthIngest';
 import { workoutHeart, activeKcal, watchFor, watchLine, lastNight, nightLine, watchStatus, hm } from '../src/core/health';
@@ -411,6 +411,80 @@ describe('D-061 실기기 뒤 설명 글: 자료 종류마다 따로 보냄 (칸
     const r = ingestHealth({ rev: 1, recs: {} }, { op: 'health', kind: 'workout', hr: '' }, NOW);
     expect(r).toMatchObject({ ok: true, received: 0, skipped: 0 });
     expect((r as { hint: string }).hint).toContain('보낸 값이 비어 있어요');
+  });
+});
+
+describe('검토 E1 활동 에너지 소스 겹침 정리 (시간 조각마다 가장 큰 kcal/초 하나)', () => {
+  const M = 60000;
+  const T0 = iso('2026-10-08T21:00:00+09:00');
+  it('검토 재현: 워치 1분×30(5 kcal씩=150) + 아이폰 10분×3(40씩=120) 같은 시간 → 150 (이전 268)', () => {
+    const iv: [number, number, number][] = [];
+    for (let i = 0; i < 30; i++) iv.push([T0 + i * M, T0 + (i + 1) * M, 5]);
+    for (let i = 0; i < 3; i++) iv.push([T0 + i * 10 * M, T0 + (i + 1) * 10 * M, 40]);
+    const k = kcalNoOverlap(iv, T0, T0 + 30 * M)!;
+    expect(k).toBeCloseTo(150, 5);
+    expect(k).toBeLessThanOrEqual(Math.max(150, 120));
+    // 서버 저장 → 운동 요약·앱 계산도 같은 값
+    const s: HState = { rev: 1, recs: {} };
+    s.recs['workouts/w1'] = { table: 'workouts', id: 'w1', data: { id: 'w1', startedAt: '2026-10-08T21:00:00+09:00', endedAt: '2026-10-08T21:30:00+09:00', blocks: [] }, hlc: '1', dev: 'A', rev: 1 };
+    const isoK = (ms: number) => new Date(ms).toISOString();
+    const lines = iv.map(([a, b, kc]) => `${isoK(a)} | ${kc} | ${isoK(b)}`).join('\n');
+    ingestHealth(s, { kind: 'workout', energy: lines }, iso('2026-10-08T22:00:00+09:00'));
+    expect(s.recs['health/ws-w1']!.data).toMatchObject({ kcal: 150, kv: WS_CALC_VERSION });
+    const rows = Object.values(s.recs).filter((r) => r.table === 'health' && r.data).map((r) => r.data as HealthRow).filter((r) => r.type === 'energy');
+    expect(activeKcal({ startedAt: '2026-10-08T21:00:00+09:00', endedAt: '2026-10-08T21:30:00+09:00' }, rows)).toBe(150);
+  });
+  it('겹치지 않으면 그냥 더함, 일부 겹침은 겹친 조각만 큰 쪽, 창 밖은 비율만큼', () => {
+    expect(kcalNoOverlap([[T0, T0 + 10 * M, 10], [T0 + 10 * M, T0 + 20 * M, 20]], T0, T0 + 20 * M)).toBeCloseTo(30, 5);
+    // A 0~10분 10kcal(1/분), B 5~15분 20kcal(2/분): 0~5 A 5, 5~15 B 20 → 25
+    expect(kcalNoOverlap([[T0, T0 + 10 * M, 10], [T0 + 5 * M, T0 + 15 * M, 20]], T0, T0 + 15 * M)).toBeCloseTo(25, 5);
+    // 창이 샘플 절반만 덮음
+    expect(kcalNoOverlap([[T0, T0 + 10 * M, 10]], T0 + 5 * M, T0 + 20 * M)).toBeCloseTo(5, 5);
+    // 점 샘플: 구간에 덮이면 빼고, 아니면 더함
+    expect(kcalNoOverlap([[T0, T0 + 10 * M, 10], [T0 + 2 * M, T0 + 2 * M, 7], [T0 + 12 * M, T0 + 12 * M, 3]], T0, T0 + 20 * M)).toBeCloseTo(13, 5);
+    expect(kcalNoOverlap([], T0, T0 + M)).toBeUndefined();
+    expect(kcalNoOverlap([[T0 - 20 * M, T0 - 10 * M, 9]], T0, T0 + M)).toBeUndefined();
+  });
+  it('배포 뒤 처음: 계산 판이 낮은(옛 wsmeta) 최근 운동 요약을 다시 계산해 부푼 kcal 을 낮춤, 원본 없는 오래된 운동은 그대로', () => {
+    const NOW2 = iso('2026-10-08T22:00:00+09:00');
+    const s: HState = { rev: 1, recs: {} };
+    s.recs['workouts/w1'] = { table: 'workouts', id: 'w1', data: { id: 'w1', startedAt: '2026-10-08T21:00:00+09:00', endedAt: '2026-10-08T21:30:00+09:00', blocks: [] }, hlc: '1', dev: 'A', rev: 1 };
+    s.recs['workouts/w0'] = { table: 'workouts', id: 'w0', data: { id: 'w0', startedAt: '2026-01-01T10:00:00+09:00', endedAt: '2026-01-01T11:00:00+09:00', blocks: [] }, hlc: '1', dev: 'A', rev: 1 };
+    // 원본: 겹친 두 소스 (0.9.9 서버라면 268 로 저장됐을 것)
+    const isoK = (ms: number) => new Date(ms).toISOString();
+    const lines: string[] = [];
+    for (let i = 0; i < 30; i++) lines.push(`${isoK(T0 + i * M)} | 5 | ${isoK(T0 + (i + 1) * M)}`);
+    for (let i = 0; i < 3; i++) lines.push(`${isoK(T0 + i * 10 * M)} | 40 | ${isoK(T0 + (i + 1) * 10 * M)}`);
+    // 옛 서버가 남긴 모양을 흉내: 원본 + 부푼 요약 + 옛 wsmeta(v 없음, done)
+    const tmp: HState = { rev: 1, recs: {} };
+    ingestHealth(tmp, { kind: 'daily', energy: lines.join('\n') }, NOW2);
+    s.recs['health/en-2026-10-08'] = tmp.recs['health/en-2026-10-08']!;
+    s.recs['health/ws-w1'] = { table: 'health', id: 'ws-w1', data: { id: 'ws-w1', type: 'ws', workoutId: 'w1', startedAt: '2026-10-08T21:00:00+09:00', endedAt: '2026-10-08T21:30:00+09:00', hrN: 0, kcal: 268 }, hlc: '1', dev: 'srv', rev: 2 };
+    s.recs['health/ws-w0'] = { table: 'health', id: 'ws-w0', data: { id: 'ws-w0', type: 'ws', workoutId: 'w0', startedAt: '2026-01-01T10:00:00+09:00', endedAt: '2026-01-01T11:00:00+09:00', hrN: 50, hrAvg: 120, hrMax: 150, kcal: 300 }, hlc: '1', dev: 'srv', rev: 2 };
+    s.recs['health/wsmeta'] = { table: 'health', id: 'wsmeta', data: { id: 'wsmeta', type: 'wsmeta', done: true, after: 'w1' }, hlc: '1', dev: 'srv', rev: 3 };
+    backfillSummaries(s, NOW2);
+    expect(s.recs['health/ws-w1']!.data).toMatchObject({ kcal: 150, kv: WS_CALC_VERSION });
+    expect(s.recs['health/ws-w0']!.data).toMatchObject({ kcal: 300, hrAvg: 120 }); // 원본 없음 → 그대로
+    expect(s.recs['health/wsmeta']!.data).toMatchObject({ v: WS_CALC_VERSION, done: true });
+    const rev = s.rev;
+    expect(backfillSummaries(s, NOW2)).toBe(0); // 한 번만
+    expect(s.rev).toBe(rev);
+  });
+});
+
+describe('검토 E3 진단 파일 모양: 키 숨김', () => {
+  const KEY = 'SECRETKEY1234567890ABCDEFGH';
+  it('key·Key ·키·KEY 칸, 다른 칸 안의 서버 키 글 → [숨김], 나머지는 종류·길이·앞 400자', () => {
+    const j = { op: 'health', key: KEY, 'Key ': KEY, 키: KEY, KEY: 'x', note: `앞 ${KEY} 뒤`, hr: '2026-10-08T10:00:00+09:00 | 70', samples: { k: KEY } };
+    const d = debugShapeOf(j, { ok: true, received: 1, skipped: 0 }, KEY, '2026-10-08T00:00:00.000Z');
+    const txt = JSON.stringify(d);
+    expect(txt.includes(KEY)).toBe(false);
+    const f = d.fields as Record<string, unknown>;
+    for (const k of ['key', 'Key ', '키', 'KEY']) expect(f[k]).toBe('[숨김]');
+    expect(f.note).toMatchObject({ type: 'string', head: '앞 [숨김] 뒤' });
+    expect(f.hr).toMatchObject({ type: 'string', length: 30 });
+    expect(JSON.stringify(f.samples)).toContain('[숨김]');
+    expect(d.result).toMatchObject({ ok: true, received: 1 });
   });
 });
 

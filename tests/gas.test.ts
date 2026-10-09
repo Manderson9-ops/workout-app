@@ -277,3 +277,15 @@ describe('D-061 칸 하나짜리 POST (실제 빌드한 서버 코드)', () => {
   });
 });
 
+describe('검토 E3 진단 파일 (실제 빌드한 서버 코드)', () => {
+  it('Key·키 칸으로 보내도 health_debug.json 에 키가 없음', () => {
+    const g = gas();
+    const r = g.post({ OP: 'health', 키: g.key, Kind: 'workout', 심박: `${new Date().toISOString()} | 70`, memo: `k=${g.key}` });
+    expect(r).toMatchObject({ ok: true, received: 1 });
+    const f = g.dbFolder()!.files.find((x) => x.name === 'health_debug.json')!;
+    expect(f).toBeDefined();
+    expect(f.content.includes(g.key)).toBe(false);
+    expect(f.content).toContain('[숨김]');
+  });
+});
+

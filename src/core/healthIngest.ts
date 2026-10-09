@@ -20,7 +20,8 @@
  *  dy-YYYY-MM-DD   {type:'daily', day, rhr?, hrvP:[초,ms×10...], hrv?, hrvN?, sleepMin?}  요약은 계속 보관
  *  canary          {type:'canary', at, received, skipped}  연결 시험(tools/watch_canary.mjs): 저장 경로만 확인, 앱은 무시
  *  ws-<운동ID>     {type:'ws', workoutId, startedAt, endedAt, hrAvg?, hrMax?, hrN, kcal?, src:'watch', computedAt}  운동별 요약 (D-059, 지우지 않음)
- *  wsmeta          {type:'wsmeta', done, after}  배포 뒤 처음 받을 때 옛 운동 요약을 나눠 채우는 위치 (앱은 무시)
+ *  wsmeta          {type:'wsmeta', v, done, after}  배포 뒤 처음 받을 때 옛 운동 요약을 나눠 채우는 위치, v = 계산 판 (앱은 무시)
+ *  활동 에너지 합은 소스 겹침을 정리해 계산 (kcalNoOverlap: 시간 조각마다 가장 큰 kcal/초 하나). 심박은 5초 칸에 나중 값 하나(소스가 섞일 수 있음, 영향 작음)
  * 원본(hr·energy·sleep)은 최근 RAW_KEEP_DAYS일만 (오래된 것은 지움 표시), 요약(daily·ws)은 계속.
  */
 
@@ -276,6 +277,24 @@ export function valueText(v: unknown, depth = 0): string {
   }
   return '';
 }
+/**
+ * 진단 파일(health_debug.json)용 모양: 칸마다 종류·길이·앞 400자. 이름이 key·키(대소문자·빈칸 무시)인 칸과
+ * 서버 키와 같은 글은 "[숨김]" (검토 E3). 마지막 1건만 덮어씀 (handler)
+ */
+export function debugShapeOf(j: Record<string, unknown>, r: Record<string, unknown> | undefined, serverKey: string | null | undefined, atIso: string): Record<string, unknown> {
+  const hide = (s: string) => (serverKey && serverKey.length >= 4 ? s.split(serverKey).join('[숨김]') : s);
+  const shape: Record<string, unknown> = {};
+  for (const k of Object.keys(j || {})) {
+    const n = nk(k);
+    if (n === 'key' || n === '키') { shape[k] = '[숨김]'; continue; }
+    const v = j[k];
+    const ty = Array.isArray(v) ? 'array' : typeof v;
+    const s = typeof v === 'string' ? v : JSON.stringify(v);
+    shape[hide(k)] = { type: ty, length: s ? s.length : 0, head: s ? hide(s.slice(0, 400 + (serverKey ? serverKey.length : 0))).slice(0, 400) : '' };
+  }
+  return { at: atIso, result: { ok: r && r.ok, received: r && r.received, skipped: r && r.skipped, hint: r && r.hint }, fields: shape };
+}
+
 /** 맨 위 칸 이름만 고침 (Key·OP·Kind·키·종류 → key·op·kind, 키 앞뒤 빈칸). 동기화 요청도 지나가므로 다른 칸은 그대로 */
 export function normalizeTop(j: Record<string, unknown>): Record<string, unknown> {
   if (!j || typeof j !== 'object') return j;
@@ -389,17 +408,24 @@ export function ingestHealth(state: HState, req: HealthReq, nowMs: number): Inge
     m.set(sec, [sec, Math.round(x.v)]);
   }
   for (const [id, m] of hrMaps) { const d = touched.get(id)!; let flat = flatSorted(m); if (flat.length > 2 * MAX_DAY_POINTS) flat = flat.slice(flat.length - 2 * MAX_DAY_POINTS); d.p = flat; }
-  // 활동 에너지: [시작초, 길이초, kcal×10]
-  const enMaps = new Map<string, Map<number, number[]>>();
+  // 활동 에너지: [시작초, 길이초, kcal×10]. 같은 (시작, 길이)면 하나 (다시 보내도 늘지 않음). 시작이 같아도 길이가 다르면
+  // 다른 소스(워치 1분·아이폰 10분)라 둘 다 둠 → 합할 때 kcalNoOverlap 이 겹침 정리 (검토 E1)
+  const enMaps = new Map<string, Map<string, number[]>>();
   for (const x of parsed.energy) {
     const day = kstDay(x.t); if (day < cutoff) continue;
     const id = 'en-' + day;
     const d = get(id, () => ({ id, type: 'energy', day, t0: kstDayStart(day), p: [] }));
-    let m = enMaps.get(id); if (!m) { m = toMap(d.p, 3); enMaps.set(id, m); }
+    let m = enMaps.get(id);
+    if (!m) { m = new Map(); const a = Array.isArray(d.p) ? (d.p as number[]) : []; for (let i = 0; i + 3 <= a.length; i += 3) m.set(a[i] + ':' + a[i + 1], a.slice(i, i + 3)); enMaps.set(id, m); }
     const sec = Math.floor((x.t - (d.t0 as number)) / 1000);
-    m.set(sec, [sec, Math.max(0, Math.round(((x.end ?? x.t) - x.t) / 1000)), Math.round(x.v * 10)]);
+    const dur = Math.max(0, Math.round(((x.end ?? x.t) - x.t) / 1000));
+    m.set(sec + ':' + dur, [sec, dur, Math.round(x.v * 10)]);
   }
-  for (const [id, m] of enMaps) touched.get(id)!.p = flatSorted(m);
+  for (const [id, m] of enMaps) {
+    const rows = Array.from(m.values()).sort((a, b) => a[0]! - b[0]! || a[1]! - b[1]!);
+    const flat: number[] = []; for (const x of rows) flat.push(x[0]!, x[1]!, x[2]!);
+    touched.get(id)!.p = flat;
+  }
   // 수면: [시작, 끝(유닉스초), 단계], 같은 (시작, 단계)는 하나
   const slMaps = new Map<string, Map<string, number[]>>();
   for (const x of parsed.sleep) {
@@ -456,12 +482,51 @@ export function ingestHealth(state: HState, req: HealthReq, nowMs: number): Inge
 
 // ---------- D-059 운동별 애플워치 요약 (지우지 않음) ----------
 export const BACKFILL_CAP = 150;
+/** 운동별 요약의 계산 판 (2 = 활동 에너지 겹침 정리, 0.9.10). wsmeta.v 가 이보다 작으면 최근 운동 요약을 다시 계산 */
+export const WS_CALC_VERSION = 2;
+
+/**
+ * 활동 에너지 합 (겹침 정리, 검토 E1): 아이폰·애플워치처럼 소스가 여럿이면 같은 시간을 여러 샘플이 덮음.
+ * 건강 앱의 "한 소스 우선"을 근사해, 모든 샘플 경계로 시간을 잘게 나눈 뒤 각 조각에서 **가장 큰 kcal/초 하나만** 더함.
+ * 점 샘플(길이 0)은 어떤 구간 샘플에도 덮이지 않을 때만 더함. iv = [시작ms, 끝ms, kcal] (점은 시작=끝)
+ */
+export function kcalNoOverlap(iv: readonly (readonly [number, number, number])[], a: number, b: number): number | undefined {
+  const spans: [number, number, number][] = [];
+  const points: [number, number][] = [];
+  let any = false;
+  for (const [s, e, k] of iv) {
+    if (e <= s) { if (s >= a && s <= b) { points.push([s, k]); any = true; } continue; }
+    const x = Math.max(a, s), y = Math.min(b, e);
+    if (y <= x) continue;
+    spans.push([x, y, k / (e - s)]); any = true;
+  }
+  if (!any) return undefined;
+  const cuts = Array.from(new Set(spans.flatMap((p) => [p[0], p[1]]))).sort((p, q) => p - q);
+  spans.sort((p, q) => p[0] - q[0]);
+  let total = 0;
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const x = cuts[i]!, y = cuts[i + 1]!;
+    let best = 0;
+    for (const sp of spans) { if (sp[0] > x) break; if (sp[1] >= y && sp[2] > best) best = sp[2]; }
+    total += best * (y - x);
+  }
+  for (const [s, k] of points) if (!spans.some((sp) => sp[0] <= s && sp[1] >= s)) total += k;
+  return total;
+}
+/** en- 기록(p:[시작초, 길이초, kcal×10 ...]) → kcalNoOverlap 입력 */
+export function enIntervals(row: { t0?: unknown; p?: unknown } | undefined): [number, number, number][] {
+  if (!row || !Array.isArray(row.p) || typeof row.t0 !== 'number') return [];
+  const p = row.p as number[]; const t0 = row.t0 as number; const out: [number, number, number][] = [];
+  for (let i = 0; i + 2 < p.length; i += 3) { const s = t0 + p[i]! * 1000; out.push([s, s + p[i + 1]! * 1000, p[i + 2]! / 10]); }
+  return out;
+}
 export interface RowLike { t0?: unknown; p?: unknown; [k: string]: unknown }
 export interface WindowSummary { hrAvg?: number; hrMax?: number; hrN: number; kcal?: number }
 /** 운동 시간 [a,b] 안 심박(평균·최고·개수)과 겹친 활동 에너지(겹친 비율만큼). 행은 ID 로 찾음 (hr-날짜, en-날짜) */
 export function windowSummary(get: (id: string) => RowLike | undefined, a: number, b: number): WindowSummary {
   if (!(b > a)) return { hrN: 0 };
-  let sum = 0, n = 0, max = 0, kcal = 0, anyK = false;
+  let sum = 0, n = 0, max = 0;
+  const iv: [number, number, number][] = [];
   for (let d = kstDayStart(kstDay(a - DAY_MS)); d <= b; d += DAY_MS) {
     const day = kstDay(d);
     const hr = get('hr-' + day);
@@ -469,20 +534,12 @@ export function windowSummary(get: (id: string) => RowLike | undefined, a: numbe
       const p = hr.p as number[];
       for (let i = 0; i + 1 < p.length; i += 2) { const t = hr.t0 + p[i]! * 1000; if (t < a || t > b) continue; const v = p[i + 1]!; sum += v; n++; if (v > max) max = v; }
     }
-    const en = get('en-' + day);
-    if (en && Array.isArray(en.p) && typeof en.t0 === 'number') {
-      const p = en.p as number[];
-      for (let i = 0; i + 2 < p.length; i += 3) {
-        const s = en.t0 + p[i]! * 1000, dur = p[i + 1]! * 1000, k = p[i + 2]! / 10;
-        if (dur <= 0) { if (s >= a && s <= b) { kcal += k; anyK = true; } continue; }
-        const ov = Math.min(b, s + dur) - Math.max(a, s);
-        if (ov > 0) { kcal += k * (ov / dur); anyK = true; }
-      }
-    }
+    for (const x of enIntervals(get('en-' + day))) iv.push(x);
   }
+  const kcal = kcalNoOverlap(iv, a, b);
   const out: WindowSummary = { hrN: n };
   if (n) { out.hrAvg = Math.round(sum / n); out.hrMax = max; }
-  if (anyK) out.kcal = Math.round(kcal);
+  if (kcal !== undefined) out.kcal = Math.round(kcal);
   return out;
 }
 interface WLike { id: string; startedAt: string; endedAt: string }
@@ -533,9 +590,9 @@ export function refreshSummary(state: HState, w: WLike, nowMs: number): boolean 
   let hrN = s.hrN, hrAvg = s.hrAvg, hrMax = s.hrMax, kcal = s.kcal;
   if (sameTime && hrN < oldN) { hrN = oldN; hrAvg = old!.hrAvg as number | undefined; hrMax = old!.hrMax as number | undefined; }
   let stale = false;
-  if (oldK !== undefined && (kcal === undefined || kcal < oldK) && (sameTime || kcal === undefined) && rawMissing(state, 'en-', a, b, DAY_MS)) { kcal = oldK; stale = !sameTime; }
-  if (sameTime && hrN === oldN && hrAvg === old!.hrAvg && hrMax === old!.hrMax && kcal === oldK && !old!.stale) return false;
-  const data: Record<string, unknown> = { ...base, hrN };
+  if (oldK !== undefined && (kcal === undefined || kcal < oldK) && (sameTime || kcal === undefined) && rawMissing(state, 'en-', a, b, 0)) { kcal = oldK; stale = !sameTime; } // 운동 날의 원본이 없을 때만 (전날 기록이 없는 건 정상, 검토 E1 다시 계산이 막히지 않게)
+  if (sameTime && hrN === oldN && hrAvg === old!.hrAvg && hrMax === old!.hrMax && kcal === oldK && !old!.stale && old!.kv === WS_CALC_VERSION) return false;
+  const data: Record<string, unknown> = { ...base, hrN, kv: WS_CALC_VERSION };
   if (hrAvg !== undefined) { data.hrAvg = hrAvg; data.hrMax = hrMax; }
   if (kcal !== undefined) data.kcal = kcal;
   if (stale) data.stale = true;
@@ -551,15 +608,18 @@ export function refreshSummaries(state: HState, pick: (w: WLike) => boolean, now
 /** 배포 뒤 처음: 옛 운동 요약을 BACKFILL_CAP 개씩 (Apps Script 실행 시간 안에서), 다음 요청에 이어서 */
 export function backfillSummaries(state: HState, nowMs: number, cap = BACKFILL_CAP): number {
   const meta = cur(state, 'wsmeta');
-  if (meta && meta.done) return 0;
-  const after = meta && typeof meta.after === 'string' ? (meta.after as string) : '';
-  const list = finishedWorkouts(state).filter((w) => w.id > after);
+  const same = !!meta && meta.v === WS_CALC_VERSION;
+  if (meta && meta.done && same) return 0;
+  // 계산 판이 바뀌면(예: 0.9.10 에너지 겹침 정리) 처음부터 다시. 원본이 남아 있는 최근 운동만 (그보다 오래된 것은 다시 셀 수 없음)
+  const after = same && typeof meta!.after === 'string' ? (meta!.after as string) : '';
+  const since = nowMs - (RAW_KEEP_DAYS + 1) * DAY_MS;
+  const list = finishedWorkouts(state).filter((w) => w.id > after && Date.parse(w.endedAt) >= since);
   if (!list.length && !meta) return 0; // 할 일이 없으면 표시도 쓰지 않음 (운동은 올라올 때 afterWorkoutMuts 가 채움)
   const batch = list.slice(0, cap);
   let n = 0;
   for (const w of batch) if (refreshSummary(state, w, nowMs)) n++;
   const done = list.length <= cap;
-  put(state, 'wsmeta', { id: 'wsmeta', type: 'wsmeta', done, after: batch.length ? batch[batch.length - 1]!.id : after, at: new Date(nowMs).toISOString() }, nowMs);
+  put(state, 'wsmeta', { id: 'wsmeta', type: 'wsmeta', v: WS_CALC_VERSION, done, after: batch.length ? batch[batch.length - 1]!.id : after, at: new Date(nowMs).toISOString() }, nowMs);
   return n;
 }
 /**
