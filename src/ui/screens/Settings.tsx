@@ -168,6 +168,11 @@ export function SettingsScreen({ s }: { s: AppState }) {
       </SetGroup>
 
       <SetGroup title="동기화·백업" card={false}>
+        <a class="card row-link" href="#/settings/watch" aria-label={`애플워치 연동${s.health.some((r) => r.type !== 'canary') ? ', 받은 기록 있음' : ''}`}>
+          <Icon name="watch" />
+          <span class="grow"><span class="rl-title">애플워치 연동</span><span class="sub rl-sub">{s.health.some((r) => r.type !== 'canary') ? '받은 기록 있음 · 상태 보기' : '아이폰 단축어로 심박·수면 보내기'}</span></span>
+          <Icon name="chevron" size={18} class="card-more" />
+        </a>
         <div class="card set-card"><BackupSection s={s} /></div>
         <div class="card set-card"><DiagSection s={s} part="send" /></div>
       </SetGroup>

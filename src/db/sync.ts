@@ -5,6 +5,7 @@
  * 대원칙: 서버가 최종 판정, 기기는 따른다. 기기는 "아직 서버가 확정 안 한 내 수정(dirty)"만 지킨다.
  */
 import type { WorkoutDB } from './db';
+import type { HealthRow } from '../core/health';
 import { SYNC_TABLES, PK, FIELD_TABLES, LOCAL_SETTINGS_FIELDS, syncedFields, withoutStamp, tombKey } from '../core/syncStamp';
 import type { SyncStamp, SyncTable, Tomb } from '../core/syncStamp';
 import { SYNC_SCHEMA } from '../core/syncMerge';
@@ -12,7 +13,8 @@ import type { Mutation, ServerRec, SyncRequest, SyncResponse } from '../core/syn
 
 export const CHUNK = 300;
 export type Transport = (req: SyncRequest) => Promise<SyncResponse | { ok: false; error: string }>;
-export interface SyncKv { since: number; epoch: number; stash?: Mutation[]; connected?: boolean; lastOkAt?: string }
+/** healthSince (D-058): 애플워치 기록을 어디까지 받았나 (서버 rev). 따로 두는 까닭: 옛 앱 시절 since 는 이미 앞서 있어도 health 는 처음부터 받아야 함 */
+export interface SyncKv { since: number; epoch: number; stash?: Mutation[]; connected?: boolean; lastOkAt?: string; healthSince?: number }
 
 type Row = Record<string, unknown> & { _s?: SyncStamp };
 
@@ -75,6 +77,24 @@ async function localStamp(db: WorkoutDB, table: string, id: string): Promise<Syn
   const r = (await db.table(table).get(id)) as Row | undefined;
   if (r?._s) return r._s;
   return (await db.tombs.get(tombKey(table, id)))?._s;
+}
+
+/**
+ * 애플워치 기록 반영 (D-058): 서버가 health 를 보냈을 때만 (새 서버). 전체 다시 받기면 비우고 다시 채움.
+ * health 표는 기기가 고치지 않으므로 동기화 표시·지움 표시 없이 그대로 씀
+ */
+async function applyHealth(db: WorkoutDB, resp: SyncResponse): Promise<number> {
+  const list = resp.health;
+  if (!Array.isArray(list)) return 0;
+  await db.transaction('rw', [db.health, db.kv], async () => {
+    if (resp.full) await db.health.clear();
+    for (const c of list) {
+      if (c.deleted) await db.health.delete(c.id);
+      else if (c.data) await db.health.put({ ...(c.data as Record<string, unknown>), id: c.id } as HealthRow);
+    }
+    await setKv(db, { healthSince: resp.rev });
+  });
+  return list.length;
 }
 
 export interface ApplyResult { confirmed: number; received: number; stashed?: number; full?: boolean; dedup?: number }
@@ -170,8 +190,9 @@ function sortObj(v: unknown): unknown {
  * ③ 같은 ID인데 내용이 다른 건 비교 ④ 사용자가 고름 ⑤ 그다음 이 기기 기록 올리기
  */
 export async function firstConnect(db: WorkoutDB, transport: Transport, choose: ChooseFn = keepLocal): Promise<ApplyResult & { conflicts: number; error?: string }> {
-  const pull = await transport({ op: 'sync', schema: SYNC_SCHEMA, epoch: 0, since: 0, muts: [] });
+  const pull = await transport({ op: 'sync', schema: SYNC_SCHEMA, epoch: 0, since: 0, muts: [], healthSince: 0 });
   if (!pull.ok) return { confirmed: 0, received: 0, conflicts: 0, error: pull.error };
+  const healthGot = await applyHealth(db, pull);
   const conflicts: Conflict[] = [];
   for (const c of pull.changes) {
     if (c.deleted || !(SYNC_TABLES as readonly string[]).includes(c.table)) continue;
@@ -215,7 +236,7 @@ export async function firstConnect(db: WorkoutDB, transport: Transport, choose: 
     await setKv(db, { since: pull.rev, epoch: pull.epoch, connected: true });
   });
   const push = await syncOnce(db, transport);
-  return { ...push, received: push.received + received, conflicts: conflicts.length, ...(dupIds.length ? { dedup: dupIds.length } : {}) };
+  return { ...push, received: push.received + received + healthGot, conflicts: conflicts.length, ...(dupIds.length ? { dedup: dupIds.length } : {}) };
 }
 
 /** 한 번 동기화: 보낼 것 보내고 받은 것 반영. 처음이면 firstConnect */
@@ -228,10 +249,10 @@ export async function syncOnce(db: WorkoutDB, transport: Transport, choose?: Cho
     const kv = await getKv(db);
     const all = await collectMutations(db);
     const muts = all.slice(0, CHUNK);
-    const resp = await transport({ op: 'sync', schema: SYNC_SCHEMA, epoch: kv.epoch, since: kv.since, muts });
+    const resp = await transport({ op: 'sync', schema: SYNC_SCHEMA, epoch: kv.epoch, since: kv.since, muts, healthSince: kv.healthSince ?? 0 });
     if (!resp.ok) return { ...total, error: resp.error };
     const r = await applyResponse(db, resp, muts);
-    total.confirmed += r.confirmed; total.received += r.received;
+    total.confirmed += r.confirmed; total.received += r.received + await applyHealth(db, resp);
     if (r.full) return { ...total, full: true, stashed: r.stashed };
     if (all.length <= CHUNK || r.confirmed === 0) break;
   }

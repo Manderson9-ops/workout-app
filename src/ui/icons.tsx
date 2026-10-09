@@ -3,7 +3,7 @@
  * 탭·메뉴·원형 버튼에서 이모지 대신 쓴다. 장식용이라 화면 읽기에서는 숨김(aria-hidden) — 이름은 버튼·링크에 붙인다.
  */
 export type IconName = 'home' | 'plan' | 'workout' | 'stats' | 'exercises' | 'settings' | 'feedback' | 'more' | 'back' | 'play' | 'chevron' | 'close' | 'info' | 'sparkle'
-  | 'swap' | 'skip' | 'undo' | 'note' | 'plate' | 'check' | 'star' | 'starLine' | 'plus' | 'minus' | 'alert' | 'sync' | 'video' | 'lock' | 'clock';
+  | 'swap' | 'skip' | 'undo' | 'note' | 'plate' | 'check' | 'star' | 'starLine' | 'plus' | 'minus' | 'alert' | 'sync' | 'video' | 'lock' | 'clock' | 'heart' | 'moon' | 'watch';
 
 const P: Record<IconName, string[]> = {
   // 집
@@ -37,6 +37,9 @@ const P: Record<IconName, string[]> = {
   plate: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z'],
   check: ['M5 12.5 10 17.5 19.5 7'],
   clock: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z', 'M12 7.5V12l3 2'],
+  heart: ['M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z'],
+  moon: ['M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'],
+  watch: ['M8 6h8v12H8z', 'M9 6l1-3h4l1 3', 'M9 18l1 3h4l1-3', 'M12 10v2.5l1.5 1'],
   star: ['M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'],
   starLine: ['M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'],
   // 주의: 세모 + 느낌표

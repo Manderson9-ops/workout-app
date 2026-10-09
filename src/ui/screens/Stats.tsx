@@ -12,6 +12,7 @@ import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
 import { recoveryByPart } from '../../core/recovery';
 import { RecoveryCard } from './RecoveryCard';
+import { lastNight, watchFor, watchLine } from '../../core/health';
 import { LineChart, BarChart, PairBarChart } from '../charts';
 import { NumInput, Empty, Metric, Delta, Sheet } from '../components';
 import { ScreenHeader } from '../header';
@@ -185,6 +186,8 @@ export function Stats({ s }: { s: AppState }) {
   // D-057 회복 상태: 분 단위로 다시 계산 (앱은 1초마다 다시 그림)
   const nowMin = Math.floor(Date.now() / 60_000);
   const rec = useMemo(() => recoveryByPart(done, byId, Date.now()), [done, byId, nowMin]);
+  // D-058 어젯밤 수면·안정 심박·HRV (애플워치, 참고. 회복 계산에는 안 씀)
+  const night = useMemo(() => lastNight(s.health, Date.now()), [s.health, nowMin]);
   const [ym, setYm] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() + 1 }; });
   const [day, setDay] = useState<number | null>(null);
   const hiddenSet = new Set(s.settings.homeHidden ?? []); // 홈에서 뺀 기록 표시 (D-040)
@@ -196,7 +199,7 @@ export function Stats({ s }: { s: AppState }) {
   const dateOf = (n: number) => `${ym.y}-${String(ym.m).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
   const dayList = day ? sorted.filter((w) => localDate(w.startedAt) === dateOf(day)).map(sumOf).filter((x) => x.workSets > 0) : [];
   const move = (d: number) => { setDay(null); setYm(({ y, m }) => { const n = new Date(y, m - 1 + d, 1); return { y: n.getFullYear(), m: n.getMonth() + 1 }; }); };
-  const card = (x: WorkoutSummary) => <WorkoutCard key={x.id} x={x} w={wById.get(x.id)} byId={byId} hidden={hiddenSet.has(x.id)} />;
+  const card = (x: WorkoutSummary) => <WorkoutCard key={x.id} x={x} w={wById.get(x.id)} byId={byId} hidden={hiddenSet.has(x.id)} health={s.health} />;
   // 최근 30개를 주별로 묶음
   const groups: { ws: string; items: WorkoutSummary[] }[] = [];
   for (const x of take(30)) {
@@ -211,7 +214,7 @@ export function Stats({ s }: { s: AppState }) {
     <main>
       <ScreenHeader title="기록" />
       <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
-      <RecoveryCard m={rec} />
+      <RecoveryCard m={rec} night={night} />
       <PartSets done={done} byId={byId} today={today} />
 
       <h2>운동 기록</h2>
@@ -335,6 +338,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
       {w.editedAt && <p class="sub small">{new Date(w.editedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}에 고침</p>}
       {w.memo && <p class="memo-line"><Icon name="note" size={16} />{w.memo}</p>}
+      {(() => { const x = watchFor(w, s.health); return x ? <p class="wc-watch detail" data-testid="detail-watch"><Icon name="heart" size={16} />{watchLine(x)}</p> : null; })()}
       {(s.settings.homeHidden ?? []).includes(w.id) && (
         <div class="card row between" role="note" aria-label={`${HOME_HIDDEN_LABEL} 기록`}>
           <span class="small">홈 "최근 운동"에서 뺀 기록이에요. 기록·통계에는 그대로예요.</span>

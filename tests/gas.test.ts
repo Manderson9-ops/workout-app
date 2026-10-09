@@ -113,3 +113,91 @@ describe('Apps Script 서버 코드 (실제 빌드 결과를 가짜 구글 서�
     expect(g.inbox.files.map((f) => f.name)[0]).toMatch(/^auto-ph-/);
   });
 });
+
+describe('D-058 애플워치 받기 (실제 빌드한 서버 코드)', () => {
+  const now = Date.now();
+  const at = (minAgo: number) => new Date(now - minAgo * 60000).toISOString();
+  const hrText = [at(30) + ' | 120 count/min', at(29) + ' | 131 count/min', '아무 글'].join('\n');
+  it('키가 틀리면 거절, JSON 으로 받기, 같은 샘플을 또 보내도 한 번만', () => {
+    const g = gas();
+    expect(g.post({ op: 'health', key: 'x', kind: 'workout', hr: hrText })).toEqual({ ok: false, error: 'bad_key' });
+    const r = g.post({ op: 'health', key: g.key, kind: 'workout', samples: { hr: hrText } });
+    expect(r).toMatchObject({ ok: true, received: 2, skipped: 1 });
+    expect(r.stored[0]).toMatch(/^hr-\d{4}-\d{2}-\d{2}$/);
+    g.post({ op: 'health', key: g.key, kind: 'workout', samples: { hr: hrText } });
+    const recs = JSON.parse(g.dbFolder()!.files.find((x) => x.name === 'records.json')!.content).recs as Record<string, { data: { p: number[] } }>;
+    const hr = Object.entries(recs).filter(([k]) => k.startsWith('health/hr-'));
+    expect(hr.reduce((a, [, v]) => a + v.data.p.length / 2, 0)).toBe(2);
+  });
+  it('폼(a=b&c=d)으로도 받음 (단축어 "양식"), 너무 많으면 거절', () => {
+    const g = gas();
+    const form = 'key=' + encodeURIComponent(g.key) + '&kind=daily&hr=' + encodeURIComponent(hrText);
+    const r = JSON.parse(g.api.doPost({ postData: { contents: form } }).text);
+    expect(r).toMatchObject({ ok: true, received: 2 });
+    const big = Array.from({ length: 30001 }, () => at(10) + ' | 100').join('\n');
+    expect(g.post({ op: 'health', key: g.key, kind: 'daily', hr: big })).toEqual({ ok: false, error: 'too_many' });
+    expect(JSON.parse(g.api.doPost({ postData: { contents: 'hello' } }).text)).toEqual({ ok: false, error: 'not_json' });
+  });
+  it('새 앱은 다음 동기화로 health 를 받고, 옛 앱(healthSince 없음)은 받지 않음, 이미 받은 위치면 힌트로 바로 답함', async () => {
+    const g = gas(); const A = dev('A');
+    await A.routines.put(R('r1', '루틴')); await syncOnce(A, g.transport);
+    g.post({ op: 'health', key: g.key, kind: 'workout', hr: hrText });
+    const r = await syncOnce(A, g.transport);
+    expect(r.received).toBeGreaterThan(0);
+    const rows = await A.health.toArray();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.type).toBe('hr');
+    const kv = await getKv(A);
+    expect(kv.healthSince).toBe(kv.since);
+    // 옛 앱 흉내: healthSince 없이
+    const old = g.post({ key: g.key, op: 'sync', schema: 1, epoch: 0, since: 0, muts: [] });
+    expect(old.changes.some((c: { table: string }) => c.table === 'health')).toBe(false);
+    expect(old.health).toBeUndefined();
+    // 바뀐 것 없음 + 다 받음 → 드라이브를 읽지 않음
+    const reads = g.reads();
+    await syncOnce(A, g.transport);
+    expect(g.reads()).toBe(reads);
+  });
+  it('옛 앱 시절에 since 가 이미 앞선 기기(업그레이드)도 healthSince 0 부터 한 번 받음 (힌트가 맞아도 읽음)', async () => {
+    const g = gas(); const A = dev('A');
+    g.post({ op: 'health', key: g.key, kind: 'workout', hr: hrText });
+    await A.routines.put(R('r1', '루틴')); await syncOnce(A, g.transport);
+    await A.health.clear();
+    const { setKv } = await import('../src/db/sync');
+    await setKv(A, { healthSince: undefined });
+    await syncOnce(A, g.transport);
+    expect(await A.health.count()).toBe(1);
+  });
+  it('연결 시험(canary): canary 기록 하나만, 다음 동기화로 앱에 옴 (앱 화면은 무시)', async () => {
+    const g = gas(); const A = dev('A');
+    expect(g.post({ op: 'health', key: g.key, kind: 'canary', hr: hrText })).toEqual({ ok: true, received: 2, skipped: 1, stored: ['canary'] });
+    await syncOnce(A, g.transport);
+    expect((await A.health.get('canary'))?.type).toBe('canary');
+  });
+});
+
+describe('D-058 연결 시험 스크립트 (tools/watch_canary.mjs) 를 가짜 서버에 실제로 돌림', () => {
+  it('보내기 → 받기(canary 방금) → 옛 앱 경로에 health 없음 → 통과, 키는 출력에 없음', async () => {
+    const { createServer } = await import('node:http');
+    const { execFile } = await import('node:child_process');
+    const { mkdtempSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const g = gas();
+    const srv = createServer((req, res) => { let b = ''; req.on('data', (d) => { b += d; }); req.on('end', () => { res.setHeader('Content-Type', 'application/json'); res.end(g.api.doPost({ postData: { contents: b } }).text); }); });
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+    const port = (srv.address() as { port: number }).port;
+    const dir = mkdtempSync(join(tmpdir(), 'canary-'));
+    const cfg = join(dir, '설정.txt');
+    writeFileSync(cfg, `설명 줄\nhttp://127.0.0.1:${port}/macros/s/TEST/exec#${g.key}\n`);
+    const out = await new Promise<{ code: number; text: string }>((resolve) => {
+      execFile(process.execPath, ['tools/watch_canary.mjs', cfg], { timeout: 20000 }, (err, stdout, stderr) => resolve({ code: err ? (err as { code?: number }).code ?? 1 : 0, text: stdout + stderr }));
+    });
+    srv.close();
+    expect(out.text).toContain('결과: 통과');
+    expect(out.text).toContain('옛 앱 경로(healthSince 없음): health 0건');
+    expect(out.text).not.toContain(g.key);
+    expect(out.code).toBe(0);
+  });
+});
+

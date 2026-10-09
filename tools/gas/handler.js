@@ -17,9 +17,12 @@ function doPost(e) {
   try {
     var body = (e && e.postData && e.postData.contents) || '';
     if (body.length > MAX_SYNC_CHARS) return out_({ ok: false, error: 'too_big' });
-    var j; try { j = JSON.parse(body); } catch (x) { return out_({ ok: false, error: 'not_json' }); }
+    var j; try { j = JSON.parse(body); } catch (x) { j = null; }
+    // D-058: 아이폰 단축어는 폼(a=b&c=d)으로 보낼 수도 있음 → 애플워치 받기만 폼 허용
+    if (!j) { j = HealthIngest.readHealthBody(body, (e && e.parameter) || undefined); if (!j || (j.op !== 'health' && !j.kind)) return out_({ ok: false, error: 'not_json' }); }
     var key = PropertiesService.getScriptProperties().getProperty('KEY');
     if (!key || !j || j.key !== key) return out_({ ok: false, error: 'bad_key' });
+    if (j.op === 'health' || (!j.op && j.kind && !j.file)) return out_(health_(j));
     if (j.op === 'sync') return out_(sync_(j));
     if (j.op === 'replace') return out_(replace_(j));
     if (j.ping) return out_({ ok: true, ping: true });
@@ -94,7 +97,9 @@ function setHint_(v) { PropertiesService.getScriptProperties().setProperty('HINT
 
 function sync_(req) {
   var h = hint_();
-  if ((!req.muts || !req.muts.length) && h && h !== 'pending' && h === req.epoch + ':' + req.since) {
+  // healthSince 가 since 보다 뒤처져 있으면(애플워치 기록을 아직 다 못 받음) 바로 답하지 않고 읽음 (D-058)
+  var healthBehind = typeof req.healthSince === 'number' && req.healthSince !== req.since;
+  if ((!req.muts || !req.muts.length) && !healthBehind && h && h !== 'pending' && h === req.epoch + ':' + req.since) {
     return { ok: true, epoch: req.epoch, rev: req.since, results: [], changes: [] };
   }
   var lock = LockService.getScriptLock();
@@ -112,6 +117,24 @@ function sync_(req) {
     }
     setHint_(state.epoch + ':' + state.rev);
     return resp;
+  } finally { lock.releaseLock(); }
+}
+
+/** D-058 애플워치(아이폰 단축어) 받기: 같은 키, 기록 파일의 health 표에 씀 → 다음 동기화로 앱에 전달 */
+function health_(j) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return { ok: false, error: 'busy' };
+  try {
+    var folder = dbFolder_();
+    var loaded = load_(folder);
+    var state = loaded.state;
+    snapshot_(folder, loaded.file);
+    var r = HealthIngest.ingestHealth(state, j, Date.now());
+    if (!r.ok) return r;
+    setHint_('pending');
+    save_(folder, loaded.file, state);
+    setHint_(state.epoch + ':' + state.rev);
+    return r;
   } finally { lock.releaseLock(); }
 }
 

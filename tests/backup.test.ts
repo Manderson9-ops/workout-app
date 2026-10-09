@@ -89,7 +89,7 @@ describe('저장소 버전 올리기 (v1 → v2): 기존 기록 유지 (AGENTS �
     expect((await v2.settings.get('main'))?.level).toBe('초보');
     await v2.bodyweight.put({ date: '2026-09-30', kg: 70 });
     expect(await v2.bodyweight.count()).toBe(1);
-    expect(v2.verno).toBe(5);
+    expect(v2.verno).toBe(6); // v6 = 애플워치 표 (D-058)
     v2.close();
   });
 });
