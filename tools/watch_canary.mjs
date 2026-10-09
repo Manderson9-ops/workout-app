@@ -3,7 +3,7 @@
 // - 설정.txt 의 "주소#키" 를 읽음. 키는 화면에 쓰지 않음 (끝 4자리만)
 // - kind:"canary" 로 심박 3줄을 보냄 → 서버는 읽기만 하고 health 표에 'canary' 기록 하나만 씀 (실제 심박 기록에는 안 섞임, 앱 화면은 무시)
 // - 앱과 같은 읽기 경로(op:sync, healthSince:0)로 다시 받아 canary 기록이 방금 시각인지 확인
-// - 옛 앱 경로(healthSince 없음)에는 health 기록이 하나도 없어야 함 (호환 확인)
+// - 옛 앱 경로(healthSince 없음)에는 health 기록(운동별 요약 ws 포함)이 하나도 없어야 함 (호환 확인)
 import { readFileSync } from 'node:fs';
 
 async function main() {
@@ -32,7 +32,10 @@ async function main() {
   const at = canary?.data?.at ? Date.parse(canary.data.at) : 0;
   const fresh = at >= t0 - 5000 && at <= Date.now() + 5000;
   console.log(`받기: health ${full.health?.length ?? '없음'}건 · canary ${canary ? canary.data.at : '없음'} · received ${canary?.data?.received} · skipped ${canary?.data?.skipped}`);
-  const old = await post({ op: 'sync', schema: 1, epoch: 0, since: 0, muts: [] });
+  // D-059 운동별 요약(ws-운동ID)도 health 표에 있어 새 앱 경로로만 받음. 가짜 운동은 만들지 않고 개수만 봄 (계산·정리는 gas 시험이 확인)
+const nWs = (full.health ?? []).filter((r) => /^ws-/.test(r.id) && !r.deleted).length;
+console.log(`운동별 애플워치 요약(ws): ${nWs}건 (서버 갱신 뒤 끝난 운동과 겹치는 심박이 오면 생김)`);
+const old = await post({ op: 'sync', schema: 1, epoch: 0, since: 0, muts: [] });
   const leak = (old.changes ?? []).filter((c) => c.table === 'health').length + (old.health ? old.health.length : 0);
   console.log(`옛 앱 경로(healthSince 없음): health ${leak}건 ${leak ? '← 문제 (옛 앱이 멈출 수 있음)' : '(정상: 없음)'}`);
   const ok = fresh && leak === 0;

@@ -13,6 +13,7 @@ import type { lastNight } from '../../core/health';
 import { Sheet, Empty } from '../components';
 import { Icon } from '../icons';
 import type { IconName } from '../icons';
+import { dateTimeText } from '../../core/dateText';
 
 export const TONE: Record<RecoveryStatus, 'busy' | 'almost' | 'ok'> = { recovering: 'busy', almost: 'almost', recovered: 'ok' };
 /** 회복 중은 정상 상태라 경고 아이콘·주황을 쓰지 않음 (검토 F5): 시계 · 시계 · 체크 */
@@ -52,12 +53,11 @@ export function RuleBox({ id }: { id: string }) {
 }
 
 function PartSheet({ r, onClose }: { r: PartRecovery; onClose: () => void }) {
-  const at = new Date(r.at);
   return (
     <Sheet title={`${r.part} 회복 추정`} onClose={onClose} trap>
       <p class="row wrap"><StatusChip st={r.status} /><span>{leftText(r)}</span></p>
       <ul class="small rec-why">
-        <li>마지막 운동: {r.workoutName} · {at.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short' })} {at.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' })} ({agoText(r.elapsedH)})</li>
+        <li>마지막 운동: {r.workoutName} · {dateTimeText(r.at, Date.now())} ({agoText(r.elapsedH)})</li>
         <li>그 운동에서 {r.part} 작업 세트 {r.sets}개 · 실패 세트(RIR 0 기록) {r.failSets}개</li>
         <li>추정 {r.estimateH}시간 = 기본 {BASE_H}시간{r.sets >= HIGH_VOL_SETS ? ` → ${HIGH_VOL_SETS}세트 이상이라 ${HIGH_VOL_H}시간` : ''}{r.failSets ? ` + 실패 세트 ${FAIL_ADD_H}시간 (앱 기준: 실패 세트 1개 이상이면 +${FAIL_ADD_H}시간)` : ''}{r.overCap ? ` (계산 ${r.rawH}시간 → ${CAP_H}시간)` : ''}</li>
       </ul>

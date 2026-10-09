@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
+import { refreshSummary, backfillSummaries, afterWorkoutMuts, windowSummary } from '../src/core/healthIngest';
 import { parseDate, parseNumber, parseStage, parseLines, ingestHealth, readHealthBody, kstDay, kstDayStart, asleepMinutes, sleepDay, RAW_KEEP_DAYS, MAX_LINES } from '../src/core/healthIngest';
 import type { HState } from '../src/core/healthIngest';
 import { workoutHeart, activeKcal, watchFor, watchLine, lastNight, nightLine, watchStatus, hm } from '../src/core/health';
@@ -275,6 +276,103 @@ describe('D-058 검토 T2: 바꾸기 뒤 health 유지 · 옛 앱이 새 백업 
     expect(parseBackup(text).ok).toBe(true);
     expect(old.ok && old.file.data.routines.map((r) => r.id)).toEqual(['r1']);
     db.close();
+  });
+});
+
+describe('D-059 운동별 애플워치 요약 (ws-운동ID, 지우지 않음)', () => {
+  const W = (id: string, s: string, e: string) => ({ table: 'workouts', id, data: { id, name: id, startedAt: s, endedAt: e, blocks: [] }, hlc: '1', dev: 'A', rev: 1 });
+  const base = () => {
+    const s: HState = { rev: 1, recs: {} };
+    s.recs['workouts/w1'] = W('w1', '2026-10-08T10:00:00+09:00', '2026-10-08T11:00:00+09:00');
+    return s;
+  };
+  const hrLines = ['2026-10-08T10:10:00+09:00 | 120', '2026-10-08T10:20:00+09:00 | 140', '2026-10-08T12:00:00+09:00 | 90'].join('\n');
+  it('받으면 겹치는 끝난 운동마다 요약 저장 (평균·최고·개수·kcal, 원본과 같은 계산)', () => {
+    const s = base();
+    ingestHealth(s, { kind: 'workout', hr: hrLines, energy: '2026-10-08T10:00:00+09:00 | 30 kcal | 2026-10-08T10:30:00+09:00' }, NOW);
+    const ws = rec(s, 'ws-w1').data!;
+    expect(ws).toMatchObject({ type: 'ws', workoutId: 'w1', hrAvg: 130, hrMax: 140, hrN: 2, kcal: 30, src: 'watch' });
+    expect(windowSummary((id) => rec(s, id)?.data as never, iso('2026-10-08T10:00:00+09:00'), iso('2026-10-08T11:00:00+09:00'))).toEqual({ hrAvg: 130, hrMax: 140, hrN: 2, kcal: 30 });
+  });
+  it('원본이 일부 정리돼 개수가 줄면 저장된 값을 지킴, 운동 시간을 고치면 새로, 바뀐 게 없으면 쓰지 않음', () => {
+    const s = base();
+    ingestHealth(s, { kind: 'workout', hr: hrLines }, NOW);
+    const r0 = s.rev;
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:00:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(false); // 그대로
+    expect(s.rev).toBe(r0);
+    // 원본 정리 흉내: 심박 기록을 지움
+    s.recs['health/hr-2026-10-08'] = { ...s.recs['health/hr-2026-10-08']!, deleted: true };
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:00:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(false);
+    expect(rec(s, 'ws-w1').data!.hrAvg).toBe(130);
+    // 시간을 고쳤는데 원본이 정리돼 다시 셀 수 없음 → 값은 두고 시간만 새로 + stale (검토 E1)
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:15:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(true);
+    expect(rec(s, 'ws-w1').data).toMatchObject({ hrN: 2, hrAvg: 130, hrMax: 140, startedAt: '2026-10-08T10:15:00+09:00', stale: true });
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:15:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(false); // 다시 해도 그대로
+  });
+  it('칼로리만 있는 운동: 에너지 원본이 정리되면 저장된 kcal 유지, 원본이 있으면 새 값으로 (검토 E1)', () => {
+    const s = base();
+    ingestHealth(s, { kind: 'workout', energy: '2026-10-08T10:00:00+09:00 | 30 kcal | 2026-10-08T10:30:00+09:00' }, NOW);
+    expect(rec(s, 'ws-w1').data).toMatchObject({ hrN: 0, kcal: 30 });
+    const r0 = s.rev;
+    s.recs['health/en-2026-10-08'] = { ...s.recs['health/en-2026-10-08']!, deleted: true };
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:00:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(false);
+    expect(s.rev).toBe(r0);
+    expect(rec(s, 'ws-w1').data!.kcal).toBe(30);
+    // 시간을 고쳤고 원본 없음 → kcal 유지 + stale
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:20:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(true);
+    expect(rec(s, 'ws-w1').data).toMatchObject({ kcal: 30, stale: true, startedAt: '2026-10-08T10:20:00+09:00' });
+  });
+  it('원본이 남아 있으면 시간을 고친 새 계산으로 (작아져도) 바꾸고 stale 없음', () => {
+    const s = base();
+    ingestHealth(s, { kind: 'workout', hr: hrLines, energy: '2026-10-08T10:00:00+09:00 | 30 kcal | 2026-10-08T10:30:00+09:00' }, NOW);
+    expect(refreshSummary(s, { id: 'w1', startedAt: '2026-10-08T10:15:00+09:00', endedAt: '2026-10-08T11:00:00+09:00' }, NOW)).toBe(true);
+    const d = rec(s, 'ws-w1').data!;
+    expect(d).toMatchObject({ hrN: 1, hrAvg: 140, kcal: 15 });
+    expect(d.stale).toBeUndefined();
+  });
+  it('120일 정리는 원본만, 요약(ws)은 남음', () => {
+    const s = base();
+    s.recs['health/ws-old'] = { table: 'health', id: 'ws-old', data: { id: 'ws-old', type: 'ws', hrN: 5 }, hlc: '0', dev: 'srv', rev: 1 };
+    s.recs['health/hr-2026-01-01'] = { table: 'health', id: 'hr-2026-01-01', data: { id: 'hr-2026-01-01', type: 'hr', p: [] }, hlc: '0', dev: 'srv', rev: 1 };
+    ingestHealth(s, { kind: 'daily', hr: '2026-10-08T13:00:00+09:00 | 70' }, NOW);
+    expect(rec(s, 'hr-2026-01-01').deleted).toBe(true);
+    expect(rec(s, 'ws-old').deleted).toBeUndefined();
+  });
+  it('운동이 올라오면(끝남) 요약, 지우면 요약도 지움 표시, 늦게 온 사본·진행 중은 건너뜀', () => {
+    const s = base();
+    ingestHealth(s, { kind: 'daily', hr: hrLines }, NOW); // 이때 w1 요약 생김
+    s.recs['workouts/w2'] = W('w2', '2026-10-08T12:00:00+09:00', '2026-10-08T12:30:00+09:00');
+    s.recs['workouts/w3'] = { ...W('w3', '2026-10-08T12:00:00+09:00', '2026-10-08T12:30:00+09:00'), data: { id: 'w3', startedAt: '2026-10-08T12:00:00+09:00', blocks: [] } };
+    expect(afterWorkoutMuts(s, ['w2', 'w3'], NOW)).toBe(true);
+    expect(rec(s, 'ws-w2').data).toMatchObject({ hrAvg: 90, hrN: 1 });
+    expect(s.recs['health/ws-w3']).toBeUndefined();
+    s.recs['workouts/w1'] = { table: 'workouts', id: 'w1', deleted: true, hlc: '2', dev: 'A', rev: ++s.rev };
+    expect(afterWorkoutMuts(s, ['w1'], NOW)).toBe(true);
+    expect(rec(s, 'ws-w1').deleted).toBe(true);
+    expect(afterWorkoutMuts(s, ['w1'], NOW)).toBe(false); // 이미 지움
+  });
+  it('배포 뒤 처음: 옛 운동을 정해진 개수씩 나눠 채우고 다 하면 done, 운동이 없으면 아무것도 안 씀', () => {
+    const empty: HState = { rev: 1, recs: {} };
+    expect(backfillSummaries(empty, NOW)).toBe(0);
+    expect(Object.keys(empty.recs)).toEqual([]);
+    const s: HState = { rev: 1, recs: {} };
+    // 원본 심박 하나 (모든 운동과 겹침)
+    ingestHealth(s, { kind: 'daily', hr: '2026-10-08T10:10:00+09:00 | 100' }, NOW);
+    for (let i = 0; i < 5; i++) s.recs[`workouts/b${i}`] = W(`b${i}`, '2026-10-08T10:00:00+09:00', '2026-10-08T11:00:00+09:00');
+    expect(backfillSummaries(s, NOW, 2)).toBe(2);
+    expect(rec(s, 'wsmeta').data).toMatchObject({ done: false, after: 'b1' });
+    expect(backfillSummaries(s, NOW, 2)).toBe(2);
+    expect(backfillSummaries(s, NOW, 2)).toBe(1);
+    expect(rec(s, 'wsmeta').data).toMatchObject({ done: true });
+    expect(backfillSummaries(s, NOW, 2)).toBe(0);
+    expect(['b0', 'b1', 'b2', 'b3', 'b4'].every((id) => rec(s, `ws-${id}`).data!.hrAvg === 100)).toBe(true);
+  });
+  it('앱: 저장된 요약을 먼저, 시간이 다르면 원본, 원본 없으면 요약', () => {
+    const w = { id: 'w9', startedAt: '2026-10-08T01:00:00.000Z', endedAt: '2026-10-08T02:00:00.000Z' };
+    const ws: HealthRow = { id: 'ws-w9', type: 'ws', workoutId: 'w9', startedAt: w.startedAt, endedAt: w.endedAt, hrAvg: 133, hrMax: 170, hrN: 400, kcal: 380 };
+    expect(watchFor(w, [ws])).toEqual({ n: 400, avg: 133, max: 170, kcal: 380 });
+    expect(watchFor({ ...w, endedAt: '2026-10-08T02:10:00.000Z' }, [ws])).toEqual({ n: 400, avg: 133, max: 170, kcal: 380 }); // 원본 없음 → 요약
+    expect(watchFor({ ...w, id: 'other' }, [ws])).toBeUndefined();
   });
 });
 

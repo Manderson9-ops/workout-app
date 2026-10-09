@@ -24,12 +24,13 @@ import { HOME_HIDDEN_LABEL } from '../../core/session';
 import { go } from '../nav';
 import { askConfirm } from '../confirm';
 import { Icon } from '../icons';
+import { axisText, weekRangeText, dateText, dateTimeText, timeRangeText, fullText, fullDateText } from '../../core/dateText';
 
 const WD = ['일', '월', '화', '수', '목', '금', '토']; // 주는 일요일 시작 (D-054)
-const md = (d: string) => d.slice(5).replace('-', '/').replace(/^0/, '').replace('/0', '/');
-const wdClass = (i: number) => (i === 0 ? 'sun' : i === 6 ? 'sat' : '');
 const ymd = (d: string) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y!, m! - 1, dd!); };
-const weekRange = (ws: string) => `${md(ws)}~${md(addDays(ws, 6))}`;
+const md = axisText; // 그래프 축 전용 "10/4" (D-060)
+const wdClass = (i: number) => (i === 0 ? 'sun' : i === 6 ? 'sat' : '');
+const weekRange = (ws: string) => weekRangeText(ws, Date.now()); // "10월 4일~10일", "9월 27일~10월 3일"
 const MAX_WEEKS_BACK = 11; // 이번 주 포함 12주
 const MARK = 10; // 연구 참고 범위 아래 끝 (부위당 주 10세트, Schoenfeld 외 2017)
 const BAND_HI = 20; // 연구 참고 범위 위 끝 (Baz-Valle 외 2022: 훈련된 남성 12~20세트 제안, 20 넘는 양은 근거가 적음)
@@ -131,7 +132,7 @@ function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Ex
             <div class="sub small trend-head">최근 4주</div>
             <table class="trend" aria-label="최근 4주 부위별 작업 세트">
               <thead><tr><th>주</th>{activeParts.map((p) => <th key={p}>{shortPart(p)}</th>)}<th>합계</th></tr></thead>
-              <tbody>{weeks.map((w) => <tr key={w.week}><td>{md(w.week)}~</td>{activeParts.map((p) => <td key={p}>{w.parts[p] || '·'}</td>)}<td><strong>{w.total}</strong></td></tr>)}</tbody>
+              <tbody>{weeks.map((w) => <tr key={w.week}><td>{dateText(w.week, Date.now(), { weekday: false })}~</td>{activeParts.map((p) => <td key={p}>{w.parts[p] || '·'}</td>)}<td><strong>{w.total}</strong></td></tr>)}</tbody>
             </table>
           </>
         )}
@@ -154,8 +155,8 @@ function PartWeekSheet({ part, rows, week, onClose }: { part: Part; rows: PartWe
       <div class="pw-list">
         {rows.map((r, i) => (
           <button key={i} class="pw-row" onClick={() => { onClose(); go(`#/stats/w/${encodeURIComponent(r.workoutId)}`); }}
-            aria-label={`${Number(r.date.slice(5, 7))}월 ${Number(r.date.slice(8))}일 ${r.name} ${r.sets}세트${r.best ? ` 최고 ${r.best}` : ''}, 기록 보기`}>
-            <span class="pw-date">{md(r.date)} {WD[ymd(r.date).getDay()]}</span>
+            aria-label={`${fullDateText(r.date)} ${r.name} ${r.sets}세트${r.best ? ` 최고 ${r.best}` : ''}, 기록 보기`}>
+            <span class="pw-date">{dateText(r.date, Date.now())}</span>
             <span class="grow"><span class="pw-name">{r.name}</span><span class="sub small">{r.workoutName}</span></span>
             <span class="pw-sets"><span class="pw-n"><b>{r.sets}</b><small>세트</small></span>{r.best && <span class="sub small">최고 {r.best}</span>}</span>
           </button>
@@ -208,7 +209,7 @@ export function Stats({ s }: { s: AppState }) {
     if (g && g.ws === ws) g.items.push(x); else groups.push({ ws, items: [x] });
   }
   const thisWs = weekStart(today);
-  const groupTitle = (ws: string) => (ws === thisWs ? '이번 주' : ws === addDays(thisWs, -7) ? '지난주' : `${Number(ws.slice(5, 7))}월 ${Number(ws.slice(8))}일 주`);
+  const groupTitle = (ws: string) => (ws === thisWs ? '이번 주' : ws === addDays(thisWs, -7) ? '지난주' : weekRange(ws));
 
   return (
     <main>
@@ -241,7 +242,7 @@ export function Stats({ s }: { s: AppState }) {
             const dt = dateOf(n);
             return (
               <button key={n} class={`cal-day ${wdClass((lead + i) % 7)} ${dt === today ? 'is-today' : ''} ${dt > today ? 'future' : ''} ${day === n ? 'sel' : ''}`}
-                aria-label={`${ym.m}월 ${n}일${c ? ` 운동 ${c}회` : ''}`} aria-pressed={day === n} disabled={!c}
+                aria-label={`${fullDateText(dt)}${c ? `, 운동 ${c}회` : ''}`} aria-pressed={day === n} disabled={!c}
                 onClick={() => setDay(day === n ? null : n)}>
                 <span>{n}</span>{c ? <i class="dot" /> : null}
               </button>
@@ -306,8 +307,8 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
             <summary class="small sub" style={{ minHeight: '44px', display: 'flex', alignItems: 'center' }}>체중 기록 {sorted.length}개 보기·지우기</summary>
             {[...sorted].reverse().slice(0, 30).map((b) => (
               <div class="row between small" key={b.date}>
-                <span>{b.date} · {b.kg}kg</span>
-                <button class="ghost" aria-label={`${b.date} 체중 지우기`} onClick={async () => { if (await askConfirm({ title: '체중 기록을 지울까요?', message: `${b.date} · ${b.kg}kg`, ok: '지우기', danger: true })) void mutate((d) => softDelete(d, 'bodyweight', b.date)); }}>지우기</button>
+                <span>{dateText(b.date, Date.now())} · {b.kg}kg</span>
+                <button class="ghost" aria-label={`${fullDateText(b.date)} 체중 지우기`} onClick={async () => { if (await askConfirm({ title: '체중 기록을 지울까요?', message: `${dateText(b.date, Date.now())} · ${b.kg}kg`, ok: '지우기', danger: true })) void mutate((d) => softDelete(d, 'bodyweight', b.date)); }}>지우기</button>
               </div>
             ))}
           </details>
@@ -334,9 +335,9 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
   return (
     <main>
       <ScreenHeader back={{ label: '기록', onClick: () => go('#/stats') }} title={w.name} />
-      <p class="sub">{new Date(w.startedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' })} · {durText(sum.durationSec)}{sum.plannedSec ? ` (예상 ${durText(sum.plannedSec)})` : ''}</p>
+      <p class="sub" aria-label={`${fullText(w.startedAt)}부터 ${durText(sum.durationSec)}`}>{w.endedAt ? `${dateText(w.startedAt, Date.now())} ${timeRangeText(w.startedAt, w.endedAt, Date.now())}` : dateTimeText(w.startedAt, Date.now(), { relative: false })} · {durText(sum.durationSec)}{sum.plannedSec ? ` (예상 ${durText(sum.plannedSec)})` : ''}</p>
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
-      {w.editedAt && <p class="sub small">{new Date(w.editedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}에 고침</p>}
+      {w.editedAt && <p class="sub small">{dateTimeText(w.editedAt, Date.now())}에 고침</p>}
       {w.memo && <p class="memo-line"><Icon name="note" size={16} />{w.memo}</p>}
       {(() => { const x = watchFor(w, s.health); return x ? <p class="wc-watch detail" data-testid="detail-watch"><Icon name="heart" size={16} />{watchLine(x)}</p> : null; })()}
       {(s.settings.homeHidden ?? []).includes(w.id) && (

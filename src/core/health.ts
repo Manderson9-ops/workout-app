@@ -59,11 +59,24 @@ export function activeKcal(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: read
   return any ? Math.round(total) : undefined;
 }
 
-export function watchFor(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: readonly HealthRow[], nowMs = Date.now()): WorkoutWatch | undefined {
+/** 서버가 저장한 운동별 요약(ws-운동ID, D-059) → 화면 값 */
+function fromSummary(r: HealthRow): WorkoutWatch | undefined {
+  const n = typeof r.hrN === 'number' ? r.hrN : 0;
+  const kcal = typeof r.kcal === 'number' ? r.kcal : undefined;
+  if (!n && kcal === undefined) return undefined;
+  return { n, ...(n && typeof r.hrAvg === 'number' ? { avg: r.hrAvg, max: r.hrMax as number } : {}), ...(kcal !== undefined ? { kcal } : {}) };
+}
+/**
+ * 운동 카드 값: 서버가 저장한 운동별 요약(ws-운동ID)을 먼저 (원본이 120일 뒤 정리돼도 남음, D-059).
+ * 요약이 없거나(서버 갱신 전·아직 동기화 전) 운동 시간을 고쳐 요약과 다르면 원본으로 계산, 원본도 없으면 있는 요약
+ */
+export function watchFor(w: Pick<Workout, 'startedAt' | 'endedAt'> & { id?: string }, rows: readonly HealthRow[], nowMs = Date.now()): WorkoutWatch | undefined {
   if (!rows.length) return undefined;
+  const ws = w.id ? byId(rows).get(`ws-${w.id}`) : undefined;
+  if (ws && ws.startedAt === w.startedAt && ws.endedAt === w.endedAt) { const s = fromSummary(ws); if (s) return s; }
   const h = workoutHeart(w, rows, nowMs);
   const kcal = activeKcal(w, rows, nowMs);
-  if (!h.n && kcal === undefined) return undefined;
+  if (!h.n && kcal === undefined) return ws ? fromSummary(ws) : undefined;
   return { ...h, ...(kcal !== undefined ? { kcal } : {}) };
 }
 

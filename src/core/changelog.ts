@@ -1,3 +1,4 @@
+import { dateText } from './dateText';
 /**
  * 업데이트 안내 (D-055 디자인 시스템 3장 1단계): CHANGELOG.json 을 읽는 순수 함수.
  * - 버전 비교 (0.9.0-preview 같은 꼬리표는 무시하고 숫자만)
@@ -167,8 +168,7 @@ export function displayVersion(v: string): string {
   return v.split('-')[0]!;
 }
 
-/** "2026-10-06" → "10월 6일" */
-export function koDate(d: string): string {
-  const m = d.match(/^\d{4}-(\d{2})-(\d{2})/);
-  return m ? `${Number(m[1])}월 ${Number(m[2])}일` : d;
+/** "2026-10-06" → "10월 6일" (다른 해면 "2025년 10월 6일", 요일 없음: 날짜 규칙 D-060) */
+export function koDate(d: string, now: number = Date.now()): string {
+  return /^\d{4}-\d{2}-\d{2}/.test(d) ? dateText(d.slice(0, 10), now, { weekday: false }) : d;
 }

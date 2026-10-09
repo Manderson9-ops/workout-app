@@ -7,6 +7,7 @@ import type { Part } from './types';
 import { PARTS } from './types';
 import { matchesQuery } from './search';
 import { localDate } from './stats';
+import { sinceText as since } from './dateText';
 
 export type NextReason = 'oldest' | 'never' | 'doneToday';
 export interface NextPick { routine: Routine; reason: NextReason; lastAt?: string }
@@ -73,16 +74,7 @@ export function filterRoutines(list: readonly Routine[], q: string, nameOf: (exe
   return list.filter((r) => matchesQuery(q, [r.name, ...partsOf(r), ...r.blocks.flatMap((b) => b.items.map((i) => nameOf(i.exerciseId)))]));
 }
 
-/** "오늘", "어제", "3일 전", "2주 전", 그 이상은 "9월 3일" (다른 해면 "2025년 9월 3일") */
+/** "오늘", "어제", "3일 전", "2주 전", "1개월 전", 1년 넘으면 "2025년 9월 3일" (규칙은 core/dateText, D-060) */
 export function sinceText(iso: string | undefined, now: number): string {
-  if (!iso) return '아직 안 함';
-  const day = (t: number) => { const d = new Date(t); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000; };
-  const n = day(now) - day(Date.parse(iso));
-  if (n <= 0) return '오늘';
-  if (n === 1) return '어제';
-  if (n < 14) return `${n}일 전`;
-  if (n < 56) return `${Math.floor(n / 7)}주 전`;
-  const d = new Date(iso);
-  const sameYear = d.getFullYear() === new Date(now).getFullYear();
-  return `${sameYear ? '' : `${d.getFullYear()}년 `}${d.getMonth() + 1}월 ${d.getDate()}일`;
+  return iso ? since(iso, now) : '아직 안 함';
 }

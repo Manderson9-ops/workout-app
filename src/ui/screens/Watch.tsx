@@ -11,8 +11,9 @@ import { ScreenHeader } from '../header';
 import { Empty } from '../components';
 import { Icon } from '../icons';
 import { backOr } from '../nav';
+import { dateTimeText } from '../../core/dateText';
 
-const when = (iso: string) => new Date(iso).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', weekday: 'short', hour: 'numeric', minute: '2-digit' });
+const when = (iso: string) => dateTimeText(iso, Date.now()); // "오늘 오전 11:24" (D-060)
 /** 주소는 앞뒤만 (전체는 복사로) */
 const shortUrl = (u: string) => u.replace(/^https:\/\//, '').replace(/\/macros\/s\/([\w-]{4})[\w-]+([\w-]{4})\/exec$/, '/macros/s/$1…$2/exec');
 

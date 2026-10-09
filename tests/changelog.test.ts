@@ -50,7 +50,8 @@ describe('D-055 업데이트 안내 (CHANGELOG)', () => {
     expect(tabOfPath('#/')).toBe('home');
     expect(tabOfPath('#/routines')).toBe('home');
     expect(tabOfPath('#/exercises/x')).toBe('exercises');
-    expect(koDate('2026-10-06')).toBe('10월 6일');
+    expect(koDate('2026-10-06', new Date(2026, 9, 8).getTime())).toBe('10월 6일');
+    expect(koDate('2025-12-30', new Date(2026, 9, 8).getTime())).toBe('2025년 12월 30일'); // D-060 다른 해는 연도
   });
   it('실제 CHANGELOG.json: 맨 위 = 앱 버전 = package.json, where 는 해시 경로, 최신 먼저 정렬돼 있음', () => {
     const cl = JSON.parse(readFileSync('CHANGELOG.json', 'utf8')) as { versions: ChangelogEntry[] };

@@ -6,6 +6,7 @@ import { saveBackupFile, readBackupFile, restoreBackup, resetAll, prepareBackup,
 import { IS_PREVIEW } from '../appName';
 import { Icon } from '../icons';
 import { askConfirm, askChoice } from '../confirm';
+import { dateTimeText } from '../../core/dateText';
 
 /** 데이터가 바뀌고 잠시(0.8초) 조용하면 백업 파일을 미리 만듦 (입력 중에는 만들지 않음) */
 function usePreparedBackup(s: AppState) {
@@ -33,7 +34,7 @@ export function BackupSection({ s }: { s: AppState }) {
     // 미리 보기 판에서 만든 백업을 본판에 넣으려 할 때 (D-031: 한 방향)
     if (r.file.preview && !IS_PREVIEW && !(await askConfirm({ title: '미리 보기 판(β) 백업이에요', message: '시험용 데이터일 수 있어요.\n그래도 본판 데이터를 이것으로 바꿀까요?', ok: '계속', danger: true }))) return;
     const warnActive = active ? `\n\n주의: 진행 중인 운동("${active.name}")도 사라져요.` : '';
-    if (!(await askConfirm({ title: '이 백업으로 바꿀까요?', ok: '바꾸기', danger: true, message: `${new Date(r.file.exportedAt).toLocaleString('ko-KR')} 백업\n운동 기록 ${c.workouts}개, 루틴 ${c.routines}개, 체중 ${c.bodyweight}개\n\n지금 이 폰의 데이터는 모두 이 백업으로 바뀌어요 (합치지 않음). 먼저 "백업 파일 저장"으로 지금 데이터를 저장해 두는 것을 권해요.${warnActive}` }))) return;
+    if (!(await askConfirm({ title: '이 백업으로 바꿀까요?', ok: '바꾸기', danger: true, message: `${dateTimeText(r.file.exportedAt, Date.now())} 백업\n운동 기록 ${c.workouts}개, 루틴 ${c.routines}개, 체중 ${c.bodyweight}개\n\n지금 이 폰의 데이터는 모두 이 백업으로 바뀌어요 (합치지 않음). 먼저 "백업 파일 저장"으로 지금 데이터를 저장해 두는 것을 권해요.${warnActive}` }))) return;
     // 동기화가 켜져 있으면 어디까지 바꿀지 고름 (D-032): 서버까지(다른 기기도 다시 받음) / 이 기기만(동기화 끔)
     let scope: 'server' | 'local' = 'local';
     if (syncEnabled()) {
@@ -57,7 +58,7 @@ export function BackupSection({ s }: { s: AppState }) {
     <>
       <h2>데이터 백업</h2>
       <p class="sub small">운동 기록은 이 아이폰 안에만 저장돼요. 홈 화면 아이콘을 지우거나 폰을 바꾸면 사라지니 백업 파일을 가끔 저장하세요. 공유 → "파일에 저장" → 구글 드라이브를 고르면 PC에서도 볼 수 있어요.</p>
-      <p class="small">마지막 백업: {st.lastBackupAt ? new Date(st.lastBackupAt).toLocaleString('ko-KR') : '없음'}</p>
+      <p class="small">마지막 백업: {st.lastBackupAt ? dateTimeText(st.lastBackupAt, Date.now()) : '없음'}</p>
       <div class="row wrap">
         <button class="primary" onClick={async () => { const r = await saveBackupFile(); setMsg({ text: SAVE_MESSAGE[r], ok: r !== 'cancelled' }); }}>백업 파일 저장</button>
         <button onClick={() => fileRef.current?.click()}>백업 불러오기</button>

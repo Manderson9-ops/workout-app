@@ -29,6 +29,7 @@ import { ScreenHeader } from '../header';
 import { go } from '../nav';
 import { askChoice } from '../confirm';
 import { syncEnabled } from '../sync';
+import { headerDateText } from '../../core/dateText';
 
 const WD = ['일', '월', '화', '수', '목', '금', '토']; // 주는 일요일 시작 (D-054)
 
@@ -128,7 +129,7 @@ export function Home({ s }: { s: AppState }) {
   const nowMin = Math.floor(Date.now() / 60_000);
   const rec = useMemo(() => recoveryByPart(history, byId, Date.now()), [history, byId, nowMin]);
   const recText = recoveryLine(splitRecent(sortedRecovery(rec)).recent); // 최근 14일 안에 한 부위만 (검토 F6)
-  const today = new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
+  const today = headerDateText(Date.now()); // "10월 8일 수요일"
   return (
     <main class="home">
       <ScreenHeader eyebrow={today} title="오늘" />

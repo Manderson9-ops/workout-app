@@ -6,8 +6,9 @@ import type { DiagEntry } from '../../core/diag';
 import { saveBackupFile, prepareBackup, SAVE_MESSAGE } from '../backupActions';
 import { AutoSendSection } from './AutoSendSection';
 import { SyncSection } from './SyncSection';
+import { dateTimeText } from '../../core/dateText';
 
-const time = (t: string) => new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+const time = (t: string) => dateTimeText(t, Date.now(), { seconds: true }); // 진단은 초까지 (D-060 예외)
 
 /** 설정의 "PC로 보내기"와 "진단 기록" (D-022~D-024). PC에서 백업을 불러오면 폰의 진단도 여기서 볼 수 있음 */
 /** part: 'send' = PC로 보내기·자동 보내기·동기화, 'diag' = 진단 기록, 없으면 둘 다 (설정 묶음 카드에서 나눠 씀, D-055 3단계) */

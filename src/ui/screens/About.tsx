@@ -35,7 +35,7 @@ export function AboutScreen() {
           <span class="ver-big" data-testid="about-version">{displayVersion(APP_VERSION)}</span>
           <span class={`chip-s ${IS_PREVIEW ? 'video' : 'acc'}`} data-testid="about-edition">판: {IS_PREVIEW ? 'β 미리 보기' : '본판'}</span>
         </div>
-        <p class="sub about-line">마지막 업데이트 {cur ? koDate(cur.date) : '-'}{cur ? ` (${cur.date})` : ''} · 빌드 이름 {APP_VERSION}</p>
+        <p class="sub about-line">마지막 업데이트 {cur ? koDate(cur.date) : '-'} · 빌드 이름 {APP_VERSION}</p>
         {IS_PREVIEW && <p class="sub small about-line">미리 보기 판은 본판과 데이터가 분리돼 있고 동기화하지 않아요.</p>}
         <div class="row wrap about-actions">
           <button disabled={res === 'busy'} onClick={async () => { setRes('busy'); setRes(await checkForUpdate()); }}>새 버전 확인</button>

@@ -8,11 +8,12 @@ import type { Conflict } from '../../db/sync';
 import { IS_PREVIEW } from '../appName';
 import { askConfirm } from '../confirm';
 import { Icon } from '../icons';
+import { agoText, dateTimeText } from '../../core/dateText';
 
 /** 충돌 비교 정보: 이 기기 / 서버 */
 function compare(c: Conflict): string {
   const d = (x: Record<string, unknown>) => {
-    if (c.table === 'routines') { const b = (x.blocks as { items: unknown[] }[] | undefined) ?? []; return `운동 ${b.reduce((n, y) => n + y.items.length, 0)}개${x.updatedAt ? ` · ${new Date(String(x.updatedAt)).toLocaleDateString('ko-KR')}` : ''}`; }
+    if (c.table === 'routines') { const b = (x.blocks as { items: unknown[] }[] | undefined) ?? []; return `운동 ${b.reduce((n, y) => n + y.items.length, 0)}개${x.updatedAt ? ` · ${dateTimeText(String(x.updatedAt), Date.now())}` : ''}`; }
     if (c.table === 'workouts') { const b = (x.blocks as { items: { sets: { done?: boolean }[] }[] }[] | undefined) ?? []; return `세트 ${b.flatMap((y) => y.items.flatMap((i) => i.sets)).filter((s) => s.done).length}개`; }
     if (c.table === 'bodyweight') return `${x.kg}kg`;
     return Object.keys(x).filter((k) => JSON.stringify(x[k]) !== JSON.stringify((c.table === 'settings' ? c.server : c.local)[k])).slice(0, 3).join(', ') || '내용 다름';
@@ -20,11 +21,7 @@ function compare(c: Conflict): string {
   return `이 기기: ${d(c.local)} / 서버: ${d(c.server)}`;
 }
 
-const ago = (t?: string) => {
-  if (!t) return '아직 없음';
-  const s = Math.round((Date.now() - Date.parse(t)) / 1000);
-  return s < 60 ? '방금' : s < 3600 ? `${Math.round(s / 60)}분 전` : new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-};
+const ago = (t?: string) => (t ? agoText(t, Date.now()) : '아직 없음'); // "방금", "5분 전", "오늘 오전 9:10" (D-060)
 
 /** 화면 위 작은 동기화 상태 (켜져 있을 때만) */
 export function SyncBadge() {
