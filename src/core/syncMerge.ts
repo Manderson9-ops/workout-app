@@ -223,17 +223,31 @@ export function changesSince(state: ServerState, since: number): ServerRec[] {
   return Object.values(state.recs).filter((r) => r.rev > since).sort((a, b) => a.rev - b.rev);
 }
 
-export interface SyncRequest { key?: string; op: 'sync'; schema: number; epoch: number; since: number; muts: Mutation[] }
-export interface SyncResponse { ok: true; epoch: number; rev: number; results: MutResult[]; changes: ServerRec[]; full?: boolean }
+/**
+ * healthSince (D-058): 애플워치 기록(health 표)을 아는 앱만 보냄. 이 번호 뒤에 바뀐 health 기록을 따로 health 에 담아 줌.
+ * 보내지 않는 옛 앱에는 health 기록을 changes 에도 health 에도 넣지 않음 (옛 앱은 모르는 표를 받으면
+ * db.table('health') 에서 오류가 나서 동기화가 멈추므로)
+ */
+export interface SyncRequest { key?: string; op: 'sync'; schema: number; epoch: number; since: number; muts: Mutation[]; healthSince?: number }
+export interface SyncResponse { ok: true; epoch: number; rev: number; results: MutResult[]; changes: ServerRec[]; full?: boolean; health?: ServerRec[] }
+
+/** 서버만 쓰는 표 (단축어 → 서버). 기기가 보낸 수정은 받지 않음 */
+export const SERVER_ONLY_TABLES = ['health'];
+const isServerOnly = (r: { table: string }) => SERVER_ONLY_TABLES.includes(r.table);
 
 /**
  * 요청 하나 처리 (서버 핸들러의 핵심). epoch가 다르면 전체를 다시 보냄(full). 기기는 epoch가 바뀌면 안 보낸 수정을 따로 보관한다.
  */
 export function handleSync(state: ServerState, req: SyncRequest, nowMs: number): SyncResponse | { ok: false; error: string } {
   if (req.schema < SYNC_SCHEMA) return { ok: false, error: 'update_app' };
-  if (req.epoch !== state.epoch) return { ok: true, epoch: state.epoch, rev: state.rev, results: [], changes: changesSince(state, 0), full: true };
-  const results = applyMutations(state, req.muts ?? [], nowMs);
-  return { ok: true, epoch: state.epoch, rev: state.rev, results, changes: changesSince(state, req.since) };
+  const wantsHealth = typeof req.healthSince === 'number';
+  if (req.epoch !== state.epoch) {
+    const all = changesSince(state, 0);
+    return { ok: true, epoch: state.epoch, rev: state.rev, results: [], changes: all.filter((r) => !isServerOnly(r)), full: true, ...(wantsHealth ? { health: all.filter(isServerOnly) } : {}) };
+  }
+  const results = applyMutations(state, (req.muts ?? []).filter((m) => !isServerOnly(m)), nowMs);
+  const changes = changesSince(state, req.since).filter((r) => !isServerOnly(r));
+  return { ok: true, epoch: state.epoch, rev: state.rev, results, changes, ...(wantsHealth ? { health: changesSince(state, req.healthSince!).filter(isServerOnly) } : {}) };
 }
 
 /** 0.5.0까지 앱이 아는 표. 바꾸기 요청에 tables가 없으면(옛 앱) 이 표들만 바꾸고 나머지(예: feedback)는 남김 */

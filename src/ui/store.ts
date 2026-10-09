@@ -6,6 +6,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { WorkoutDB, getSettings, DEFAULT_SETTINGS, requestPersist } from '../db/db';
 import type { Settings, ExerciseMeta, CustomExercise, BodyweightRow } from '../db/db';
 import type { Feedback } from '../core/feedback';
+import type { HealthRow } from '../core/health';
 import type { Routine, Workout } from '../core/session';
 import { Clock } from '../core/hlc';
 import type { ClockStore } from '../core/hlc';
@@ -24,17 +25,19 @@ export interface AppState {
   custom: CustomExercise[];
   bodyweight: BodyweightRow[];
   feedback: Feedback[];
+  /** 애플워치 기록 (D-058) */
+  health: HealthRow[];
 }
 
-let state: AppState = { ready: false, settings: DEFAULT_SETTINGS, routines: [], workouts: [], meta: new Map(), custom: [], bodyweight: [], feedback: [] };
+let state: AppState = { ready: false, settings: DEFAULT_SETTINGS, routines: [], workouts: [], meta: new Map(), custom: [], bodyweight: [], feedback: [], health: [] };
 const listeners = new Set<(s: AppState) => void>();
 
 /** 이 기기에서 진행 중 운동을 바꾼 횟수: load가 읽는 도중 바뀌면 옛 값으로 덮지 않도록 다시 읽음 (S2b 검토) */
 let localVer = 0;
 export async function load(retry = 0): Promise<void> {
   const startVer = localVer;
-  const [settings, routines, workouts, meta, custom, bodyweight, feedback] = await Promise.all([
-    getSettings(db), db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.bodyweight.toArray(), db.feedback.toArray(),
+  const [settings, routines, workouts, meta, custom, bodyweight, feedback, health] = await Promise.all([
+    getSettings(db), db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.bodyweight.toArray(), db.feedback.toArray(), db.health.toArray(),
   ]);
   if (startVer !== localVer && retry < 3) return load(retry + 1);
   state = {
@@ -42,7 +45,7 @@ export async function load(retry = 0): Promise<void> {
     routines: routines.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)),
     workouts: workouts.sort((a, b) => (a.startedAt < b.startedAt ? 1 : -1)),
     meta: new Map(meta.map((m) => [m.exerciseId, m])),
-    custom, bodyweight, feedback,
+    custom, bodyweight, feedback, health,
   };
   listeners.forEach((l) => l(state));
 }

@@ -1,14 +1,17 @@
 /**
+ * 0.9.5(5d1f175) 의 src/core/backup.ts 그대로 (가져오는 경로만 바꿈). 옛 앱이 새 백업(health 칸)을 읽는지 시험용 (D-058 검토 T2). 고치지 말 것
+ */
+/**
  * 백업 파일 (BLUEPRINT 4.6, D-021). 기기 안 데이터 전체를 JSON 한 파일로.
  * 형식이 바뀌면 schema를 올리고 migrateBackup에 변환을 추가한다 (예전 백업도 계속 가져올 수 있게).
  * 불러오기는 전체 교체라서, 깨진 파일이 기존 데이터를 지우지 않도록 **항목 하나하나까지** 검사한다.
  */
-import type { Routine, Workout } from './session';
-import { PARTS, EQUIPMENT, PATTERNS } from './types.ts';
-import { diagEntryOk, DIAG_MAX } from './diag.ts';
-import type { DiagEntry } from './diag.ts';
-import { feedbackOk } from './feedback.ts';
-import type { Feedback } from './feedback.ts';
+import type { Routine, Workout } from '../../src/core/session';
+import { PARTS, EQUIPMENT, PATTERNS } from '../../src/core/types.ts';
+import { diagEntryOk, DIAG_MAX } from '../../src/core/diag.ts';
+import type { DiagEntry } from '../../src/core/diag.ts';
+import { feedbackOk } from '../../src/core/feedback.ts';
+import type { Feedback } from '../../src/core/feedback.ts';
 
 export const BACKUP_APP = 'workout-app';
 /** 1: P4 첫 형식. 2: 진단 기록(diag) 추가 (D-026). 3: 개선 메모(feedback) 추가 (S3) */
@@ -25,17 +28,13 @@ export interface BackupData {
   diag: DiagEntry[];
   /** 개선 메모 (schema 3, S3) */
   feedback: Feedback[];
-  /** 애플워치 기록 (D-058, 있으면). 형식 번호는 그대로 3: 옛 앱도 이 파일을 불러올 수 있음(이 칸만 무시) */
-  health?: Record<string, unknown>[];
 }
-/** 늘 있는 칸 (health 는 있으면만, D-058) */
-export type BackupKey = Exclude<keyof BackupData, 'health'>;
-export const BACKUP_KEYS: BackupKey[] = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight', 'diag', 'feedback'];
+export const BACKUP_KEYS: (keyof BackupData)[] = ['routines', 'workouts', 'meta', 'custom', 'settings', 'bodyweight', 'diag', 'feedback'];
 /** device: 만든 기기 (진단의 기기 ID와 이름, 예: iPhone · Safari 26.0). 비밀 값은 절대 넣지 않음 (D-025) */
 /** preview: 미리 보기 판(workout-app-next)에서 만든 파일 (D-031). 본판에서 불러올 때 경고, PC 검사에 표시 */
-export interface BackupFile { app: typeof BACKUP_APP; schema: number; appVersion: string; exportedAt: string; preview?: true; device?: { id: string; label: string }; counts: Record<BackupKey, number> & { health?: number }; data: BackupData }
+export interface BackupFile { app: typeof BACKUP_APP; schema: number; appVersion: string; exportedAt: string; preview?: true; device?: { id: string; label: string }; counts: Record<keyof BackupData, number>; data: BackupData }
 
-export const countsOf = (data: BackupData) => ({ ...Object.fromEntries(BACKUP_KEYS.map((k) => [k, data[k].length])), ...(data.health ? { health: data.health.length } : {}) }) as BackupFile['counts'];
+export const countsOf = (data: BackupData) => Object.fromEntries(BACKUP_KEYS.map((k) => [k, data[k].length])) as BackupFile['counts'];
 
 export function makeBackup(data: BackupData, appVersion: string, now: string, device?: { id: string; label: string }, preview = false): BackupFile {
   return { app: BACKUP_APP, schema: BACKUP_SCHEMA, appVersion, exportedAt: now, ...(preview ? { preview: true as const } : {}), ...(device ? { device } : {}), counts: countsOf(data), data };
@@ -120,7 +119,7 @@ export function parseBackup(text: string): ParseResult {
   const data = d as unknown as BackupData;
   // 파일에 적힌 개수와 실제 개수가 다르면 중간이 잘린 파일
   if (isObj(f.counts) && BACKUP_KEYS.some((k) => f.counts[k] !== undefined && f.counts[k] !== data[k].length)) return { ok: false, error: '백업 파일이 중간에 잘렸거나 바뀌었어요 (개수가 맞지 않음)' };
-  const checks: [BackupKey, (x: unknown) => boolean, string, string | null][] = [
+  const checks: [keyof BackupData, (x: unknown) => boolean, string, string | null][] = [
     ['workouts', workoutOk, '운동 기록', 'id'], ['routines', routineOk, '루틴', 'id'], ['meta', metaOk, '운동 표시(즐겨찾기 등)', 'exerciseId'],
     ['custom', customOk, '직접 추가한 운동', 'id'], ['settings', settingsOk, '설정', 'key'], ['bodyweight', bwOk, '체중 기록', 'date'], ['diag', diagEntryOk, '진단 기록', null], ['feedback', feedbackOk, '개선 메모', 'id'],
   ];
@@ -134,7 +133,6 @@ export function parseBackup(text: string): ParseResult {
   if (f.preview !== undefined && f.preview !== true) return { ok: false, error: '미리 보기 표시가 잘못됐어요' };
   if (f.device !== undefined && !(isObj(f.device) && str(f.device.id) && (f.device.id as string).length <= 12 && typeof f.device.label === 'string' && (f.device.label as string).length <= 80)) return { ok: false, error: '기기 정보가 잘못됐어요' };
   if (data.workouts.filter((w) => !w.endedAt).length > 1) return { ok: false, error: '진행 중인 운동이 두 개 들어 있어요' };
-  if (data.health !== undefined && !(Array.isArray(data.health) && data.health.length <= 5000 && data.health.every((h) => isObj(h) && str(h.id) && str(h.type)) && unique(data.health, 'id'))) return { ok: false, error: '애플워치 기록 형식이 맞지 않아요' };
   return { ok: true, file: { ...f, counts: countsOf(data), data } };
 }
 
@@ -158,3 +156,4 @@ export function backupDue(lastBackupAt: string | undefined, finishedWorkouts: nu
   if (!lastBackupAt) return true;
   return nowMs - Date.parse(lastBackupAt) >= days * 86400000;
 }
+

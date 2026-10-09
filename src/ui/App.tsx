@@ -31,6 +31,7 @@ const WorkoutDetail = lazyScreen(() => withFull(import('./screens/Stats')).then(
 const WorkoutEdit = lazyScreen(() => withFull(import('./screens/WorkoutEdit')).then((m) => m.WorkoutEdit));
 const RecoveryTips = lazyScreen(() => import('./screens/Recovery').then((m) => m.RecoveryTips), '회복 팁');
 const RecoveryPapers = lazyScreen(() => import('./screens/Recovery').then((m) => m.RecoveryPapers), '근거 논문');
+const WatchScreen = lazyScreen(() => import('./screens/Watch').then((m) => m.WatchScreen), '애플워치 연동');
 const ToolsScreen = lazyScreen(() => import('./screens/Tools').then((m) => m.ToolsScreen), '도구');
 
 export function useHash(): string {
@@ -108,6 +109,7 @@ export function App() {
   else if (path.startsWith('/exercises')) screen = <Exercises s={s} />;
   else if (path.startsWith('/workout')) screen = <WorkoutScreen s={s} />;
   else if (path.startsWith('/settings/about')) screen = <AboutScreen />;
+  else if (path.startsWith('/settings/watch')) screen = <WatchScreen s={s} />;
   else if (path.startsWith('/settings')) screen = <SettingsScreen s={s} />;
   else if (path.startsWith('/stats/w/') && path.endsWith('/edit')) screen = <WorkoutEdit key={path} s={s} id={decodeURIComponent(path.slice(9, -5))} />;
   else if (path.startsWith('/stats/w/')) screen = <WorkoutDetail s={s} id={decodeURIComponent(path.slice(9))} />;

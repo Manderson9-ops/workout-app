@@ -1133,9 +1133,12 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
 });
 
 test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 그대로, 지우기는 지움 표시', async ({ page }) => {
-  // 앱이 연 저장소를 닫고 지운 뒤, 0.3.0(v3)과 같은 구조로 직접 만들어 기록을 넣음
+  // 앱이 연 저장소를 닫고 지운 뒤, 0.3.0(v3)과 같은 구조로 직접 만들어 기록을 넣음.
+  // 앱 화면에서 하면 앱(Dexie)이 지운 직후 저장소를 v6(60)으로 다시 열어 v3(30) 열기가 VersionError 로 실패할 수 있음 (D-058 검토 T1, 전체 실행 때만 나던 경쟁)
+  // → 앱이 없는 같은 출처 파일(version.json)로 옮겨 앱 연결을 끊고, 지우기가 끝날 때(onsuccess)까지 기다림
+  await page.goto('./version.json');
   await page.evaluate(async () => {
-    await new Promise<void>((res) => { const r = indexedDB.deleteDatabase('workout-app'); r.onsuccess = () => res(); r.onerror = () => res(); r.onblocked = () => res(); });
+    await new Promise<void>((res, rej) => { const r = indexedDB.deleteDatabase('workout-app'); r.onsuccess = () => res(); r.onerror = () => rej(r.error); });
     await new Promise<void>((res, rej) => {
       const o = indexedDB.open('workout-app', 30);
       o.onupgradeneeded = () => {
@@ -1158,7 +1161,7 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
       o.onerror = () => rej(o.error);
     });
   });
-  await page.reload();
+  await page.goto('./#/');
   await expect(page.getByRole('heading', { name: '예전 루틴' })).toBeVisible();
   await page.getByRole('link', { name: '설정' }).click();
   await expect(page.getByRole('button', { name: '상급' })).toHaveAttribute('aria-pressed', 'true');
@@ -1166,7 +1169,7 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
     const o = indexedDB.open('workout-app');
     o.onsuccess = () => { const db = o.result; const g = db.transaction('routines').objectStore('routines').get('r-old'); g.onsuccess = () => { res({ ver: db.version, stamped: !!g.result?._s && g.result._s.y === 1 }); db.close(); }; };
   }));
-  expect(info).toEqual({ ver: 50, stamped: true });
+  expect(info).toEqual({ ver: 60, stamped: true }); // Dexie 버전 6 × 10 (v6 = 애플워치 표, D-058)
   // 지우면 기록은 없어지고 지움 표시가 남음
   await page.getByRole('link', { name: '홈' }).click();
   await routineMenu(page, '예전 루틴', '지우기');
@@ -1964,13 +1967,13 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
   await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.4 바뀐 점'); // 0.9.5(3줄) + 0.9.4(3줄) + 0.9.3(2줄) = 8줄
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.5 바뀐 점'); // 0.9.6(3줄) + 0.9.5(3줄) + 0.9.4(2줄) = 8줄
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
   await checkScreen(page, '65-whats-new');
   await sheet.getByRole('button', { name: /^모두 보기/ }).click();
-  await expect(sheet.locator('.wn-lines li')).toHaveCount(28); // 0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(31); // 0.9.6·0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
@@ -2005,7 +2008,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.5(3줄) + 0.9.4(3줄) + 0.9.3(2줄) = 8줄, 0.9.2 이전은 [모두 보기]
+  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.6(3줄) + 0.9.5(3줄) + 0.9.4(2줄) = 8줄, 0.9.3 이전은 [모두 보기]
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   const gear = page.getByRole('link', { name: '설정', exact: true });
@@ -2023,9 +2026,14 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await aboutRow.click();
   await expect(page.getByRole('heading', { name: '앱 정보' })).toBeVisible();
   await page.getByRole('link', { name: '홈', exact: true }).click();
-  await expect(page.getByRole('link', { name: '설정', exact: true }).locator('.ndot')).toHaveCount(0);
+  // 0.9.6 의 where(#/settings/watch)도 설정 버튼 점 → 애플워치 연동 화면까지 열어야 지워짐 (where 마다 따로)
+  await expect(page.getByRole('link', { name: '설정', exact: true }).locator('.ndot')).toHaveCount(1);
   await page.getByRole('link', { name: '설정', exact: true }).click();
   await expect(aboutRow).not.toHaveAttribute('aria-label', /새 기능 있음/);
+  await page.getByRole('link', { name: /^애플워치 연동/ }).click();
+  await expect(page.getByRole('heading', { name: '애플워치 연동' })).toBeVisible();
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+  await expect(page.getByRole('link', { name: '설정', exact: true }).locator('.ndot')).toHaveCount(0);
 });
 
 test('D-055 0.8.x 에서 올라옴: 마지막 본 버전 기록이 없고 루틴이 있으면 "새로 바뀐 점"(이번 버전만)을 보여 줌', async ({ page }) => {
@@ -2739,6 +2747,71 @@ test.describe('D-057 회복', () => {
     await page.goto('./#/settings');
     await page.getByRole('link', { name: '세트 간 휴식 근거 논문' }).click();
     await expect(page.getByTestId('paper-count')).toHaveText(/^\d+편 · 주제 세트 간 휴식$/);
+  });
+});
+
+test.describe('D-058 애플워치 연동', () => {
+  test('기록이 없으면 운동 카드에 심박 줄 없음, 연동 화면은 빈 안내', async ({ page }) => {
+    await page.goto('./#/settings');
+    await page.getByRole('link', { name: /^애플워치 연동/ }).click();
+    await expect(page.getByTestId('watch-status')).toContainText('아직 애플워치 기록을 받지 않았어요');
+    await expect(page.getByRole('region', { name: '단축어에 넣을 주소와 키' })).toContainText('먼저 설정');
+    await checkScreen(page, '91-watch-empty');
+    await page.getByRole('button', { name: '설정으로' }).click();
+    await expect(page).toHaveURL(/#\/settings$/);
+  });
+
+  test('받은 심박·에너지가 운동 시간과 겹치면 카드·상세에 평균·최고 심박·kcal, 회복 카드에 어젯밤 수면(짧으면 팁), 연동 화면 상태', async ({ page }) => {
+    await makeRoutine(page, ['이두'], '30분');
+    await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
+    await expect(page.getByRole('button', { name: '현재 세트 완료' })).toBeVisible();
+    const kg = page.locator('.set-row.current input[aria-label$=" 무게"]');
+    if (await kg.count()) await kg.first().fill('10');
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    await page.waitForTimeout(2200); // 운동 시간이 2초는 되게
+    await endWorkout(page);
+    // 그 운동 시간 안 심박 120·140, 활동 에너지 12kcal (점 샘플), 오늘 요약(수면 5시간 30분·안정 심박 56·HRV 48)
+    await page.evaluate(async () => {
+      const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      const w = await new Promise<{ startedAt: string; endedAt: string }>((res) => { const q = db.transaction('workouts').objectStore('workouts').getAll(); q.onsuccess = () => res((q.result as { startedAt: string; endedAt?: string }[]).find((x) => x.endedAt) as never); });
+      const K = 9 * 3600000;
+      const day = (ms: number) => { const d = new Date(ms + K); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
+      const a = Date.parse(w.startedAt), b = Date.parse(w.endedAt);
+      const d = day(a); const p = d.split('-').map(Number); const t0 = Date.UTC(p[0]!, p[1]! - 1, p[2]!) - K;
+      const sa = Math.ceil((a - t0) / 1000), sb = Math.floor((b - t0) / 1000);
+      const rx = new Date().toISOString();
+      const rows = [
+        { id: `hr-${d}`, type: 'hr', day: d, t0, p: [sa - 600, 190, sa, 120, sb, 140], rx },
+        { id: `en-${d}`, type: 'energy', day: d, t0, p: [sa, 0, 120], rx },
+        { id: `dy-${day(Date.now())}`, type: 'daily', day: day(Date.now()), sleepMin: 330, rhr: 56, hrv: 48.4, rx },
+      ];
+      await new Promise<void>((res, rej) => { const tx = db.transaction('health', 'readwrite'); for (const r of rows) tx.objectStore('health').put(r); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+      db.close();
+    });
+    await page.reload();
+    const line = '평균 심박 130 · 최고 140 · 12kcal (애플워치)';
+    await expect(page.getByTestId('wc-watch').first()).toHaveText(line);
+    await expect(page.getByRole('group', { name: /^최근 운동 / }).first().getByRole('button').first()).toHaveAttribute('aria-label', new RegExp(line.replace(/[()]/g, '\\$&')));
+    await checkScreen(page, '92-home-watch');
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await expect(page.getByTestId('rec-night')).toContainText('어젯밤 수면 5시간 30분 · 안정 심박 56 · HRV 48ms (애플워치, 참고)');
+    await expect(page.getByTestId('rec-sleep-tip')).toHaveAttribute('href', '#/recovery');
+    await expect(page.locator('main').getByTestId('wc-watch').first()).toHaveText(line);
+    await checkScreen(page, '93-stats-watch');
+    await page.locator('main .wcard').first().click();
+    await expect(page.getByTestId('detail-watch')).toHaveText(line);
+    // 연동 화면: 받은 상태
+    await page.goto('./#/settings/watch');
+    const st = page.getByTestId('watch-status');
+    await expect(st).toContainText('심박');
+    await expect(st).toContainText('마지막으로 받음');
+    await expect(st).toContainText('최근 7일 받은 기록 3번');
+    await expect(page.getByTestId('watch-delay')).toContainText('심박은 몇 분~몇 시간 늦게 들어올 수 있어요');
+    await expect(page.getByTestId('watch-key-warn')).toContainText('공유');
+    // 이름 칸이 세로로 갈라지지 않음 (한 줄 높이)
+    const lab = st.locator('.watch-row > span').first();
+    expect((await lab.boundingBox())!.height).toBeLessThan(30);
+    await checkScreen(page, '94-watch-status');
   });
 });
 

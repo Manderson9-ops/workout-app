@@ -697,3 +697,15 @@ button.chip.full { width: 100%; }
 .lbl-chip.weak { color: var(--sub); border: 1px dotted var(--line); }
 .rec-stale { margin: 4px 0 8px; }
 .rec-stale > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--sub); font-size: 14px; }
+/* ===== D-058 애플워치 ===== */
+.wc-watch { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
+.wc-watch .icon { color: var(--sub); flex: none; }
+.wc-watch.detail { font-size: 14px; color: var(--text); }
+.rec-night { margin: 4px 0 8px; }
+.rec-night p { display: flex; align-items: center; gap: 6px; margin: 0; }
+.rec-night .icon { color: var(--sub); flex: none; }
+.watch-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.watch-row > span:first-child { flex: none; min-width: 7.5em; white-space: nowrap; font-weight: 600; } /* 이름이 세로로 갈라지지 않게 (검토 D1) */
+.watch-row > span:last-child { min-width: 0; text-align: right; }
+.watch-row:last-child { border-bottom: 0; }
+.watch-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }

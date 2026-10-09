@@ -10,6 +10,7 @@ import type { BackupData } from '../core/backup';
 import type { DiagEntry } from '../core/diag';
 import { Clock, memoryClockStore } from '../core/hlc';
 import type { Feedback } from '../core/feedback';
+import type { HealthRow } from '../core/health';
 import { SYNC_TABLES, PK, stampValue, baseStamp, tombKey, withoutStamp } from '../core/syncStamp';
 import type { SyncTable, Tomb } from '../core/syncStamp';
 
@@ -52,6 +53,8 @@ export class WorkoutDB extends Dexie {
   diag!: Table<DiagEntry & { id?: number }, number>;
   /** 개선 메모 (S3, v5) */
   feedback!: Table<Feedback, string>;
+  /** 애플워치 기록 (D-058, v6): 서버(단축어)가 쓰고 기기는 받기만. 동기화 표시 없음 */
+  health!: Table<HealthRow, string>;
   tombs!: Table<Tomb, string>;
   /** 동기화 상태 등 기기 안 값 (since, epoch, 보관한 수정) */
   kv!: Table<{ k: string; v: unknown }, string>;
@@ -93,6 +96,8 @@ export class WorkoutDB extends Dexie {
       const row = (await tx.table('kv').get('sync')) as { k: string; v: Record<string, unknown> } | undefined;
       if (row?.v && typeof row.v.since === 'number' && row.v.since > 0) await tx.table('kv').put({ k: 'sync', v: { ...row.v, since: 0 } });
     });
+    // v6 (D-058): 애플워치 기록 표. 기존 표와 데이터는 그대로 (마이그레이션 테스트: tests/health.test.ts)
+    this.version(6).stores({ health: 'id' });
     // 모든 저장에 동기화 표시를 자동으로 붙임 (같은 트랜잭션, 빠뜨릴 곳 없음). 지우기는 softDelete로만
     const self = this;
     this.use({
@@ -158,19 +163,19 @@ export async function requestPersist(): Promise<boolean> {
 
 /** 읽기 트랜잭션 하나로 읽어서, 읽는 도중 기록이 바뀌어도 서로 어긋나지 않게 */
 export async function exportAll(db: WorkoutDB): Promise<BackupData> {
-  return db.transaction('r', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag, db.feedback], async () => {
-    const [routines, workouts, meta, custom, settings, bodyweight, diagRows, feedback] = await Promise.all([
-      db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.settings.toArray(), db.bodyweight.toArray(), db.diag.orderBy('id').toArray(), db.feedback.toArray(),
+  return db.transaction('r', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag, db.feedback, db.health], async () => {
+    const [routines, workouts, meta, custom, settings, bodyweight, diagRows, feedback, health] = await Promise.all([
+      db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.settings.toArray(), db.bodyweight.toArray(), db.diag.orderBy('id').toArray(), db.feedback.toArray(), db.health.toArray(),
     ]);
     const diag = diagRows.map(({ id: _id, ...e }) => e);
     // 동기화 표시(_s)는 기기 안 정보라 백업 파일에 넣지 않음
     const strip = <T,>(xs: T[]) => xs.map((x) => withoutStamp(x as never) as unknown as T);
-    return { routines: strip(routines), workouts: strip(workouts), meta: strip(meta), custom: strip(custom) as unknown as Record<string, unknown>[], settings: strip(settings) as unknown as Record<string, unknown>[], bodyweight: strip(bodyweight), diag, feedback: strip(feedback) };
+    return { routines: strip(routines), workouts: strip(workouts), meta: strip(meta), custom: strip(custom) as unknown as Record<string, unknown>[], settings: strip(settings) as unknown as Record<string, unknown>[], bodyweight: strip(bodyweight), diag, feedback: strip(feedback), ...(health.length ? { health } : {}) };
   });
 }
 /** 백업으로 전부 바꾸기. 한 트랜잭션이라 중간에 실패하면 아무것도 바뀌지 않음 */
 export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackupAt?: string } = {}): Promise<void> {
-  await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag, db.feedback, db.tombs, db.kv], async () => {
+  await db.transaction('rw', [db.routines, db.workouts, db.meta, db.custom, db.settings, db.bodyweight, db.diag, db.feedback, db.tombs, db.kv, db.health], async () => {
     await Promise.all([db.routines.clear(), db.workouts.clear(), db.meta.clear(), db.custom.clear(), db.settings.clear(), db.bodyweight.clear(), db.diag.clear(), db.feedback.clear(), db.tombs.clear()]);
     // 파일 안의 _s(동기화 표시)는 믿지 않고 떼어 냄 → 새로 표시(아직 안 보냄). 진행 중 운동은 이 기기가 주인
     const clean = <T,>(xs: T[]) => xs.map((x) => withoutStamp(x as never) as unknown as T);
@@ -184,9 +189,11 @@ export async function importAll(db: WorkoutDB, d: BackupData, opts: { lastBackup
     await db.settings.bulkPut(st);
     await db.bodyweight.bulkPut(clean(d.bodyweight));
     await db.feedback.bulkPut(clean(d.feedback ?? []));
+    // 애플워치 기록 (D-058): 파일에 있으면 그것으로, 옛 백업(없음)이면 지금 것을 그대로 둠 (다음 동기화로도 다시 받음)
+    if (Array.isArray(d.health)) { await db.health.clear(); await db.health.bulkPut(d.health as HealthRow[]); }
     // 불러온 뒤 동기화를 다시 켜면 처음 연결 절차(받기 → 비교 → 고르기 → 올리기)를 거치게 (보관본은 유지)
     const kv = ((await db.kv.get('sync'))?.v ?? {}) as Record<string, unknown>;
-    await db.kv.put({ k: 'sync', v: { ...kv, epoch: 0, since: 0 } });
+    await db.kv.put({ k: 'sync', v: { ...kv, epoch: 0, since: 0, healthSince: 0 } });
     await db.diag.bulkAdd((d.diag ?? []).map(({ id: _id, ...e }: DiagEntry & { id?: number }) => e));
   });
 }

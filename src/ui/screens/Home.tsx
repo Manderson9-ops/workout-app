@@ -186,7 +186,7 @@ export function Home({ s }: { s: AppState }) {
       {recent.length > 0 && <h2>최근 운동</h2>}
       <div class="wide-cards">
         {recent.map((w) => (
-          <WorkoutCardWithMenu key={w.id} x={summarize(w, byId, s.bodyweight)} w={w} byId={byId} items={[
+          <WorkoutCardWithMenu key={w.id} x={summarize(w, byId, s.bodyweight)} w={w} byId={byId} health={s.health} items={[
             { label: '수정', aria: `최근 운동 ${w.name} 수정`, run: () => go(`#/stats/w/${encodeURIComponent(w.id)}/edit`) },
             { label: '삭제…', aria: `최근 운동 ${w.name} 삭제`, danger: true, run: () => void removeRecent(w).then((p) => { if (p === 'ok') setDone(`"${w.name}"을(를) 홈에서 뺐어요. 기록 탭의 상세에서 되돌릴 수 있어요`); else if (p === 'alt') setDone(`"${w.name}"을(를) 완전히 지웠어요`); }) },
           ]} />

@@ -11,7 +11,19 @@ import { stripTypeScriptTypes } from 'node:module';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+/** 순수 TS 모듈 하나를 Apps Script 용 이름 공간(var Name = (function(){...})())으로 */
+function bundle(file: string, name: string): string {
+  const ts = readFileSync(join(ROOT, 'src', 'core', file), 'utf8');
+  if (/^\s*import\s/m.test(ts)) throw new Error(`${file}는 다른 모듈을 가져오면 안 됩니다 (Apps Script)`);
+  let js = stripTypeScriptTypes(ts, { mode: 'strip' }).replace(/[\u00a0\u2000-\u200b\u3000]/g, ' ');
+  if (/\d_\d/.test(js.replace(/(['"`])(?:\\.|(?!\1).)*\1/g, ''))) throw new Error(`${file}에 숫자 구분자(예: 60_000)가 있어요`);
+  const names = [...js.matchAll(/^export (?:const|function) (\w+)/gm)].map((m) => m[1]);
+  js = js.replace(/^export (const|function) /gm, '$1 ');
+  return `// ---- 자동 생성: src/core/${file} (고치지 말 것) ----\nvar ${name} = (function () {\n${js}\nreturn { ${names.join(', ')} };\n})();\n`;
+}
+
 export function buildGas(local?: { INBOX_ID: string; EXEC_URL: string }): string {
+  const health = bundle('healthIngest.ts', 'HealthIngest'); // D-058 애플워치 받기
   const ts = readFileSync(join(ROOT, 'src', 'core', 'syncMerge.ts'), 'utf8');
   if (/^\s*import\s/m.test(ts)) throw new Error('syncMerge.ts는 다른 모듈을 가져오면 안 됩니다 (Apps Script)');
   // 형식을 지운 자리에 들어가는 특수 공백(U+2002 등)은 Apps Script 편집기가 못 읽어 저장이 안 됨 → 보통 공백으로
@@ -24,7 +36,7 @@ export function buildGas(local?: { INBOX_ID: string; EXEC_URL: string }): string
   let handler = readFileSync(join(ROOT, 'tools', 'gas', 'handler.js'), 'utf8');
   // 주석에도 같은 글자가 있어서, 따옴표로 감싼 값 자리만 바꿈
   if (local) handler = handler.replace("'__INBOX_ID__'", JSON.stringify(local.INBOX_ID)).replace("'__EXEC_URL__'", JSON.stringify(local.EXEC_URL));
-  return `${lib}\n${handler}`;
+  return `${lib}\n${health}\n${handler}`;
 }
 
 if (process.argv[1]?.replace(/\\/g, '/').endsWith('tools/gas/build.ts')) {

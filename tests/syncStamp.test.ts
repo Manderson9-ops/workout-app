@@ -133,7 +133,7 @@ describe('DB 층: 모든 저장에 자동 표시, 지우기는 지움 표시 (S2
     expect(s._s.f.level).toBe(hlcZero('devM'));
     expect(s._s.f).not.toHaveProperty('soundOn');
     expect(((await db.bodyweight.get('2026-09-30')) as unknown as { _s?: unknown })._s).toBeDefined();
-    expect(db.verno).toBe(5);
+    expect(db.verno).toBe(6); // v6 = 애플워치 표 (D-058)
     // 옛 진행 중 운동은 이 기기가 주인
     expect(await db.workouts.get('w-open')).toMatchObject({ ownerDeviceId: 'devM', ownerAt: '2026-09-30T09:00:00.000Z' });
     db.close();
@@ -146,7 +146,7 @@ describe('DB 층: 모든 저장에 자동 표시, 지우기는 지움 표시 (S2
     await old.table('kv').put({ k: 'sync', v: { epoch: 3, since: 42, stash: { muts: [] } } });
     old.close();
     const db = new WorkoutDB(name2, { clock: new Clock(memoryClockStore(), () => 5_000), deviceId: () => 'devM' });
-    expect(db.verno).toBe(5);
+    expect(db.verno).toBe(6); // v6 = 애플워치 표 (D-058)
     expect(await db.feedback.count()).toBe(0);
     expect((await db.routines.get('r1'))?.name).toBe('등');
     expect((await db.kv.get('sync'))?.v).toEqual({ epoch: 3, since: 0, stash: { muts: [] } });

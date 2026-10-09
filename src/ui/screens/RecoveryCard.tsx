@@ -8,6 +8,8 @@ import { sortedRecovery, STATUS_LABEL, agoText, BASE_H, HIGH_VOL_H, HIGH_VOL_SET
 import { labelKinds, isWeakLabel } from '../../core/recoveryData';
 import { ruleById } from '../recoveryDb';
 import { BodyRecovery } from '../bodyMapView';
+import { nightLine, SHORT_SLEEP_MIN } from '../../core/health';
+import type { lastNight } from '../../core/health';
 import { Sheet, Empty } from '../components';
 import { Icon } from '../icons';
 import type { IconName } from '../icons';
@@ -67,7 +69,7 @@ function PartSheet({ r, onClose }: { r: PartRecovery; onClose: () => void }) {
   );
 }
 
-export function RecoveryCard({ m }: { m: Map<Part, PartRecovery> }) {
+export function RecoveryCard({ m, night }: { m: Map<Part, PartRecovery>; night?: ReturnType<typeof lastNight> }) {
   const [open, setOpen] = useState<Part | null>(null);
   const all = sortedRecovery(m);
   // 최근 14일(RECENT_DAYS) 안에 한 부위만 목록·그림에 (검토 F6). 나머지는 접어서 한 줄
@@ -78,6 +80,12 @@ export function RecoveryCard({ m }: { m: Map<Part, PartRecovery> }) {
   return (
     <section class="card" data-testid="recovery-card" aria-label="회복 상태 (추정)">
       <div class="card-head"><span class="card-title grow">회복 상태 (추정)</span><a class="ev-link small" href="#/recovery">회복 팁·근거<Icon name="chevron" size={14} /></a></div>
+      {night && (
+        <div class="rec-night" data-testid="rec-night">
+          <p class="small"><Icon name="moon" size={16} />{nightLine(night)}</p>
+          {night.sleepMin !== undefined && night.sleepMin < SHORT_SLEEP_MIN && <a class="ev-link small" href="#/recovery" data-testid="rec-sleep-tip">잠을 못 잔 날 팁 (AR-09)<Icon name="chevron" size={14} /></a>}
+        </div>
+      )}
       {list.length === 0 ? (
         <Empty text={all.length ? `최근 ${RECENT_DAYS}일 안에 한 운동이 없어요` : '아직 회복을 추정할 운동이 없어요'} hint="운동을 끝내면 부위별로 회복 중·회복됨을 추정해 보여 줘요" />
       ) : (
