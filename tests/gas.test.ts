@@ -236,3 +236,29 @@ describe('D-058 검토 G4: 기록 파일에 120일 health(약 3MB) 가 있을 �
   });
 });
 
+describe('D-059 운동별 요약 (실제 빌드한 서버 코드)', () => {
+  const at = (minAgo: number) => new Date(Date.now() - minAgo * 60000).toISOString();
+  it('운동을 먼저 올리고 심박을 받으면 ws 생김 → 새 앱은 받고, 옛 앱 경로에는 없음', async () => {
+    const g = gas(); const A = dev('A');
+    const w = { id: 'wk1', name: '등', startedAt: at(60), endedAt: at(10), blocks: [], timer: null };
+    await A.workouts.put(w as never); await syncOnce(A, g.transport);
+    g.post({ op: 'health', key: g.key, kind: 'workout', hr: [`${at(50)} | 120`, `${at(40)} | 150`].join('\n') });
+    await syncOnce(A, g.transport);
+    expect(await A.health.get('ws-wk1')).toMatchObject({ hrAvg: 135, hrMax: 150, hrN: 2 });
+    const old = g.post({ key: g.key, op: 'sync', schema: 1, epoch: 0, since: 0, muts: [] });
+    expect(old.changes.some((c: { table: string }) => c.table === 'health')).toBe(false);
+  });
+  it('심박을 먼저 받고 운동이 나중에 올라오면 그 동기화 응답에 바로 ws, 지우면 ws 지움', async () => {
+    const g = gas(); const A = dev('A');
+    await A.routines.put(R('r1', '루틴')); await syncOnce(A, g.transport);
+    g.post({ op: 'health', key: g.key, kind: 'daily', hr: [`${at(50)} | 110`, `${at(40)} | 130`].join('\n') });
+    await A.workouts.put({ id: 'wk2', name: '하체', startedAt: at(60), endedAt: at(10), blocks: [], timer: null } as never);
+    await syncOnce(A, g.transport);
+    expect(await A.health.get('ws-wk2')).toMatchObject({ hrAvg: 120, hrN: 2 });
+    const { softDelete } = await import('../src/db/db');
+    await softDelete(A, 'workouts', 'wk2');
+    await syncOnce(A, g.transport);
+    expect(await A.health.get('ws-wk2')).toBeUndefined();
+  });
+});
+

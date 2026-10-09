@@ -20,6 +20,7 @@ import { ScreenHeader } from '../header';
 import { go, setEditReturn } from '../nav';
 import { askChoice, askConfirm } from '../confirm';
 import { lsGet, lsSet } from '../appName';
+import { fullText } from '../../core/dateText';
 
 const SORT_KEY = 'routines.sort';
 const SORT_LABEL: Record<RoutineSort, string> = { recent: '최근 한 순', name: '이름 순', short: '짧은 시간 순' };
@@ -94,7 +95,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
             <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>
           </div>
           <div class="routine-when sub small" role="note" aria-label={u ? `마지막으로 한 날 ${when}, 총 ${u.count}회` : '아직 안 한 루틴'}
-            title={u?.lastAt ? new Date(u.lastAt).toLocaleString('ko-KR') : undefined}>
+            title={u?.lastAt ? fullText(u.lastAt) : undefined}>
             <div aria-hidden="true">{u ? <>마지막 <b>{when}</b></> : '아직 안 함'}</div>{u && <div aria-hidden="true">총 {u.count}회</div>}
           </div>
         </div>

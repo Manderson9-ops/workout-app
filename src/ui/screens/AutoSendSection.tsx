@@ -3,8 +3,9 @@ import { getSendConfig, saveSendConfig, clearSendConfig, pingSend, sendNow, last
 import { maskKey } from '../../core/autoSendConfig';
 import { IS_PREVIEW } from '../appName';
 import { askConfirm } from '../confirm';
+import { dateTimeText } from '../../core/dateText';
 
-const when = (t?: string) => (t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '없음');
+const when = (t?: string) => (t ? dateTimeText(t, Date.now()) : '없음');
 
 /** 홈: 운동 종료 뒤 자동 보내기 결과 (보내는 동안 앱을 닫지 않도록 안내) */
 export function SendStatus() {

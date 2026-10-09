@@ -111,6 +111,12 @@ function sync_(req) {
     snapshot_(folder, loaded.file);
     var before = state.rev, epochBefore = state.epoch;
     var resp = SyncMerge.handleSync(state, req, Date.now());
+    // D-059: 올라온 운동(끝남·지움)의 애플워치 요약을 다시 계산. 바뀌면 응답 rev 와 health 를 다시 채움 (옛 앱에는 health 를 넣지 않음)
+    var wids = (req.muts || []).filter(function (m) { return m.table === 'workouts'; }).map(function (m) { return m.id; });
+    if (resp.ok && wids.length && HealthIngest.afterWorkoutMuts(state, wids, Date.now())) {
+      resp.rev = state.rev;
+      if (typeof req.healthSince === 'number') resp.health = SyncMerge.changesSince(state, req.full || resp.full ? 0 : req.healthSince).filter(function (r) { return r.table === 'health'; });
+    }
     if (state.rev !== before || state.epoch !== epochBefore || !loaded.file) {
       setHint_('pending');
       save_(folder, loaded.file, state);

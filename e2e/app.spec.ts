@@ -1967,13 +1967,13 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
   await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.5 바뀐 점'); // 0.9.6(3줄) + 0.9.5(3줄) + 0.9.4(2줄) = 8줄
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.6 바뀐 점'); // 0.9.7(2줄) + 0.9.6(3줄) + 0.9.5(3줄) = 8줄
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
   await checkScreen(page, '65-whats-new');
   await sheet.getByRole('button', { name: /^모두 보기/ }).click();
-  await expect(sheet.locator('.wn-lines li')).toHaveCount(31); // 0.9.6·0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(33); // 0.9.7 2줄 + 0.9.6·0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
@@ -2008,7 +2008,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.6(3줄) + 0.9.5(3줄) + 0.9.4(2줄) = 8줄, 0.9.3 이전은 [모두 보기]
+  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.7(2줄) + 0.9.6(3줄) + 0.9.5(3줄) = 8줄, 0.9.4 이전은 [모두 보기]
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   const gear = page.getByRole('link', { name: '설정', exact: true });
@@ -2813,5 +2813,99 @@ test.describe('D-058 애플워치 연동', () => {
     expect((await lab.boundingBox())!.height).toBeLessThan(30);
     await checkScreen(page, '94-watch-status');
   });
+
+  test('D-059 서버가 저장한 운동별 요약(ws-운동ID)만 있고 원본 심박이 없어도(120일 정리 뒤) 카드·상세에 그대로', async ({ page }) => {
+    await makeRoutine(page, ['이두'], '30분');
+    await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
+    await expect(page.getByRole('button', { name: '현재 세트 완료' })).toBeVisible();
+    const kg = page.locator('.set-row.current input[aria-label$=" 무게"]');
+    if (await kg.count()) await kg.first().fill('10');
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    await endWorkout(page);
+    await page.evaluate(async () => {
+      const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      const w = await new Promise<{ id: string; startedAt: string; endedAt: string }>((res) => { const q = db.transaction('workouts').objectStore('workouts').getAll(); q.onsuccess = () => res((q.result as { id: string; startedAt: string; endedAt?: string }[]).find((x) => x.endedAt) as never); });
+      const row = { id: `ws-${w.id}`, type: 'ws', workoutId: w.id, startedAt: w.startedAt, endedAt: w.endedAt, hrAvg: 133, hrMax: 170, hrN: 400, kcal: 380, src: 'watch', computedAt: new Date().toISOString() };
+      await new Promise<void>((res, rej) => { const tx = db.transaction('health', 'readwrite'); tx.objectStore('health').put(row); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+      db.close();
+    });
+    await page.reload();
+    const line = '평균 심박 133 · 최고 170 · 380kcal (애플워치)';
+    await expect(page.getByTestId('wc-watch').first()).toHaveText(line);
+    await page.locator('main .wcard').first().click();
+    await expect(page.getByTestId('detail-watch')).toHaveText(line);
+    // 요약은 받은 상태 목록(심박·에너지·수면·요약)에 섞이지 않음
+    await page.goto('./#/settings/watch');
+    await expect(page.getByTestId('watch-status')).not.toContainText('마지막으로 받음');
+  });
 });
 
+test.describe('D-060 날짜·시각 표시 (고정 시각, 한국 시간)', () => {
+  test.use({ timezoneId: 'Asia/Seoul' });
+  const at = (s: string) => new Date(s + '+09:00');
+  const p8 = async (page: Page, name: string) => { await checkScreen(page, name); };
+  test('어제 한 운동: 홈·기록·상세·연동·앱 정보, 주가 바뀌면 날짜, 해가 바뀌면 연도', async ({ page }) => {
+    await page.clock.setFixedTime(at('2026-10-07T19:05:00'));
+    await page.reload();
+    await makeRoutine(page, ['이두'], '30분');
+    await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
+    await expect(page.getByRole('button', { name: '현재 세트 완료' })).toBeVisible();
+    const kg = page.locator('.set-row.current input[aria-label$=" 무게"]');
+    if (await kg.count()) await kg.first().fill('10');
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    await page.clock.setFixedTime(at('2026-10-07T20:05:00'));
+    await endWorkout(page);
+    await expect.poll(() => page.evaluate(async () => {
+      const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      const ws = await new Promise<{ endedAt?: string }[]>((res) => { const q = db.transaction('workouts').objectStore('workouts').getAll(); q.onsuccess = () => res(q.result); });
+      db.close();
+      return ws.find((x) => x.endedAt)?.endedAt ?? '';
+    })).toBe(at('2026-10-07T20:05:00').toISOString());
+    // 다음 날(목) 오전 11:24
+    await page.clock.setFixedTime(at('2026-10-08T11:24:00'));
+    await page.evaluate(async () => {
+      const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      const rx = new Date('2026-10-08T11:00:00+09:00').toISOString();
+      await new Promise<void>((res, rej) => { const tx = db.transaction('health', 'readwrite'); tx.objectStore('health').put({ id: 'hr-2026-10-08', type: 'hr', day: '2026-10-08', t0: Date.parse('2026-10-08T00:00:00+09:00'), p: [39600, 70], rx }); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+      db.close();
+    });
+    await page.goto('./#/');
+    await page.reload();
+    await expect(page.getByText('10월 8일 목요일')).toBeVisible();
+    const card = page.locator('main .wcard').first();
+    await expect(card.locator('.wc-meta')).toHaveText('어제 오후 7:05');
+    await expect(card).toHaveAttribute('aria-label', /2026년 10월 7일 수요일 오후 7시 5분/);
+    await expect(page.locator('.routine-card').first()).toContainText('어제');
+    await card.scrollIntoViewIfNeeded();
+    await p8(page, 'p8-home');
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await expect(page.getByTestId('part-week')).toHaveText('이번 주 · 10월 4일~10일');
+    await expect(page.locator('h3.wk-head').first()).toHaveText('이번 주');
+    await expect(page.locator('main .wcard .wc-meta').first()).toHaveText('어제 오후 7:05');
+    await page.locator('h3.wk-head').first().scrollIntoViewIfNeeded();
+    await p8(page, 'p8-stats');
+    await page.locator('main .wcard').first().click();
+    await expect(page.locator('main p.sub').first()).toContainText('10월 7일(수) 오후 7:05~오후 8:05 · 1시간');
+    await p8(page, 'p8-detail');
+    await page.goto('./#/settings/watch');
+    await expect(page.getByTestId('watch-status')).toContainText('마지막으로 받음 오늘 오전 11:00');
+    await p8(page, 'p8-watch');
+    await page.goto('./#/settings/about');
+    await expect(page.getByLabel('지금 버전')).toContainText('마지막 업데이트');
+    await expect(page.getByLabel('지금 버전')).not.toContainText(/\(\d{4}-\d{2}-\d{2}\)/);
+    await p8(page, 'p8-about');
+    // 다음 주 월요일: 지난주 → 날짜, "마지막 5일 전"
+    await page.clock.setFixedTime(at('2026-10-12T09:00:00'));
+    await page.goto('./#/');
+    await page.reload();
+    await expect(page.locator('main .wcard .wc-meta').first()).toHaveText('10월 7일(수) 오후 7:05');
+    await expect(page.locator('.routine-card').first()).toContainText('5일 전');
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await expect(page.locator('h3.wk-head').first()).toHaveText('지난주');
+    // 해가 바뀜: 연도 붙음, 주 제목은 날짜 범위
+    await page.clock.setFixedTime(at('2027-01-05T09:00:00'));
+    await page.reload();
+    await expect(page.locator('main .wcard .wc-meta').first()).toHaveText('2026년 10월 7일(수) 오후 7:05');
+    await expect(page.locator('h3.wk-head').first()).toHaveText('2026년 10월 4일~10일');
+  });
+});

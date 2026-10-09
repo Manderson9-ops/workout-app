@@ -39,6 +39,7 @@ import { syncNow } from '../sync';
 import { remoteActiveOf } from '../store';
 import { useDragSort } from '../dragSort';
 import { remapIndex } from '../../core/reorder';
+import { sinceText } from '../../core/dateText';
 
 export function WorkoutScreen({ s }: { s: AppState }) {
   const w = activeOf(s);
@@ -325,7 +326,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
                 <div key={ii} class={`wk-item${it.skipped ? ' skipped' : ''}`}>
                   <div class="row wk-item-head">
                     {g && <GradeBadge g={g} />}
-                    {!single ? <strong class="grow">{String.fromCharCode(65 + ii)}. {nameOf(it.exerciseId)}</strong> : <span class="grow sub small">{it.skipped ? '건너뜀' : `지난번 ${prev.at ? new Date(prev.at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) : '기록 없음'}`}</span>}
+                    {!single ? <strong class="grow">{String.fromCharCode(65 + ii)}. {nameOf(it.exerciseId)}</strong> : <span class="grow sub small">{it.skipped ? '건너뜀' : `지난번 ${prev.at ? sinceText(prev.at, Date.now()) : '기록 없음'}`}</span>}
                     {infoLink(it.exerciseId)}
                     {!single && menuBtn(bi, ii)}
                   </div>

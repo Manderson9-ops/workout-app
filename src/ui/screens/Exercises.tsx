@@ -20,6 +20,7 @@ import { newId, softDelete } from '../../db/db';
 import { go } from '../nav';
 import { askConfirm } from '../confirm';
 import { groupOf } from '../../core/volume';
+import { sinceText, axisText, dateText } from '../../core/dateText';
 
 /** D-041: 주 근육·보조 근육 표시 (플랜은 주 1세트, 보조 0.5세트로 셈) */
 export const muscleText = (muscles: readonly string[]) =>
@@ -149,7 +150,7 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
   const title = (vid: string) => sourceVideos.find((v) => v.video_id === vid)?.title ?? vid;
   const lastH = hist[hist.length - 1];
   const lastW = lastH?.maxWeight ?? lastH?.bestSet?.weight;
-  const lastDate = lastH ? `${Number(lastH.date.slice(5, 7))}/${Number(lastH.date.slice(8))}` : undefined;
+  const lastDate = lastH ? sinceText(lastH.date, Date.now()) : undefined; // "3일 전" (D-060)
   return (
     <main>
       <ScreenHeader back={{ label: '뒤로', onClick: () => history.back(), aria: '뒤로' }} />
@@ -197,15 +198,15 @@ export function ExerciseDetail({ s, id }: { s: AppState; id: string }) {
       {hist.some((h) => h.best1RM) && (
         <>
           <p class="small">추정 1RM 최고 {best}kg <span class="sub">(Epley 공식 추정)</span></p>
-          <LineChart label="추정 1RM 추이" unit="kg" points={hist.filter((h) => h.best1RM).slice(-20).map((h) => ({ label: h.date.slice(5).replace('-', '/'), value: h.best1RM! }))} />
-          <BarChart label="볼륨 추이" unit="kg" points={hist.slice(-8).map((h) => ({ label: h.date.slice(5).replace('-', '/'), value: Math.round(h.volume) }))} />
+          <LineChart label="추정 1RM 추이" unit="kg" points={hist.filter((h) => h.best1RM).slice(-20).map((h) => ({ label: axisText(h.date), value: h.best1RM! }))} />
+          <BarChart label="볼륨 추이" unit="kg" points={hist.slice(-8).map((h) => ({ label: axisText(h.date), value: Math.round(h.volume) }))} />
         </>
       )}
       {hist.length > 0 && (
         <div class="card">
           {[...hist].reverse().slice(0, 10).map((h) => (
             <div class="row between small hist-row" key={h.workoutId}>
-              <span>{h.date.slice(5).replace('-', '/')}</span>
+              <span>{dateText(h.date, Date.now())}</span>
               <span>{h.sets}세트{h.bestSet ? ` · 최고 ${h.bestSet.weight}kg×${h.bestSet.reps}` : ''}{h.seconds ? ` · ${h.seconds}초` : ''}</span>
               <span class="sub">{h.volume ? `${Math.round(h.volume).toLocaleString()}kg` : ''}</span>
             </div>

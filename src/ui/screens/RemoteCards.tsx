@@ -9,8 +9,9 @@ import { syncNow } from '../sync';
 import { go } from '../nav';
 import { askConfirm, showNotice } from '../confirm';
 import { Icon } from '../icons';
+import { agoText } from '../../core/dateText';
 
-const since = (ms: number) => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.round(m / 60)}시간 전`; };
+const since = (ms: number) => agoText(ms, Date.now()); // "방금", "5분 전", "오늘 오전 9:10" (D-060)
 /** 가져오기 진행 중 (확인·동기화를 기다리는 동안 다시 눌러 두 번 가져오지 않게) */
 let taking = false;
 const doneSets = (w: Workout) => w.blocks.flatMap((b) => b.items.flatMap((i) => i.sets)).filter((x) => x.done && !x.warmup).length;

@@ -12,6 +12,7 @@ import { deviceId } from '../deviceId';
 import { APP_VERSION } from '../../core/version';
 import { softDelete } from '../../db/db';
 import { askConfirm } from '../confirm';
+import { dateTimeText } from '../../core/dateText';
 
 const openers = new Set<() => void>();
 /** 화면 제목 줄 오른쪽 원형 "개선" 버튼 (D-055). 시트는 FeedbackButton이 App 맨 위에서 띄움 (머리 안에 고정 시트를 두면 위치가 틀어질 수 있어서) */
@@ -68,7 +69,7 @@ export function FeedbackList({ s }: { s: AppState }) {
       {!items.length && <p class="sub small">아직 없어요.</p>}
       {items.map((f) => (
         <div class="card" key={f.id} aria-label={`개선 메모 ${f.id}`}>
-          <div class="row between small"><span class="sub">{new Date(f.createdAt).toLocaleDateString('ko-KR')} · {f.screen}</span><strong>{f.status}</strong></div>
+          <div class="row between small"><span class="sub">{dateTimeText(f.createdAt, Date.now())} · {f.screen}</span><strong>{f.status}</strong></div>
           <p style={{ whiteSpace: 'pre-wrap', margin: '6px 0' }}>{f.text}</p>
           {f.note && <p class="small sub">{f.status === '보류' ? '보류 이유: ' : ''}{f.note}</p>}
           {f.status === '접수' && <button class="ghost" aria-label={`${f.id} 지우기`} onClick={async () => { if (await askConfirm({ title: '이 메모를 지울까요?', ok: '지우기', danger: true })) await mutate((d) => softDelete(d, 'feedback', f.id)); }}>지우기</button>}

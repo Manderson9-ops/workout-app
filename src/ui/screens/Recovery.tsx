@@ -13,6 +13,7 @@ import { RULES, ruleById } from '../recoveryDb';
 import { ScreenHeader } from '../header';
 import { Metric } from '../components';
 import { Icon } from '../icons';
+import { dateText } from '../../core/dateText';
 
 const PAPERS = (papersFile as { papers: Paper[] }).papers;
 const paperById = new Map(PAPERS.map((p) => [p.id, p]));
@@ -48,7 +49,7 @@ function ProteinBox({ s }: { s: AppState }) {
   const t = proteinTarget(last.kg);
   return (
     <div class="metrics2" data-testid="protein-box">
-      <Metric label={`하루 목표 (체중 ${last.kg}kg × 1.6)`} value={t.target} unit="g" status={`${last.date} 체중 기준`} />
+      <Metric label={`하루 목표 (체중 ${last.kg}kg × 1.6)`} value={t.target} unit="g" status={`${dateText(last.date, Date.now(), { weekday: false })} 체중 기준`} />
       <Metric label="여유 범위 (1.4~2.2 g/kg)" parts={[[t.low, 'g'], [`~${t.high}`, 'g']]} status="연구 근거 범위" />
     </div>
   );
@@ -88,7 +89,7 @@ function PaperItem({ p }: { p: Paper }) {
       </div>
       <p class="paper-title" lang="en">{p.title}</p>
       <p class="sub small" lang="en">{shortRef(p)} · {p.journal}</p>
-      <p class="sub small" data-testid="cite">인용 {p.citation_count.toLocaleString()} · {SOURCE_SHORT(p.citation_source)} · {p.citation_checked} 확인</p>
+      <p class="sub small" data-testid="cite">인용 {p.citation_count.toLocaleString()} · {SOURCE_SHORT(p.citation_source)} · {/^\d{4}-\d{2}-\d{2}$/.test(p.citation_checked) ? dateText(p.citation_checked, Date.now(), { weekday: false }) : p.citation_checked} 확인</p>
       <details>
         <summary>핵심 결과 ({p.key_findings.length})</summary>
         <ul>{p.key_findings.map((k, i) => <li key={i}>{k}</li>)}</ul>
