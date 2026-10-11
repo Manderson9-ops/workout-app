@@ -27,6 +27,7 @@ import { softDelete } from '../../db/db';
 
 import { unlockAudio, wasAlerted, markAlerted, audioState, playEndSound, playWarnSound } from '../device';
 import { diagTimerEnd, diagHaptic } from '../diag';
+import { afterWorkoutFinished } from '../watchRun';
 import { haptic, hapticOn, buzzOnTime, hapticMethod, restHintText } from '../haptics';
 import { notifyOn, notifyPermission, showAppNotification } from '../notify';
 import { shouldNotify, restNotifyBody } from '../../core/notify';
@@ -89,7 +90,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       const cw = activeOf(getState());
       const nPr = cw && cw.id === id ? prExerciseCount(cw, historyOf(getState())) : 0;
       const r = await finishActiveWorkout(id); // 실패 문구는 finishActiveWorkout이 setFinishError로 남김
-      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); if (nPr) showToast(`기록 갱신 ${nPr}개 운동 (앱 기준)`, 'star'); }
+      if (r.ok) { go('#/'); void afterWorkoutFinished(Promise.allSettled([sendNow('workout'), syncNow('finish')])); if (nPr) showToast(`기록 갱신 ${nPr}개 운동 (앱 기준)`, 'star'); }
     } finally { finishing.current = false; }
   };
   // 블록 끌어서 순서 바꾸기 (D-037). 펼친 카드는 옮긴 자리를 따라감
