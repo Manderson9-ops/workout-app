@@ -2819,6 +2819,7 @@ test.describe('D-058 애플워치 연동', () => {
     await page.evaluate(([u, k]) => localStorage.setItem('send.cfg', `${u}#${k}`), [URL_, KEY]);
     await page.goto('./#/settings/watch');
     await page.reload();
+    await page.getByTestId('watch-old-ways').locator('summary').click();
     const card = page.getByTestId('describe-card');
     await expect(card).toContainText('iOS 27: 설명으로 만들기 (가장 쉬움)');
     await expect(card.getByTestId('describe-untested')).toHaveText('실기기 시험 전');
@@ -2851,6 +2852,46 @@ test.describe('D-058 애플워치 연동', () => {
     await page.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } }); });
     await card.getByRole('button', { name: '단축어 B 설명 복사' }).click();
     await expect(card.getByRole('alert')).toContainText('손으로 만들기');
+  });
+
+  test('D-064 자동 보내기: 홈 화면 앱이 아니면 기본 꺼짐, 켜기 저장, 운동 끝내기 뒤 단축어 실행 링크(NFD 이름)', async ({ page }) => {
+    await page.goto('./#/settings/watch');
+    const card = page.getByTestId('watch-autorun');
+    await expect(card).toContainText('자동 보내기 (자동화 없이)');
+    const tg = card.getByTestId('watch-autorun-toggle');
+    await expect(tg).not.toBeChecked(); // 화면 시험(사파리 탭과 같음)에서는 기본 꺼짐
+    // 오늘 하루 보내기는 이미 한 것으로 (다시 읽을 때 하루 보내기가 끼어들지 않게)
+    await page.evaluate(() => localStorage.setItem('watch.runState', JSON.stringify({ dailyDay: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) })));
+    await tg.check();
+    await page.reload();
+    await expect(page.getByTestId('watch-autorun-toggle')).toBeChecked();
+    // 단축어 앱으로 넘어가는 대신 기록 (앱의 시험용 가로채기)
+    await page.evaluate(() => { const w = window as Window & { __runs?: string[]; __woOpen?: (u: string) => void }; w.__runs = []; w.__woOpen = (u) => { w.__runs!.push(u); }; });
+    await page.getByTestId('watch-autorun').getByRole('button', { name: '지금 보내기 (운동)' }).click();
+    const runs = await page.evaluate(() => (window as Window & { __runs?: string[] }).__runs ?? []);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.startsWith('shortcuts://run-shortcut?name=')).toBe(true);
+    expect(decodeURIComponent(runs[0]!.split('name=')[1]!)).toBe('WO 운동 실행'.normalize('NFD'));
+    await expect(page.getByTestId('watch-autorun-last')).toContainText('마지막 운동 보내기 실행');
+    // 운동을 끝내면 0.8초 뒤 "WO 운동 실행"을 한 번 실행 (켜져 있을 때)
+    await page.getByRole('link', { name: '플랜' }).click();
+    await pickPart(page, '이두');
+    await page.getByRole('button', { name: '60분' }).click();
+    await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await page.getByRole('button', { name: '저장하고 시작' }).click();
+    await expect(page.getByRole('button', { name: '현재 세트 완료' })).toBeVisible();
+    // 오늘 하루 보내기를 아직 안 한 상태로 바꿈 → 운동을 끝낼 때 하루 보내기가 끼어들면 안 됨 (운동 보내기 한 번만)
+    await page.evaluate(() => localStorage.setItem('watch.runState', JSON.stringify({ dailyDay: '2000-01-01' })));
+    await page.getByRole('button', { name: '운동 끝내기' }).click();
+    await page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' }).click();
+    await expect.poll(() => page.evaluate(() => ((window as Window & { __runs?: string[] }).__runs ?? []).length), { timeout: 10_000 }).toBe(2);
+    const runs2 = await page.evaluate(() => (window as Window & { __runs?: string[] }).__runs ?? []);
+    expect(decodeURIComponent(runs2[1]!.split('name=')[1]!)).toBe('WO 운동 실행'.normalize('NFD'));
+    await page.waitForTimeout(3500);
+    expect(await page.evaluate(() => ((window as Window & { __runs?: string[] }).__runs ?? []).length)).toBe(2);
+    // 예전 방법은 접힌 곳에
+    await expect(page.getByTestId('watch-old-ways')).not.toHaveAttribute('open', '');
   });
 
   test('D-059 서버가 저장한 운동별 요약(ws-운동ID)만 있고 원본 심박이 없어도(120일 정리 뒤) 카드·상세에 그대로', async ({ page }) => {
