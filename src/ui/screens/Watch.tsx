@@ -78,10 +78,8 @@ function AutoRunCard() {
   return (
     <section class="card" aria-label="자동 보내기" data-testid="watch-autorun">
       <div class="card-head"><span class="card-title grow">자동 보내기 (자동화 없이)</span><span class="chip-s" data-testid="watch-autorun-untested">실기기 확인 중</span></div>
-      <label class="row">
-        <input type="checkbox" checked={on} onChange={toggle} data-testid="watch-autorun-toggle" />
-        <span class="grow">운동을 끝내면, 그리고 하루 한 번 앱을 열 때 애플워치 기록 보내기</span>
-      </label>
+      <p class="small">운동을 끝내면, 그리고 하루 한 번 앱을 열 때 애플워치 기록 보내기</p>
+      <div class="row wrap"><button class={`chip${on ? ' on' : ''}`} aria-pressed={on} onClick={toggle} data-testid="watch-autorun-toggle">자동 보내기 {on ? '켬' : '끔'}</button></div>
       <p class="sub small">켜 두면 앱이 아이폰 단축어 <b>WO 운동 실행</b>(운동 끝)·<b>WO 하루 실행</b>(하루 한 번, 새벽 5시 이후 처음 열 때)을 실행해요. 단축어 앱으로 잠깐 넘어가요. 끝나면 왼쪽 위 <b>◀</b>로 이 앱에 돌아오세요. 단축어는 맥이 넣어 준 "WO" 단축어를 써요 (아이폰에서 따로 만들지 않아도 돼요).</p>
       {!canRunShortcuts() && <p class="sub small" data-testid="watch-autorun-notphone">이 기기는 아이폰·아이패드가 아니라서 단축어를 실행할 수 없어요. 아이폰 앱에서 켜 두세요.</p>}
       <div class="row wrap">
