@@ -2859,12 +2859,13 @@ test.describe('D-058 애플워치 연동', () => {
     const card = page.getByTestId('watch-autorun');
     await expect(card).toContainText('자동 보내기 (자동화 없이)');
     const tg = card.getByTestId('watch-autorun-toggle');
-    await expect(tg).not.toBeChecked(); // 화면 시험(사파리 탭과 같음)에서는 기본 꺼짐
+    await expect(tg).toHaveAttribute('aria-pressed', 'false'); // 화면 시험(사파리 탭과 같음)에서는 기본 꺼짐
     // 오늘 하루 보내기는 이미 한 것으로 (다시 읽을 때 하루 보내기가 끼어들지 않게)
     await page.evaluate(() => localStorage.setItem('watch.runState', JSON.stringify({ dailyDay: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) })));
-    await tg.check();
+    await tg.click();
+    await expect(tg).toHaveText('자동 보내기 켬');
     await page.reload();
-    await expect(page.getByTestId('watch-autorun-toggle')).toBeChecked();
+    await expect(page.getByTestId('watch-autorun-toggle')).toHaveAttribute('aria-pressed', 'true');
     // 단축어 앱으로 넘어가는 대신 기록 (앱의 시험용 가로채기)
     await page.evaluate(() => { const w = window as Window & { __runs?: string[]; __woOpen?: (u: string) => void }; w.__runs = []; w.__woOpen = (u) => { w.__runs!.push(u); }; });
     await page.getByTestId('watch-autorun').getByRole('button', { name: '지금 보내기 (운동)' }).click();
