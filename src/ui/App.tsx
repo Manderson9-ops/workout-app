@@ -10,6 +10,7 @@ import { mmss } from './components';
 import { Icon } from './icons';
 import type { IconName } from './icons';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
+import { useDailyWatchRun } from './watchRun';
 import { useUpdateAvailable, markFirstScreen } from './update';
 import { ConfirmHost, askConfirm } from './confirm';
 import { ToastHost } from './toast';
@@ -96,6 +97,7 @@ export function App() {
   useAudioUnlock(s.settings.soundOn);
   useFlushOnHide();
   useWakeLock(!!active && s.settings.keepAwake);
+  useDailyWatchRun(s.ready, !!active);
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
   const [news, closeNews] = useWhatsNew(s);
   const path = hash.replace(/^#/, '');
