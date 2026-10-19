@@ -10,9 +10,11 @@ import { mmss } from './components';
 import { Icon } from './icons';
 import type { IconName } from './icons';
 import { useAudioUnlock, useWakeLock, useFlushOnHide } from './device';
+import { useDailyWatchRun } from './watchRun';
 import { useUpdateAvailable, markFirstScreen } from './update';
 import { ConfirmHost, askConfirm } from './confirm';
 import { ToastHost } from './toast';
+import { EndAskBanner } from './EndAskBanner';
 import { useWhatsNew, WhatsNewSheet, newDotTargets, clearDotIfVisited } from './whatsNew';
 import { displayVersion } from '../core/changelog';
 import type { TabId } from '../core/changelog';
@@ -96,6 +98,7 @@ export function App() {
   useAudioUnlock(s.settings.soundOn);
   useFlushOnHide();
   useWakeLock(!!active && s.settings.keepAwake);
+  useDailyWatchRun(s.ready, !!active);
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
   const [news, closeNews] = useWhatsNew(s);
   const path = hash.replace(/^#/, '');
@@ -126,6 +129,7 @@ export function App() {
   return (
     <>
       <UpdateBanner active={!!active} onWorkout={onWorkout} />
+      <EndAskBanner active={active} />
       <FeedbackButton s={s} />
       {screen}
       {active && !onWorkout && (

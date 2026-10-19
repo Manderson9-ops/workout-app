@@ -14,10 +14,11 @@ import { lsGet, lsSet, lsRemove } from './appName';
 /** D-044: 운동 추가에서 마지막으로 고른 부위 (이 기기만) */
 export const PICKER_PART_KEY = 'picker.part';
 
-export function GradeBadge({ g }: { g: Pick<ResolvedGrade, 'value' | 'source' | 'estimated'> }) {
+/** prefix = 글자 앞에 "등급" (묶음 카드에서 A·B 운동 글자와 헷갈리지 않게, 0.9.11) */
+export function GradeBadge({ g, prefix }: { g: Pick<ResolvedGrade, 'value' | 'source' | 'estimated'>; prefix?: boolean }) {
   const cls = g.source === 'USER' ? 'user' : g.estimated ? 'est' : 'video';
   const title = g.source === 'USER' ? '내가 정한 등급' : g.estimated ? '추정 (영상 없음)' : '영상 등급';
-  return <span class={`badge ${cls}`} title={title} aria-label={`등급 ${g.value} ${title}`}>{g.value}{g.estimated ? ' 추정' : ''}</span>;
+  return <span class={`badge ${cls}${prefix ? ' grade-tag' : ''}`} title={title} aria-label={`등급 ${g.value} ${title}`}>{prefix && <span class="grade-k" aria-hidden="true">등급 </span>}{g.value}{g.estimated ? ' 추정' : ''}</span>;
 }
 
 /**

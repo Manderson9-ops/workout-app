@@ -97,8 +97,11 @@ describe('백업 schema 2 (D-026)', () => {
     if (r.ok) { expect(r.file.schema).toBe(3); expect(r.file.data.diag).toEqual([]); expect(r.file.data.feedback).toEqual([]); }
   });
   it('깨진 진단·기기 정보·너무 많은 진단은 거절', () => {
-    const f = makeBackup({ ...empty, diag: [{ ...e('timer'), k: 'x' } as never] }, '0.3.0', '2026-09-30T10:00:00.000Z');
-    expect(parseBackup(JSON.stringify(f))).toMatchObject({ ok: false, error: expect.stringContaining('진단 기록') });
+    // 모르는 종류(새 앱이 만든 것)는 그 줄만 버리고 받음 (A2). 형식이 깨진 진단은 여전히 거절
+    const f = makeBackup({ ...empty, diag: [{ ...e('timer'), k: 'x' } as never, e('vis')] }, '0.3.0', '2026-09-30T10:00:00.000Z');
+    expect(parseBackup(JSON.stringify(f))).toMatchObject({ ok: true, droppedDiag: 1, file: { counts: { diag: 1 } } });
+    const f2 = makeBackup({ ...empty, diag: [{ ...e('timer'), t: '2026' } as never] }, '0.3.0', '2026-09-30T10:00:00.000Z');
+    expect(parseBackup(JSON.stringify(f2))).toMatchObject({ ok: false, error: expect.stringContaining('진단 기록') });
     const g = makeBackup(empty, '0.3.0', '2026-09-30T10:00:00.000Z', { id: 'x'.repeat(40), label: 'a' });
     expect(parseBackup(JSON.stringify(g))).toMatchObject({ ok: false, error: expect.stringContaining('기기 정보') });
     const h = makeBackup({ ...empty, diag: Array.from({ length: 2001 }, () => e('vis')) }, '0.3.0', '2026-09-30T10:00:00.000Z');

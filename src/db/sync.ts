@@ -83,6 +83,10 @@ async function localStamp(db: WorkoutDB, table: string, id: string): Promise<Syn
  * 애플워치 기록 반영 (D-058): 서버가 health 를 보냈을 때만 (새 서버). 전체 다시 받기면 비우고 다시 채움.
  * health 표는 기기가 고치지 않으므로 동기화 표시·지움 표시 없이 그대로 씀
  */
+/** D-071 진단: 받은 health 묶음을 화면 쪽(ui/sync)이 요약해 진단에 남길 수 있게 (db 층은 진단 모듈을 모름) */
+let healthHook: ((list: NonNullable<SyncResponse['health']>) => void) | undefined;
+export const setHealthBatchHook = (fn: typeof healthHook) => { healthHook = fn; };
+
 async function applyHealth(db: WorkoutDB, resp: SyncResponse): Promise<number> {
   const list = resp.health;
   if (!Array.isArray(list)) return 0;
@@ -94,6 +98,7 @@ async function applyHealth(db: WorkoutDB, resp: SyncResponse): Promise<number> {
     }
     await setKv(db, { healthSince: resp.rev });
   });
+  if (list.length && healthHook) { try { healthHook(list); } catch { /* 진단 때문에 동기화가 멈추면 안 됨 */ } }
   return list.length;
 }
 

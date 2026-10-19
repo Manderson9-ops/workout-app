@@ -1,29 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
-import { activeOf, historyOf, mutate, flushPending, getState } from '../store';
+import { activeOf, historyOf, flushPending, getState } from '../store';
 import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
   currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, setWorkoutMemo, addSet, removeSet, skipItem, replaceItem, appendExercise, moveWorkoutBlock,
-  adjustTimer, clearTimer, timerRemaining, progress, restAfter,
+  adjustTimer, clearTimer, timerRemaining, progress, restAfter, completeRound, roundSteps, isGroup, roundOf,
 } from '../../core/session';
+import { isAutoWarmup, WARMUP_RULE } from '../../core/warmupGuess';
 import { setTime, targetReps } from '../../core/time';
 import { GradeBadge, Stepper, NumInput, ExercisePicker, MemoSheet, MenuSheet, Metric, mmss } from '../components';
 import type { MenuItem } from '../components';
 import { Icon } from '../icons';
 import { summarize } from '../../core/stats';
-import { previousSetsFor, prevFor, prevText, workoutPRs, prExerciseCount, ringDash } from '../../core/workoutHistory';
+import { previousSetsFor, prevFor, prevText, workoutPRs, ringDash } from '../../core/workoutHistory';
 import type { PrKind, PrevSets } from '../../core/workoutHistory';
-import { showToast } from '../toast';
 import { ScreenHeader } from '../header';
 import { resolveGrade } from '../../core/exercises';
 import { hasDbInfo } from '../../core/planEdit';
-import { updateWorkoutAfterInputs, finishActiveWorkout, useFinishError, setFinishError } from '../actions';
-import { askConfirm } from '../confirm';
+import { updateWorkoutAfterInputs, useFinishError, setFinishError } from '../actions';
+import { askAndFinish } from '../finishFlow';
 import { PlateSheet } from './Tools';
 import { go } from '../nav';
 import { RoutineList } from './MyRoutines';
-import { softDelete } from '../../db/db';
 
 import { unlockAudio, wasAlerted, markAlerted, audioState, playEndSound, playWarnSound } from '../device';
 import { diagTimerEnd, diagHaptic } from '../diag';
@@ -34,8 +33,6 @@ import { lsGet, lsSet } from '../appName';
 
 /** D-056 휴식 안내를 본 기기 (이 기기만) */
 export const REST_HINT_KEY = 'hint.restSilent';
-import { sendNow } from '../autoSend';
-import { syncNow } from '../sync';
 import { remoteActiveOf } from '../store';
 import { useDragSort } from '../dragSort';
 import { remapIndex } from '../../core/reorder';
@@ -70,7 +67,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     const k = (e: KeyboardEvent) => {
       // 누르고 있기(반복)·한글 조합 중·시트(메모·교체 등)가 열려 있을 때는 무시
       if (e.repeat || e.isComposing || document.querySelector('.sheet')) return;
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.querySelector<HTMLButtonElement>('[aria-label="현재 세트 완료"]')?.click(); } };
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.querySelector<HTMLButtonElement>('[aria-label^="현재 세트 완료"]')?.click(); } };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, []);
@@ -78,20 +75,6 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const warned = useRef<number>(0);
   /** 운동 끝내기가 안 됐을 때 이유 (D-038). 타이머 자리(화면 아래 고정)에 보여 어느 위치에서 눌러도 보임 */
   const finishErr = useFinishError();
-  const finishing = useRef(false);
-  /** 확인 뒤 끝내기. 두 번 눌러도 한 번만 */
-  const doFinish = async (id: string) => {
-    if (finishing.current) return;
-    finishing.current = true;
-    try {
-      setFinishError(null);
-      // 끝내기 전에 기록 갱신(앱 기준) 운동 수를 셈 → 홈에서 짧은 알림 (D-055 2단계)
-      const cw = activeOf(getState());
-      const nPr = cw && cw.id === id ? prExerciseCount(cw, historyOf(getState())) : 0;
-      const r = await finishActiveWorkout(id); // 실패 문구는 finishActiveWorkout이 setFinishError로 남김
-      if (r.ok) { go('#/'); void sendNow('workout'); void syncNow('finish'); if (nPr) showToast(`기록 갱신 ${nPr}개 운동 (앱 기준)`, 'star'); }
-    } finally { finishing.current = false; }
-  };
   // 블록 끌어서 순서 바꾸기 (D-037). 펼친 카드는 옮긴 자리를 따라감
   // 이동은 하나씩 차례로 (빠르게 ↓↓ 눌러도 순서가 뒤바뀌지 않게), 펼친 카드는 저장된 뒤에 따라감 (깜빡임 방지)
   const moveQ = useRef<Promise<void>>(Promise.resolve());
@@ -158,6 +141,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const prog = progress(w, nowMs, (id, reps) => { const e = byId.get(id); return e ? setTime(e, reps) : 40; });
   const nameOf = (id: string) => byId.get(id)?.name_ko ?? id;
   const complete = (st: Step) => { unlockAudio(); setEnded(false); void upd((cw) => completeSet(cw, st, Date.now())); setOpen(null); };
+  /** 큰 ✓(아래 도크)만: 묶음이면 이 라운드 남은 세트를 한 번에 (D-066). 저장된 최신 기록으로 라운드를 다시 고름 */
+  const completeMain = (st: Step) => { unlockAudio(); setEnded(false); void upd((cw) => completeRound(cw, st, Date.now())); setOpen(null); };
   const curItem = cur ? w.blocks[cur.block]!.items[cur.item]! : undefined;
   const nextRest = cur ? restAfter(w, cur) : null;
   // D-055 2단계: 볼륨(완료 작업 세트), 기록 갱신(앱 기준)
@@ -190,6 +175,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           </div>
         )}
         <div class="row wrap small set-tools">
+          {/* 웜업 표시 끄기 (D-070): 아직 안 한 웜업. 미리 표시를 끈 첫 세트(자동 값·15회 이상)는 다시 켤 수 있음 */}
+          {!x.done && (x.warmup || (k === 0 && !!x.auto && (x.reps ?? 0) >= WARMUP_RULE.minReps)) && it.target.seconds === undefined && (
+            <button class={`chip ${x.warmup ? 'on' : ''}`} aria-pressed={x.warmup} aria-label={`${label} 웜업 표시`} onClick={() => void upd((cw) => updateSet(cw, st, { warmup: !x.warmup }))}>웜업 W</button>
+          )}
           {!x.warmup && <>
             <span class="sub" title="남은 횟수 여유 (RIR)">RIR</span>
             {[0, 1, 2, 3].map((r) => <button key={r} class={`chip ${x.rir === r ? 'on' : ''}`} aria-pressed={x.rir === r} onClick={() => upd((cw) => updateSet(cw, st, { rir: x.rir === r ? undefined : r }))}>{r}{r === 3 ? '+' : ''}</button>)}
@@ -201,21 +190,23 @@ export function WorkoutScreen({ s }: { s: AppState }) {
     );
   };
 
-  const setRow = (b: number, i: number, k: number, x: SetLog, prevSet: SetLog | undefined) => {
+  /** letter = 묶음 안 운동 글자 (A·B…, 번호 칸에 "A1"·"AW") */
+  const setRow = (b: number, i: number, k: number, x: SetLog, prevSet: SetLog | undefined, letter = '') => {
     const st = { block: b, item: i, set: k };
     const isCur = !!cur && cur.block === b && cur.item === i && cur.set === k;
     const it = w.blocks[b]!.items[i]!;
     const timeEx = it.target.seconds !== undefined;
     const workNo = it.sets.slice(0, k + 1).filter((z) => !z.warmup).length;
     const label = `${nameOf(it.exerciseId)} ${x.warmup ? '웜업' : workNo + '세트'}`;
+    const autoW = isAutoWarmup(x);
     const key = `${b}-${i}-${k}`;
     const pr = x.done ? prs.get(key) : undefined;
     const expanded = isCur || detail === key;
     const prevTxt = prevText(prevSet, timeEx);
     return (
-      <div key={k} class="set-wrap">
+      <div key={`${i}-${k}`} class="set-wrap">
         <div class={`set-row ${x.done ? 'done' : ''} ${isCur ? 'current' : ''} ${x.warmup ? 'warm' : ''}`}>
-          <button class="set-idx" aria-label={`${label} 자세히 (RIR·메모)`} aria-expanded={expanded} title="누르면 RIR·메모" onClick={() => { if (!isCur) setDetailKey(detail === key ? null : key); }}><span class="idx-n">{x.warmup ? 'W' : workNo}</span><Icon name="chevron" size={12} class={`idx-chev${expanded ? ' open' : ''}`} /></button>
+          <button class="set-idx" aria-label={`${label} 자세히 (RIR·메모)`} aria-expanded={expanded} title="누르면 RIR·메모" onClick={() => { if (!isCur) setDetailKey(detail === key ? null : key); }}><span class="idx-n">{letter}{x.warmup ? 'W' : workNo}</span><Icon name="chevron" size={12} class={`idx-chev${expanded ? ' open' : ''}`} /></button>
           <span class="set-prev" aria-label={`${label} 지난번 ${prevTxt === '-' ? '없음' : prevTxt}`}>{prevTxt}</span>
           <NumInput pendingKey={`${b}-${i}-${k}-w`} label={`${label} 무게`} value={x.weight} suffix="" onChange={(v) => upd((cw) => updateSet(cw, st, { weight: v }))} />
           {timeEx
@@ -225,6 +216,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             ? <button class="check done" aria-label="완료 취소" title={`${label} 완료됨 (누르면 완료 취소)`} onClick={() => upd((cw) => undoSet(cw, st))}><Icon name="check" size={22} /></button>
             : <button class={`check ${isCur ? 'cur' : ''}`} aria-label={`${label} 완료`} onClick={() => complete(st)}><Icon name="check" size={22} /></button>}
         </div>
+        {autoW && <p class="sub small autow-line">지난번 무게의 절반 이하·15회 이상이라 웜업(W)으로 표시했어요</p>}
         {pr && (
           <div class="pr-line" title="앱 기준: 추정 1RM(Epley, 12회 이하)이 지난 최고보다 크거나, 지난 어떤 세트보다 무겁거나, 그 무게 이상에서 횟수가 더 많음">
             <span class="pr-badge"><Icon name="star" size={14} />기록 갱신</span>
@@ -260,12 +252,78 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       : <a class="btn info-btn" href={`#/exercises/${encodeURIComponent(exId)}`} aria-label={`${nameOf(exId)} 정보 (DB 없음)`} title="정보 (내 운동 DB 없음)"><span class="ib-dot"><Icon name="info" size={18} /></span></a>;
   };
 
-  // 브라우저 기본 confirm()은 조용히 취소될 수 있어 앱 안 확인 창을 씀 (D-038)
-  const finish = async () => {
-    const left = prog.totalSets - prog.doneSets;
-    const id = w.id;
-    if (!(await askConfirm({ title: '운동을 끝낼까요?', message: left ? `아직 ${left}세트 남았어요.` : undefined, ok: '끝내기', danger: true }))) return;
-    await doFinish(id);
+  // 브라우저 기본 confirm()은 조용히 취소될 수 있어 앱 안 확인 창을 씀 (D-038). 빈 운동·늦은 끝내기는 finishFlow 가 물음 (D-065·D-072)
+  const finish = () => void askAndFinish(w.id, { left: prog.totalSets - prog.doneSets });
+  const prevOf = (exId: string) => prevCache.get(exId) ?? (() => { const p = previousSetsFor(history, exId, w.id); prevCache.set(exId, p); return p; })();
+  const footBtns = (bi: number, ii: number) => {
+    const it = w.blocks[bi]!.items[ii]!;
+    return <>
+      <button class="tonal" onClick={() => upd((cw) => addSet(cw, bi, ii))}>+ 세트</button>
+      <button class="tonal" onClick={() => upd((cw) => addSet(cw, bi, ii, true))}>+ 웜업</button>
+      {it.sets.length > 1 && !it.sets[it.sets.length - 1]!.done && <button class="tonal" onClick={() => upd((cw) => removeSet(cw, { block: bi, item: ii, set: it.sets.length - 1 }))}>− 세트</button>}
+    </>;
+  };
+  /**
+   * 묶음 블록 (D-066): 위에 운동 A·B 이름, 아래 세트 표를 라운드별로 묶어 (1라운드: A1·B1 …).
+   * 웜업은 맨 앞 한 묶음. 줄마다 ✓는 그 세트만(현재 줄도), 아래 큰 ✓만 라운드 한 번에 (B1, "줄마다 체크는 그대로")
+   */
+  const groupBody = (bi: number) => {
+    const b = w.blocks[bi]!;
+    const items = b.items.map((it, ii) => ({ it, ii, letter: String.fromCharCode(65 + ii) }));
+    const act = items.filter((x) => !x.it.skipped);
+    const warm = act.flatMap((x) => x.it.sets.map((s, k) => ({ ...x, s, k })).filter((y) => y.s.warmup));
+    const work = act.map((x) => ({ ...x, idx: x.it.sets.map((s, k) => (s.warmup ? -1 : k)).filter((k) => k >= 0) }));
+    const rounds = Math.max(0, ...work.map((x) => x.idx.length));
+    const curRound = cur && cur.block === bi && !w.blocks[bi]!.items[cur.item]!.sets[cur.set]!.warmup ? roundOf(w, cur) : 0;
+    const allTime = act.length > 0 && act.every((x) => x.it.target.seconds !== undefined);
+    const grp = isGroup(w, bi);
+    return (
+      <>
+        {items.map(({ it, ii, letter }) => {
+          const ex = byId.get(it.exerciseId);
+          const g = ex ? resolveGrade(ex, ex.part, s.settings.level, undefined, s.meta.get(ex.id)?.userGrade) : undefined;
+          return (
+            <div key={ii} class={`wk-item grp-item${it.skipped ? ' skipped' : ''}`}>
+              <div class="row wk-item-head">
+                {/* 묶음: 운동 글자(A·B)를 맨 앞에, 등급은 이름 뒤 "등급 S" (글자와 헷갈리지 않게) */}
+                <strong class="grow"><span class="grp-letter">{letter}.</span> {nameOf(it.exerciseId)}</strong>
+                {g && <GradeBadge g={g} prefix />}
+                {it.skipped && <span class="pill">건너뜀</span>}
+                {infoLink(it.exerciseId)}
+                {menuBtn(bi, ii)}
+              </div>
+              {it.skipped && <button class="tonal" onClick={() => upd((cw) => skipItem(cw, bi, ii, false))}>되살리기</button>}
+              {it.memo && <p class="sub small memo-line"><Icon name="note" size={14} />{it.memo}</p>}
+            </div>
+          );
+        })}
+        {act.length > 0 && (
+          <div class="set-table grp-table">
+            <div class="set-row set-head" aria-hidden="true"><span>세트</span><span>지난번</span><span>kg</span><span>{allTime ? '초' : '회'}</span><span><Icon name="check" size={16} /></span></div>
+            {warm.length > 0 && (
+              <div class="round-grp warm" role="group" aria-label="웜업">
+                <div class="round-cap">웜업</div>
+                {warm.map((y) => setRow(bi, y.ii, y.k, y.s, prevFor(prevOf(y.it.exerciseId), y.it.sets, y.k), y.letter))}
+              </div>
+            )}
+            {Array.from({ length: rounds }, (_, r) => {
+              const rows = work.filter((x) => x.idx[r] !== undefined);
+              const allDone = rows.every((x) => x.it.sets[x.idx[r]!]!.done);
+              const isCurR = grp && curRound === r + 1;
+              return (
+                <div key={r} class={`round-grp${isCurR ? ' cur' : ''}${allDone ? ' done' : ''}`} role="group" aria-label={`${r + 1}라운드${allDone ? ' 완료' : ''}`}>
+                  <div class="round-cap">{r + 1}라운드{allDone ? ' · 완료' : isCurR ? ' · 지금' : ''}</div>
+                  {rows.map((x) => setRow(bi, x.ii, x.idx[r]!, x.it.sets[x.idx[r]!]!, prevFor(prevOf(x.it.exerciseId), x.it.sets, x.idx[r]!), x.letter))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {act.map((x) => (
+          <div class="row set-foot" key={`f${x.ii}`}><span class="grp-foot-l" aria-hidden="true">{x.letter}</span>{footBtns(bi, x.ii)}</div>
+        ))}
+      </>
+    );
   };
   const delta = prog.deltaSec;
   const timerOn = !!w.timer && (rem > 0 || ended);
@@ -274,7 +332,15 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   // 다음 세트 요약 (도크 한 줄, 캡션)
   const curSetLabel = cur && curItem ? (curItem.sets[cur.set]!.warmup ? '웜업' : `${curItem.sets.slice(0, cur.set + 1).filter((z) => !z.warmup).length}세트`) : '';
   const curLetter = cur && w.blocks[cur.block]!.kind !== 'single' ? `${String.fromCharCode(65 + cur.item)}. ` : '';
-  const nextText = cur && curItem ? `${curLetter}${nameOf(curItem.exerciseId)} ${curSetLabel}` : '';
+  // 묶음 라운드 (D-066): 큰 ✓가 이 라운드의 남은 세트를 한 번에 완료
+  const round = cur ? roundSteps(w, cur) : [];
+  const roundNo = cur && round.length > 1 ? roundOf(w, cur) : 0;
+  const roundLetters = round.map((x) => String.fromCharCode(65 + x.item)).join('+');
+  // 다음 세트 글은 한 모양 "글자 N세트": 라운드면 "A+B 2세트", 하나면 "B 2세트"(도크) / "B. 이름 2세트"(큰 ✓)
+  const nextText = cur && curItem ? (roundNo ? `${roundLetters} ${roundNo}세트` : `${curLetter}${nameOf(curItem.exerciseId)} ${curSetLabel}`) : '';
+  const nextShort = roundNo ? `${roundLetters} ${roundNo}세트` : `${curLetter.replace('. ', ' ')}${curSetLabel}`;
+  const mainAria = roundNo ? `현재 세트 완료 · ${roundLetters} ${roundNo}세트 한 번에` : '현재 세트 완료';
+  const mainRest = cur && roundNo ? restAfter(w, round[round.length - 1]!) : nextRest;
   nextRef.current = nextText;
   const menuItem = menu ? w.blocks[menu.b]?.items[menu.i] : undefined;
 
@@ -317,7 +383,8 @@ export function WorkoutScreen({ s }: { s: AppState }) {
               </div>
               {single && menuBtn(bi, 0)}
             </div>
-            {isOpen && b.items.map((it, ii) => {
+            {isOpen && !single && groupBody(bi)}
+            {isOpen && single && b.items.map((it, ii) => {
               const ex = byId.get(it.exerciseId);
               const g = ex ? resolveGrade(ex, ex.part, s.settings.level, undefined, s.meta.get(ex.id)?.userGrade) : undefined;
               const prev = prevCache.get(it.exerciseId) ?? (() => { const p = previousSetsFor(history, it.exerciseId, w.id); prevCache.set(it.exerciseId, p); return p; })();
@@ -372,25 +439,25 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             <div class="rp-mid grow">
               <div class="rp-num" aria-label={`휴식 남은 시간 ${rem}초`}>{mmss(rem)}</div>
               {/* 화면에는 짧게 "다음: …", 화면 읽기·시험에는 휴식 이름 전체 */}
-              <div class="rp-label" aria-hidden="true">{rem > 0 ? (curSetLabel ? `다음 ${curLetter.replace('. ', ' ')}${curSetLabel}` : '휴식') : '휴식 끝!'}</div>
+              <div class="rp-label" aria-hidden="true">{rem > 0 ? (curSetLabel ? `다음 ${nextShort}` : '휴식') : '휴식 끝!'}</div>
               <span class="sr-only">{rem > 0 ? w.timer.label : '휴식 끝! 다음 세트'}{nextText ? ` · 다음 ${nextText}` : ''}</span>
             </div>
             <button class="rp-btn" aria-label="15초 줄이기" onClick={() => upd((cw) => adjustTimer(cw, -15, Date.now()))}>−15</button>
             <button class="rp-btn" aria-label="15초 늘리기" onClick={() => upd((cw) => adjustTimer(cw, 15, Date.now()))}>+15</button>
             <button class="rp-btn" aria-label="휴식 건너뛰기" onClick={() => { setEnded(false); void upd((cw) => clearTimer(cw)); }}><Icon name="skip" size={20} /></button>
             {cur && curItem && (
-              <button class="rp-done" onClick={() => complete(cur)} aria-label="현재 세트 완료" title={`${nextText} 완료`}>
+              <button class="rp-done" onClick={() => completeMain(cur)} aria-label={mainAria} title={`${nextText} 완료`}>
                 <Icon name="check" size={22} /><span class="sr-only">{nextText} 완료</span>
               </button>
             )}
           </div>
         ) : cur && curItem ? (
-          <button class="ok wk-done" onClick={() => complete(cur)} aria-label="현재 세트 완료">
+          <button class="ok wk-done" onClick={() => completeMain(cur)} aria-label={mainAria}>
             <Icon name="check" size={20} /><span class="wd-text">{nextText} 완료</span>
-            {nextRest ? <span class="small wd-rest">→ 휴식 {nextRest.sec}초</span> : null}
+            {mainRest ? <span class="small wd-rest">→ 휴식 {mainRest.sec}초</span> : null}
           </button>
         ) : (
-          <button class="primary wk-done" onClick={() => void doFinish(w.id)}>모든 세트 완료 · 운동 끝내기</button>
+          <button class="primary wk-done" onClick={() => void askAndFinish(w.id, { plain: true })}>모든 세트 완료 · 운동 끝내기</button>
         )}
       </div>
 
@@ -412,4 +479,3 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   );
 }
 
-export async function discardWorkout(w: Workout) { await mutate((d) => softDelete(d, 'workouts', w.id)); }

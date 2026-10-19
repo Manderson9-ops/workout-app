@@ -12,7 +12,8 @@ import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
 import { recoveryByPart } from '../../core/recovery';
 import { RecoveryCard } from './RecoveryCard';
-import { lastNight, watchFor, watchLine } from '../../core/health';
+import { RecordFixCard } from './RecordFix';
+import { lastNight, watchReason, watchReasonLines, WATCH_PENDING, WATCH_GATE } from '../../core/health';
 import { LineChart, BarChart, PairBarChart } from '../charts';
 import { NumInput, Empty, Metric, Delta, Sheet } from '../components';
 import { ScreenHeader } from '../header';
@@ -214,6 +215,7 @@ export function Stats({ s }: { s: AppState }) {
   return (
     <main>
       <ScreenHeader title="기록" />
+      <RecordFixCard s={s} byId={byId} />
       <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
       <RecoveryCard m={rec} night={night} />
       <PartSets done={done} byId={byId} today={today} />
@@ -319,6 +321,29 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
   );
 }
 
+/** D-058 상세 애플워치 한 줄. D-071(승인안): 원인을 고칠 때까지 숫자는 모두 숨기고 "확인 중" + [왜?] (이 운동의 이유) */
+function DetailWatch({ w, s }: { w: Workout; s: AppState }) {
+  const [info, setInfo] = useState(false);
+  const r = watchReason(w, s.health);
+  if (!r) return null;
+  const g = WATCH_GATE;
+  return (
+    <>
+      <p class="wc-watch detail pending" data-testid="detail-watch-pending"><Icon name="heart" size={16} />{WATCH_PENDING}
+        <button class="ghost wc-why" aria-haspopup="dialog" onClick={() => setInfo(true)}>왜?</button></p>
+      {info && (
+        <Sheet title={WATCH_PENDING} onClose={() => setInfo(false)} modal trap>
+          <p class="small" data-testid="watch-pending-info">애플워치에서 받은 심박·칼로리 중 사람에게 나오기 어려운 값이 있어서, 원인을 고칠 때까지 모든 운동의 숫자를 보여 주지 않아요.</p>
+          <p class="small"><b>이 운동</b></p>
+          <ul class="small" data-testid="watch-reason">{watchReasonLines(r).map((t, i) => <li key={i}>{t}</li>)}</ul>
+          <p class="sub small">믿을 수 있는 값의 기준: 최고 심박 {g.hrMax} 이하, 평균 심박 {g.hrAvgMin}~{g.hrAvgMax}, 운동 중 심박 {g.hrNMin}개 이상, 칼로리는 분당 {g.kcalPerMin}kcal 이하. 운동 기록(세트·무게)에는 영향이 없어요.</p>
+          <button class="big" style={{ width: '100%' }} onClick={() => setInfo(false)}>알겠어요</button>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
 export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
   const w = s.workouts.find((x) => x.id === id);
   const all = catalog(s.custom);
@@ -339,7 +364,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
       {w.editedAt && <p class="sub small">{dateTimeText(w.editedAt, Date.now())}에 고침</p>}
       {w.memo && <p class="memo-line"><Icon name="note" size={16} />{w.memo}</p>}
-      {(() => { const x = watchFor(w, s.health); return x ? <p class="wc-watch detail" data-testid="detail-watch"><Icon name="heart" size={16} />{watchLine(x)}</p> : null; })()}
+      <DetailWatch w={w} s={s} />
       {(s.settings.homeHidden ?? []).includes(w.id) && (
         <div class="card row between" role="note" aria-label={`${HOME_HIDDEN_LABEL} 기록`}>
           <span class="small">홈 "최근 운동"에서 뺀 기록이에요. 기록·통계에는 그대로예요.</span>

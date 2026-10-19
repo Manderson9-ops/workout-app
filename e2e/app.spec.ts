@@ -143,27 +143,29 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   await page.getByLabel('원암 랫풀다운 1세트 무게', { exact: true }).pressSequentially('40');
   taps++; await big.dispatchEvent('click');
   await expect(page.getByLabel('원암 랫풀다운 1세트 무게', { exact: true })).toHaveValue('40');
-  await expect(page.getByRole('timer')).toContainText('다음 운동으로 바로 (묶음)'); // 슈퍼세트 전환
+  // 묶음은 큰 ✓ 한 번에 라운드(A1+B1) 완료, 휴식은 라운드 후 한 번 (D-066)
+  await expect(page.getByRole('timer')).toContainText('라운드 후 휴식');
+  await expect(page.getByText(/\b2\/\d+세트/)).toBeVisible();
   await expect(page.getByLabel('원암 랫풀다운 2세트 무게', { exact: true })).toHaveValue('40'); // 앞 세트 무게 이어받기
   await tap(big);
-  await expect(page.getByRole('timer')).toContainText('라운드 후 휴식');
+  await expect(page.getByText(/\b4\/\d+세트/)).toBeVisible();
   const before = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
   await page.getByRole('button', { name: '15초 늘리기' }).click();
   await expect.poll(async () => Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0])).toBeGreaterThanOrEqual(before + 13);
   await checkScreen(page, '04-timer');
-  await tap(big);
-  await expect(page.getByText(/3\/\d+세트/)).toBeVisible();
   // 입력 중 새로고침해도 값 유지 (늦춘 저장 후)
   await page.getByLabel('원암 랫풀다운 2세트 횟수', { exact: true }).fill('9');
   await page.waitForTimeout(600);
   await page.reload();
   await expect(page.getByLabel('원암 랫풀다운 2세트 횟수', { exact: true })).toHaveValue('9');
   await expect(page.getByLabel(/휴식 남은 시간 \d+초/)).toBeVisible(); // 타이머도 유지
+  await tap(big);
+  const doneN = (await page.getByText(/\b[56]\/\d+세트/).textContent())!.match(/\b([56])\//)![1];
   await tap(page.getByRole('button', { name: '끝내기', exact: true }));
   await tap(page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' })); // 앱 안 확인 창 (D-038)
   await expect(page.getByText('최근 운동')).toBeVisible();
-  await expect(page.getByRole('group', { name: /^최근 운동 / }).first()).toContainText('세트 3');
-  expect(taps, '루틴 시작 → 세트 3개 → 종료 (확인창 포함)').toBeLessThanOrEqual(12);
+  await expect(page.getByRole('group', { name: /^최근 운동 / }).first()).toContainText(`세트 ${doneN}`);
+  expect(taps, '루틴 시작 → 라운드 3번 → 종료 (확인창 포함)').toBeLessThanOrEqual(12);
   await checkScreen(page, '05-home-after');
 
   // 다시 시작: 지난번 무게가 미리 채워짐 + 웜업 세트 순서
@@ -194,6 +196,7 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   const doneBtn = page.getByRole('button', { name: '현재 세트 완료' });
   await expect(doneBtn).toBeVisible();
+  await doneBtn.click(); // 세트 하나는 완료 (완료 0개면 버리기를 묻는 다른 창, D-072)
 
   // 1) 아래 "운동 끝내기" → 앱 안 확인 창 (남은 세트 수) → 취소하면 운동 그대로
   await page.getByRole('button', { name: '운동 끝내기' }).click();
@@ -1850,6 +1853,8 @@ test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 �
   await page.reload();
   await expect.poll(heads).toEqual([p1[0], last, p1[1], ...p1.slice(2, -1)]);
   await endWorkout(page);
+  // 루틴으로 시작한 운동의 순서를 바꿨으니 끝낸 뒤 루틴 반영을 물음 (D-068) → 원래대로
+  await page.getByRole('dialog', { name: '루틴에 반영할까요?' }).getByRole('button', { name: '원래대로' }).click();
 
   // 루틴 편집: 끌어서 옮기고 저장 → 다시 열면 그 순서
   await page.getByRole('button', { name: '+ 직접' }).click();
@@ -1967,13 +1972,20 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
   await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.8 바뀐 점'); // 0.9.9(3줄) + 0.9.8(3줄) + 0.9.7(2줄) = 8줄
+  // 최신부터 최대 8줄: 줄 수는 CHANGELOG.json 에서 계산 (0.9.11 줄이 늘어 고정 숫자 '0.9.10이 두 번째'가 1단계부터 깨짐)
+  const cl = (JSON.parse(readFileSync('CHANGELOG.json', 'utf8')) as { versions: { version: string; changes: string[] }[] }).versions;
+  const since = cl.slice(0, cl.findIndex((v) => v.version === '0.8.12-preview'));
+  let left = 8; const perEntry: number[] = [];
+  for (const v of since) { if (left <= 0) break; const n = Math.min(left, v.changes.length); perEntry.push(n); left -= n; }
+  await expect(entries).toHaveCount(perEntry.length);
+  if (perEntry.length > 1) await expect(entries.nth(1)).toHaveAttribute('aria-label', `${displayVersion(since[1]!.version)} 바뀐 점`);
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
   await checkScreen(page, '65-whats-new');
   await sheet.getByRole('button', { name: /^모두 보기/ }).click();
-  await expect(sheet.locator('.wn-lines li')).toHaveCount(39); // 0.9.9·0.9.8 3줄 + 0.9.7 2줄 + 0.9.6·0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(since.reduce((s, v) => s + v.changes.length, 0)); // 0.8.13~지금 모든 줄 (지금 55줄)
+  expect(since.reduce((s, v) => s + v.changes.length, 0)).toBeGreaterThan(8);
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
@@ -2008,7 +2020,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.9(3줄) + 0.9.8(3줄) + 0.9.7(2줄) = 8줄, 0.9.6 이전은 [모두 보기]
+  await expect(sheet.locator('.wn-entry')).toHaveCount(perEntry.length); // 최신부터 8줄까지 (0.9.11이 13줄이라 한 판만), 나머지는 [모두 보기]
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   const gear = page.getByRole('link', { name: '설정', exact: true });
@@ -2755,6 +2767,9 @@ test.describe('D-058 애플워치 연동', () => {
     await page.goto('./#/settings');
     await page.getByRole('link', { name: /^애플워치 연동/ }).click();
     await expect(page.getByTestId('watch-status')).toContainText('아직 애플워치 기록을 받지 않았어요');
+    await expect(page.getByTestId('watch-last-rx')).toHaveText('마지막 수신: 아직 없음'); // D-071
+    // D-064 뒤로 주소·키 카드는 "예전 방법" 접기 안에 있음(접힌 동안에는 역할 트리에서 빠짐) → 펼친 뒤 확인
+    await page.getByTestId('watch-old-ways').locator(':scope > summary').click();
     await expect(page.getByRole('region', { name: '단축어에 넣을 주소와 키' })).toContainText('먼저 설정');
     await checkScreen(page, '91-watch-empty');
     await page.getByRole('button', { name: '설정으로' }).click();
@@ -2770,42 +2785,78 @@ test.describe('D-058 애플워치 연동', () => {
     await page.getByRole('button', { name: '현재 세트 완료' }).click();
     await page.waitForTimeout(2200); // 운동 시간이 2초는 되게
     await endWorkout(page);
-    // 그 운동 시간 안 심박 120·140, 활동 에너지 12kcal (점 샘플), 오늘 요약(수면 5시간 30분·안정 심박 56·HRV 48)
-    await page.evaluate(async () => {
+    // D-071: 처음엔 심박 2개(20개 미만) → 숫자 대신 "확인 중" + 상세 [왜?] 안내
+    // 그다음 운동 시간을 40분으로 늘리고 심박 24개(120·140 번갈아), 활동 에너지 12kcal (점 샘플), 오늘 요약(수면 5시간 30분·안정 심박 56·HRV 48)
+    const putHealth = (mode: 'few' | 'ok') => page.evaluate(async (mode) => {
       const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
       const w = await new Promise<{ startedAt: string; endedAt: string }>((res) => { const q = db.transaction('workouts').objectStore('workouts').getAll(); q.onsuccess = () => res((q.result as { startedAt: string; endedAt?: string }[]).find((x) => x.endedAt) as never); });
+      if (mode === 'ok') {
+        // 운동 시간을 40분으로 (시험용: 시작 시각만 앞으로)
+        w.startedAt = new Date(Date.parse(w.endedAt) - 40 * 60000).toISOString();
+        await new Promise<void>((res, rej) => { const tx = db.transaction('workouts', 'readwrite'); tx.objectStore('workouts').put(w); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+      }
       const K = 9 * 3600000;
       const day = (ms: number) => { const d = new Date(ms + K); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; };
       const a = Date.parse(w.startedAt), b = Date.parse(w.endedAt);
       const d = day(a); const p = d.split('-').map(Number); const t0 = Date.UTC(p[0]!, p[1]! - 1, p[2]!) - K;
       const sa = Math.ceil((a - t0) / 1000), sb = Math.floor((b - t0) / 1000);
       const rx = new Date().toISOString();
+      const hr = mode === 'few' ? [sa, 120, sb, 140] : Array.from({ length: 24 }, (_, i) => [sa + 30 + i * 60, i % 2 ? 140 : 120]).flat();
       const rows = [
-        { id: `hr-${d}`, type: 'hr', day: d, t0, p: [sa - 600, 190, sa, 120, sb, 140], rx },
+        { id: `hr-${d}`, type: 'hr', day: d, t0, p: [sa - 600, 190, ...hr], rx },
         { id: `en-${d}`, type: 'energy', day: d, t0, p: [sa, 0, 120], rx },
         { id: `dy-${day(Date.now())}`, type: 'daily', day: day(Date.now()), sleepMin: 330, rhr: 56, hrv: 48.4, rx },
       ];
       await new Promise<void>((res, rej) => { const tx = db.transaction('health', 'readwrite'); for (const r of rows) tx.objectStore('health').put(r); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
       db.close();
-    });
+    }, mode);
+    await putHealth('few');
     await page.reload();
-    const line = '평균 심박 130 · 최고 140 · 12kcal (애플워치)';
-    await expect(page.getByTestId('wc-watch').first()).toHaveText(line);
-    await expect(page.getByRole('group', { name: /^최근 운동 / }).first().getByRole('button').first()).toHaveAttribute('aria-label', new RegExp(line.replace(/[()]/g, '\\$&')));
+    await expect(page.getByTestId('wc-watch-pending').first()).toHaveText('애플워치 값 확인 중');
+    await expect(page.getByTestId('wc-watch')).toHaveCount(0);
+    await expect(page.getByRole('group', { name: /^최근 운동 / }).first().getByRole('button').first()).toHaveAttribute('aria-label', /, 애플워치 값 확인 중/);
+    await page.getByTestId('wc-watch-pending').first().scrollIntoViewIfNeeded();
+    await checkScreen(page, '92a-home-watch-pending');
+    await page.locator('main .wcard').first().click();
+    await expect(page.getByTestId('detail-watch-pending')).toContainText('애플워치 값 확인 중');
+    await expect(page.getByTestId('detail-watch')).toHaveCount(0);
+    await page.getByTestId('detail-watch-pending').getByRole('button', { name: '왜?' }).click();
+    const info = page.getByRole('dialog', { name: '애플워치 값 확인 중' });
+    await expect(info.getByTestId('watch-pending-info')).toContainText('원인을 고칠 때까지 모든 운동의 숫자를 보여 주지 않아요');
+    await expect(info).toContainText('최고 심박 220 이하');
+    // B4: 그 운동의 이유 (받은 심박 개수·범위 밖 개수·걸린 조건), 고정 예시 숫자 아님
+    await expect(info.getByTestId('watch-reason')).toContainText('이 운동 시간에 받은 심박 2개 중 사람 범위(30~220) 밖 0개');
+    await expect(info.getByTestId('watch-reason')).toContainText('운동 중 심박이 2개뿐이에요');
+    await expect(info).not.toContainText('3,320');
+    await checkScreen(page, '92b-detail-watch-pending-info');
+    await info.getByRole('button', { name: '알겠어요' }).click();
+    await expect(info).toHaveCount(0);
+    await page.goto('./#/');
+    await putHealth('ok');
+    await page.reload();
+    // B4 (D-071 승인안): 조건에 맞는 값(심박 24개·평균 130·최고 140·12kcal)도 원인을 고칠 때까지 숫자는 숨김
+    await expect(page.getByTestId('wc-watch-pending').first()).toHaveText('애플워치 값 확인 중');
+    await expect(page.getByTestId('wc-watch')).toHaveCount(0);
+    await expect(page.getByRole('group', { name: /^최근 운동 / }).first().getByRole('button').first()).not.toHaveAttribute('aria-label', /평균 심박|kcal/);
     await checkScreen(page, '92-home-watch');
     await page.getByRole('link', { name: '기록', exact: true }).click();
     await expect(page.getByTestId('rec-night')).toContainText('어젯밤 수면 5시간 30분 · 안정 심박 56 · HRV 48ms (애플워치, 참고)');
     await expect(page.getByTestId('rec-sleep-tip')).toHaveAttribute('href', '#/recovery');
-    await expect(page.locator('main').getByTestId('wc-watch').first()).toHaveText(line);
+    await expect(page.locator('main').getByTestId('wc-watch-pending').first()).toHaveText('애플워치 값 확인 중');
     await checkScreen(page, '93-stats-watch');
     await page.locator('main .wcard').first().click();
-    await expect(page.getByTestId('detail-watch')).toHaveText(line);
+    await expect(page.getByTestId('detail-watch')).toHaveCount(0);
+    await page.getByTestId('detail-watch-pending').getByRole('button', { name: '왜?' }).click();
+    await expect(page.getByTestId('watch-reason')).toContainText('이 운동 시간에 받은 심박 24개 중 사람 범위(30~220) 밖 0개');
+    await expect(page.getByTestId('watch-reason')).toContainText('모든 운동의 숫자를 숨겨요');
+    await page.getByRole('button', { name: '알겠어요' }).click();
     // 연동 화면: 받은 상태
     await page.goto('./#/settings/watch');
     const st = page.getByTestId('watch-status');
     await expect(st).toContainText('심박');
     await expect(st).toContainText('마지막으로 받음');
-    await expect(st).toContainText('최근 7일 받은 기록 3번');
+    await expect(st).toContainText('최근 7일 받은 기록 25번');
+    await expect(page.getByTestId('watch-last-rx')).toHaveText(/^마지막 수신: (방금|오늘 오[전후] \d{1,2}:\d{2})$/); // D-071 (오늘이면 "N일 전" 없음)
     await expect(page.getByTestId('watch-delay')).toContainText('심박은 몇 분~몇 시간 늦게 들어올 수 있어요');
     await expect(page.getByTestId('watch-key-warn')).toContainText('공유');
     // 이름 칸이 세로로 갈라지지 않음 (한 줄 높이)
@@ -2819,6 +2870,8 @@ test.describe('D-058 애플워치 연동', () => {
     await page.evaluate(([u, k]) => localStorage.setItem('send.cfg', `${u}#${k}`), [URL_, KEY]);
     await page.goto('./#/settings/watch');
     await page.reload();
+    // D-064에서 설명 카드가 "예전 방법" 접기 안으로 들어가 안쪽 summary(자동화 손 안내·미리 보기)까지 걸림 → 바깥 접기의 제 제목만
+    await page.getByTestId('watch-old-ways').locator(':scope > summary').click();
     const card = page.getByTestId('describe-card');
     await expect(card).toContainText('iOS 27: 설명으로 만들기 (가장 쉬움)');
     await expect(card.getByTestId('describe-untested')).toHaveText('실기기 시험 전');
@@ -2853,6 +2906,49 @@ test.describe('D-058 애플워치 연동', () => {
     await expect(card.getByRole('alert')).toContainText('손으로 만들기');
   });
 
+  test('D-064 자동 보내기: 홈 화면 앱이 아니면 기본 꺼짐, 켜기 저장, 운동 끝내기 뒤 단축어 실행 링크(NFD 이름)', async ({ page }) => {
+    await page.goto('./#/settings/watch');
+    const card = page.getByTestId('watch-autorun');
+    await expect(card).toContainText('자동 보내기 (자동화 없이)');
+    const tg = card.getByTestId('watch-autorun-toggle');
+    await expect(tg).toHaveAttribute('aria-pressed', 'false'); // 화면 시험(사파리 탭과 같음)에서는 기본 꺼짐
+    // 오늘 하루 보내기는 이미 한 것으로 (다시 읽을 때 하루 보내기가 끼어들지 않게)
+    await page.evaluate(() => localStorage.setItem('watch.runState', JSON.stringify({ dailyDay: new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) })));
+    await tg.click();
+    await expect(tg).toHaveText('자동 보내기 켬');
+    await page.reload();
+    await expect(page.getByTestId('watch-autorun-toggle')).toHaveAttribute('aria-pressed', 'true');
+    // 단축어 앱으로 넘어가는 대신 기록 (앱의 시험용 가로채기)
+    await page.evaluate(() => { const w = window as Window & { __runs?: string[]; __woOpen?: (u: string) => void }; w.__runs = []; w.__woOpen = (u) => { w.__runs!.push(u); }; });
+    await page.getByTestId('watch-autorun').getByRole('button', { name: '지금 보내기 (운동)' }).click();
+    const runs = await page.evaluate(() => (window as Window & { __runs?: string[] }).__runs ?? []);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.startsWith('shortcuts://run-shortcut?name=')).toBe(true);
+    expect(decodeURIComponent(runs[0]!.split('name=')[1]!)).toBe('WO 운동 실행'.normalize('NFD'));
+    await expect(page.getByTestId('watch-autorun-last')).toContainText('마지막 운동 보내기 실행');
+    // 운동을 끝내면 0.8초 뒤 "WO 운동 실행"을 한 번 실행 (켜져 있을 때)
+    await page.getByRole('link', { name: '플랜' }).click();
+    await pickPart(page, '이두');
+    await page.getByRole('button', { name: '60분' }).click();
+    await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await page.getByRole('button', { name: '저장하고 시작' }).click();
+    await expect(page.getByRole('button', { name: '현재 세트 완료' })).toBeVisible();
+    // 오늘 하루 보내기를 아직 안 한 상태로 바꿈 → 운동을 끝낼 때 하루 보내기가 끼어들면 안 됨 (운동 보내기 한 번만)
+    await page.evaluate(() => localStorage.setItem('watch.runState', JSON.stringify({ dailyDay: '2000-01-01' })));
+    await page.getByRole('button', { name: '운동 끝내기' }).click();
+    await page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' }).click();
+    await expect.poll(() => page.evaluate(() => ((window as Window & { __runs?: string[] }).__runs ?? []).length), { timeout: 10_000 }).toBe(2);
+    const runs2 = await page.evaluate(() => (window as Window & { __runs?: string[] }).__runs ?? []);
+    expect(decodeURIComponent(runs2[1]!.split('name=')[1]!)).toBe('WO 운동 실행'.normalize('NFD'));
+    await page.waitForTimeout(3500);
+    expect(await page.evaluate(() => ((window as Window & { __runs?: string[] }).__runs ?? []).length)).toBe(2);
+    // 예전 방법은 접힌 곳에 (운동을 끝내면 연동 화면을 떠나므로 다시 열고 확인)
+    await page.goto('./#/settings/watch');
+    await expect(page.getByTestId('watch-old-ways')).toBeAttached();
+    await expect(page.getByTestId('watch-old-ways')).not.toHaveAttribute('open', '');
+  });
+
   test('D-059 서버가 저장한 운동별 요약(ws-운동ID)만 있고 원본 심박이 없어도(120일 정리 뒤) 카드·상세에 그대로', async ({ page }) => {
     await makeRoutine(page, ['이두'], '30분');
     await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
@@ -2864,15 +2960,34 @@ test.describe('D-058 애플워치 연동', () => {
     await page.evaluate(async () => {
       const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
       const w = await new Promise<{ id: string; startedAt: string; endedAt: string }>((res) => { const q = db.transaction('workouts').objectStore('workouts').getAll(); q.onsuccess = () => res((q.result as { id: string; startedAt: string; endedAt?: string }[]).find((x) => x.endedAt) as never); });
+      // D-071: 60분 운동으로 (380kcal가 분당 20kcal 안). 시험용으로 시작 시각만 앞으로
+      w.startedAt = new Date(Date.parse(w.endedAt) - 60 * 60000).toISOString();
+      await new Promise<void>((res, rej) => { const tx = db.transaction('workouts', 'readwrite'); tx.objectStore('workouts').put(w); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
       const row = { id: `ws-${w.id}`, type: 'ws', workoutId: w.id, startedAt: w.startedAt, endedAt: w.endedAt, hrAvg: 133, hrMax: 170, hrN: 400, kcal: 380, src: 'watch', computedAt: new Date().toISOString() };
       await new Promise<void>((res, rej) => { const tx = db.transaction('health', 'readwrite'); tx.objectStore('health').put(row); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
       db.close();
     });
     await page.reload();
-    const line = '평균 심박 133 · 최고 170 · 380kcal (애플워치)';
-    await expect(page.getByTestId('wc-watch').first()).toHaveText(line);
+    // B4: 그럴듯한 요약도 숫자는 숨김 ([왜?]에 서버 요약 심박 개수)
+    await expect(page.getByTestId('wc-watch-pending').first()).toHaveText('애플워치 값 확인 중');
+    await expect(page.getByTestId('wc-watch')).toHaveCount(0);
     await page.locator('main .wcard').first().click();
-    await expect(page.getByTestId('detail-watch')).toHaveText(line);
+    await expect(page.getByTestId('detail-watch')).toHaveCount(0);
+    await page.getByTestId('detail-watch-pending').getByRole('button', { name: '왜?' }).click();
+    await expect(page.getByTestId('watch-reason')).toContainText('이 운동 심박 400개 (서버가 만든 요약)');
+    await page.getByRole('button', { name: '알겠어요' }).click();
+    // D-071: 실제로 받은 모양(최고 240, 운동 중 심박 11개)으로 바꾸면 숫자 대신 "확인 중"
+    await page.evaluate(async () => {
+      const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      const all = await new Promise<Record<string, unknown>[]>((res) => { const q = db.transaction('health').objectStore('health').getAll(); q.onsuccess = () => res(q.result); });
+      const ws = all.find((x) => x.type === 'ws')!;
+      await new Promise<void>((res, rej) => { const tx = db.transaction('health', 'readwrite'); tx.objectStore('health').put({ ...ws, hrAvg: 131, hrMax: 240, hrN: 11 }); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+      db.close();
+    });
+    await page.reload();
+    await expect(page.getByTestId('detail-watch-pending')).toContainText('애플워치 값 확인 중');
+    await expect(page.getByTestId('detail-watch')).toHaveCount(0);
+    await expect(page.getByTestId('detail-watch-pending')).not.toContainText(/\d/); // 숫자를 사실처럼 보이지 않음
     // 요약은 받은 상태 목록(심박·에너지·수면·요약)에 섞이지 않음
     await page.goto('./#/settings/watch');
     await expect(page.getByTestId('watch-status')).not.toContainText('마지막으로 받음');
@@ -2892,8 +3007,11 @@ test.describe('D-060 날짜·시각 표시 (고정 시각, 한국 시간)', () =
     const kg = page.locator('.set-row.current input[aria-label$=" 무게"]');
     if (await kg.count()) await kg.first().fill('10');
     await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    await expect(page.getByLabel(/휴식 남은 시간/)).toBeVisible(); // 완료가 저장된 뒤에 시계를 옮김 (끝낸 시각이 19:05)
     await page.clock.setFixedTime(at('2026-10-07T20:05:00'));
-    await endWorkout(page);
+    // 마지막 세트 뒤 60분 → 끝난 시각 고르기 (D-065). 이 시험은 "지금"
+    await page.getByRole('button', { name: '끝내기', exact: true }).click();
+    await page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '지금 (오후 8:05)' }).click();
     await expect.poll(() => page.evaluate(async () => {
       const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
       const ws = await new Promise<{ endedAt?: string }[]>((res) => { const q = db.transaction('workouts').objectStore('workouts').getAll(); q.onsuccess = () => res(q.result); });

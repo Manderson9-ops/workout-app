@@ -13,6 +13,8 @@ import type { Part } from '../../core/types';
 import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts, stepItemSets, stepItemReps } from '../../core/routineEdit';
 import { startRoutine } from '../actions';
 import { go, editReturnTo } from '../nav';
+import { paceLabelOf, takeFitOnOpen } from '../pace';
+import { FitSheet, PaceLine } from './FitSheet';
 import { HeadButtons, BackButton } from '../header';
 import { SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX, rangeText, ROUND_REST_MIN, ROUND_REST_MAX, ROUND_REST_STEP, TRANSITION_MIN, TRANSITION_MAX, TRANSITION_STEP } from '../../core/planEdit';
 
@@ -23,6 +25,8 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
   const [r, setR] = useState<Routine | undefined>(r0);
   const [picker, setPicker] = useState<{ b: number; i: number } | { add: Part | undefined } | null>(null);
   const [msg, setMsg] = useState('');
+  // 내 시간에 맞추기 창 (D-067). 카드의 [맞추기]로 왔으면 바로 열림
+  const [fit, setFit] = useState(() => takeFitOnOpen(id));
   const flip = useRef(false); // 같은 안내가 반복돼도 다시 읽히게 보이지 않는 글자를 번갈아 붙임
   const pendingFocus = useRef<string | null>(null); // 운동을 추가한 뒤 초점을 줄 버튼의 aria-label
   const all = catalog(s.custom);
@@ -44,8 +48,9 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
     setR({ ...r, blocks: r.blocks.map((b, x) => (x === bi ? fn(b) : b)).filter((b): b is RoutineBlock => !!b && b.items.length > 0) });
   const setItem = (bi: number, ii: number, fn: (i: RoutineItem) => RoutineItem) => setBlock(bi, (x) => ({ ...x, items: x.items.map((y, z) => (z === ii ? fn(y) : y)) }));
   const est = routineEstimate(r, byId, rest.between) + (r.warmupSec ?? 0);
-  const saved = (): Routine => ({ ...r, estimatedSec: est, updatedAt: new Date().toISOString() });
-  const save = async () => { await mutate((d) => d.routines.put(saved())); };
+  const saved = (x: Routine = r): Routine => ({ ...x, estimatedSec: routineEstimate(x, byId, rest.between) + (x.warmupSec ?? 0), updatedAt: new Date().toISOString() });
+  const save = async (x: Routine = r) => { await mutate((d) => d.routines.put(saved(x))); };
+  const pl = r.blocks.length ? paceLabelOf(s, r) : undefined;
   const move = (bi: number, dir: -1 | 1) => { setMsg(''); setR(moveRoutineBlock(r, bi, bi + dir)); };
   const nameOf = (it: RoutineItem) => byId.get(it.exerciseId)?.name_ko ?? it.exerciseId;
   const blockName = (b: RoutineBlock) => b.items.map(nameOf).join(' + ');
@@ -84,7 +89,10 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
       </div>
       <label>루틴 이름</label>
       <input value={r.name} aria-label="루틴 이름" onInput={(e) => setR({ ...r, name: (e.target as HTMLInputElement).value })} />
-      <p class="sub small">예상 {mmss(est)} {r.warmupSec ? `(웜업 ${Math.round(r.warmupSec / 60)}분 포함)` : ''}</p>
+      {/* 예상은 한 모양(약 N분): 내 속도 예상이 있으면 그것이 먼저, 앱 기본 예상은 이름을 붙여 아래에 */}
+      {pl && <PaceLine pl={pl} />}
+      <p class="sub small" data-testid="editor-app-est">{pl ? '앱 기본 예상' : '예상'} 약 {Math.round(est / 60)}분{r.warmupSec ? ` (웜업 ${Math.round(r.warmupSec / 60)}분 포함)` : ''}</p>
+      {r.blocks.length > 0 && <button class="tonal fit-open" onClick={() => setFit(true)}>내 시간에 맞추기</button>}
       <p class="sub small" id="part-add-h" style={{ margin: '12px 0 6px' }}>부위를 눌러 운동 추가</p>
       <div class="row wrap part-add" role="group" aria-label="부위별 운동 추가">
         {PARTS.map((p) => {
@@ -178,6 +186,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         <button class="grow" onClick={async () => { await save(); go(editReturnTo()); }}>저장</button>
         <button class="primary grow" disabled={!r.blocks.length} onClick={async () => { await save(); await startRoutine(s, saved()); }}>저장하고 시작</button>
       </div>
+      {fit && <FitSheet s={s} r={r} byId={byId} onClose={() => setFit(false)} onApply={async (next) => { setFit(false); setR(next); await save(next); say('내 시간에 맞춰 저장했어요'); }} />}
       {picker && (
         <ExercisePicker s={s} all={all} title={'add' in picker ? '운동 추가' : '운동 교체'}
           part={'add' in picker ? undefined : byId.get(r.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part}

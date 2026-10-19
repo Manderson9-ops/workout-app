@@ -6,16 +6,16 @@
  *  - measured: 앱이 직접 잰 값 (타이머 오차, 앱 전환, 오류 등)
  *  - proxy: 대신 보는 값. 실제 결과는 실기기 체크리스트로 확인 (소리 재생 = 소리 장치 상태, 화면 꺼짐 방지 = 요청 성공)
  */
-export const DIAG_KINDS = ['start', 'timer', 'audio', 'wake', 'vis', 'input', 'plan', 'error', 'backup', 'send', 'haptic', 'notify'] as const;
+export const DIAG_KINDS = ['start', 'timer', 'audio', 'wake', 'vis', 'input', 'plan', 'error', 'backup', 'send', 'haptic', 'notify', 'health'] as const;
 export type DiagKind = (typeof DIAG_KINDS)[number];
 
 export const DIAG_LABEL: Record<DiagKind, string> = {
   start: '앱 시작', timer: '휴식 타이머', audio: '소리', wake: '화면 꺼짐 방지', vis: '앱 전환',
-  input: '입력 저장', plan: '플랜 생성', error: '오류', backup: '백업', send: 'PC로 보내기', haptic: '휴식 끝 진동', notify: '휴식 끝 알림(실험)',
+  input: '입력 저장', plan: '플랜 생성', error: '오류', backup: '백업', send: 'PC로 보내기', haptic: '휴식 끝 진동', notify: '휴식 끝 알림(실험)', health: '애플워치 받음',
 };
 export const DIAG_TRUST: Record<DiagKind, 'measured' | 'proxy'> = {
   start: 'measured', timer: 'measured', audio: 'proxy', wake: 'proxy', vis: 'measured',
-  input: 'measured', plan: 'measured', error: 'measured', backup: 'measured', send: 'measured', haptic: 'proxy', notify: 'proxy',
+  input: 'measured', plan: 'measured', error: 'measured', backup: 'measured', send: 'measured', haptic: 'proxy', notify: 'proxy', health: 'measured',
 };
 
 /** 한 건 (약 100바이트). t=시각, k=종류, d=기기 ID(짧게), m=짧은 설명, v=숫자 값(ms 등), ok=성공 여부 */
@@ -49,6 +49,21 @@ export function classifyTimerEnd(x: { endsAt: number; now: number; screenShownAt
   if (x.lastVisibleAt > 0 && x.now - x.lastVisibleAt < 1000 && x.now - x.endsAt > 1000) return 'returned';
   if (x.screenShownAt > x.endsAt - 250) return 'offscreen';
   return 'measured';
+}
+
+/**
+ * 백업 파일·PC로 보내기에 넣는 진단 종류 (0.9.11). 'health'(애플워치 받음)는 0.9.10 이하 앱의 백업 검사가 모르는 종류라
+ * 넣으면 옛 앱이 백업 전체를 거절함 → 본판이 모두 0.9.11 이상이 될 때까지 백업에서 뺌 (기기 안에는 남음)
+ */
+export const BACKUP_DIAG_KINDS: readonly DiagKind[] = DIAG_KINDS.filter((k) => k !== 'health');
+/** 백업에 넣을 진단만 (옛 앱이 모르는 종류 빼기) */
+export const diagForBackup = <T extends { k: string }>(list: readonly T[]): T[] => list.filter((e) => (BACKUP_DIAG_KINDS as readonly string[]).includes(e.k));
+
+/** 모르는 종류만 빼고 형식이 맞는 진단 한 건 (새 앱이 만든 백업: 이 줄만 버리고 백업은 받음) */
+export function diagEntryUnknownKind(x: unknown): boolean {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return false;
+  const e = x as Record<string, unknown>;
+  return typeof e.k === 'string' && !DIAG_KINDS.includes(e.k as DiagKind) && diagEntryOk({ ...e, k: 'start' });
 }
 
 /** 백업 파일 안 진단 한 건 검사 (백업 검사에서 사용) */

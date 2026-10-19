@@ -54,6 +54,8 @@ export async function load(retry = 0): Promise<void> {
 const writeListeners = new Set<() => void>();
 export function onLocalWrite(fn: () => void): () => void { writeListeners.add(fn); return () => writeListeners.delete(fn); }
 const notifyWrite = () => writeListeners.forEach((f) => f());
+/** 저장소를 직접 바꾼 뒤(mutate 밖) 동기화 예약 알림 */
+export const notifyLocalWrite = (): void => notifyWrite();
 
 export async function mutate(fn: (d: WorkoutDB) => Promise<unknown>): Promise<void> {
   await fn(db);

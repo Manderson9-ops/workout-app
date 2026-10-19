@@ -129,7 +129,9 @@ export function parseStage(text: string): SleepStage | undefined {
   return undefined;
 }
 
-const RANGE: Record<HealthField, [number, number]> = { hr: [25, 250], energy: [0, 2000], sleep: [0, 0], rhr: [25, 150], hrv: [1, 300] };
+/** D-071 심박 범위는 사람 기준 30~220 (예전 25~250). 서버는 Apps Script를 다시 만들어 올린 뒤부터 적용 (그 전 받은 기록은 그대로) */
+export const HR_RANGE: [number, number] = [30, 220];
+const RANGE: Record<HealthField, [number, number]> = { hr: HR_RANGE, energy: [0, 2000], sleep: [0, 0], rhr: [25, 150], hrv: [1, 300] };
 
 /** 줄 안에서 찾은 날짜 (위치) */
 interface Found { ms: number; a: number; b: number }

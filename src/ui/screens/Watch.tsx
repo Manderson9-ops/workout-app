@@ -5,17 +5,18 @@
  */
 import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
-import { watchStatus } from '../../core/health';
+import { watchStatus, lastRxOf } from '../../core/health';
 import { getSendConfig } from '../autoSend';
 import { syncNow, useSyncStatus } from '../sync';
 import { ScreenHeader } from '../header';
 import { Empty } from '../components';
 import { Icon } from '../icons';
 import { backOr } from '../nav';
-import { dateTimeText } from '../../core/dateText';
+import { dateTimeText, daysAgo, sinceText } from '../../core/dateText';
 import { buildPrompt, previewPrompt, AUTOMATION_MANUAL, DAILY_TIME, NAME } from '../../core/shortcutPrompt';
 import type { PromptId, PromptLang } from '../../core/shortcutPrompt';
 import { showToast } from '../toast';
+import { canRunShortcuts, runWatchShortcut, setWatchRunEnabled, watchRunEnabled, watchRunState } from '../watchRun';
 
 /** D-061 설명으로 만들기 카드 */
 function DescribeCard({ cfg }: { cfg: { url: string; key: string } | null | undefined }) {
@@ -67,6 +68,29 @@ const when = (iso: string) => dateTimeText(iso, Date.now()); // "오늘 오전 1
 /** 주소는 앞뒤만 (전체는 복사로) */
 const shortUrl = (u: string) => u.replace(/^https:\/\//, '').replace(/\/macros\/s\/([\w-]{4})[\w-]+([\w-]{4})\/exec$/, '/macros/s/$1…$2/exec');
 
+/** D-064 앱이 단축어를 직접 실행 (아이폰 자동화 없이) */
+function AutoRunCard() {
+  const [on, setOn] = useState(watchRunEnabled());
+  const [, bump] = useState(0);
+  const run = (k: 'workout' | 'daily') => { runWatchShortcut(k); bump((n) => n + 1); };
+  const st = watchRunState();
+  const toggle = () => { const v = !on; setWatchRunEnabled(v); setOn(v); };
+  return (
+    <section class="card" aria-label="자동 보내기" data-testid="watch-autorun">
+      <div class="card-head"><span class="card-title grow">자동 보내기 (자동화 없이)</span><span class="chip-s" data-testid="watch-autorun-untested">실기기 확인 중</span></div>
+      <p class="small">운동을 끝내면, 그리고 하루 한 번 앱을 열 때 애플워치 기록 보내기</p>
+      <div class="row wrap"><button class={`chip${on ? ' on' : ''}`} aria-pressed={on} onClick={toggle} data-testid="watch-autorun-toggle">자동 보내기 {on ? '켬' : '끔'}</button></div>
+      <p class="sub small">켜 두면 앱이 아이폰 단축어 <b>WO 운동 실행</b>(운동 끝)·<b>WO 하루 실행</b>(하루 한 번, 새벽 5시 이후 처음 열 때)을 실행해요. 단축어 앱으로 잠깐 넘어가요. 끝나면 왼쪽 위 <b>◀</b>로 이 앱에 돌아오세요. 단축어는 맥이 넣어 준 "WO" 단축어를 써요 (아이폰에서 따로 만들지 않아도 돼요).</p>
+      {!canRunShortcuts() && <p class="sub small" data-testid="watch-autorun-notphone">이 기기는 아이폰·아이패드가 아니라서 단축어를 실행할 수 없어요. 아이폰 앱에서 켜 두세요.</p>}
+      <div class="row wrap">
+        <button disabled={!canRunShortcuts()} onClick={() => run('workout')}>지금 보내기 (운동)</button>
+        <button disabled={!canRunShortcuts()} onClick={() => run('daily')}>지금 보내기 (하루)</button>
+      </div>
+      <p class="sub small" data-testid="watch-autorun-last">{st.workoutAt ? `마지막 운동 보내기 실행 ${when(new Date(st.workoutAt).toISOString())}` : '아직 운동 보내기를 실행하지 않았어요'}{st.dailyDay ? ` · 마지막 하루 보내기 ${st.dailyDay}` : ''}</p>
+    </section>
+  );
+}
+
 export function WatchScreen({ s }: { s: AppState }) {
   const cfg = getSendConfig();
   const sync = useSyncStatus();
@@ -82,14 +106,18 @@ export function WatchScreen({ s }: { s: AppState }) {
   return (
     <main>
       <ScreenHeader back={{ label: '설정', onClick: () => backOr('#/settings'), aria: '설정으로' }} title="애플워치 연동" />
-      <p class="sub small">아이폰 단축어가 건강 앱의 심박·활동 에너지·수면·안정 심박·HRV를 동기화 서버로 보내면, 다음 동기화 때 이 앱에 들어와요. 운동 카드에 평균·최고 심박과 칼로리, 기록 탭에 어젯밤 수면을 참고로 보여 줘요 (회복 추정에는 쓰지 않아요).</p>
+      {(() => { // D-071: 자료가 끊겼는지 한눈에 (D-060 날짜 규칙: 2일 넘게 지났으면 "N일 전" 덧붙임)
+        const last = lastRxOf(rows); const now = Date.now();
+        return <p class="small watch-last" data-testid="watch-last-rx">{last ? <>마지막 수신: <b>{dateTimeText(last, now)}</b>{daysAgo(last, now) >= 2 ? ` · ${sinceText(last, now)}` : ''}</> : '마지막 수신: 아직 없음'}</p>;
+      })()}
+      <p class="sub small">아이폰 단축어가 건강 앱의 심박·활동 에너지·수면·안정 심박·HRV를 동기화 서버로 보내면, 다음 동기화 때 이 앱에 들어와요. 기록 탭에 어젯밤 수면을 참고로 보여 줘요 (회복 추정에는 쓰지 않아요). 운동 카드의 심박·칼로리는 받은 값에 믿기 어려운 것이 있어, 원인을 고칠 때까지 숫자 대신 "애플워치 값 확인 중"으로 보여요.</p>
 
-      <DescribeCard cfg={cfg} />
+      <AutoRunCard />
 
       <section class="card" aria-label="받은 상태" data-testid="watch-status">
         <div class="card-head"><span class="card-title grow">받은 상태</span></div>
         {rows.length === 0 ? (
-          <Empty text="아직 애플워치 기록을 받지 않았어요" hint="아래 안내대로 단축어를 만들고 한 번 실행해 보세요" />
+          <Empty text="아직 애플워치 기록을 받지 않았어요" hint="위 [지금 보내기 (하루)]를 한 번 눌러 보세요" />
         ) : status.map((x) => (
           <div class="watch-row small" key={x.kind}>
             <span>{x.label}</span>
@@ -97,9 +125,12 @@ export function WatchScreen({ s }: { s: AppState }) {
           </div>
         ))}
         {canary && typeof canary.at === 'string' && <p class="sub small">연결 시험 기록: {when(canary.at)}</p>}
-        <p class="sub small" data-testid="watch-delay">심박은 몇 분~몇 시간 늦게 들어올 수 있어요. 아이폰이 잠겨 있으면 건강 기록을 읽지 못해 운동 직후 보내기가 0건일 수 있는데, 밤 {DAILY_TIME} "하루 건강 보내기"가 최근 24시간 심박·에너지를 다시 보내 그날 운동 카드에 채워져요.</p>
+        <p class="sub small" data-testid="watch-delay">심박은 몇 분~몇 시간 늦게 들어올 수 있어요. 자동 보내기는 앱을 쓰는 중(아이폰 잠금이 풀린 때)에 실행돼서 건강 기록을 읽을 수 있어요. 하루 보내기가 최근 24시간 심박·에너지·수면을 다시 보내, 빠진 기록은 그날 운동 카드에 채워져요.</p>
       </section>
 
+      <details class="watch-old" data-testid="watch-old-ways">
+        <summary class="small">예전 방법: 단축어를 아이폰에서 직접 만들기 (참고)</summary>
+        <DescribeCard cfg={cfg} />
       <section class="card" aria-label="단축어에 넣을 주소와 키">
         <div class="card-head"><span class="card-title grow">단축어에 넣을 주소와 키</span></div>
         {cfg ? (
@@ -125,13 +156,14 @@ export function WatchScreen({ s }: { s: AppState }) {
         </ol>
         <p class="sub small">한 단계씩 자세한 안내: 내 드라이브 › WORK_OUT_APP › docs › 애플워치_연동_안내.md</p>
       </section>
+      </details>
 
       <section class="card" aria-label="연결 시험">
         <div class="card-head"><span class="card-title grow">연결 시험</span></div>
         <ol class="watch-steps">
-          <li>단축어 앱에서 "운동 기록 보내기"를 직접 한 번 실행 (화면에 {'{"ok":true,"received":…}'}가 나오면 서버가 받은 것)</li>
+          <li>위 "자동 보내기"의 [지금 보내기 (운동)] 또는 [지금 보내기 (하루)]를 누르고, 단축어가 끝나면 왼쪽 위 ◀로 돌아오기</li>
           <li>이 화면으로 돌아와 [지금 받기]</li>
-          <li>위 "심박 · 마지막으로 받음" 시각이 방금으로 바뀌면 성공. 운동 직후라면 그 운동 카드에 평균 심박이 보여요</li>
+          <li>위 "심박 · 마지막으로 받음" 시각이 방금으로 바뀌면 성공. 운동 직후라면 그 운동 카드에 "애플워치 값 확인 중"이 보여요 (숫자는 원인을 고칠 때까지 숨김)</li>
         </ol>
         <button class="primary" disabled={!cfg || sync.phase === 'syncing'} onClick={() => void syncNow('watch').then(() => setMsg('받아 왔어요'))}><Icon name="sync" size={18} />지금 받기</button>
         <p class="sub small">건강 기록은 내 구글 드라이브의 동기화 파일(sync/db)에만 저장돼요. 공개 저장소·진단 기록에는 들어가지 않아요. 단축어가 보낸 응답에 "received" 0이면 함께 온 "hint" 안내(빈 값·날짜 형식 등)를 확인하세요.</p>
