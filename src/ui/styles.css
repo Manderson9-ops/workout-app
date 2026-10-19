@@ -732,3 +732,22 @@ button.chip.full { width: 100%; }
 .watch-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
 .prompt-pre { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; background: var(--bg); border-radius: 10px; padding: 10px; margin: 8px 0 0; font-family: inherit; }
 .watch-steps li button { margin: 2px 0; }
+
+/* 0.9.11 사용 개선 2단계 (D-067, D-068) */
+.pace-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 0; }
+.pace-line .pace-cut { color: var(--warn); }
+.pace-line button.fit-btn { padding: 0 12px; font-size: 14px; }
+.fit-target { margin: 4px 0 8px; }
+.fit-sum { margin: 4px 0; font-size: 17px; }
+.fit-warn { margin: 6px 0; }
+.fit-rows { list-style: none; padding: 0; margin: 10px 0 0; max-height: 46vh; overflow: auto; }
+.fit-row { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--card2); }
+.fit-row .fit-sets { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--sub); }
+.fit-row.cut .fit-sets { color: var(--text); font-weight: 700; }
+.fit-up { margin-left: 6px; font-size: 12px; }
+.dup-note { flex-direction: column; }
+.dup-note .row { margin-top: 6px; }
+/* 묶음 카드: 운동 글자는 이름 앞 굵게, 등급은 이름 뒤 "등급 S" 테두리 배지 (A·B와 헷갈리지 않게) */
+.grp-letter { color: var(--acc-text); }
+.badge.grade-tag { font-size: 12px; padding: 1px 6px; }
+.badge.grade-tag .grade-k { font-weight: 500; margin-right: 2px; }

@@ -285,8 +285,9 @@ export function WorkoutScreen({ s }: { s: AppState }) {
           return (
             <div key={ii} class={`wk-item grp-item${it.skipped ? ' skipped' : ''}`}>
               <div class="row wk-item-head">
-                {g && <GradeBadge g={g} />}
-                <strong class="grow">{letter}. {nameOf(it.exerciseId)}</strong>
+                {/* 묶음: 운동 글자(A·B)를 맨 앞에, 등급은 이름 뒤 "등급 S" (글자와 헷갈리지 않게) */}
+                <strong class="grow"><span class="grp-letter">{letter}.</span> {nameOf(it.exerciseId)}</strong>
+                {g && <GradeBadge g={g} prefix />}
                 {it.skipped && <span class="pill">건너뜀</span>}
                 {infoLink(it.exerciseId)}
                 {menuBtn(bi, ii)}

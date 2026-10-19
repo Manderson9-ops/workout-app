@@ -14,13 +14,16 @@ import { routineUse, routineParts, sortRoutines, filterRoutines, sinceText } fro
 import type { RoutineSort } from '../../core/routineList';
 import type { Part } from '../../core/types';
 import { newId } from '../../db/db';
-import { minutes, MenuSheet, Empty } from '../components';
+import { minutes, MenuSheet, Empty, Sheet } from '../components';
 import { Icon } from '../icons';
 import { ScreenHeader } from '../header';
 import { go, setEditReturn } from '../nav';
 import { askChoice, askConfirm } from '../confirm';
 import { lsGet, lsSet } from '../appName';
-import { fullText } from '../../core/dateText';
+import { fullText, dateText } from '../../core/dateText';
+import { duplicateNames } from '../../core/routineFit';
+import { paceLabelOf, setFitOnOpen } from '../pace';
+import { PaceLine } from './FitSheet';
 
 const SORT_KEY = 'routines.sort';
 const SORT_LABEL: Record<RoutineSort, string> = { recent: '최근 한 순', name: '이름 순', short: '짧은 시간 순' };
@@ -81,6 +84,24 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
 
   const [menu, setMenu] = useState<Routine | null>(null);
   const edit = (r: Routine) => { setEditReturn(mode === 'pick' ? '#/workout' : '#/'); go(`#/routine/${encodeURIComponent(r.id)}`); };
+  /** 카드의 [맞추기]: 편집 화면을 열며 맞추기 창을 바로 (D-067) */
+  const fitFrom = (r: Routine) => { setFitOnOpen(r.id); edit(r); };
+  // 같은 이름 루틴 (D-067): 보이는 루틴 중 이름이 같은 것, 오래된(먼저 만든) 쪽에 [이름 바꾸기]/[숨기기]
+  const dups = mode === 'pick' ? [] : duplicateNames(visible);
+  const [rename, setRename] = useState<{ r: Routine; name: string } | null>(null);
+  const hideOld = async (r: Routine) => {
+    const ok = await askConfirm({ title: '오래된 루틴을 숨길까요?', message: `「${r.name}」 (만든 날 ${dateText(r.createdAt, now, { weekday: false })})\n목록에서만 숨겨요. 루틴과 운동 기록은 남고 "숨긴 루틴"에서 되돌릴 수 있어요.`, ok: '숨기기' });
+    if (ok) await hide(r);
+  };
+  const saveRename = async () => {
+    if (!rename) return;
+    const name = rename.name.trim();
+    if (!name || name === rename.r.name) { setRename(null); return; }
+    const id = rename.r.id;
+    await mutate(async (d) => { const cur = await d.routines.get(id); if (cur) await d.routines.put({ ...cur, name, updatedAt: new Date().toISOString() }); });
+    setRename(null);
+    setToast({ text: `루틴 이름을 「${name}」으로 바꿨어요` });
+  };
 
   const card = (r: Routine, isHidden = false) => {
     const u = use.get(r.id);
@@ -100,6 +121,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
           </div>
         </div>
         <div class="sub small" style={{ marginTop: '4px' }}>{items.length ? `운동 ${items.length}개${r.estimatedSec ? ` · 약 ${minutes(r.estimatedSec)}` : ''}` : '아직 운동이 없어요'}</div>
+        {!isHidden && items.length > 0 && (() => { const pl = paceLabelOf(s, r); return pl && <PaceLine pl={pl} name={r.name} onFit={() => fitFrom(r)} />; })()}
         {items.length > 0 && <div class="pill routine-preview">{items.slice(0, 4).map((i) => nameOf(i.exerciseId)).join(', ')}{items.length > 4 ? ` 외 ${items.length - 4}개` : ''}</div>}
         <div class="row" style={{ marginTop: '10px' }}>
           {isHidden ? <>
@@ -140,6 +162,15 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
           {!hidden.length && <><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button><button onClick={() => void newRoutine()}>+ 직접 만들기</button></>}
         </Empty>
       )}
+      {dups.flatMap((g) => g.older.map((o) => (
+        <div class="rec-note dup-note" role="note" key={`dup-${o.id}`} data-testid="dup-note">
+          <span>같은 이름 루틴이 {g.older.length + 1}개 있어요: 「{g.name}」. 오래된 것(만든 날 {dateText(o.createdAt, now, { weekday: false })}, {use.get(o.id) ? `마지막 ${sinceText(use.get(o.id)!.lastAt, now)}` : '아직 안 함'})을 정리할까요?</span>
+          <span class="row">
+            <button onClick={() => setRename({ r: o, name: `${o.name} (이전)` })} aria-label={`오래된 「${o.name}」 이름 바꾸기`}>이름 바꾸기</button>
+            <button onClick={() => void hideOld(o)} aria-label={`오래된 「${o.name}」 숨기기`}>숨기기</button>
+          </span>
+        </div>
+      )))}
       {visible.length > 0 && !shown.length && <Empty label="검색 결과 없음" text={`"${q}"에 맞는 루틴이 없어요`} hint="다른 이름·부위로 찾아보세요" />}
       <div class="wide-cards">{shown.map((r) => card(r))}</div>
       {mode === 'home' && visible.length > 0 && (sorted.length > 3 || hidden.length > 0) && (
@@ -150,6 +181,16 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
           <button class="ghost" aria-expanded={showHidden} onClick={() => setShowHidden(!showHidden)}><Icon name="chevron" size={16} class={`rot${showHidden ? ' open' : ''}`} />숨긴 루틴 {hidden.length}개</button>
           {showHidden && <div class="wide-cards">{sortRoutines(hidden, use, 'name').map((r) => card(r, true))}</div>}
         </div>
+      )}
+      {rename && (
+        <Sheet title="루틴 이름 바꾸기" onClose={() => setRename(null)} modal trap>
+          <p class="sub small">「{rename.r.name}」 (만든 날 {dateText(rename.r.createdAt, now, { weekday: false })})</p>
+          <input value={rename.name} aria-label="새 루틴 이름" onInput={(e) => setRename({ ...rename, name: (e.target as HTMLInputElement).value })} />
+          <div class="row" style={{ marginTop: '10px' }}>
+            <button class="big grow" onClick={() => setRename(null)}>취소</button>
+            <button class="big grow primary" disabled={!rename.name.trim()} onClick={() => void saveRename()}>이름 바꾸기</button>
+          </div>
+        </Sheet>
       )}
       {menu && <MenuSheet title={menu.name} onClose={() => setMenu(null)} items={[
         { label: '편집', aria: `${menu.name} 편집`, run: () => edit(menu) },

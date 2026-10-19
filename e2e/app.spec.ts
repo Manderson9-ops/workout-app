@@ -1853,6 +1853,8 @@ test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 �
   await page.reload();
   await expect.poll(heads).toEqual([p1[0], last, p1[1], ...p1.slice(2, -1)]);
   await endWorkout(page);
+  // 루틴으로 시작한 운동의 순서를 바꿨으니 끝낸 뒤 루틴 반영을 물음 (D-068) → 원래대로
+  await page.getByRole('dialog', { name: '루틴에 반영할까요?' }).getByRole('button', { name: '원래대로' }).click();
 
   // 루틴 편집: 끌어서 옮기고 저장 → 다시 열면 그 순서
   await page.getByRole('button', { name: '+ 직접' }).click();

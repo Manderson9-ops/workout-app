@@ -8,7 +8,10 @@ import { diag } from './diag';
 import { deviceId } from './deviceId';
 import type { AppState } from './store';
 import { newId, DEFAULT_SETTINGS, softDelete } from '../db/db';
-import { startWorkout, planToRoutine, decideFinish, withHidden, withoutHidden } from '../core/session';
+import { startWorkout, planToRoutine, decideFinish, withHidden, withoutHidden, routineEstimate } from '../core/session';
+import { routineFromWorkout, newRoutineFromWorkout } from '../core/routineDiff';
+import { dateText } from '../core/dateText';
+import { catalog } from './catalog';
 import type { FinishDecision } from '../core/session';
 import type { Routine, Workout } from '../core/session';
 import type { PlanBlock } from '../core/planner';
@@ -210,4 +213,33 @@ export async function deleteRoutineForever(id: string): Promise<void> {
     const st = await d.settings.get('main');
     if (st && (st.routineHidden ?? []).includes(id)) await d.settings.put({ ...st, routineHidden: withoutHidden(st.routineHidden, id) });
   });
+}
+
+/**
+ * 끝낸 운동을 루틴에 반영 (D-068 [루틴 업데이트]): 운동 목록·순서·세트 수. 저장소의 지금 루틴에 덮어씀(이름·웜업·메모 유지).
+ * 루틴이 그사이 지워졌으면 아무것도 안 함 (undefined)
+ */
+export async function applyWorkoutToRoutine(routineId: string, w: Workout): Promise<Routine | undefined> {
+  const st = getState();
+  const byId = new Map(catalog(st.custom).map((e) => [e.id, e]));
+  let out: Routine | undefined;
+  await mutate(async (d) => {
+    const cur = await d.routines.get(routineId);
+    if (!cur) return;
+    const next = routineFromWorkout(cur, w, new Date().toISOString());
+    out = { ...next, estimatedSec: routineEstimate(next, byId, st.settings.rest.between) + (next.warmupSec ?? 0) };
+    await d.routines.put(out);
+  });
+  return out;
+}
+
+/** 끝낸 운동을 새 루틴으로 저장 (D-068 [새 루틴으로 저장]). 이름 = "루틴 이름 (10월 20일)" */
+export async function saveWorkoutAsRoutine(r: Routine, w: Workout): Promise<Routine> {
+  const st = getState();
+  const byId = new Map(catalog(st.custom).map((e) => [e.id, e]));
+  const now = new Date().toISOString();
+  const base = newRoutineFromWorkout(r, w, newId('r'), `${r.name} (${dateText(now, now, { weekday: false })})`, now);
+  const out = { ...base, estimatedSec: routineEstimate(base, byId, st.settings.rest.between) + (base.warmupSec ?? 0) };
+  await mutate((d) => d.routines.put(out));
+  return out;
 }

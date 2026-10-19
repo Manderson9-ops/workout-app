@@ -6,7 +6,9 @@
  */
 import { activeOf, historyOf, getState, flushPending } from './store';
 import { askConfirm, askChoice } from './confirm';
-import { finishActiveWorkout, discardActiveWorkout, setFinishError } from './actions';
+import { finishActiveWorkout, discardActiveWorkout, setFinishError, applyWorkoutToRoutine, saveWorkoutAsRoutine } from './actions';
+import { routineDiff, diffText } from '../core/routineDiff';
+import { catalog } from './catalog';
 import { doneCount, shouldAskEndTime, endAtLastSet, lastDoneMs, whenText } from '../core/finishTime';
 import { timeText } from '../core/dateText';
 import { prExerciseCount } from '../core/workoutHistory';
@@ -29,11 +31,52 @@ export async function finishAndAfter(id: string, at: 'now' | 'last' = 'now'): Pr
     const nPr = cw && cw.id === id ? prExerciseCount(cw, historyOf(getState())) : 0;
     const r = await finishActiveWorkout(id, at); // 실패 문구는 finishActiveWorkout이 남김
     if (!r.ok) return false;
+    const moved = waitHash('#/');
     go('#/');
     void afterWorkoutFinished(Promise.allSettled([sendNow('workout'), syncNow('finish')]));
     if (nPr) showToast(`기록 갱신 ${nPr}개 운동 (앱 기준)`, 'star');
+    // 끝낸 뒤 루틴 반영 묻기 (D-068). 홈으로 옮긴 뒤에 (화면이 바뀌면 열린 확인 창이 닫히므로)
+    void moved.then(() => offerRoutineUpdate(id));
     return true;
   } finally { busy = false; }
+}
+
+/** 해시가 h로 바뀐 뒤 (이미 h면 바로). 늦어도 0.5초 */
+function waitHash(h: string): Promise<void> {
+  if (location.hash === h || (h === '#/' && (location.hash === '' || location.hash === '#'))) return Promise.resolve();
+  return new Promise((res) => {
+    const done = () => { window.removeEventListener('hashchange', done); clearTimeout(t); setTimeout(res, 0); };
+    const t = setTimeout(done, 500);
+    window.addEventListener('hashchange', done);
+  });
+}
+
+/**
+ * 루틴으로 시작한 운동을 끝낸 뒤, 운동 구성이 루틴과 달라졌으면 묻기 (D-068):
+ * [루틴 업데이트] = 이번 운동 목록·순서·세트 수로 루틴을 바꿈 / [새 루틴으로 저장] / [원래대로] = 아무것도 안 함.
+ * 무게·횟수·세트 완료만 바뀐 것은 묻지 않음. 루틴이 지워졌으면 묻지 않음
+ */
+export async function offerRoutineUpdate(id: string): Promise<void> {
+  const st = getState();
+  const w = st.workouts.find((x) => x.id === id);
+  if (!w?.endedAt || !w.routineId) return;
+  const r = st.routines.find((x) => x.id === w.routineId);
+  if (!r) return;
+  const d = routineDiff(r, w);
+  if (!d.changed) return;
+  const byId = new Map(catalog(st.custom).map((e) => [e.id, e]));
+  const a = await askChoice({
+    title: '루틴에 반영할까요?',
+    message: `이번 운동이 「${r.name}」 루틴과 달라요.\n${diffText(d, (x) => byId.get(x)?.name_ko ?? x)}\n(무게·횟수는 루틴에 넣지 않아요)`,
+    ok: '루틴 업데이트', alt: '새 루틴으로 저장', cancel: '원래대로',
+  });
+  if (a === 'ok') {
+    const n = await applyWorkoutToRoutine(r.id, w);
+    showToast(n ? `「${r.name}」 루틴을 업데이트했어요` : '루틴을 찾지 못해 바꾸지 않았어요');
+  } else if (a === 'alt') {
+    const n = await saveWorkoutAsRoutine(r, w);
+    showToast(`새 루틴 「${n.name}」으로 저장했어요`);
+  }
 }
 
 /** 기록하지 않고 버리기 → 홈 (D-072) */
