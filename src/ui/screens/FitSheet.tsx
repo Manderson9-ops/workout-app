@@ -43,6 +43,8 @@ export function FitSheet({ s, r, byId, onApply, onClose }: { s: AppState; r: Rou
       </div>
       <p class="fit-sum" aria-live="polite"><b>약 {m(f.beforeSec)}분 → {m(f.afterSec)}분</b> <span class="sub small">(목표 {target}분)</span></p>
       <p class="sub small">{pace ? `내 속도: 세트당 약 ${(pace.secPerSet / 60).toFixed(1)}분 (최근 ${pace.n}회 기록)` : '기록이 3회보다 적어 앱 기본 예상으로 계산해요'}</p>
+      {/* D-067 남은 일: 카드에서 뺀 앱 기본 예상은 여기서만 (비교용) */}
+      {pace && <p class="sub small" data-testid="fit-app-default">앱 기본 예상: 약 {m(r.estimatedSec ?? routineEstimate(r, byId, s.settings.rest.between) + (r.warmupSec ?? 0))}분</p>}
       <p class="sub small">운동당 세트를 줄여요 ({FIT_MIN_SETS}세트 아래로는 안 줄임) · 최근 {RECENT_DAYS}일 많이 한 부위부터 줄이고, 덜 한 부위를 앞으로</p>
       {!f.fits && <p class="warn-text fit-warn" role="note">{FIT_MIN_SETS}세트까지 줄여도 약 {m(f.afterSec)}분이에요. 운동을 빼거나 목표 시간을 늘려 주세요</p>}
       {!changed && <p class="sub" role="note">이미 목표 시간 안이에요. 바꿀 게 없어요</p>}

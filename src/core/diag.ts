@@ -6,16 +6,16 @@
  *  - measured: 앱이 직접 잰 값 (타이머 오차, 앱 전환, 오류 등)
  *  - proxy: 대신 보는 값. 실제 결과는 실기기 체크리스트로 확인 (소리 재생 = 소리 장치 상태, 화면 꺼짐 방지 = 요청 성공)
  */
-export const DIAG_KINDS = ['start', 'timer', 'audio', 'wake', 'vis', 'input', 'plan', 'error', 'backup', 'send', 'haptic', 'notify'] as const;
+export const DIAG_KINDS = ['start', 'timer', 'audio', 'wake', 'vis', 'input', 'plan', 'error', 'backup', 'send', 'haptic', 'notify', 'health'] as const;
 export type DiagKind = (typeof DIAG_KINDS)[number];
 
 export const DIAG_LABEL: Record<DiagKind, string> = {
   start: '앱 시작', timer: '휴식 타이머', audio: '소리', wake: '화면 꺼짐 방지', vis: '앱 전환',
-  input: '입력 저장', plan: '플랜 생성', error: '오류', backup: '백업', send: 'PC로 보내기', haptic: '휴식 끝 진동', notify: '휴식 끝 알림(실험)',
+  input: '입력 저장', plan: '플랜 생성', error: '오류', backup: '백업', send: 'PC로 보내기', haptic: '휴식 끝 진동', notify: '휴식 끝 알림(실험)', health: '애플워치 받음',
 };
 export const DIAG_TRUST: Record<DiagKind, 'measured' | 'proxy'> = {
   start: 'measured', timer: 'measured', audio: 'proxy', wake: 'proxy', vis: 'measured',
-  input: 'measured', plan: 'measured', error: 'measured', backup: 'measured', send: 'measured', haptic: 'proxy', notify: 'proxy',
+  input: 'measured', plan: 'measured', error: 'measured', backup: 'measured', send: 'measured', haptic: 'proxy', notify: 'proxy', health: 'measured',
 };
 
 /** 한 건 (약 100바이트). t=시각, k=종류, d=기기 ID(짧게), m=짧은 설명, v=숫자 값(ms 등), ok=성공 여부 */

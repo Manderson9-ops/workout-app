@@ -722,6 +722,10 @@ button.chip.full { width: 100%; }
 .wc-watch { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 13px; color: var(--sub); font-variant-numeric: tabular-nums; }
 .wc-watch .icon { color: var(--sub); flex: none; }
 .wc-watch.detail { font-size: 14px; color: var(--text); }
+/* D-071 "애플워치 값 확인 중": 작고 중립 (경고색 아님) */
+.wc-watch.pending, .wc-watch.detail.pending { color: var(--sub); font-size: 13px; }
+.wc-why { min-height: 44px; min-width: 44px; padding: 2px 8px; font-size: 13px; margin-left: 4px; }
+.watch-last { margin: 4px 0 8px; }
 .rec-night { margin: 4px 0 8px; }
 .rec-night p { display: flex; align-items: center; gap: 6px; margin: 0; }
 .rec-night .icon { color: var(--sub); flex: none; }

@@ -5,14 +5,14 @@
  */
 import { useState } from 'preact/hooks';
 import type { AppState } from '../store';
-import { watchStatus } from '../../core/health';
+import { watchStatus, lastRxOf } from '../../core/health';
 import { getSendConfig } from '../autoSend';
 import { syncNow, useSyncStatus } from '../sync';
 import { ScreenHeader } from '../header';
 import { Empty } from '../components';
 import { Icon } from '../icons';
 import { backOr } from '../nav';
-import { dateTimeText } from '../../core/dateText';
+import { dateTimeText, daysAgo, sinceText } from '../../core/dateText';
 import { buildPrompt, previewPrompt, AUTOMATION_MANUAL, DAILY_TIME, NAME } from '../../core/shortcutPrompt';
 import type { PromptId, PromptLang } from '../../core/shortcutPrompt';
 import { showToast } from '../toast';
@@ -106,7 +106,11 @@ export function WatchScreen({ s }: { s: AppState }) {
   return (
     <main>
       <ScreenHeader back={{ label: '설정', onClick: () => backOr('#/settings'), aria: '설정으로' }} title="애플워치 연동" />
-      <p class="sub small">아이폰 단축어가 건강 앱의 심박·활동 에너지·수면·안정 심박·HRV를 동기화 서버로 보내면, 다음 동기화 때 이 앱에 들어와요. 운동 카드에 평균·최고 심박과 칼로리, 기록 탭에 어젯밤 수면을 참고로 보여 줘요 (회복 추정에는 쓰지 않아요).</p>
+      {(() => { // D-071: 자료가 끊겼는지 한눈에 (D-060 날짜 규칙: 2일 넘게 지났으면 "N일 전" 덧붙임)
+        const last = lastRxOf(rows); const now = Date.now();
+        return <p class="small watch-last" data-testid="watch-last-rx">{last ? <>마지막 수신: <b>{dateTimeText(last, now)}</b>{daysAgo(last, now) >= 2 ? ` · ${sinceText(last, now)}` : ''}</> : '마지막 수신: 아직 없음'}</p>;
+      })()}
+      <p class="sub small">아이폰 단축어가 건강 앱의 심박·활동 에너지·수면·안정 심박·HRV를 동기화 서버로 보내면, 다음 동기화 때 이 앱에 들어와요. 운동 카드에 평균·최고 심박과 칼로리, 기록 탭에 어젯밤 수면을 참고로 보여 줘요 (회복 추정에는 쓰지 않아요). 받은 값이 사람에게 나오기 어려운 범위면 숫자 대신 "애플워치 값 확인 중"으로 보여요.</p>
 
       <AutoRunCard />
 
@@ -159,7 +163,7 @@ export function WatchScreen({ s }: { s: AppState }) {
         <ol class="watch-steps">
           <li>위 "자동 보내기"의 [지금 보내기 (운동)] 또는 [지금 보내기 (하루)]를 누르고, 단축어가 끝나면 왼쪽 위 ◀로 돌아오기</li>
           <li>이 화면으로 돌아와 [지금 받기]</li>
-          <li>위 "심박 · 마지막으로 받음" 시각이 방금으로 바뀌면 성공. 운동 직후라면 그 운동 카드에 평균 심박이 보여요</li>
+          <li>위 "심박 · 마지막으로 받음" 시각이 방금으로 바뀌면 성공. 운동 직후라면 그 운동 카드에 평균 심박이 보여요 (값이 이상하면 "애플워치 값 확인 중")</li>
         </ol>
         <button class="primary" disabled={!cfg || sync.phase === 'syncing'} onClick={() => void syncNow('watch').then(() => setMsg('받아 왔어요'))}><Icon name="sync" size={18} />지금 받기</button>
         <p class="sub small">건강 기록은 내 구글 드라이브의 동기화 파일(sync/db)에만 저장돼요. 공개 저장소·진단 기록에는 들어가지 않아요. 단축어가 보낸 응답에 "received" 0이면 함께 온 "hint" 안내(빈 값·날짜 형식 등)를 확인하세요.</p>

@@ -65,15 +65,28 @@ const chestBack = routine('r-cb', '가슴+등 75분', [
 
 test('D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 보기(목표 바꾸기) → 적용하면 75분 안', async ({ page }) => {
   await idbPut(page, 'workouts', [past('p1', 1), past('p2', 3), past('p3', 5), past('p4', 7)]);
-  await idbPut(page, 'routines', [chestBack]);
+  await idbPut(page, 'routines', [{ ...chestBack, estimatedSec: 152 * 60 }]); // 앱 기본 예상 152분 (사용자 루틴 모양)
   await page.reload();
+  // 홈: 내 속도 줄은 루틴마다 한 번. 이 루틴은 "다음 운동"이라 그 카드에만 (내 루틴 목록 카드에는 다시 안 보임)
+  const next = page.getByTestId('home-next');
   const card = page.getByRole('group', { name: '루틴 가슴+등 75분' });
-  await expect(card.getByTestId('pace-line')).toHaveText('내 속도로 약 139분·목표 75분이면 못 할 운동 5개맞추기');
+  await expect(next.getByTestId('pace-line')).toHaveText('내 속도로 약 139분·목표 75분이면 못 할 운동 5개맞추기');
+  await expect(page.getByTestId('pace-line')).toHaveCount(1);
+  await expect(card.getByTestId('pace-line')).toHaveCount(0);
+  // 내 속도 예상이 있으면 앱 기본 예상("· 약 N분")은 카드에서 빠짐
+  await expect(next.locator('.next-meta')).toHaveText('운동 12개');
+  await expect(card).not.toContainText(/운동 \d+개 · 약/);
   await checkScreen(page, 'u10-pace-card');
-  await card.getByRole('button', { name: '가슴+등 75분 내 시간에 맞추기' }).click();
+  // 내 루틴 화면(다음 운동 카드 없음)에서는 목록 카드에 보임
+  await page.goto('./#/routines');
+  const card2 = page.getByRole('group', { name: '루틴 가슴+등 75분' });
+  await expect(card2.getByTestId('pace-line')).toHaveText('내 속도로 약 139분·목표 75분이면 못 할 운동 5개맞추기');
+  await page.goto('./#/');
+  await next.getByRole('button', { name: '가슴+등 75분 내 시간에 맞추기' }).click();
   const dlg = page.getByRole('dialog', { name: '내 시간에 맞추기' });
   await expect(dlg).toContainText('약 139분 → 74분');
   await expect(dlg).toContainText('내 속도: 세트당 약 2.5분 (최근 4회 기록)');
+  await expect(dlg.getByTestId('fit-app-default')).toHaveText('앱 기본 예상: 약 152분');
   // 많이 한 가슴은 2세트로, 덜 한 등은 앞으로
   await expect(dlg.getByRole('listitem').first()).toContainText('풀업앞으로 (2번째에서)');
   await expect(dlg.getByRole('listitem').filter({ hasText: /^바벨 벤치프레스/ })).toContainText('5 → 2세트');
@@ -97,10 +110,13 @@ test('D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 �
 
 test('D-067 기록이 3회보다 적으면 내 속도 줄은 안 보임', async ({ page }) => {
   await idbPut(page, 'workouts', [past('p1', 1), past('p2', 3)]);
-  await idbPut(page, 'routines', [chestBack]);
+  await idbPut(page, 'routines', [{ ...chestBack, estimatedSec: 152 * 60 }]);
   await page.reload();
   await expect(page.getByRole('group', { name: '루틴 가슴+등 75분' })).toBeVisible();
   await expect(page.getByTestId('pace-line')).toHaveCount(0);
+  // 내 속도가 없으면 앱 기본 예상은 그대로 (다음 운동·목록 카드)
+  await expect(page.getByTestId('home-next').locator('.next-meta')).toHaveText('운동 12개 · 약 152분');
+  await expect(page.getByRole('group', { name: '루틴 가슴+등 75분' })).toContainText('운동 12개 · 약 152분');
 });
 
 test('D-067 같은 이름 루틴: 오래된 것 [숨기기](확인) · [이름 바꾸기]', async ({ page }) => {

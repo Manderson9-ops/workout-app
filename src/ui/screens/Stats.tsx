@@ -13,7 +13,7 @@ import { BodyHeat } from '../bodyMapView';
 import { recoveryByPart } from '../../core/recovery';
 import { RecoveryCard } from './RecoveryCard';
 import { RecordFixCard } from './RecordFix';
-import { lastNight, watchFor, watchLine } from '../../core/health';
+import { lastNight, watchView, watchLine, WATCH_PENDING, WATCH_GATE } from '../../core/health';
 import { LineChart, BarChart, PairBarChart } from '../charts';
 import { NumInput, Empty, Metric, Delta, Sheet } from '../components';
 import { ScreenHeader } from '../header';
@@ -321,6 +321,32 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
   );
 }
 
+/** D-058 상세 애플워치 한 줄. D-071: 그럴듯하지 않으면 숫자 대신 "확인 중" + [왜?] 안내 창 */
+function DetailWatch({ w, s }: { w: Workout; s: AppState }) {
+  const [info, setInfo] = useState(false);
+  const v = watchView(w, s.health);
+  if (!v) return null;
+  if (v.ok) return <p class="wc-watch detail" data-testid="detail-watch"><Icon name="heart" size={16} />{watchLine(v.x)}</p>;
+  const g = WATCH_GATE;
+  return (
+    <>
+      <p class="wc-watch detail pending" data-testid="detail-watch-pending"><Icon name="heart" size={16} />{WATCH_PENDING}
+        <button class="ghost wc-why" aria-haspopup="dialog" onClick={() => setInfo(true)}>왜?</button></p>
+      {info && (
+        <Sheet title={WATCH_PENDING} onClose={() => setInfo(false)} modal trap>
+          <p class="small" data-testid="watch-pending-info">애플워치에서 받은 이 운동의 심박·칼로리가 사람에게 나오기 어려운 범위라서, 원인을 확인하는 동안 숫자를 보여 주지 않아요.</p>
+          <ul class="small sub">
+            <li>보여 주는 조건: 최고 심박 {g.hrMax} 이하, 평균 심박 {g.hrAvgMin}~{g.hrAvgMax}, 운동 중 심박 {g.hrNMin}개 이상, 칼로리는 분당 {g.kcalPerMin}kcal 이하</li>
+            <li>예: 최고 심박 240, 93분에 3,320kcal, 운동 중 심박 4~11개처럼 받은 값이 있었어요</li>
+            <li>다음에 받는 기록부터 어떤 값이 왔는지(개수·최소·최대만) 진단에 남겨 원인을 찾아요. 운동 기록(세트·무게)에는 영향이 없어요</li>
+          </ul>
+          <button class="big" style={{ width: '100%' }} onClick={() => setInfo(false)}>알겠어요</button>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
 export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
   const w = s.workouts.find((x) => x.id === id);
   const all = catalog(s.custom);
@@ -341,7 +367,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
       <p class="sub small">작업 세트 {sum.workSets} · 볼륨 {sum.volume.toLocaleString()}kg · {PARTS.filter((p) => sum.parts[p]).map((p) => `${p} ${sum.parts[p]}`).join(', ')}</p>
       {w.editedAt && <p class="sub small">{dateTimeText(w.editedAt, Date.now())}에 고침</p>}
       {w.memo && <p class="memo-line"><Icon name="note" size={16} />{w.memo}</p>}
-      {(() => { const x = watchFor(w, s.health); return x ? <p class="wc-watch detail" data-testid="detail-watch"><Icon name="heart" size={16} />{watchLine(x)}</p> : null; })()}
+      <DetailWatch w={w} s={s} />
       {(s.settings.homeHidden ?? []).includes(w.id) && (
         <div class="card row between" role="note" aria-label={`${HOME_HIDDEN_LABEL} 기록`}>
           <span class="small">홈 "최근 운동"에서 뺀 기록이에요. 기록·통계에는 그대로예요.</span>

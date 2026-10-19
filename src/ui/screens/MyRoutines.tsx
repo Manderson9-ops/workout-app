@@ -108,6 +108,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
     const parts = partsOf(r);
     const items = r.blocks.flatMap((b) => b.items);
     const when = sinceText(u?.lastAt, now);
+    const pl = !isHidden && items.length > 0 ? paceLabelOf(s, r) : undefined;
     return (
       <div class={`card routine-card${isHidden ? ' is-hidden' : ''}`} key={r.id} role="group" aria-label={`루틴 ${r.name}`}>
         <div class="row between" style={{ alignItems: 'flex-start' }}>
@@ -120,8 +121,9 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
             <div aria-hidden="true">{u ? <>마지막 <b>{when}</b></> : '아직 안 함'}</div>{u && <div aria-hidden="true">총 {u.count}회</div>}
           </div>
         </div>
-        <div class="sub small" style={{ marginTop: '4px' }}>{items.length ? `운동 ${items.length}개${r.estimatedSec ? ` · 약 ${minutes(r.estimatedSec)}` : ''}` : '아직 운동이 없어요'}</div>
-        {!isHidden && items.length > 0 && (() => { const pl = paceLabelOf(s, r); return pl && <PaceLine pl={pl} name={r.name} onFit={() => fitFrom(r)} />; })()}
+        {/* D-067 남은 일: 내 속도 예상이 있으면 앱 기본 예상(약 N분)은 빼고 내 예상만. 홈에서는 "다음 운동" 카드에 이미 나온 루틴은 줄을 다시 안 보임 (한 루틴에 한 번) */}
+        <div class="sub small" style={{ marginTop: '4px' }}>{items.length ? `운동 ${items.length}개${r.estimatedSec && !pl ? ` · 약 ${minutes(r.estimatedSec)}` : ''}` : '아직 운동이 없어요'}</div>
+        {pl && !(mode === 'home' && r.id === nextId) && <PaceLine pl={pl} name={r.name} onFit={() => fitFrom(r)} />}
         {items.length > 0 && <div class="pill routine-preview">{items.slice(0, 4).map((i) => nameOf(i.exerciseId)).join(', ')}{items.length > 4 ? ` 외 ${items.length - 4}개` : ''}</div>}
         <div class="row" style={{ marginTop: '10px' }}>
           {isHidden ? <>

@@ -99,13 +99,15 @@ function NextWorkoutCard({ s, pick, rec }: { s: AppState; pick: NextPick; rec: M
   const byId = new Map(all.map((e) => [e.id, e]));
   const items = r.blocks.flatMap((b) => b.items);
   const parts = routineParts(r, (id): Part | undefined => byId.get(id)?.part);
+  const pl = items.length ? paceLabelOf(s, r) : undefined;
   return (
     <Card title="다음 운동" testid="home-next">
       <div class="next-name">{r.name}</div>
       {parts.length > 0 && <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>}
       <p class={`next-why ${pick.reason === 'doneToday' ? 't-sub' : 't-acc'}`}>{nextReason(pick)}</p>
-      <p class="sub next-meta">운동 {items.length}개{r.estimatedSec ? ` · 약 ${minutes(r.estimatedSec)}` : ''}</p>
-      {(() => { const pl = items.length ? paceLabelOf(s, r) : undefined; return pl && <PaceLine pl={pl} name={r.name} onFit={() => { setFitOnOpen(r.id); setEditReturn('#/'); go(`#/routine/${encodeURIComponent(r.id)}`); }} />; })()}
+      {/* D-067 남은 일: 내 속도 예상이 있으면 앱 기본 예상(약 N분)은 빼고 내 예상만 (앱 기본 예상은 맞추기 창에) */}
+      <p class="sub next-meta">운동 {items.length}개{r.estimatedSec && !pl ? ` · 약 ${minutes(r.estimatedSec)}` : ''}</p>
+      {pl && <PaceLine pl={pl} name={r.name} onFit={() => { setFitOnOpen(r.id); setEditReturn('#/'); go(`#/routine/${encodeURIComponent(r.id)}`); }} />}
       {busyParts(rec, parts).length > 0 && (
         <p class="rec-note" role="note" data-testid="next-rec-note"><Icon name="info" size={18} /><span>회복 중으로 추정: {busyParts(rec, parts).map((x) => `${x.part}(약 ${x.remainingH}시간)`).join(', ')}. 가볍게 하거나 다른 부위를 먼저 해도 돼요</span></p>
       )}

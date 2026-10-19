@@ -6,7 +6,8 @@
  */
 import { useEffect, useState } from 'preact/hooks';
 import { db, load, whenReady, onLocalWrite } from './store';
-import { syncOnce, getKv, setKv, restoreStash, dropStash, collectMutations } from '../db/sync';
+import { syncOnce, getKv, setKv, restoreStash, dropStash, collectMutations, setHealthBatchHook } from '../db/sync';
+import { healthBatchStats, healthStatText } from '../core/health';
 import type { Transport, Conflict } from '../db/sync';
 import type { SyncRequest, ServerRec } from '../core/syncMerge';
 import { SYNC_TABLES, PK, FIELD_TABLES, syncedFields, withoutStamp } from '../core/syncStamp';
@@ -15,6 +16,9 @@ import { getSendConfig } from './autoSend';
 import { lsGet, lsSet, APP, IS_PREVIEW } from './appName';
 import { diag } from './diag';
 import { applyFeedbackStatus } from './feedbackStatus';
+
+// D-071 애플워치 원인 찾기: 받은 묶음마다 종류별 개수·범위 밖 개수·최소·최대만 진단에 (원본 값·시각·키·주소 없음, D-025)
+setHealthBatchHook((list) => { for (const x of healthBatchStats(list)) diag('health', { m: healthStatText(x), v: x.n, ok: x.out === 0 }); });
 
 export type SyncPhase = 'off' | 'idle' | 'syncing' | 'error';
 export interface SyncStatus { phase: SyncPhase; lastOkAt?: string; pending: number; error?: string; stash: number; conflicts?: Conflict[]; received?: number }
