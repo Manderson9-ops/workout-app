@@ -7,6 +7,7 @@ import { blockTime, DEFAULT_TIME } from './time';
 import type { TimedBlock } from './time';
 import { moveItem } from './reorder';
 import { findItem } from './syncMerge';
+import { preMarkWarmup } from './warmupGuess';
 
 export interface RoutineItem { exerciseId: string; sets: number; reps: number; seconds?: number }
 export interface RoutineBlock { kind: 'single' | 'superset' | 'compound'; items: RoutineItem[]; restSec: number; roundRestSec: number; transitionSec: number }
@@ -78,14 +79,15 @@ export function startWorkout(id: string, routine: Routine, now: string, history:
         const prev = lastSets(history, i.exerciseId);
         return {
           exerciseId: i.exerciseId, target: { sets: i.sets, reps: i.reps, ...(i.seconds !== undefined ? { seconds: i.seconds } : {}) },
-          sets: Array.from({ length: i.sets }, (_, k) => {
+          // 첫 세트가 지난번 작업 무게의 50% 이하·15회 이상이면 웜업으로 미리 표시 (D-070)
+          sets: preMarkWarmup(Array.from({ length: i.sets }, (_, k) => {
             const p = prev[Math.min(k, prev.length - 1)];
             return {
               warmup: false, done: false,
               ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}),
               ...(i.seconds !== undefined ? { seconds: p?.seconds ?? i.seconds } : { reps: p?.reps ?? i.reps }),
             };
-          }),
+          }), prev),
         };
       }),
     })),
@@ -171,6 +173,43 @@ export function completeSet(w: Workout, s: Step, nowMs: number): Workout {
   return { ...done, timer: r ? { startedAt: nowMs, endsAt: nowMs + r.sec * 1000, label: r.label, kind: r.kind } : null };
 }
 
+/** 묶음 블록인지 (슈퍼세트·컴파운드, 건너뛰지 않은 운동이 2개 이상) */
+export function isGroup(w: Workout, block: number): boolean {
+  const b = w.blocks[block];
+  return !!b && b.kind !== 'single' && b.items.filter((x) => !x.skipped).length > 1;
+}
+
+/** 작업 세트 순번 (1부터, 웜업이면 0) */
+export function roundOf(w: Workout, s: Step): number {
+  const sets = w.blocks[s.block]!.items[s.item]!.sets;
+  return sets[s.set]!.warmup ? 0 : sets.slice(0, s.set + 1).filter((x) => !x.warmup).length;
+}
+
+/**
+ * 이 세트가 속한 라운드의 남은 세트들 (D-066). 묶음의 작업 세트면 같은 라운드 번호의 아직 안 한 세트(운동 순서대로),
+ * 묶음이 아니거나 웜업이면 이 세트 하나
+ */
+export function roundSteps(w: Workout, s: Step): Step[] {
+  if (!isGroup(w, s.block) || roundOf(w, s) === 0) return [s];
+  const r = roundOf(w, s);
+  return steps(w).filter((x) => x.block === s.block && roundOf(w, x) === r && !w.blocks[x.block]!.items[x.item]!.sets[x.set]!.done);
+}
+
+/**
+ * 라운드 한 번에 완료 (D-066): 라운드의 남은 세트를 모두 완료(세트마다 무게 이어받기는 completeSet과 같음),
+ * 휴식은 라운드 마지막 세트 뒤 한 번 (마지막 운동을 체크했을 때와 같은 restAfter)
+ */
+export function completeRound(w: Workout, s: Step, nowMs: number): Workout {
+  const list = roundSteps(w, s);
+  if (list.length <= 1) return completeSet(w, list[0] ?? s, nowMs);
+  // 끝낸 시각은 1ms씩 띄움 (늦은 기록 합치기가 끝낸 시각으로 같은 세트를 가려서)
+  let cur = w;
+  list.forEach((x, i) => { cur = completeSet(cur, x, nowMs + i); });
+  const last = list[list.length - 1]!;
+  const r = restAfter(cur, last);
+  return { ...cur, timer: r ? { startedAt: nowMs, endsAt: nowMs + r.sec * 1000, label: r.label, kind: r.kind } : null };
+}
+
 export function undoSet(w: Workout, s: Step): Workout {
   const next = patchSet(w, s, ({ doneAt: _d, ...rest }) => ({ ...rest, done: false }));
   return { ...next, timer: null };
@@ -204,13 +243,13 @@ export function replaceItem(w: Workout, block: number, item: number, exerciseId:
     let work = -1;
     return {
       ...it, exerciseId, skipped: false,
-      sets: it.sets.map((s) => {
+      sets: preMarkWarmup(it.sets.map((s) => {
         if (!s.warmup) work++;
         if (s.done) return s;
         // 웜업 세트는 지난 작업 무게를 받지 않는다. 작업 세트는 작업 세트 순번으로 맞춤
         const p = s.warmup ? undefined : prev[Math.min(work, prev.length - 1)];
         return { warmup: s.warmup, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : { reps: s.warmup ? s.reps ?? 10 : p?.reps ?? it.target.reps }) };
-      }),
+      }), prev),
     };
   });
 }
@@ -218,7 +257,7 @@ export function appendExercise(w: Workout, exerciseId: string, sets: number, rep
   const prev = lastSets(history, exerciseId);
   const item: WorkoutItem = {
     exerciseId, target: { sets, reps, ...(seconds !== undefined ? { seconds } : {}) },
-    sets: Array.from({ length: sets }, (_, k) => ({ warmup: false, done: false, ...(prev[k]?.weight !== undefined ? { weight: prev[k]!.weight, auto: true } : {}), ...(seconds !== undefined ? { seconds } : { reps: prev[k]?.reps ?? reps }) })),
+    sets: preMarkWarmup(Array.from({ length: sets }, (_, k) => ({ warmup: false, done: false, ...(prev[k]?.weight !== undefined ? { weight: prev[k]!.weight, auto: true } : {}), ...(seconds !== undefined ? { seconds } : { reps: prev[k]?.reps ?? reps }) })), prev),
   };
   return { ...w, blocks: [...w.blocks, { kind: 'single', items: [item], restSec, roundRestSec: 120, transitionSec: 10 }] };
 }

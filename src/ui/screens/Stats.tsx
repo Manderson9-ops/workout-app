@@ -12,6 +12,7 @@ import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
 import { recoveryByPart } from '../../core/recovery';
 import { RecoveryCard } from './RecoveryCard';
+import { RecordFixCard } from './RecordFix';
 import { lastNight, watchFor, watchLine } from '../../core/health';
 import { LineChart, BarChart, PairBarChart } from '../charts';
 import { NumInput, Empty, Metric, Delta, Sheet } from '../components';
@@ -214,6 +215,7 @@ export function Stats({ s }: { s: AppState }) {
   return (
     <main>
       <ScreenHeader title="기록" />
+      <RecordFixCard s={s} byId={byId} />
       <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
       <RecoveryCard m={rec} night={night} />
       <PartSets done={done} byId={byId} today={today} />

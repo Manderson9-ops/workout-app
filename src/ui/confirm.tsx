@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { Sheet } from './components';
 import { diag } from './diag';
 
-export interface ConfirmOpts { title: string; message?: string; ok: string; cancel?: string; danger?: boolean }
+export interface ConfirmOpts { title: string; message?: string; ok: string; cancel?: string; danger?: boolean; /** 위험 색 없이 취소에 초점 (Enter 한 번으로 정하지 않게) */ focusCancel?: boolean }
 /** 내부 요청: alt = 세 번째 선택지(askChoice), notice = 취소 없이 확인만(showNotice) */
 interface Req extends ConfirmOpts { alt?: string; altDanger?: boolean; notice?: boolean; resolve: (v: Answer) => void }
 /** true = 확인, 'alt' = 두 번째 선택지, false = 취소·닫기·Esc, null = 다른 창이 대신함 */
@@ -74,7 +74,7 @@ export function ConfirmHost() {
     if (!req) return;
     if (!backTo.current) backTo.current = document.activeElement as HTMLElement | null;
     // 위험한 확인(끝내기 등)은 "취소"에 초점: PC에서 Enter 한 번으로 끝나지 않게. 나머지는 확인에
-    (req.danger && !req.notice ? cancelRef : okRef).current?.focus();
+    ((req.danger || req.focusCancel) && !req.notice ? cancelRef : okRef).current?.focus();
     const k = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); answer(false); return; }
       if (e.key === 'Tab') { // 초점을 확인 창 안에 가둠

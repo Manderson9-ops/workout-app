@@ -2,8 +2,8 @@
  * 화면에서 쓰는 저장 동작 모음
  */
 import { useEffect, useState } from 'preact/hooks';
-import { mutate, activeOf, historyOf, db, setWorkoutLocal, askPersistOnce, flushPending, load, getState } from './store';
-import { askConfirm } from './confirm';
+import { mutate, activeOf, historyOf, db, setWorkoutLocal, askPersistOnce, flushPending, load, getState, notifyLocalWrite } from './store';
+import { askConfirm, askChoice } from './confirm';
 import { diag } from './diag';
 import { deviceId } from './deviceId';
 import type { AppState } from './store';
@@ -12,6 +12,7 @@ import { startWorkout, planToRoutine, decideFinish, withHidden, withoutHidden } 
 import type { FinishDecision } from '../core/session';
 import type { Routine, Workout } from '../core/session';
 import type { PlanBlock } from '../core/planner';
+import { doneCount, endAtLastSet } from '../core/finishTime';
 import { go } from './nav';
 
 export async function saveWorkout(w: Workout) { await mutate((d) => d.workouts.put(w)); }
@@ -41,7 +42,7 @@ export async function updateWorkoutAfterInputs(id: string, fn: (w: Workout) => W
 }
 
 /** 운동 끝내기 결과 (D-038): 실패하면 이유와 화면에 보일 문구 */
-export type FinishFail = 'input' | 'missing' | 'other-device' | 'not-saved' | 'error';
+export type FinishFail = 'input' | 'missing' | 'other-device' | 'not-saved' | 'error' | 'has-sets';
 export type FinishResult = { ok: true } | { ok: false; reason: FinishFail; message: string };
 export const FINISH_MSG: Record<FinishFail, string> = {
   input: '마지막으로 입력한 값을 저장하지 못해 끝내지 않았어요. 다시 누르면 저장을 다시 시도해요.',
@@ -49,6 +50,7 @@ export const FINISH_MSG: Record<FinishFail, string> = {
   'other-device': '이 운동은 다른 기기로 넘어가서 여기서 끝낼 수 없어요. 그 기기에서 끝내 주세요.',
   'not-saved': '끝내기가 저장되지 않았어요. 다시 눌러 주세요.',
   error: '끝내기를 저장하는 중 오류가 났어요. 다시 눌러 주세요.',
+  'has-sets': '그사이 완료한 세트가 생겨서 버리지 않았어요. 다시 눌러 주세요.',
 };
 const errText = (e: unknown) => (e as Error)?.message ?? String(e);
 
@@ -67,7 +69,7 @@ export function useFinishError(): string | null {
  * 진행 중 운동 끝내기 (D-038). 입력 먼저 저장 → 끝낸 시각 저장(쓰기 트랜잭션 안에서 판단) → 다시 읽어 저장됐는지 확인.
  * 끝내지 못하면 이유를 돌려주고, 화면 문구(setFinishError)와 진단 기록(오류)에 남긴다.
  */
-export async function finishActiveWorkout(id: string): Promise<FinishResult> {
+export async function finishActiveWorkout(id: string, at: 'now' | 'last' = 'now'): Promise<FinishResult> {
   const fail = (reason: FinishFail, detail?: string): FinishResult => {
     diag('error', { m: `운동 끝내기 안 됨: ${reason}${detail ? ` · ${detail}` : ''}` });
     setFinishError(FINISH_MSG[reason]);
@@ -80,7 +82,10 @@ export async function finishActiveWorkout(id: string): Promise<FinishResult> {
   let d: FinishDecision;
   try {
     d = await db.transaction('rw', db.workouts, async () => {
-      const r = decideFinish(await db.workouts.get(id), deviceId(), new Date().toISOString());
+      const cur = await db.workouts.get(id);
+      // 'last' = 끝난 시각을 마지막 세트 + 3분으로 (D-065). 저장된 최신 기록으로 다시 계산
+      const end = at === 'last' && cur ? endAtLastSet(cur, Date.now()) : new Date().toISOString();
+      const r = decideFinish(cur, deviceId(), end);
       if (r.kind === 'ok') await db.workouts.put(r.w);
       return r;
     });
@@ -90,6 +95,34 @@ export async function finishActiveWorkout(id: string): Promise<FinishResult> {
   try { saved = await db.workouts.get(id); } catch (e) { return fail('error', `다시 읽기 · ${errText(e)}`); }
   if (!saved?.endedAt) return fail('not-saved');
   setWorkoutLocal(saved);
+  setFinishError(null);
+  return { ok: true };
+}
+
+/**
+ * 진행 중 운동 버리기 (D-072): 완료 세트가 0개일 때만, 기록으로 남기지 않고 지움(지움 표시, 동기화).
+ * 쓰기 트랜잭션 안에서 다시 읽어 판단: 그사이 세트가 생겼거나 다른 기기로 넘어갔으면 지우지 않음
+ */
+export async function discardActiveWorkout(id: string): Promise<FinishResult> {
+  const fail = (reason: FinishFail, detail?: string): FinishResult => {
+    diag('error', { m: `운동 버리기 안 됨: ${reason}${detail ? ` · ${detail}` : ''}` });
+    setFinishError(FINISH_MSG[reason]);
+    return { ok: false, reason, message: FINISH_MSG[reason] };
+  };
+  let r: 'ok' | 'missing' | 'other-device' | 'has-sets';
+  try {
+    r = await db.transaction('rw', db.workouts, db.tombs, async () => {
+      const cur = await db.workouts.get(id);
+      if (!cur || cur.endedAt) return 'missing' as const;
+      if (cur.ownerDeviceId && cur.ownerDeviceId !== deviceId()) return 'other-device' as const;
+      if (doneCount(cur) > 0) return 'has-sets' as const;
+      await softDelete(db, 'workouts', id);
+      return 'ok' as const;
+    });
+  } catch (e) { return fail('error', errText(e)); }
+  await load().catch(() => undefined);
+  if (r === 'other-device' || r === 'has-sets') return fail(r);
+  if (r === 'ok') notifyLocalWrite();
   setFinishError(null);
   return { ok: true };
 }
@@ -106,12 +139,19 @@ export async function startRoutine(s: AppState, r: Routine) {
   try {
     const first = activeOf(s);
     if (first) {
-      const ans = await askConfirm({ title: '진행 중인 운동이 있어요', message: `"${first.name}"을(를) 끝내고 새로 시작할까요?`, ok: '끝내고 새로 시작', danger: true });
+      // 완료 세트가 없으면 "버리고 새로 시작"이 기본 (D-072). 기록으로 남기는 것도 고를 수 있음
+      const empty = doneCount(first) === 0;
+      const ans = empty
+        ? await askChoice({ title: '진행 중인 운동이 있어요', message: `"${first.name}"은(는) 완료한 세트가 없어요. 버리고 새로 시작할까요?`, ok: '버리고 새로 시작', alt: '기록 남기고 새로 시작' })
+        : await askConfirm({ title: '진행 중인 운동이 있어요', message: `"${first.name}"을(를) 끝내고 새로 시작할까요?`, ok: '끝내고 새로 시작', danger: true });
       if (ans === null) return; // 다른 확인 창으로 바뀜: 아무것도 안 함
       if (!ans) { go('#/workout'); return; }
       const cur = activeOf(getState());
       if (cur) {
-        const f = await finishActiveWorkout(cur.id);
+        // 버리기는 확인 뒤 다시 읽어 세트가 여전히 0개일 때만 (그사이 생겼으면 끝내기로: 기록을 지우지 않게)
+        const discard = empty && ans === 'ok' && doneCount(cur) === 0;
+        let f = discard ? await discardActiveWorkout(cur.id) : await finishActiveWorkout(cur.id);
+        if (!f.ok && f.reason === 'has-sets') f = await finishActiveWorkout(cur.id);
         if (!f.ok) { go('#/workout'); return; }
       }
     }

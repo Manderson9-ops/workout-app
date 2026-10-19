@@ -143,27 +143,29 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   await page.getByLabel('원암 랫풀다운 1세트 무게', { exact: true }).pressSequentially('40');
   taps++; await big.dispatchEvent('click');
   await expect(page.getByLabel('원암 랫풀다운 1세트 무게', { exact: true })).toHaveValue('40');
-  await expect(page.getByRole('timer')).toContainText('다음 운동으로 바로 (묶음)'); // 슈퍼세트 전환
+  // 묶음은 큰 ✓ 한 번에 라운드(A1+B1) 완료, 휴식은 라운드 후 한 번 (D-066)
+  await expect(page.getByRole('timer')).toContainText('라운드 후 휴식');
+  await expect(page.getByText(/\b2\/\d+세트/)).toBeVisible();
   await expect(page.getByLabel('원암 랫풀다운 2세트 무게', { exact: true })).toHaveValue('40'); // 앞 세트 무게 이어받기
   await tap(big);
-  await expect(page.getByRole('timer')).toContainText('라운드 후 휴식');
+  await expect(page.getByText(/\b4\/\d+세트/)).toBeVisible();
   const before = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
   await page.getByRole('button', { name: '15초 늘리기' }).click();
   await expect.poll(async () => Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0])).toBeGreaterThanOrEqual(before + 13);
   await checkScreen(page, '04-timer');
-  await tap(big);
-  await expect(page.getByText(/3\/\d+세트/)).toBeVisible();
   // 입력 중 새로고침해도 값 유지 (늦춘 저장 후)
   await page.getByLabel('원암 랫풀다운 2세트 횟수', { exact: true }).fill('9');
   await page.waitForTimeout(600);
   await page.reload();
   await expect(page.getByLabel('원암 랫풀다운 2세트 횟수', { exact: true })).toHaveValue('9');
   await expect(page.getByLabel(/휴식 남은 시간 \d+초/)).toBeVisible(); // 타이머도 유지
+  await tap(big);
+  const doneN = (await page.getByText(/\b[56]\/\d+세트/).textContent())!.match(/\b([56])\//)![1];
   await tap(page.getByRole('button', { name: '끝내기', exact: true }));
   await tap(page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' })); // 앱 안 확인 창 (D-038)
   await expect(page.getByText('최근 운동')).toBeVisible();
-  await expect(page.getByRole('group', { name: /^최근 운동 / }).first()).toContainText('세트 3');
-  expect(taps, '루틴 시작 → 세트 3개 → 종료 (확인창 포함)').toBeLessThanOrEqual(12);
+  await expect(page.getByRole('group', { name: /^최근 운동 / }).first()).toContainText(`세트 ${doneN}`);
+  expect(taps, '루틴 시작 → 라운드 3번 → 종료 (확인창 포함)').toBeLessThanOrEqual(12);
   await checkScreen(page, '05-home-after');
 
   // 다시 시작: 지난번 무게가 미리 채워짐 + 웜업 세트 순서
@@ -194,6 +196,7 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   const doneBtn = page.getByRole('button', { name: '현재 세트 완료' });
   await expect(doneBtn).toBeVisible();
+  await doneBtn.click(); // 세트 하나는 완료 (완료 0개면 버리기를 묻는 다른 창, D-072)
 
   // 1) 아래 "운동 끝내기" → 앱 안 확인 창 (남은 세트 수) → 취소하면 운동 그대로
   await page.getByRole('button', { name: '운동 끝내기' }).click();
@@ -1967,13 +1970,13 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(sheet).toHaveAttribute('aria-modal', 'true');
   const entries = sheet.locator('.wn-entry');
   await expect(entries.first()).toHaveAttribute('aria-label', `${SHOWN_VERSION} 바뀐 점`);
-  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.8 바뀐 점'); // 0.9.9(3줄) + 0.9.8(3줄) + 0.9.7(2줄) = 8줄
+  await expect(entries.nth(1)).toHaveAttribute('aria-label', '0.9.10 바뀐 점'); // 0.9.11(5줄) + 0.9.10(3줄) = 8줄
   await expect(sheet.locator('.wn-lines li')).toHaveCount(8); // 최대 8줄 + 모두 보기
   await expect(sheet.getByRole('button', { name: /^모두 보기/ })).toBeVisible();
   await expect(sheet.getByRole('button', { name: '확인' })).toBeFocused();
   await checkScreen(page, '65-whats-new');
   await sheet.getByRole('button', { name: /^모두 보기/ }).click();
-  await expect(sheet.locator('.wn-lines li')).toHaveCount(39); // 0.9.9·0.9.8 3줄 + 0.9.7 2줄 + 0.9.6·0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
+  await expect(sheet.locator('.wn-lines li')).toHaveCount(47); // 0.9.11 5줄 + 0.9.10 3줄 + 0.9.9·0.9.8 3줄 + 0.9.7 2줄 + 0.9.6·0.9.5·0.9.4 3줄 + 0.9.3 2줄 + 0.9.2·0.9.1·0.9.0·0.8.13 각 5줄
   // 다시 열면 안 뜸 (본 버전 저장)
   expect(await page.evaluate(() => localStorage.getItem('app.lastSeenVersion'))).toBe(APP_VERSION);
   // [보러 가기] → 그 화면(앱 정보)으로 가고 시트는 닫힘
@@ -2008,7 +2011,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await seedNextLoad(page, { 'app.lastSeenVersion': '0.8.13-preview', 'app.newDots': null });
   await page.reload();
   await expect(sheet).toBeVisible();
-  await expect(sheet.locator('.wn-entry')).toHaveCount(3); // 0.9.9(3줄) + 0.9.8(3줄) + 0.9.7(2줄) = 8줄, 0.9.6 이전은 [모두 보기]
+  await expect(sheet.locator('.wn-entry')).toHaveCount(2); // 0.9.11(5줄) + 0.9.10(3줄) = 8줄, 0.9.9 이전은 [모두 보기]
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
   const gear = page.getByRole('link', { name: '설정', exact: true });
@@ -2934,8 +2937,11 @@ test.describe('D-060 날짜·시각 표시 (고정 시각, 한국 시간)', () =
     const kg = page.locator('.set-row.current input[aria-label$=" 무게"]');
     if (await kg.count()) await kg.first().fill('10');
     await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    await expect(page.getByLabel(/휴식 남은 시간/)).toBeVisible(); // 완료가 저장된 뒤에 시계를 옮김 (끝낸 시각이 19:05)
     await page.clock.setFixedTime(at('2026-10-07T20:05:00'));
-    await endWorkout(page);
+    // 마지막 세트 뒤 60분 → 끝난 시각 고르기 (D-065). 이 시험은 "지금"
+    await page.getByRole('button', { name: '끝내기', exact: true }).click();
+    await page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '지금 (오후 8:05)' }).click();
     await expect.poll(() => page.evaluate(async () => {
       const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
       const ws = await new Promise<{ endedAt?: string }[]>((res) => { const q = db.transaction('workouts').objectStore('workouts').getAll(); q.onsuccess = () => res(q.result); });
