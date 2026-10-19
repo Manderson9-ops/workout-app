@@ -125,12 +125,12 @@ describe('A2 백업 호환 (0.9.10 이하 앱)', () => {
 // ---------- B2 ----------
 describe('B2 긴 기록 줄: 날짜가 바뀌면 날짜, 운동 시간 전 → 후', () => {
   it('25시간 17분 → 1시간 3분, 새 끝에 날짜', () => {
-    const start = Date.parse('2026-10-02T10:00:00+09:00');
+    const start = new Date(2026, 9, 2, 10, 0).getTime() /* 기기 시간대 기준 (CI는 UTC) */;
     const t = endChangeText({ startedAt: iso(start), endedAt: iso(start + 25 * H + 17 * MIN), newEnd: iso(start + 63 * MIN) });
     expect(t).toBe('끝 10월 3일(토) 오전 11:17 → 10월 2일(금) 오전 11:03 · 25시간 17분 → 1시간 3분');
   });
   it('같은 날이면 시각만', () => {
-    const start = Date.parse('2026-10-02T10:00:00+09:00');
+    const start = new Date(2026, 9, 2, 10, 0).getTime() /* 기기 시간대 기준 (CI는 UTC) */;
     expect(endChangeText({ startedAt: iso(start), endedAt: iso(start + 2 * H), newEnd: iso(start + 50 * MIN) })).toBe('끝 오후 12:00 → 오전 10:50 · 2시간 → 50분');
   });
 });
