@@ -94,8 +94,8 @@ export interface EndFix { id: string; name: string; startedAt: string; endedAt: 
 export function endFixes(history: readonly Workout[]): EndFix[] {
   const out: EndFix[] = [];
   for (const w of history) {
-    // 사용자가 기록 수정 화면에서 고친 기록(editedAt)은 건드리지 않음: 끝 시각을 직접 정했거나 세트 시각이 "시작 + k초"라 믿을 수 없음 (A1)
-    if (!w.endedAt || w.pendingMerge || w.editedAt) continue;
+    // 기록 수정 화면에서 고친 기록은 건드리지 않음: 세트 시각이 "시작 + k초"라 믿을 수 없음 (A1). editedAt 은 웜업 고치기·끝 시각 고치기도 붙이므로 쓰지 않고 시각 모양(hasEditStamps)으로 가림 (새 저장 필드는 옛 앱 백업 검증에 걸릴 수 있어 안 만듦)
+    if (!w.endedAt || w.pendingMerge || hasEditStamps(w)) continue;
     const end = Date.parse(w.endedAt), start = Date.parse(w.startedAt);
     if (end - start > FINISH_RULE.longMs) continue; // 긴 기록은 따로 (longFixes)
     const last = lastDoneMs(w);
@@ -127,8 +127,8 @@ export function mainCluster(times: readonly number[]): { first: number; last: nu
 export function longFixes(history: readonly Workout[]): EndFix[] {
   const out: EndFix[] = [];
   for (const w of history) {
-    // 사용자가 기록 수정 화면에서 고친 기록(editedAt)은 건드리지 않음: 끝 시각을 직접 정했거나 세트 시각이 "시작 + k초"라 믿을 수 없음 (A1)
-    if (!w.endedAt || w.pendingMerge || w.editedAt) continue;
+    // 기록 수정 화면에서 고친 기록은 건드리지 않음 (hasEditStamps, 위 endFixes 주석 참고)
+    if (!w.endedAt || w.pendingMerge || hasEditStamps(w)) continue;
     const end = Date.parse(w.endedAt), start = Date.parse(w.startedAt);
     if (end - start <= FINISH_RULE.longMs) continue;
     const times = doneTimes(w);

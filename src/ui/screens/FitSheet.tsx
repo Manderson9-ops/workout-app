@@ -18,7 +18,7 @@ const T_MIN = 10, T_MAX = 300, T_STEP = 5;
 export function PaceLine({ pl, onFit, name }: { pl: PaceLabel; onFit?: () => void; name?: string }) {
   return (
     <p class="sub small pace-line" data-testid="pace-line">
-      <span>{pl.head}</span><span aria-hidden="true">·</span><span class={pl.cut ? 'pace-cut' : ''}>{pl.tail}</span>
+      <span class="pace-part">{pl.head}</span><span class={pl.cut ? 'pace-part pace-cut' : 'pace-part'}><span aria-hidden="true" class="pace-sep">·</span>{pl.tail}</span>
       {onFit && pl.cut > 0 && <button class="tonal fit-btn" onClick={onFit} aria-label={`${name ?? '이 루틴'} 내 시간에 맞추기`}>시간 맞추기</button>}
     </p>
   );

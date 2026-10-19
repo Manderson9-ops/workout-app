@@ -18,7 +18,7 @@ import { parseBackup as parseBackup0910 } from './legacy/backup_0910';
 import { DIAG_KINDS as DIAG_KINDS_0910 } from './legacy/diag_0910';
 import { WorkoutDB, exportAll } from '../src/db/db';
 import { fixEndsIn, deleteEmptyIn, fixWarmupsIn } from '../src/db/recordFix';
-import { warmupFixes } from '../src/core/warmupGuess';
+import { warmupFixes, applyWarmups } from '../src/core/warmupGuess';
 import { tombKey } from '../src/core/syncStamp';
 import { Clock, memoryClockStore } from '../src/core/hlc';
 import type { Part } from '../src/core/types';
@@ -56,7 +56,18 @@ describe('A1 수정 화면에서 완료한 세트(시작 + k초)는 속도·끝 
     expect(endFixes([e])).toEqual([]);
     const long = { ...session('l', T0, 10, 150), endedAt: iso(T0 + 20 * H) };
     expect(longFixes([long]).map((f) => f.id)).toEqual(['l']);
-    expect(longFixes([{ ...long, editedAt: iso(T0 + DAY) }])).toEqual([]);
+    expect(longFixes([{ ...long, editedAt: iso(T0 + DAY) }]).map((f) => f.id)).toEqual(['l']); // editedAt 만으로는 빼지 않음 (웜업 고치기도 붙임)
+    expect(longFixes([{ ...editedSession('le', T0, 10, 20 * 60) }])).toEqual([]); // 수정 화면 기록(시각 모양)은 뺌
+  });
+  it('웜업 고치기를 먼저 해도 끝 시각 후보로 남음 (editedAt 순서 의존 없음)', () => {
+    const w = { ...session('wu', T0, 5, 150), endedAt: iso(T0 + 2 * H) };
+    expect(endFixes([w]).map((f) => f.id)).toEqual(['wu']);
+    const fix = { id: 'wu', name: 'wu', startedAt: w.startedAt, block: 0, item: 0, set: 0, exerciseId: 'bench', weight: 50, reps: 10, top: 50 };
+    const after = applyWarmups(w, [fix], iso(T0 + DAY));
+    expect(after.editedAt).toBeDefined();
+    expect(after.blocks[0]!.items[0]!.sets[0]!.warmup).toBe(true);
+    expect(endFixes([after]).map((f) => f.id)).toEqual(['wu']);
+    expect(hasEditStamps(after)).toBe(false);
   });
   it('personalPace: 수정 화면 기록은 빼고 셈 (세트당 1초가 섞이지 않음)', () => {
     const real = [session('a', T0, 20, 150), session('b', T0 + DAY, 20, 150), session('c', T0 + 2 * DAY, 20, 150)];

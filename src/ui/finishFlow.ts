@@ -68,6 +68,8 @@ export async function offerRoutineUpdate(id: string): Promise<void> {
   const byId = new Map(catalog(st.custom).map((e) => [e.id, e]));
   const what = diffText(d, (x) => byId.get(x)?.name_ko ?? x);
   // 운동하는 동안 루틴이 바뀌었으면(다른 화면·기기에서 고침) 덮어쓰지 않게: [루틴 업데이트]는 빼고 경고, 기본은 원래대로
+  // 주의: routine.updatedAt(다른 기기 시계일 수 있음)과 운동 시작 시각(이 기기 시계)을 비교함. 기기 시계가 달라 틀릴 수 있지만,
+  // 틀려도 "바뀜"으로 보는 쪽(덮어쓰지 않음)으로 안전하게 기울게 한 것이라 최악이 루틴 미갱신 확인 창임
   if (routineChangedDuring(r, w)) {
     const b = await askConfirm({
       title: '운동 중 루틴이 바뀌었어요',
