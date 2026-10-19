@@ -5,7 +5,7 @@
  */
 import type { Routine, Workout } from './session';
 import { PARTS, EQUIPMENT, PATTERNS } from './types.ts';
-import { diagEntryOk, DIAG_MAX } from './diag.ts';
+import { diagEntryOk, diagEntryUnknownKind, DIAG_MAX } from './diag.ts';
 import type { DiagEntry } from './diag.ts';
 import { feedbackOk } from './feedback.ts';
 import type { Feedback } from './feedback.ts';
@@ -44,7 +44,8 @@ export function makeBackup(data: BackupData, appVersion: string, now: string, de
 export const backupFileName = (now: Date) =>
   `workout-backup-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.json`;
 
-export type ParseResult = { ok: true; file: BackupFile } | { ok: false; error: string };
+/** droppedDiag: 이 앱이 모르는 종류라 버린 진단 줄 수 (새 앱이 만든 백업) */
+export type ParseResult = { ok: true; file: BackupFile; droppedDiag?: number } | { ok: false; error: string };
 
 // ---------- 검사 도우미 ----------
 type O = Record<string, unknown>;
@@ -117,9 +118,12 @@ export function parseBackup(text: string): ParseResult {
   const f = migrateBackup(j as unknown as BackupFile);
   const d = f.data as unknown;
   if (!isObj(d) || BACKUP_KEYS.some((k) => !Array.isArray(d[k]))) return { ok: false, error: '백업 내용이 빠졌거나 깨졌어요' };
-  const data = d as unknown as BackupData;
+  const raw = d as unknown as BackupData;
   // 파일에 적힌 개수와 실제 개수가 다르면 중간이 잘린 파일
-  if (isObj(f.counts) && BACKUP_KEYS.some((k) => f.counts[k] !== undefined && f.counts[k] !== data[k].length)) return { ok: false, error: '백업 파일이 중간에 잘렸거나 바뀌었어요 (개수가 맞지 않음)' };
+  if (isObj(f.counts) && BACKUP_KEYS.some((k) => f.counts[k] !== undefined && f.counts[k] !== raw[k].length)) return { ok: false, error: '백업 파일이 중간에 잘렸거나 바뀌었어요 (개수가 맞지 않음)' };
+  // 새 앱이 만든 모르는 진단 종류는 그 줄만 버림 (백업 전체를 거절하지 않음)
+  const droppedDiag = raw.diag.filter(diagEntryUnknownKind).length;
+  const data: BackupData = droppedDiag ? { ...raw, diag: raw.diag.filter((x) => !diagEntryUnknownKind(x)) } : raw;
   const checks: [BackupKey, (x: unknown) => boolean, string, string | null][] = [
     ['workouts', workoutOk, '운동 기록', 'id'], ['routines', routineOk, '루틴', 'id'], ['meta', metaOk, '운동 표시(즐겨찾기 등)', 'exerciseId'],
     ['custom', customOk, '직접 추가한 운동', 'id'], ['settings', settingsOk, '설정', 'key'], ['bodyweight', bwOk, '체중 기록', 'date'], ['diag', diagEntryOk, '진단 기록', null], ['feedback', feedbackOk, '개선 메모', 'id'],
@@ -135,7 +139,7 @@ export function parseBackup(text: string): ParseResult {
   if (f.device !== undefined && !(isObj(f.device) && str(f.device.id) && (f.device.id as string).length <= 12 && typeof f.device.label === 'string' && (f.device.label as string).length <= 80)) return { ok: false, error: '기기 정보가 잘못됐어요' };
   if (data.workouts.filter((w) => !w.endedAt).length > 1) return { ok: false, error: '진행 중인 운동이 두 개 들어 있어요' };
   if (data.health !== undefined && !(Array.isArray(data.health) && data.health.length <= 5000 && data.health.every((h) => isObj(h) && str(h.id) && str(h.type)) && unique(data.health, 'id'))) return { ok: false, error: '애플워치 기록 형식이 맞지 않아요' };
-  return { ok: true, file: { ...f, counts: countsOf(data), data } };
+  return { ok: true, file: { ...f, counts: countsOf(data), data }, ...(droppedDiag ? { droppedDiag } : {}) };
 }
 
 /** 예전 형식 → 현재 형식. 1 → 2: 진단 기록 빈 목록. 2 → 3: 개선 메모 빈 목록 */

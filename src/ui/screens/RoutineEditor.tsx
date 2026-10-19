@@ -89,8 +89,9 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
       </div>
       <label>루틴 이름</label>
       <input value={r.name} aria-label="루틴 이름" onInput={(e) => setR({ ...r, name: (e.target as HTMLInputElement).value })} />
-      <p class="sub small">예상 {mmss(est)} {r.warmupSec ? `(웜업 ${Math.round(r.warmupSec / 60)}분 포함)` : ''}</p>
+      {/* 예상은 한 모양(약 N분): 내 속도 예상이 있으면 그것이 먼저, 앱 기본 예상은 이름을 붙여 아래에 */}
       {pl && <PaceLine pl={pl} />}
+      <p class="sub small" data-testid="editor-app-est">{pl ? '앱 기본 예상' : '예상'} 약 {Math.round(est / 60)}분{r.warmupSec ? ` (웜업 ${Math.round(r.warmupSec / 60)}분 포함)` : ''}</p>
       {r.blocks.length > 0 && <button class="tonal fit-open" onClick={() => setFit(true)}>내 시간에 맞추기</button>}
       <p class="sub small" id="part-add-h" style={{ margin: '12px 0 6px' }}>부위를 눌러 운동 추가</p>
       <div class="row wrap part-add" role="group" aria-label="부위별 운동 추가">

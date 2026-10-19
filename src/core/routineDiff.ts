@@ -64,11 +64,14 @@ export function diffText(d: RoutineDiff, nameOf: (id: string) => string): string
   return parts.join('\n');
 }
 
-/** 운동 칸 하나의 세트 수: 웜업으로 바뀐 첫 세트가 있어도 시작 때 목표를 유지, 세트를 더하거나 지웠으면 그 수 */
-function setCount(it: WorkoutItem): number {
+/**
+ * 운동 칸 하나의 세트 수 = 웜업이 아닌 세트 수 (웜업은 루틴 세트 수에 넣지 않음).
+ * 단, 시작 때 루틴 세트의 첫 세트를 웜업으로 미리 표시(D-070)했고 세트 수를 그대로 뒀으면 루틴 세트 수 그대로
+ */
+export function setCount(it: WorkoutItem): number {
   const work = it.sets.filter((s) => !s.warmup).length;
-  if (it.sets.length < it.target.sets) return Math.max(1, it.sets.length);
-  return Math.max(1, it.target.sets, work);
+  const preMarked = it.sets.length === it.target.sets && !!it.sets[0]?.warmup && work === it.target.sets - 1;
+  return Math.max(1, preMarked ? it.target.sets : work);
 }
 
 /**
@@ -98,3 +101,6 @@ export function newRoutineFromWorkout(r: Routine, w: Workout, id: string, name: 
   const { estimatedSec: _e, ...rest } = base;
   return { ...rest, id, name, createdAt: now, updatedAt: now };
 }
+
+/** 운동을 시작한 뒤 루틴이 고쳐졌는지 (루틴 updatedAt > 운동 startedAt). 그러면 [루틴 업데이트]로 덮어쓰지 않음 (P4) */
+export const routineChangedDuring = (r: Pick<Routine, 'updatedAt'>, w: Pick<Workout, 'startedAt'>): boolean => Date.parse(r.updatedAt) > Date.parse(w.startedAt);

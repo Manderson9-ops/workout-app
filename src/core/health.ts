@@ -20,12 +20,12 @@ function daysBetween(a: number, b: number): string[] {
 const idxCache = new WeakMap<readonly HealthRow[], Map<string, HealthRow>>();
 const byId = (rows: readonly HealthRow[]) => { let m = idxCache.get(rows); if (!m) { m = new Map(rows.map((r) => [r.id, r])); idxCache.set(rows, m); } return m; };
 
-/** 운동 시간 안 심박 (startedAt~endedAt, 끝이 없으면 지금까지) */
-export function workoutHeart(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: readonly HealthRow[], nowMs = Date.now()): { avg?: number; max?: number; n: number } {
+/** 운동 시간 안 심박 원본 훑기: 범위 안 합·개수·최고, 받은 전체 개수(total)와 30~220 밖 개수(out) */
+function heartScan(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: readonly HealthRow[], nowMs: number): { sum: number; n: number; max: number; total: number; out: number } {
   const a = Date.parse(w.startedAt), b = w.endedAt ? Date.parse(w.endedAt) : nowMs;
-  if (!(b > a)) return { n: 0 };
+  let sum = 0, n = 0, max = 0, total = 0, out = 0;
+  if (!(b > a)) return { sum, n, max, total, out };
   const m = byId(rows);
-  let sum = 0, n = 0, max = 0;
   for (const day of daysBetween(a, b)) {
     const r = m.get(`hr-${day}`);
     if (!r || !Array.isArray(r.p) || typeof r.t0 !== 'number') continue;
@@ -33,10 +33,17 @@ export function workoutHeart(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: re
       const t = r.t0 + r.p[i]! * 1000;
       if (t < a || t > b) continue;
       const v = r.p[i + 1]!;
-      if (v < HR_RANGE[0] || v > HR_RANGE[1]) continue; // D-071 사람 기준 밖 값은 빼고 셈 (서버 범위가 넓던 때 받은 값)
+      total++;
+      if (v < HR_RANGE[0] || v > HR_RANGE[1]) { out++; continue; } // D-071 사람 기준 밖 값은 빼고 셈 (서버 범위가 넓던 때 받은 값)
       sum += v; n++; if (v > max) max = v;
     }
   }
+  return { sum, n, max, total, out };
+}
+
+/** 운동 시간 안 심박 (startedAt~endedAt, 끝이 없으면 지금까지) */
+export function workoutHeart(w: Pick<Workout, 'startedAt' | 'endedAt'>, rows: readonly HealthRow[], nowMs = Date.now()): { avg?: number; max?: number; n: number } {
+  const { sum, n, max } = heartScan(w, rows, nowMs);
   return n ? { avg: Math.round(sum / n), max, n } : { n: 0 };
 }
 
@@ -101,12 +108,44 @@ export function watchPlausible(x: WorkoutWatch, durMin: number): WatchCheck {
   if (x.kcal !== undefined && !(x.kcal <= g.kcalPerMin * Math.max(0, durMin))) why.push('kcal');
   return why.length ? { ok: false, why } : { ok: true, x };
 }
-/** 화면에서 쓰는 한 번에: 값이 없으면 undefined, 그럴듯하면 ok, 아니면 확인 중 */
-export function watchView(w: Pick<Workout, 'startedAt' | 'endedAt'> & { id?: string }, rows: readonly HealthRow[], nowMs = Date.now()): WatchCheck | undefined {
+/**
+ * D-071 (승인안): 원인을 고칠 때까지 운동 카드·상세에서 애플워치 심박·kcal 숫자는 **모두** 숨김 (조건에 맞아도).
+ * 화면은 "애플워치 값 확인 중"과 [왜?]만, [왜?]에는 그 운동의 이유(받은 심박 개수·범위 밖 개수·걸린 조건)를 보여 줌
+ */
+/** 한 운동의 [왜?] 근거 (숫자 값 자체는 없음: 개수와 걸린 조건만) */
+export interface WatchReason {
+  /** 걸린 조건 (비어 있으면 조건 안이지만 모두 숨기는 중) */
+  why: WatchWhy[];
+  /** 범위 안 심박 개수 (요약이면 서버가 센 개수) */
+  n: number;
+  /** 원본이 있으면: 운동 시간에 받은 심박 전체 개수와 30~220 밖 개수 */
+  total?: number; out?: number;
+  /** 칼로리를 받았는지 */
+  kcal: boolean;
+}
+/** 화면용: 애플워치 값이 없으면 undefined, 있으면 숨김 이유 (D-071) */
+export function watchReason(w: Pick<Workout, 'startedAt' | 'endedAt'> & { id?: string }, rows: readonly HealthRow[], nowMs = Date.now()): WatchReason | undefined {
   const x = watchFor(w, rows, nowMs);
   if (!x) return undefined;
   const a = Date.parse(w.startedAt), b = w.endedAt ? Date.parse(w.endedAt) : nowMs;
-  return watchPlausible(x, (b - a) / 60000);
+  const c = watchPlausible(x, (b - a) / 60000);
+  const raw = heartScan(w, rows, nowMs);
+  return { why: c.ok ? [] : c.why, n: x.n, ...(raw.total ? { total: raw.total, out: raw.out } : {}), kcal: x.kcal !== undefined };
+}
+const WHY_TEXT: Record<WatchWhy, (r: WatchReason) => string> = {
+  hrN: (r) => `운동 중 심박이 ${r.n}개뿐이에요 (${WATCH_GATE.hrNMin}개 이상이어야 평균을 믿을 수 있어요)`,
+  hrMax: () => `최고 심박이 ${WATCH_GATE.hrMax}을 넘었어요`,
+  hrAvg: () => `평균 심박이 ${WATCH_GATE.hrAvgMin}~${WATCH_GATE.hrAvgMax} 밖이에요`,
+  kcal: () => `칼로리가 운동 시간에 비해 너무 커요 (분당 ${WATCH_GATE.kcalPerMin}kcal 넘음)`,
+};
+/** [왜?] 창 글 (이 운동 것만, 심박·kcal 값은 쓰지 않음) */
+export function watchReasonLines(r: WatchReason): string[] {
+  const out: string[] = [];
+  if (r.total !== undefined) out.push(`이 운동 시간에 받은 심박 ${r.total}개 중 사람 범위(${HR_RANGE[0]}~${HR_RANGE[1]}) 밖 ${r.out ?? 0}개`);
+  else out.push(`이 운동 심박 ${r.n}개 (서버가 만든 요약)`);
+  for (const k of r.why) out.push(WHY_TEXT[k](r));
+  if (!r.why.length) out.push('이 운동 값은 기준 안이지만, 다른 운동에서 믿기 어려운 값이 와서 원인을 고칠 때까지 모든 운동의 숫자를 숨겨요');
+  return out;
 }
 export const WATCH_PENDING = '애플워치 값 확인 중';
 

@@ -2822,25 +2822,34 @@ test.describe('D-058 애플워치 연동', () => {
     await expect(page.getByTestId('detail-watch')).toHaveCount(0);
     await page.getByTestId('detail-watch-pending').getByRole('button', { name: '왜?' }).click();
     const info = page.getByRole('dialog', { name: '애플워치 값 확인 중' });
-    await expect(info.getByTestId('watch-pending-info')).toContainText('원인을 확인하는 동안 숫자를 보여 주지 않아요');
+    await expect(info.getByTestId('watch-pending-info')).toContainText('원인을 고칠 때까지 모든 운동의 숫자를 보여 주지 않아요');
     await expect(info).toContainText('최고 심박 220 이하');
+    // B4: 그 운동의 이유 (받은 심박 개수·범위 밖 개수·걸린 조건), 고정 예시 숫자 아님
+    await expect(info.getByTestId('watch-reason')).toContainText('이 운동 시간에 받은 심박 2개 중 사람 범위(30~220) 밖 0개');
+    await expect(info.getByTestId('watch-reason')).toContainText('운동 중 심박이 2개뿐이에요');
+    await expect(info).not.toContainText('3,320');
     await checkScreen(page, '92b-detail-watch-pending-info');
     await info.getByRole('button', { name: '알겠어요' }).click();
     await expect(info).toHaveCount(0);
     await page.goto('./#/');
     await putHealth('ok');
     await page.reload();
-    const line = '평균 심박 130 · 최고 140 · 12kcal (애플워치)';
-    await expect(page.getByTestId('wc-watch').first()).toHaveText(line);
-    await expect(page.getByRole('group', { name: /^최근 운동 / }).first().getByRole('button').first()).toHaveAttribute('aria-label', new RegExp(line.replace(/[()]/g, '\\$&')));
+    // B4 (D-071 승인안): 조건에 맞는 값(심박 24개·평균 130·최고 140·12kcal)도 원인을 고칠 때까지 숫자는 숨김
+    await expect(page.getByTestId('wc-watch-pending').first()).toHaveText('애플워치 값 확인 중');
+    await expect(page.getByTestId('wc-watch')).toHaveCount(0);
+    await expect(page.getByRole('group', { name: /^최근 운동 / }).first().getByRole('button').first()).not.toHaveAttribute('aria-label', /평균 심박|kcal/);
     await checkScreen(page, '92-home-watch');
     await page.getByRole('link', { name: '기록', exact: true }).click();
     await expect(page.getByTestId('rec-night')).toContainText('어젯밤 수면 5시간 30분 · 안정 심박 56 · HRV 48ms (애플워치, 참고)');
     await expect(page.getByTestId('rec-sleep-tip')).toHaveAttribute('href', '#/recovery');
-    await expect(page.locator('main').getByTestId('wc-watch').first()).toHaveText(line);
+    await expect(page.locator('main').getByTestId('wc-watch-pending').first()).toHaveText('애플워치 값 확인 중');
     await checkScreen(page, '93-stats-watch');
     await page.locator('main .wcard').first().click();
-    await expect(page.getByTestId('detail-watch')).toHaveText(line);
+    await expect(page.getByTestId('detail-watch')).toHaveCount(0);
+    await page.getByTestId('detail-watch-pending').getByRole('button', { name: '왜?' }).click();
+    await expect(page.getByTestId('watch-reason')).toContainText('이 운동 시간에 받은 심박 24개 중 사람 범위(30~220) 밖 0개');
+    await expect(page.getByTestId('watch-reason')).toContainText('모든 운동의 숫자를 숨겨요');
+    await page.getByRole('button', { name: '알겠어요' }).click();
     // 연동 화면: 받은 상태
     await page.goto('./#/settings/watch');
     const st = page.getByTestId('watch-status');
@@ -2959,10 +2968,14 @@ test.describe('D-058 애플워치 연동', () => {
       db.close();
     });
     await page.reload();
-    const line = '평균 심박 133 · 최고 170 · 380kcal (애플워치)';
-    await expect(page.getByTestId('wc-watch').first()).toHaveText(line);
+    // B4: 그럴듯한 요약도 숫자는 숨김 ([왜?]에 서버 요약 심박 개수)
+    await expect(page.getByTestId('wc-watch-pending').first()).toHaveText('애플워치 값 확인 중');
+    await expect(page.getByTestId('wc-watch')).toHaveCount(0);
     await page.locator('main .wcard').first().click();
-    await expect(page.getByTestId('detail-watch')).toHaveText(line);
+    await expect(page.getByTestId('detail-watch')).toHaveCount(0);
+    await page.getByTestId('detail-watch-pending').getByRole('button', { name: '왜?' }).click();
+    await expect(page.getByTestId('watch-reason')).toContainText('이 운동 심박 400개 (서버가 만든 요약)');
+    await page.getByRole('button', { name: '알겠어요' }).click();
     // D-071: 실제로 받은 모양(최고 240, 운동 중 심박 11개)으로 바꾸면 숫자 대신 "확인 중"
     await page.evaluate(async () => {
       const db: IDBDatabase = await new Promise((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });

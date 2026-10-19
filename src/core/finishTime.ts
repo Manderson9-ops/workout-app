@@ -5,6 +5,7 @@
  */
 import type { Workout } from './session';
 import { timeText, dateTimeText, daysAgo } from './dateText';
+import { durText } from './stats';
 
 export const FINISH_RULE = {
   /** 끝내기 때 묻는 기준: 마지막 세트 뒤 15분 */
@@ -71,6 +72,18 @@ export function whenText(iso: string | number, nowMs: number): string {
   return daysAgo(iso, nowMs) === 0 ? timeText(iso) : dateTimeText(iso, nowMs);
 }
 
+/**
+ * 기록 수정 화면에서 완료로 바꾼 세트가 있는지 (A1). 그 세트의 끝낸 시각은 실제 시각이 아니라
+ * workoutEdit.finalizeEdit 이 붙인 "시작 + k초"(k = 1, 2, …)라서 속도·끝 시각 계산에 쓰면 안 됨
+ */
+export function hasEditStamps(w: Workout): boolean {
+  if (!w.editedAt) return false;
+  // finalizeEdit 은 1초부터 차례로 붙이므로 "시작 + 정확히 1초" 세트가 있으면 그 모양 (실제 체크 시각은 ms 단위라 거의 안 겹침)
+  const first = new Date(Date.parse(w.startedAt) + 1000).toISOString();
+  for (const b of w.blocks) for (const it of b.items) for (const s of it.sets) if (s.done && s.doneAt === first) return true;
+  return false;
+}
+
 // ---------- 기존 기록 정리 (한 번 확인) ----------
 
 export interface EndFix { id: string; name: string; startedAt: string; endedAt: string; lastAt: string; newEnd: string; stragglers: number }
@@ -81,7 +94,8 @@ export interface EndFix { id: string; name: string; startedAt: string; endedAt: 
 export function endFixes(history: readonly Workout[]): EndFix[] {
   const out: EndFix[] = [];
   for (const w of history) {
-    if (!w.endedAt || w.pendingMerge) continue;
+    // 사용자가 기록 수정 화면에서 고친 기록(editedAt)은 건드리지 않음: 끝 시각을 직접 정했거나 세트 시각이 "시작 + k초"라 믿을 수 없음 (A1)
+    if (!w.endedAt || w.pendingMerge || w.editedAt) continue;
     const end = Date.parse(w.endedAt), start = Date.parse(w.startedAt);
     if (end - start > FINISH_RULE.longMs) continue; // 긴 기록은 따로 (longFixes)
     const last = lastDoneMs(w);
@@ -113,7 +127,8 @@ export function mainCluster(times: readonly number[]): { first: number; last: nu
 export function longFixes(history: readonly Workout[]): EndFix[] {
   const out: EndFix[] = [];
   for (const w of history) {
-    if (!w.endedAt || w.pendingMerge) continue;
+    // 사용자가 기록 수정 화면에서 고친 기록(editedAt)은 건드리지 않음: 끝 시각을 직접 정했거나 세트 시각이 "시작 + k초"라 믿을 수 없음 (A1)
+    if (!w.endedAt || w.pendingMerge || w.editedAt) continue;
     const end = Date.parse(w.endedAt), start = Date.parse(w.startedAt);
     if (end - start <= FINISH_RULE.longMs) continue;
     const times = doneTimes(w);
@@ -134,4 +149,17 @@ export function emptyFinished(history: readonly Workout[]): Workout[] {
 /** 끝난 시각 고치기: 운동 기록 수정과 같이 고친 시각(editedAt)을 남김 (D-035) */
 export function applyEnd(w: Workout, newEnd: string, nowIso: string): Workout {
   return { ...w, endedAt: newEnd, timer: null, editedAt: nowIso };
+}
+
+/** 같은 날(기준 base)이면 시각만, 아니면 날짜·시각 (기록 정리 화면) */
+export const atText = (iso: string, base: string) => (daysAgo(iso, base) === 0 ? timeText(iso) : dateTimeText(iso, base, { relative: false }));
+/**
+ * 끝 시각 전 → 후 (B2): 새 끝이 원래 끝과 다른 날이면 새 끝에도 날짜를 붙이고, 운동 시간도 전 → 후로
+ * 예: "끝 10월 3일(토) 오전 1:17 → 10월 2일(금) 오전 1:03 · 25시간 17분 → 1시간 3분"
+ */
+export function endChangeText(f: Pick<EndFix, 'startedAt' | 'endedAt' | 'newEnd'>): string {
+  const oldEnd = atText(f.endedAt, f.startedAt);
+  const newEnd = daysAgo(f.newEnd, f.endedAt) !== 0 ? dateTimeText(f.newEnd, f.startedAt, { relative: false }) : atText(f.newEnd, f.startedAt);
+  const dur = (iso: string) => durText((Date.parse(iso) - Date.parse(f.startedAt)) / 1000);
+  return `끝 ${oldEnd} → ${newEnd} · ${dur(f.endedAt)} → ${dur(f.newEnd)}`;
 }

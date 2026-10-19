@@ -7,7 +7,7 @@
 import { activeOf, historyOf, getState, flushPending } from './store';
 import { askConfirm, askChoice } from './confirm';
 import { finishActiveWorkout, discardActiveWorkout, setFinishError, applyWorkoutToRoutine, saveWorkoutAsRoutine } from './actions';
-import { routineDiff, diffText } from '../core/routineDiff';
+import { routineDiff, diffText, routineChangedDuring } from '../core/routineDiff';
 import { catalog } from './catalog';
 import { doneCount, shouldAskEndTime, endAtLastSet, lastDoneMs, whenText } from '../core/finishTime';
 import { timeText } from '../core/dateText';
@@ -33,10 +33,11 @@ export async function finishAndAfter(id: string, at: 'now' | 'last' = 'now'): Pr
     if (!r.ok) return false;
     const moved = waitHash('#/');
     go('#/');
-    void afterWorkoutFinished(Promise.allSettled([sendNow('workout'), syncNow('finish')]));
-    if (nPr) showToast(`기록 갱신 ${nPr}개 운동 (앱 기준)`, 'star');
     // 끝낸 뒤 루틴 반영 묻기 (D-068). 홈으로 옮긴 뒤에 (화면이 바뀌면 열린 확인 창이 닫히므로)
-    void moved.then(() => offerRoutineUpdate(id));
+    const dialogs = moved.then(() => offerRoutineUpdate(id));
+    // D-064 단축어 자동 실행은 묻는 창이 닫힌 뒤에 (창이 열린 채 앱을 떠나지 않게). 끝난 시각 창은 이미 닫힘(끝내기 전에 물음)
+    void afterWorkoutFinished(Promise.allSettled([sendNow('workout'), syncNow('finish')]), dialogs);
+    if (nPr) showToast(`기록 갱신 ${nPr}개 운동 (앱 기준)`, 'star');
     return true;
   } finally { busy = false; }
 }
@@ -65,9 +66,20 @@ export async function offerRoutineUpdate(id: string): Promise<void> {
   const d = routineDiff(r, w);
   if (!d.changed) return;
   const byId = new Map(catalog(st.custom).map((e) => [e.id, e]));
+  const what = diffText(d, (x) => byId.get(x)?.name_ko ?? x);
+  // 운동하는 동안 루틴이 바뀌었으면(다른 화면·기기에서 고침) 덮어쓰지 않게: [루틴 업데이트]는 빼고 경고, 기본은 원래대로
+  if (routineChangedDuring(r, w)) {
+    const b = await askConfirm({
+      title: '운동 중 루틴이 바뀌었어요',
+      message: `「${r.name}」 루틴이 이 운동을 시작한 뒤에 고쳐졌어요. 덮어쓰지 않도록 루틴 업데이트는 하지 않아요.\n이번 운동 구성:\n${what}\n새 루틴으로 저장할까요?`,
+      ok: '새 루틴으로 저장', cancel: '원래대로', focusCancel: true,
+    });
+    if (b) { const n = await saveWorkoutAsRoutine(r, w); showToast(`새 루틴 「${n.name}」으로 저장했어요`); }
+    return;
+  }
   const a = await askChoice({
     title: '루틴에 반영할까요?',
-    message: `이번 운동이 「${r.name}」 루틴과 달라요.\n${diffText(d, (x) => byId.get(x)?.name_ko ?? x)}\n(무게·횟수는 루틴에 넣지 않아요)`,
+    message: `이번 운동이 「${r.name}」 루틴과 달라요.\n${what}\n[루틴 업데이트]는 운동 목록·순서와 세트 수를 이번 운동대로 바꿔요 (무게·횟수는 넣지 않아요)`,
     ok: '루틴 업데이트', alt: '새 루틴으로 저장', cancel: '원래대로',
   });
   if (a === 'ok') {

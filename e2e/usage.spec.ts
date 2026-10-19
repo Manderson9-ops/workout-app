@@ -116,6 +116,8 @@ test('D-065·D-070·D-072 기록 정리 카드: 목록 → 확인 → 끝난 시
   await expect(card).toContainText('기록 정리 (한 번만)');
   await expect(card.getByTestId('fix-end')).toContainText('늦게 끝냄');
   await expect(card.getByTestId('fix-long')).toContainText('떨어진 세트 1개는 그대로');
+  // B2: 새 끝이 원래 끝과 다른 날이면 날짜, 운동 시간 전 → 후
+  await expect(card.getByTestId('fix-long')).toContainText(/→ \d+월 \d+일\([일월화수목금토]\) 오[전후] \d+:\d{2} · 25시간 → 53분/);
   await expect(card.getByTestId('fix-empty')).toContainText('빈 기록');
   await expect(card.getByTestId('fix-warm')).toContainText('바벨 컬 20kg × 15회');
   await checkScreen(page, 'u03-record-fix-card');
@@ -220,8 +222,8 @@ test('D-066 묶음: 큰 ✓ 한 번에 라운드(A1+B1) 완료·라운드 휴식
   const r1 = page.getByRole('group', { name: '1라운드', exact: true });
   await expect(r1.locator('.idx-n')).toHaveText(['A1', 'B1']);
   await expect(page.getByRole('group', { name: '2라운드', exact: true }).locator('.idx-n')).toHaveText(['A2', 'B2']);
-  const big = page.getByRole('button', { name: '현재 세트 완료 · 1라운드 2세트 한 번에' });
-  await expect(big).toContainText('1라운드 A+B 완료');
+  const big = page.getByRole('button', { name: '현재 세트 완료 · A+B 1세트 한 번에' });
+  await expect(big).toContainText('A+B 1세트 완료');
   await expect(big).toContainText('휴식 120초');
   await checkScreen(page, 'u08-round-group');
   // 무게를 입력하고 포커스를 빼지 않은 채 큰 ✓ (입력 먼저 저장)
@@ -246,4 +248,23 @@ test('D-066 묶음: 큰 ✓ 한 번에 라운드(A1+B1) 완료·라운드 휴식
   await page.getByRole('button', { name: '트라이셉 로프 푸시다운 2세트 완료', exact: true }).click();
   await expect(page.getByRole('button', { name: '트라이셉 로프 푸시다운 2세트 완료', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '현재 세트 완료', exact: true })).toContainText('A. 바벨 컬 2세트 완료');
+});
+
+test('B1 묶음: 현재 줄의 ✓ 도 그 세트만 (줄마다 체크는 그대로), 라운드 한 번에는 아래 큰 ✓ 만', async ({ page }) => {
+  await idbPut(page, 'routines', [routine('r-ss1', '묶음 줄 시험', [{ kind: 'superset', restSec: 60, roundRestSec: 120, transitionSec: 10,
+    items: [{ exerciseId: 'barbell_curl', sets: 2, reps: 10 }, { exerciseId: 'rope_pushdown', sets: 2, reps: 12 }] }])]);
+  await page.reload();
+  await page.getByRole('button', { name: /묶음 줄 시험 시작$/ }).first().click();
+  await expect(page.getByRole('button', { name: '현재 세트 완료 · A+B 1세트 한 번에' })).toBeVisible();
+  // 현재 줄(A1)의 ✓ → A1만 완료, B1은 남음 (라운드 한 번에가 아님)
+  await page.getByRole('group', { name: '1라운드', exact: true }).getByRole('button', { name: '바벨 컬 1세트 완료', exact: true }).click();
+  await expect(page.getByRole('group', { name: '1라운드', exact: true }).locator('.set-row.done')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '트라이셉 로프 푸시다운 1세트 완료', exact: true })).toBeVisible();
+  const wk = (await workouts(page)).find((w) => !w.endedAt)!;
+  expect(wk.blocks[0]!.items[0]!.sets[0]!.done).toBe(true);
+  expect(wk.blocks[0]!.items[1]!.sets[0]!.done).toBe(false);
+  expect(wk.timer?.kind).toBe('transition');
+  // 도크 글도 같은 모양 ("글자 N세트")
+  await expect(page.locator('.rp-label')).toHaveText('다음 B 1세트');
+  await checkScreen(page, 'u08b-row-check-one');
 });

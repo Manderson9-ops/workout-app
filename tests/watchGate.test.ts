@@ -7,7 +7,7 @@ import 'fake-indexeddb/auto';
 import { WorkoutDB } from '../src/db/db';
 import { Clock, memoryClockStore } from '../src/core/hlc';
 import { syncOnce, setHealthBatchHook } from '../src/db/sync';
-import { watchPlausible, watchView, watchFor, healthBatchStats, healthStatText, lastRxOf, WATCH_GATE, workoutHeart } from '../src/core/health';
+import { watchPlausible, watchReason, watchReasonLines, watchFor, healthBatchStats, healthStatText, lastRxOf, WATCH_GATE, workoutHeart } from '../src/core/health';
 import type { HealthRow } from '../src/core/health';
 import { HR_RANGE, parseLines } from '../src/core/healthIngest';
 
@@ -27,9 +27,9 @@ const wOf = (r: HealthRow) => ({ id: String(r.workoutId), startedAt: String(r.st
 
 describe('D-071 표시 조건 (순수 함수)', () => {
   it('지금 받은 4건은 모두 "확인 중" (숨김)', () => {
-    const got = REAL.map((r) => watchView(wOf(r), REAL));
-    expect(got.every((x) => x && !x.ok)).toBe(true);
-    expect(got.map((x) => (x && !x.ok ? x.why : []))).toEqual([
+    const got = REAL.map((r) => watchReason(wOf(r), REAL));
+    expect(got.every((x) => !!x)).toBe(true);
+    expect(got.map((x) => x!.why)).toEqual([
       ['hrMax', 'hrN'], // 240, 11개
       ['hrMax', 'hrN'], // 225, 7개
       ['hrMax', 'hrN'], // 223, 4개
@@ -51,9 +51,28 @@ describe('D-071 표시 조건 (순수 함수)', () => {
     expect(watchPlausible({ ...ok, kcal: 10 }, 0)).toEqual({ ok: false, why: ['kcal'] }); // 길이 0 운동에 kcal
     expect(WATCH_GATE).toEqual({ hrMax: 220, hrAvgMin: 40, hrAvgMax: 200, hrNMin: 20, kcalPerMin: 20 });
   });
-  it('그럴듯한 요약(심박 400개·최고 170·60분 380kcal)은 그대로 보임', () => {
+  it('B4 승인안: 그럴듯한 요약(심박 400개·최고 170·60분 380kcal)도 숫자는 숨기고, 이유는 "조건 안이지만 모두 숨김"', () => {
     const r = ws('w5', '2026-10-10T10:00:00.000Z', 60, { hrAvg: 133, hrMax: 170, hrN: 400, kcal: 380 });
-    expect(watchView(wOf(r), [r])).toEqual({ ok: true, x: { n: 400, avg: 133, max: 170, kcal: 380 } });
+    const x = watchReason(wOf(r), [r])!;
+    expect(x).toEqual({ why: [], n: 400, kcal: true });
+    const lines = watchReasonLines(x);
+    expect(lines[0]).toBe('이 운동 심박 400개 (서버가 만든 요약)');
+    expect(lines[1]).toContain('모든 운동의 숫자를 숨겨요');
+    expect(lines.join(' ')).not.toMatch(/133|170|380/); // 심박·kcal 값은 쓰지 않음
+  });
+  it('B4 [왜?]는 그 운동의 이유: 받은 심박 개수·범위 밖 개수·걸린 조건 (운동마다 다름)', () => {
+    const lines = REAL.map((r) => watchReasonLines(watchReason(wOf(r), REAL)!));
+    expect(lines[0]).toEqual(['이 운동 심박 11개 (서버가 만든 요약)', '최고 심박이 220을 넘었어요', '운동 중 심박이 11개뿐이에요 (20개 이상이어야 평균을 믿을 수 있어요)']);
+    expect(lines[2]![2]).toContain('4개뿐');
+    expect(lines[3]).toEqual(['이 운동 심박 9개 (서버가 만든 요약)', '운동 중 심박이 9개뿐이에요 (20개 이상이어야 평균을 믿을 수 있어요)', '칼로리가 운동 시간에 비해 너무 커요 (분당 20kcal 넘음)']);
+    // 원본이 있으면 운동 시간 안 받은 전체·범위 밖 개수
+    const t0 = Date.parse('2026-10-08T00:00:00+09:00');
+    const rows: HealthRow[] = [{ id: 'hr-2026-10-08', type: 'hr', day: '2026-10-08', t0, p: [3600, 17, 3605, 120, 3610, 240, 3615, 140, 3620, 221, 3625, 30, 3630, 220] }];
+    const w = { startedAt: new Date(t0 + 3500 * 1000).toISOString(), endedAt: new Date(t0 + 3700 * 1000).toISOString() };
+    const rr = watchReason(w, rows)!;
+    expect(rr).toMatchObject({ n: 4, total: 7, out: 3, why: ['hrN'], kcal: false });
+    expect(watchReasonLines(rr)[0]).toBe('이 운동 시간에 받은 심박 7개 중 사람 범위(30~220) 밖 3개');
+    expect(watchReason({ startedAt: '2026-01-01T00:00:00Z', endedAt: '2026-01-01T01:00:00Z' }, rows)).toBeUndefined();
   });
   it('원본에서 셀 때 30~220 밖 심박은 빼고 셈 (서버 범위가 25~250이던 때 받은 값)', () => {
     const t0 = Date.parse('2026-10-08T00:00:00+09:00');

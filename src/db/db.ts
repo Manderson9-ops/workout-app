@@ -8,6 +8,7 @@ import type { Exercise, Level, Part, Equipment } from '../core/types';
 import type { Grade } from '../core/version';
 import type { BackupData } from '../core/backup';
 import type { DiagEntry } from '../core/diag';
+import { diagForBackup } from '../core/diag';
 import { Clock, memoryClockStore } from '../core/hlc';
 import type { Feedback } from '../core/feedback';
 import type { HealthRow } from '../core/health';
@@ -167,7 +168,8 @@ export async function exportAll(db: WorkoutDB): Promise<BackupData> {
     const [routines, workouts, meta, custom, settings, bodyweight, diagRows, feedback, health] = await Promise.all([
       db.routines.toArray(), db.workouts.toArray(), db.meta.toArray(), db.custom.toArray(), db.settings.toArray(), db.bodyweight.toArray(), db.diag.orderBy('id').toArray(), db.feedback.toArray(), db.health.toArray(),
     ]);
-    const diag = diagRows.map(({ id: _id, ...e }) => e);
+    // 'health' 진단은 옛 앱(0.9.10 이하)이 백업 전체를 거절하게 만들어서 뺌 (diagForBackup, 0.9.11)
+    const diag = diagForBackup(diagRows.map(({ id: _id, ...e }) => e));
     // 동기화 표시(_s)는 기기 안 정보라 백업 파일에 넣지 않음
     const strip = <T,>(xs: T[]) => xs.map((x) => withoutStamp(x as never) as unknown as T);
     return { routines: strip(routines), workouts: strip(workouts), meta: strip(meta), custom: strip(custom) as unknown as Record<string, unknown>[], settings: strip(settings) as unknown as Record<string, unknown>[], bodyweight: strip(bodyweight), diag, feedback: strip(feedback), ...(health.length ? { health } : {}) };

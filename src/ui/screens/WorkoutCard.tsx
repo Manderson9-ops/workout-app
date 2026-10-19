@@ -7,7 +7,7 @@ import type { Exercise } from '../../core/types';
 import { PARTS } from '../../core/types';
 import type { Workout } from '../../core/session';
 import type { HealthRow } from '../../core/health';
-import { watchView, watchLine, WATCH_PENDING } from '../../core/health';
+import { watchReason, WATCH_PENDING } from '../../core/health';
 import { HOME_HIDDEN_LABEL } from '../../core/session';
 import type { WorkoutSummary } from '../../core/stats';
 import { exerciseLines, durText, durParts } from '../../core/stats';
@@ -22,9 +22,9 @@ export const shortPart = (p: string) => (p === '전완·악력' ? '전완' : p);
 export const timeLabel = (iso: string, now = Date.now()) => dateTimeText(iso, now);
 
 export function WorkoutCard({ x, w, byId, hidden, withMenu, health }: { x: WorkoutSummary; w: Workout | undefined; byId: Map<string, Exercise>; hidden: boolean; withMenu?: boolean; health?: readonly HealthRow[] }) {
-  // D-058: 애플워치 기록이 이 운동 시간과 겹칠 때만 한 줄. D-071: 그럴듯하지 않은 값은 숫자 대신 "확인 중"
-  const watch = useMemo(() => (w && health?.length ? watchView(w, health) : undefined), [w, health]);
-  const watchText = watch ? (watch.ok ? watchLine(watch.x) : WATCH_PENDING) : undefined;
+  // D-058: 애플워치 기록이 이 운동 시간과 겹칠 때만 한 줄. D-071(승인안): 원인을 고칠 때까지 숫자는 모두 숨기고 "확인 중"만
+  const watch = useMemo(() => (w && health?.length ? watchReason(w, health) : undefined), [w, health]);
+  const watchText = watch ? WATCH_PENDING : undefined;
   const diff = x.plannedSec ? x.durationSec - x.plannedSec : undefined;
   const lines = w ? exerciseLines(w, byId) : [];
   const parts = PARTS.filter((p) => (x.parts[p] ?? 0) > 0);
@@ -43,8 +43,7 @@ export function WorkoutCard({ x, w, byId, hidden, withMenu, health }: { x: Worko
           <span class="mm"><span class="mm-l">세트</span> <span class="mm-v"><b>{x.workSets}</b></span></span>
           <span class="mm"><span class="mm-l">볼륨</span> <span class="mm-v"><b>{x.volume.toLocaleString()}</b><small>kg</small></span></span>
         </div>
-        {watch?.ok && <div class="wc-watch" data-testid="wc-watch" aria-hidden="true"><Icon name="heart" size={14} />{watchLine(watch.x)}</div>}
-        {watch && !watch.ok && <div class="wc-watch pending" data-testid="wc-watch-pending" aria-hidden="true"><Icon name="heart" size={14} />{WATCH_PENDING}</div>}
+        {watch && <div class="wc-watch pending" data-testid="wc-watch-pending" aria-hidden="true"><Icon name="heart" size={14} />{WATCH_PENDING}</div>}
         {diff !== undefined && Math.abs(diff) >= 60 && <div class="wc-chips"><span class="chip2 hint">예상보다 {Math.round(Math.abs(diff) / 60)}분 {diff > 0 ? '김' : '짧음'}</span></div>}
         {parts.length > 0 && <div class="wc-tags">{parts.map((p) => <span class="ptag" key={p}>{shortPart(p)}</span>)}</div>}
         {lines.slice(0, 3).map((l, i) => <div class="wc-ex" key={i}>{l.name} · {l.sets}세트{l.best ? ` · 최고 ${l.best}` : ''}</div>)}

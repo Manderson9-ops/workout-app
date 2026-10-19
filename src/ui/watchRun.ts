@@ -45,10 +45,12 @@ export function runWatchShortcut(kind: WatchRunKind, nowMs = Date.now()): void {
  * 운동 기록 동기화(sent)를 먼저 끝내거나 최대 5초 기다린 뒤 실행 (서버가 운동 기록을 먼저 받아야 운동별 애플워치 요약이 맞음, D-059)
  */
 let workoutPending = false; // 운동 보내기를 기다리는 동안 하루 보내기가 끼어들지 않게 (운동이 끝나 activeWorkout 이 바뀌면 하루 확인이 돎)
-export async function afterWorkoutFinished(sent: Promise<unknown>): Promise<void> {
+/** dialogs: 끝낸 뒤 묻는 창(루틴 반영 등)이 닫힐 때까지 기다림 (창이 열린 채 단축어 앱으로 넘어가지 않게) */
+export async function afterWorkoutFinished(sent: Promise<unknown>, dialogs?: Promise<unknown>): Promise<void> {
   if (!watchRunEnabled()) return;
   workoutPending = true;
   try {
+    if (dialogs) await dialogs.catch(() => undefined);
     await Promise.race([sent.catch(() => undefined), new Promise((r) => setTimeout(r, 5000))]);
     await new Promise((r) => setTimeout(r, 300));
     runWatchShortcut('workout');

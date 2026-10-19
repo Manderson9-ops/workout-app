@@ -70,7 +70,11 @@ test('D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 �
   // 홈: 내 속도 줄은 루틴마다 한 번. 이 루틴은 "다음 운동"이라 그 카드에만 (내 루틴 목록 카드에는 다시 안 보임)
   const next = page.getByTestId('home-next');
   const card = page.getByRole('group', { name: '루틴 가슴+등 75분' });
-  await expect(next.getByTestId('pace-line')).toHaveText('내 속도로 약 139분·목표 75분이면 못 할 운동 5개맞추기');
+  await expect(next.getByTestId('pace-line')).toHaveText('내 속도로 약 139분 (최근 4회)·목표 75분이면 못 할 운동 5개');
+  // [시간 맞추기]는 [시작] 아래 보조 자리 (시작을 밀어 내리지 않음)
+  const startBox = await next.getByRole('button', { name: /^다음 운동으로 시작/ }).boundingBox();
+  const fitBox = await next.getByRole('button', { name: '가슴+등 75분 내 시간에 맞추기' }).boundingBox();
+  expect(fitBox!.y).toBeGreaterThan(startBox!.y);
   await expect(page.getByTestId('pace-line')).toHaveCount(1);
   await expect(card.getByTestId('pace-line')).toHaveCount(0);
   // 내 속도 예상이 있으면 앱 기본 예상("· 약 N분")은 카드에서 빠짐
@@ -80,16 +84,19 @@ test('D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 �
   // 내 루틴 화면(다음 운동 카드 없음)에서는 목록 카드에 보임
   await page.goto('./#/routines');
   const card2 = page.getByRole('group', { name: '루틴 가슴+등 75분' });
-  await expect(card2.getByTestId('pace-line')).toHaveText('내 속도로 약 139분·목표 75분이면 못 할 운동 5개맞추기');
+  await expect(card2.getByTestId('pace-line')).toHaveText('내 속도로 약 139분 (최근 4회)·목표 75분이면 못 할 운동 5개시간 맞추기');
   await page.goto('./#/');
   await next.getByRole('button', { name: '가슴+등 75분 내 시간에 맞추기' }).click();
   const dlg = page.getByRole('dialog', { name: '내 시간에 맞추기' });
-  await expect(dlg).toContainText('약 139분 → 74분');
+  await expect(dlg).toContainText('약 139분 → 71분'); // 주 운동(바벨 벤치 등)은 고르게 맨 나중에 줄여 묶음 라운드째 줄어 71분
   await expect(dlg).toContainText('내 속도: 세트당 약 2.5분 (최근 4회 기록)');
   await expect(dlg.getByTestId('fit-app-default')).toHaveText('앱 기본 예상: 약 152분');
-  // 많이 한 가슴은 2세트로, 덜 한 등은 앞으로
-  await expect(dlg.getByRole('listitem').first()).toContainText('풀업앞으로 (2번째에서)');
-  await expect(dlg.getByRole('listitem').filter({ hasText: /^바벨 벤치프레스/ })).toContainText('5 → 2세트');
+  // 첫 운동(바벨 벤치프레스)은 제자리, 덜 한 등은 그 뒤로 앞당김 (한 줄 요약), 많이 한 가슴은 세트를 줄임
+  await expect(dlg.getByRole('listitem').first()).toContainText('바벨 벤치프레스');
+  await expect(dlg.getByTestId('fit-move')).toHaveText(/^등 운동 \d+개.*를 앞으로$/);
+  await expect(dlg.locator('.fit-up')).toHaveCount(0);
+  // 아래 [취소]·[적용]은 창 아래에 붙어 늘 보임
+  await expect(dlg.getByRole('button', { name: '적용' })).toBeInViewport();
   await checkScreen(page, 'u11-fit-preview');
   // 목표 바꾸기
   await dlg.getByRole('button', { name: '목표 시간 5분 늘리기' }).click();
@@ -100,12 +107,35 @@ test('D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 �
   expect((await routines(page)).find((r) => r.id === 'r-cb')!.blocks[0]!.items[0]!.exerciseId).toBe('bench_press');
   await dlg.getByRole('button', { name: '적용' }).click();
   await expect(dlg).toHaveCount(0);
-  await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r-cb')!.blocks.flatMap((b) => b.items).reduce((s, i) => s + i.sets, 0)).toBe(30);
+  await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r-cb')!.blocks.flatMap((b) => b.items).reduce((s, i) => s + i.sets, 0)).toBe(29);
   const saved = (await routines(page)).find((r) => r.id === 'r-cb')!;
-  expect(saved.blocks[0]!.items[0]!.exerciseId).toBe('pull_up');
+  expect(saved.blocks[0]!.items[0]!.exerciseId).toBe('bench_press');
   expect(saved.blocks.flatMap((b) => b.items)).toHaveLength(12);
   await expect(page.getByTestId('pace-line')).toContainText('목표 75분 안');
+  // 편집 화면 예상은 한 모양(약 N분): 내 속도가 먼저, 앱 기본 예상은 이름을 붙여
+  await expect(page.getByTestId('editor-app-est')).toHaveText(/^앱 기본 예상 약 \d+분 \(웜업 8분 포함\)$/);
   await checkScreen(page, 'u12-fit-applied');
+});
+
+test('맞추기 창 PC 1280×860: 높이 제한, [취소]·[적용]이 창 아래에 붙어 보임', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  const pc = await ctx.newPage();
+  await pc.goto('./#/');
+  await pc.getByRole('button', { name: '알겠어요' }).click();
+  await idbPut(pc, 'workouts', [past('p1', 1), past('p2', 3), past('p3', 5), past('p4', 7)]);
+  await idbPut(pc, 'routines', [{ ...chestBack, estimatedSec: 152 * 60 }]);
+  await pc.reload();
+  await pc.getByTestId('home-next').getByRole('button', { name: '가슴+등 75분 내 시간에 맞추기' }).click();
+  const dlg = pc.getByRole('dialog', { name: '내 시간에 맞추기' });
+  await expect(dlg.getByRole('listitem')).toHaveCount(12);
+  const box = (await dlg.boundingBox())!;
+  expect(box.height).toBeLessThanOrEqual(721);
+  await expect(dlg.getByRole('button', { name: '적용' })).toBeInViewport();
+  await expect(dlg.getByRole('button', { name: '취소' })).toBeInViewport();
+  const ok = (await dlg.getByRole('button', { name: '적용' }).boundingBox())!;
+  expect(ok.y + ok.height).toBeLessThanOrEqual(box.y + box.height + 1);
+  await pc.screenshot({ path: `reports/screens/${test.info().project.name}-u12b-fit-pc.png` });
+  await ctx.close();
 });
 
 test('D-067 기록이 3회보다 적으면 내 속도 줄은 안 보임', async ({ page }) => {
@@ -172,7 +202,7 @@ for (const pick of ['루틴 업데이트', '원래대로', '새 루틴으로 저
     const dlg = page.getByRole('dialog', { name: '루틴에 반영할까요?' });
     await expect(dlg).toContainText('이번 운동이 「팔 75분」 루틴과 달라요.');
     await expect(dlg).toContainText('추가: 해머 컬');
-    await expect(dlg).toContainText('무게·횟수는 루틴에 넣지 않아요');
+    await expect(dlg).toContainText('운동 목록·순서와 세트 수를 이번 운동대로 바꿔요 (무게·횟수는 넣지 않아요)');
     await expect(page.getByText('최근 운동')).toBeVisible(); // 끝내기는 이미 됨 (홈)
     if (pick === '루틴 업데이트') await checkScreen(page, 'u14-routine-update-ask');
     await dlg.getByRole('button', { name: pick }).click();
@@ -194,6 +224,24 @@ for (const pick of ['루틴 업데이트', '원래대로', '새 루틴으로 저
     }
   });
 }
+
+test('P4 운동 중 루틴이 바뀌었으면 [루틴 업데이트] 없이 경고, 기본은 원래대로 → [새 루틴으로 저장]', async ({ page }) => {
+  // 루틴이 운동 시작(20분 전) 뒤인 5분 전에 고쳐짐 (다른 화면·기기)
+  await idbPut(page, 'routines', [{ ...armR('r-chg'), updatedAt: iso(Date.now() - 5 * MIN) }]);
+  await idbPut(page, 'workouts', [activeFrom('r-chg', 'w-chg')]);
+  await page.reload();
+  await page.getByRole('link', { name: '운동', exact: true }).click();
+  await page.getByRole('button', { name: '끝내기', exact: true }).click();
+  await page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' }).click();
+  const dlg = page.getByRole('dialog', { name: '운동 중 루틴이 바뀌었어요' });
+  await expect(dlg).toContainText('추가: 해머 컬');
+  await expect(dlg.getByRole('button', { name: '루틴 업데이트' })).toHaveCount(0);
+  await expect(dlg.getByRole('button', { name: '원래대로' })).toBeFocused();
+  await checkScreen(page, 'u14b-routine-changed-during');
+  await dlg.getByRole('button', { name: '새 루틴으로 저장' }).click();
+  await expect.poll(async () => (await routines(page)).length).toBe(2);
+  expect((await routines(page)).find((x) => x.id === 'r-chg')!.blocks).toHaveLength(2);
+});
 
 test('D-068 무게·횟수만 바뀌었으면 묻지 않음', async ({ page }) => {
   const w = activeFrom('r-same', 'w-same');

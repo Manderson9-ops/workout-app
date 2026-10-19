@@ -112,8 +112,8 @@ describe('D-067 루틴 예상·못 할 운동', () => {
   });
 
   it('한 줄 글', () => {
-    expect(paceLabel(chestBack, PACE, 75)?.text).toBe('내 속도로 약 139분 · 목표 75분이면 못 할 운동 5개');
-    expect(paceLabel(legs, PACE, 75)?.text).toBe('내 속도로 약 69분 · 목표 75분 안');
+    expect(paceLabel(chestBack, PACE, 75)?.text).toBe('내 속도로 약 139분 (최근 8회) · 목표 75분이면 못 할 운동 5개');
+    expect(paceLabel(legs, PACE, 75)?.text).toBe('내 속도로 약 69분 (최근 8회) · 목표 75분 안');
     expect(paceLabel(legs, undefined, 75)).toBeUndefined();
     expect(paceLabel(mk('e', 'e', []), PACE, 75)).toBeUndefined();
   });
@@ -138,20 +138,20 @@ describe('D-067 내 시간에 맞추기 (운동당 세트 줄이기)', () => {
     // 운동은 하나도 빠지지 않음, 2세트 아래로 안 줄임
     expect(f.routine.blocks.flatMap((b) => b.items).length).toBe(12);
     expect(Math.min(...f.routine.blocks.flatMap((b) => b.items.map((i) => i.sets)))).toBeGreaterThanOrEqual(FIT_MIN_SETS);
-    // 덜 한 부위(등)가 들어 있는 블록이 앞으로, 묶음은 통째로
+    // 첫 블록(벤치)은 제자리, 덜 한 부위(등)가 들어 있는 블록이 그 뒤로 앞당겨짐, 묶음은 통째로 (B3)
     expect(f.moved).toBe(true);
     expect(f.routine.blocks.map((b) => b.items.map((i) => i.exerciseId).join('+'))).toEqual([
-      'latpull', 'incline_db+row', 'crossover+onearm_row', 'neutral_pullup', 'rackpull', 'kelso+dips', 'bench', 'decline', 'pecdeck',
+      'bench', 'latpull', 'incline_db+row', 'crossover+onearm_row', 'neutral_pullup', 'rackpull', 'kelso+dips', 'decline', 'pecdeck',
     ]);
     // 묶음 안 세트 수는 같음
     for (const b of f.routine.blocks) expect(new Set(b.items.map((i) => i.sets)).size).toBe(1);
     // 많이 한 가슴부터 줄임: 가슴 단일 블록은 모두 2세트, 등 단일은 덜 줄임
     const sets = (id: string) => f.routine.blocks.flatMap((b) => b.items).find((i) => i.exerciseId === id)!.sets;
-    expect([sets('bench'), sets('decline'), sets('pecdeck')]).toEqual([2, 2, 2]);
+    expect([sets('decline'), sets('pecdeck')]).toEqual([2, 2]);
     expect(sets('latpull')).toBeGreaterThan(2);
     // 미리 보기 줄: 전 → 후, 원래 자리
     const bench = f.rows.find((x) => x.exerciseId === 'bench')!;
-    expect(bench).toMatchObject({ fromBlock: 0, toBlock: 6, before: 5, after: 2, letter: '' });
+    expect(bench).toMatchObject({ fromBlock: 0, toBlock: 0, before: 5, letter: '' });
     expect(f.rows.find((x) => x.exerciseId === 'dips')).toMatchObject({ letter: 'B', before: 5 });
     // 이제 못 할 운동 없음
     expect(cutCount(f.routine, PACE, 75 * 60)).toBe(0);

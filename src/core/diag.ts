@@ -51,6 +51,21 @@ export function classifyTimerEnd(x: { endsAt: number; now: number; screenShownAt
   return 'measured';
 }
 
+/**
+ * 백업 파일·PC로 보내기에 넣는 진단 종류 (0.9.11). 'health'(애플워치 받음)는 0.9.10 이하 앱의 백업 검사가 모르는 종류라
+ * 넣으면 옛 앱이 백업 전체를 거절함 → 본판이 모두 0.9.11 이상이 될 때까지 백업에서 뺌 (기기 안에는 남음)
+ */
+export const BACKUP_DIAG_KINDS: readonly DiagKind[] = DIAG_KINDS.filter((k) => k !== 'health');
+/** 백업에 넣을 진단만 (옛 앱이 모르는 종류 빼기) */
+export const diagForBackup = <T extends { k: string }>(list: readonly T[]): T[] => list.filter((e) => (BACKUP_DIAG_KINDS as readonly string[]).includes(e.k));
+
+/** 모르는 종류만 빼고 형식이 맞는 진단 한 건 (새 앱이 만든 백업: 이 줄만 버리고 백업은 받음) */
+export function diagEntryUnknownKind(x: unknown): boolean {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return false;
+  const e = x as Record<string, unknown>;
+  return typeof e.k === 'string' && !DIAG_KINDS.includes(e.k as DiagKind) && diagEntryOk({ ...e, k: 'start' });
+}
+
 /** 백업 파일 안 진단 한 건 검사 (백업 검사에서 사용) */
 export function diagEntryOk(x: unknown): boolean {
   if (!x || typeof x !== 'object' || Array.isArray(x)) return false;

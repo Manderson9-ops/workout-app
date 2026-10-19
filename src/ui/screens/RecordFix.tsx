@@ -12,11 +12,11 @@ import type { AppState } from '../store';
 import { mutate, historyOf } from '../store';
 import type { Exercise } from '../../core/types';
 import type { Workout } from '../../core/session';
-import { endFixes, longFixes, emptyFinished, applyEnd, doneCount } from '../../core/finishTime';
+import { endFixes, longFixes, emptyFinished, endChangeText } from '../../core/finishTime';
 import type { EndFix } from '../../core/finishTime';
-import { warmupFixes, applyWarmups } from '../../core/warmupGuess';
+import { warmupFixes } from '../../core/warmupGuess';
 import type { WarmupFix } from '../../core/warmupGuess';
-import { softDelete } from '../../db/db';
+import { fixEndsIn, deleteEmptyIn, fixWarmupsIn } from '../../db/recordFix';
 import { askConfirm } from '../confirm';
 import { showToast } from '../toast';
 import { lsGet, lsSet } from '../appName';
@@ -34,47 +34,21 @@ const warmKey = (f: WarmupFix) => `warm:${f.id}:${f.block}-${f.item}-${f.set}`;
 /** 같은 날이면 시각만, 아니면 날짜·시각 (기록 시작 날 기준) */
 const at = (iso: string, base: string) => (daysAgo(iso, base) === 0 ? timeText(iso) : dateTimeText(iso, base, { relative: false }));
 
-// ---------- 고치기 (저장된 최신 기록을 다시 읽어, 그사이 바뀌었으면 건너뜀) ----------
+// ---------- 고치기 (db/recordFix: 저장된 최신 기록을 다시 읽어 다시 계산, 그사이 바뀌었으면 건너뜀) ----------
 
 async function fixEnds(list: EndFix[]): Promise<number> {
-  let n = 0; const nowIso = new Date().toISOString();
-  await mutate(async (d) => {
-    for (const f of list) {
-      await d.transaction('rw', d.workouts, async () => {
-        const cur = await d.workouts.get(f.id);
-        if (!cur || cur.endedAt !== f.endedAt) return;
-        await d.workouts.put(applyEnd(cur, f.newEnd, nowIso)); n++;
-      });
-    }
-  });
+  let n = 0;
+  await mutate(async (d) => { n = await fixEndsIn(d, list, new Date().toISOString()); });
   return n;
 }
 async function deleteEmpty(list: Workout[]): Promise<number> {
   let n = 0;
-  await mutate(async (d) => {
-    for (const w of list) {
-      await d.transaction('rw', d.workouts, d.tombs, async () => {
-        const cur = await d.workouts.get(w.id);
-        if (!cur || !cur.endedAt || doneCount(cur) > 0) return;
-        await softDelete(d, 'workouts', w.id); n++;
-      });
-    }
-  });
+  await mutate(async (d) => { n = await deleteEmptyIn(d, list); });
   return n;
 }
 async function fixWarmups(list: WarmupFix[]): Promise<number> {
-  let n = 0; const nowIso = new Date().toISOString();
-  const ids = [...new Set(list.map((f) => f.id))];
-  await mutate(async (d) => {
-    for (const id of ids) {
-      await d.transaction('rw', d.workouts, async () => {
-        const cur = await d.workouts.get(id);
-        if (!cur) return;
-        const next = applyWarmups(cur, list, nowIso);
-        if (next !== cur) { await d.workouts.put(next); n += list.filter((f) => f.id === id).length; }
-      });
-    }
-  });
+  let n = 0;
+  await mutate(async (d) => { n = await fixWarmupsIn(d, list, new Date().toISOString()); });
   return n;
 }
 
@@ -143,11 +117,11 @@ export function RecordFixCard({ s, byId }: { s: AppState; byId: Map<string, Exer
       <div class="card-head"><span class="card-title">기록 정리 (한 번만)</span></div>
       <p class="sub small">예전 기록에서 고치면 좋을 것을 찾았어요. 고를 것만 남기고 확인하면 고쳐요. 그대로 두면 다시 묻지 않아요.</p>
       <Section testId="fix-end" title="끝난 시각이 늦은 기록" note="마지막 세트 뒤 15분 넘게 지나 끝낸 기록이에요. 끝난 시각을 마지막 세트 + 3분으로 바꿔요."
-        rows={ends.map((f) => ({ key: endKey('end', f), text: `${day(f.startedAt)} ${f.name}`, sub: `끝 ${at(f.endedAt, f.startedAt)} → ${at(f.newEnd, f.startedAt)} (마지막 세트 ${at(f.lastAt, f.startedAt)})` }))}
+        rows={ends.map((f) => ({ key: endKey('end', f), text: `${day(f.startedAt)} ${f.name}`, sub: `${endChangeText(f)} (마지막 세트 ${at(f.lastAt, f.startedAt)})` }))}
         okLabel="끝난 시각 고치기" confirmTitle="끝난 시각을 고칠까요?" confirmMsg={(n) => `${n}건의 끝난 시각을 마지막 세트 + 3분으로 바꿔요. 세트 기록은 그대로예요.`}
         run={(keys) => fixEnds(ends.filter((f) => keys.has(endKey('end', f))))} onSeen={onSeen} />
       <Section testId="fix-long" title="12시간 넘게 이어진 기록" note="다음 날 체크한 세트처럼 떨어진 세트를 빼고, 이어서 한 세트(앞 세트와 3시간 안) 중 마지막 세트 + 3분으로 끝난 시각을 바꿔요. 떨어진 세트는 지우지 않아요."
-        rows={longs.map((f) => ({ key: endKey('long', f), text: `${day(f.startedAt)} ${f.name}`, sub: `끝 ${at(f.endedAt, f.startedAt)} → ${at(f.newEnd, f.startedAt)}${f.stragglers ? ` · 떨어진 세트 ${f.stragglers}개는 그대로` : ''}` }))}
+        rows={longs.map((f) => ({ key: endKey('long', f), text: `${day(f.startedAt)} ${f.name}`, sub: `${endChangeText(f)}${f.stragglers ? ` · 떨어진 세트 ${f.stragglers}개는 그대로` : ''}` }))}
         okLabel="긴 기록 고치기" confirmTitle="긴 기록의 끝난 시각을 고칠까요?" confirmMsg={(n) => `${n}건의 끝난 시각을 이어서 한 마지막 세트 + 3분으로 바꿔요. 세트 기록은 그대로예요.`}
         run={(keys) => fixEnds(longs.filter((f) => keys.has(endKey('long', f))))} onSeen={onSeen} />
       <Section testId="fix-empty" title="완료한 세트가 없는 기록" note="세트를 하나도 완료하지 않은 기록이에요. 지우면 되돌릴 수 없어요."

@@ -141,7 +141,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const prog = progress(w, nowMs, (id, reps) => { const e = byId.get(id); return e ? setTime(e, reps) : 40; });
   const nameOf = (id: string) => byId.get(id)?.name_ko ?? id;
   const complete = (st: Step) => { unlockAudio(); setEnded(false); void upd((cw) => completeSet(cw, st, Date.now())); setOpen(null); };
-  /** 큰 ✓(아래 도크·현재 줄): 묶음이면 이 라운드 남은 세트를 한 번에 (D-066). 저장된 최신 기록으로 라운드를 다시 고름 */
+  /** 큰 ✓(아래 도크)만: 묶음이면 이 라운드 남은 세트를 한 번에 (D-066). 저장된 최신 기록으로 라운드를 다시 고름 */
   const completeMain = (st: Step) => { unlockAudio(); setEnded(false); void upd((cw) => completeRound(cw, st, Date.now())); setOpen(null); };
   const curItem = cur ? w.blocks[cur.block]!.items[cur.item]! : undefined;
   const nextRest = cur ? restAfter(w, cur) : null;
@@ -214,7 +214,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             : <NumInput integer pendingKey={`${b}-${i}-${k}-r`} label={`${label} 횟수`} value={x.reps} suffix="" onChange={(v) => upd((cw) => updateSet(cw, st, { reps: v }))} />}
           {x.done
             ? <button class="check done" aria-label="완료 취소" title={`${label} 완료됨 (누르면 완료 취소)`} onClick={() => upd((cw) => undoSet(cw, st))}><Icon name="check" size={22} /></button>
-            : <button class={`check ${isCur ? 'cur' : ''}`} aria-label={`${label} 완료`} onClick={() => (isCur ? completeMain(st) : complete(st))}><Icon name="check" size={22} /></button>}
+            : <button class={`check ${isCur ? 'cur' : ''}`} aria-label={`${label} 완료`} onClick={() => complete(st)}><Icon name="check" size={22} /></button>}
         </div>
         {autoW && <p class="sub small autow-line">지난번 무게의 절반 이하·15회 이상이라 웜업(W)으로 표시했어요</p>}
         {pr && (
@@ -265,7 +265,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   };
   /**
    * 묶음 블록 (D-066): 위에 운동 A·B 이름, 아래 세트 표를 라운드별로 묶어 (1라운드: A1·B1 …).
-   * 웜업은 맨 앞 한 묶음. 줄마다 ✓는 그 세트만, 현재 줄·아래 큰 ✓는 라운드 한 번에
+   * 웜업은 맨 앞 한 묶음. 줄마다 ✓는 그 세트만(현재 줄도), 아래 큰 ✓만 라운드 한 번에 (B1, "줄마다 체크는 그대로")
    */
   const groupBody = (bi: number) => {
     const b = w.blocks[bi]!;
@@ -336,8 +336,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const round = cur ? roundSteps(w, cur) : [];
   const roundNo = cur && round.length > 1 ? roundOf(w, cur) : 0;
   const roundLetters = round.map((x) => String.fromCharCode(65 + x.item)).join('+');
-  const nextText = cur && curItem ? (roundNo ? `${roundNo}라운드 ${roundLetters}` : `${curLetter}${nameOf(curItem.exerciseId)} ${curSetLabel}`) : '';
-  const mainAria = roundNo ? `현재 세트 완료 · ${roundNo}라운드 ${round.length}세트 한 번에` : '현재 세트 완료';
+  // 다음 세트 글은 한 모양 "글자 N세트": 라운드면 "A+B 2세트", 하나면 "B 2세트"(도크) / "B. 이름 2세트"(큰 ✓)
+  const nextText = cur && curItem ? (roundNo ? `${roundLetters} ${roundNo}세트` : `${curLetter}${nameOf(curItem.exerciseId)} ${curSetLabel}`) : '';
+  const nextShort = roundNo ? `${roundLetters} ${roundNo}세트` : `${curLetter.replace('. ', ' ')}${curSetLabel}`;
+  const mainAria = roundNo ? `현재 세트 완료 · ${roundLetters} ${roundNo}세트 한 번에` : '현재 세트 완료';
   const mainRest = cur && roundNo ? restAfter(w, round[round.length - 1]!) : nextRest;
   nextRef.current = nextText;
   const menuItem = menu ? w.blocks[menu.b]?.items[menu.i] : undefined;
@@ -437,7 +439,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             <div class="rp-mid grow">
               <div class="rp-num" aria-label={`휴식 남은 시간 ${rem}초`}>{mmss(rem)}</div>
               {/* 화면에는 짧게 "다음: …", 화면 읽기·시험에는 휴식 이름 전체 */}
-              <div class="rp-label" aria-hidden="true">{rem > 0 ? (curSetLabel ? `다음 ${curLetter.replace('. ', ' ')}${curSetLabel}` : '휴식') : '휴식 끝!'}</div>
+              <div class="rp-label" aria-hidden="true">{rem > 0 ? (curSetLabel ? `다음 ${nextShort}` : '휴식') : '휴식 끝!'}</div>
               <span class="sr-only">{rem > 0 ? w.timer.label : '휴식 끝! 다음 세트'}{nextText ? ` · 다음 ${nextText}` : ''}</span>
             </div>
             <button class="rp-btn" aria-label="15초 줄이기" onClick={() => upd((cw) => adjustTimer(cw, -15, Date.now()))}>−15</button>

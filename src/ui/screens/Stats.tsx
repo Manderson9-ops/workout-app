@@ -13,7 +13,7 @@ import { BodyHeat } from '../bodyMapView';
 import { recoveryByPart } from '../../core/recovery';
 import { RecoveryCard } from './RecoveryCard';
 import { RecordFixCard } from './RecordFix';
-import { lastNight, watchView, watchLine, WATCH_PENDING, WATCH_GATE } from '../../core/health';
+import { lastNight, watchReason, watchReasonLines, WATCH_PENDING, WATCH_GATE } from '../../core/health';
 import { LineChart, BarChart, PairBarChart } from '../charts';
 import { NumInput, Empty, Metric, Delta, Sheet } from '../components';
 import { ScreenHeader } from '../header';
@@ -321,12 +321,11 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
   );
 }
 
-/** D-058 상세 애플워치 한 줄. D-071: 그럴듯하지 않으면 숫자 대신 "확인 중" + [왜?] 안내 창 */
+/** D-058 상세 애플워치 한 줄. D-071(승인안): 원인을 고칠 때까지 숫자는 모두 숨기고 "확인 중" + [왜?] (이 운동의 이유) */
 function DetailWatch({ w, s }: { w: Workout; s: AppState }) {
   const [info, setInfo] = useState(false);
-  const v = watchView(w, s.health);
-  if (!v) return null;
-  if (v.ok) return <p class="wc-watch detail" data-testid="detail-watch"><Icon name="heart" size={16} />{watchLine(v.x)}</p>;
+  const r = watchReason(w, s.health);
+  if (!r) return null;
   const g = WATCH_GATE;
   return (
     <>
@@ -334,12 +333,10 @@ function DetailWatch({ w, s }: { w: Workout; s: AppState }) {
         <button class="ghost wc-why" aria-haspopup="dialog" onClick={() => setInfo(true)}>왜?</button></p>
       {info && (
         <Sheet title={WATCH_PENDING} onClose={() => setInfo(false)} modal trap>
-          <p class="small" data-testid="watch-pending-info">애플워치에서 받은 이 운동의 심박·칼로리가 사람에게 나오기 어려운 범위라서, 원인을 확인하는 동안 숫자를 보여 주지 않아요.</p>
-          <ul class="small sub">
-            <li>보여 주는 조건: 최고 심박 {g.hrMax} 이하, 평균 심박 {g.hrAvgMin}~{g.hrAvgMax}, 운동 중 심박 {g.hrNMin}개 이상, 칼로리는 분당 {g.kcalPerMin}kcal 이하</li>
-            <li>예: 최고 심박 240, 93분에 3,320kcal, 운동 중 심박 4~11개처럼 받은 값이 있었어요</li>
-            <li>다음에 받는 기록부터 어떤 값이 왔는지(개수·최소·최대만) 진단에 남겨 원인을 찾아요. 운동 기록(세트·무게)에는 영향이 없어요</li>
-          </ul>
+          <p class="small" data-testid="watch-pending-info">애플워치에서 받은 심박·칼로리 중 사람에게 나오기 어려운 값이 있어서, 원인을 고칠 때까지 모든 운동의 숫자를 보여 주지 않아요.</p>
+          <p class="small"><b>이 운동</b></p>
+          <ul class="small" data-testid="watch-reason">{watchReasonLines(r).map((t, i) => <li key={i}>{t}</li>)}</ul>
+          <p class="sub small">믿을 수 있는 값의 기준: 최고 심박 {g.hrMax} 이하, 평균 심박 {g.hrAvgMin}~{g.hrAvgMax}, 운동 중 심박 {g.hrNMin}개 이상, 칼로리는 분당 {g.kcalPerMin}kcal 이하. 운동 기록(세트·무게)에는 영향이 없어요.</p>
           <button class="big" style={{ width: '100%' }} onClick={() => setInfo(false)}>알겠어요</button>
         </Sheet>
       )}

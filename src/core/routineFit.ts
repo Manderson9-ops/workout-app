@@ -4,11 +4,13 @@
  *     (마지막 작업 세트 − 첫 작업 세트) ÷ (작업 세트 − 1)의 가운데 값. 3회 미만이면 없음(앱 기본 예상을 씀)
  *     시작 → 첫 세트도 기록에서 잼 (루틴 웜업 8~10분은 실제로 관찰되지 않음, 중앙 약 0.5분)
  *  2. 루틴 예상 = 시작→첫 세트 + 첫 세트 + (세트 수 − 1) × 세트당 시간. 목표 시간이 지나서야 시작하는 운동 = "못 할 운동"
- *  3. 내 시간에 맞추기 = 최근 2주 덜 한 부위의 블록을 앞으로(묶음은 통째로) + 많이 한 부위·운동부터 세트를 하나씩
+ *  3. 내 시간에 맞추기 = 첫 블록·주 운동(바벨 복합 운동) 블록은 제자리, 나머지 중 최근 2주 덜 한 부위의 블록을 앞으로(묶음은 통째로)
+ *     + 많이 한 부위·운동부터 세트를 하나씩
  *     줄임(작업 세트 2개 아래로는 안 줄임, 묶음 안 세트 수는 맞춤) → 목표 시간 안이 될 때까지
  */
 import type { Routine, RoutineBlock, Workout } from './session';
-import type { Part } from './types';
+import type { Exercise, Part } from './types';
+import { hasEditStamps } from './finishTime';
 
 export const PACE_RULE = {
   /** 최근 몇 회를 보나 */
@@ -63,7 +65,8 @@ function firstDone(w: Workout): number | undefined {
 /** 내 속도. 기록이 모자라면 undefined (부르는 쪽이 앱 기본 예상을 씀) */
 export function personalPace(history: readonly Workout[]): Pace | undefined {
   const recent = history
-    .filter((w) => w.endedAt && !w.pendingMerge && Date.parse(w.endedAt) - Date.parse(w.startedAt) <= PACE_RULE.maxSessionMs && workTimes(w).length > 0)
+    // 기록 수정 화면에서 완료로 바꾼 세트가 있는 기록은 뺌 (끝낸 시각이 "시작 + k초", A1)
+    .filter((w) => w.endedAt && !w.pendingMerge && !hasEditStamps(w) && Date.parse(w.endedAt) - Date.parse(w.startedAt) <= PACE_RULE.maxSessionMs && workTimes(w).length > 0)
     .sort((a, b) => (a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0))
     .slice(0, PACE_RULE.sessions);
   const paces: number[] = [];
@@ -123,14 +126,14 @@ export function targetMinutesOf(name: string, fallback: number): number {
   return v >= 10 && v <= 300 ? v : fallback;
 }
 
-export interface PaceLabel { estMin: number; targetMin: number; cut: number; head: string; tail: string; text: string }
-/** 카드·편집 화면 한 줄: "내 속도로 약 52분 · 목표 75분이면 못 할 운동 3개" */
+export interface PaceLabel { estMin: number; targetMin: number; cut: number; n: number; head: string; tail: string; text: string }
+/** 카드·편집 화면 한 줄: "내 속도로 약 52분 (최근 8회) · 목표 75분이면 못 할 운동 3개" (괄호 = 근거 기록 수) */
 export function paceLabel(r: Routine, p: Pace | undefined, targetMin: number): PaceLabel | undefined {
   if (!p || !routineSets(r)) return undefined;
   const estMin = Math.round(paceEstimate(r, p) / 60);
   const cut = cutCount(r, p, targetMin * 60);
-  const head = `내 속도로 약 ${estMin}분`, tail = cut ? `목표 ${targetMin}분이면 못 할 운동 ${cut}개` : `목표 ${targetMin}분 안`;
-  return { estMin, targetMin, cut, head, tail, text: `${head} · ${tail}` };
+  const head = `내 속도로 약 ${estMin}분 (최근 ${p.n}회)`, tail = cut ? `목표 ${targetMin}분이면 못 할 운동 ${cut}개` : `목표 ${targetMin}분 안`;
+  return { estMin, targetMin, cut, n: p.n, head, tail, text: `${head} · ${tail}` };
 }
 
 export interface Recent { part: Map<Part, number>; ex: Map<string, number> }
@@ -151,6 +154,12 @@ export function recentSets(history: readonly Workout[], partOf: (id: string) => 
   return { part, ex };
 }
 
+/**
+ * 주 운동 (B3): 바벨로 하는 복합 운동 (벤치프레스·스쿼트·데드리프트·랙풀·바벨 로우 등). 무겁고 힘이 많이 드는 운동이라
+ * 맞추기에서 자리를 옮기지 않고(지친 뒤로 밀리지 않게), 세트는 다른 운동을 다 줄인 뒤에야 줄임
+ */
+export const isMainLift = (ex: Pick<Exercise, 'mechanics' | 'equipment'> | undefined): boolean => !!ex && ex.mechanics === 'compound' && ex.equipment.includes('barbell');
+
 export interface FitRow { exerciseId: string; letter: string; fromBlock: number; toBlock: number; before: number; after: number }
 export interface FitResult { routine: Routine; beforeSec: number; afterSec: number; fits: boolean; moved: boolean; reduced: number; rows: FitRow[] }
 export interface FitInput {
@@ -159,20 +168,32 @@ export interface FitInput {
   estimate: (r: Routine) => number;
   partOf: (id: string) => Part | undefined;
   recent: Recent;
+  /** 주 운동인지 (isMainLift). 없으면 첫 블록만 제자리 */
+  isMain?: (id: string) => boolean;
+}
+
+/** 제자리 블록 (B3): 첫 블록 + 주 운동이 든 블록 */
+export function anchoredBlocks(r: Routine, isMain: (id: string) => boolean = () => false): boolean[] {
+  return r.blocks.map((b, i) => i === 0 || b.items.some((it) => isMain(it.exerciseId)));
 }
 
 /**
  * 내 시간에 맞추기 (D-067, 사용자 선택: 운동당 세트 줄이기). 결과만 돌려주고 저장은 부르는 쪽이 확인 뒤에.
- *  1) 블록 순서: 최근 2주 그 블록 부위 세트가 적은 것부터(블록 안 부위 중 가장 적은 값, 같으면 원래 순서). 묶음은 통째로
- *  2) 목표보다 길면 한 세트씩 줄임: 최근 2주 많이 한 부위 → 많이 한 운동 → 세트가 많은 운동 → 뒤쪽 블록 순
+ *  1) 블록 순서: 첫 블록과 주 운동 블록은 제자리. 나머지(옮길 수 있는 블록)만 그 빈자리 안에서 최근 2주 그 블록 부위 세트가
+ *     적은 것부터(블록 안 부위 중 가장 적은 값, 같으면 원래 순서). 묶음은 통째로
+ *  2) 목표보다 길면 한 세트씩 줄임: 옮길 수 있는 블록 먼저(제자리 블록은 맨 나중, 그것들끼리는 세트가 많은 것부터 고르게) → 최근 2주 많이 한 부위 → 많이 한 운동 → 세트가 많은 운동 → 뒤쪽 블록 순
  *     작업 세트 2개 아래로는 안 줄임(원래 2개 이하는 그대로). 묶음은 세트가 가장 많은 운동들을 같이 줄여 라운드 수를 맞춤
  */
 export function fitRoutine(inp: FitInput): FitResult {
   const { routine, targetSec, estimate, partOf, recent } = inp;
   const pr = (id: string) => { const p = partOf(id); return p ? recent.part.get(p) ?? 0 : 0; };
   const beforeSec = estimate(routine);
+  const fixed = anchoredBlocks(routine, inp.isMain);
   const order = routine.blocks.map((b, i) => ({ b, i, score: Math.min(...b.items.map((it) => pr(it.exerciseId))) }));
-  const sorted = [...order].sort((a, b) => a.score - b.score || a.i - b.i);
+  const movable = order.filter((x) => !fixed[x.i]).sort((a, b) => a.score - b.score || a.i - b.i);
+  let mi = 0;
+  const sorted = order.map((x) => (fixed[x.i] ? x : movable[mi++]!));
+  const anchorAt = sorted.map((x) => fixed[x.i]!);
   const moved = sorted.some((x, k) => x.i !== k);
   let blocks: RoutineBlock[] = sorted.map((x) => ({ ...x.b, items: x.b.items.map((it) => ({ ...it })) }));
   const from = sorted.map((x) => x.i);
@@ -187,7 +208,9 @@ export function fitRoutine(inp: FitInput): FitResult {
       const max = Math.max(...b.items.map((i) => i.sets));
       if (max <= FIT_MIN_SETS) continue;
       const top = b.items.filter((i) => i.sets === max);
-      const key = [Math.max(...top.map((i) => pr(i.exerciseId))), Math.max(...top.map((i) => recent.ex.get(i.exerciseId) ?? 0)), max, x];
+      const p = Math.max(...top.map((i) => pr(i.exerciseId))), e = Math.max(...top.map((i) => recent.ex.get(i.exerciseId) ?? 0));
+      // 제자리(주 운동) 블록은 맨 나중에, 그것들끼리는 세트가 많은 것부터 고르게 (주 운동 하나만 크게 줄지 않게)
+      const key = anchorAt[x] ? [0, max, p, e, x] : [1, p, e, max, x];
       if (bi < 0 || cmp(key, bestKey) > 0) { bi = x; bestKey = key; }
     }
     if (bi < 0) break;
@@ -206,6 +229,17 @@ export function fitRoutine(inp: FitInput): FitResult {
     fromBlock: from[bi]!, toBlock: bi, before: before.get(`${from[bi]}-${ii}`) ?? it.sets, after: it.sets,
   })));
   return { routine: cur(), beforeSec, afterSec: est, fits: est <= targetSec, moved, reduced, rows };
+}
+
+/**
+ * 미리 보기 한 줄 (B3): 앞으로 옮긴 운동을 부위별로 세어 "등 운동 4개를 앞으로" (여러 부위면 "등 운동 3개·어깨 운동 1개를 앞으로").
+ * 옮긴 것이 없으면 ''
+ */
+export function moveSummary(rows: readonly FitRow[], partOf: (id: string) => Part | undefined): string {
+  const m = new Map<string, number>();
+  for (const x of rows) if (x.toBlock < x.fromBlock) { const p = partOf(x.exerciseId) ?? '기타'; m.set(p, (m.get(p) ?? 0) + 1); }
+  if (!m.size) return '';
+  return `${[...m].sort((a, b) => b[1] - a[1]).map(([p, n]) => `${p} 운동 ${n}개`).join('·')}를 앞으로`;
 }
 
 /** 앞에서부터 큰 쪽이 이김 */
