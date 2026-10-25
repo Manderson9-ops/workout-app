@@ -121,6 +121,7 @@ function buildPools(req: PlanRequest, all: BuiltExercise[], reasons: string[]): 
     type C = { ex: BuiltExercise; grade: ResolvedGrade };
     const rank = (c: C) => [
       gradeIdx(c.grade.value),
+      c.grade.source === 'USER' ? 0 : 1, // D-074: 사용자가 직접 추가·지정한 운동 우선
       c.grade.estimated ? 1 : 0, // M-09
       c.grade.estimated ? (c.ex.staple?.[p.part] ?? 99) : 0, // M-14
       fav.has(c.ex.id) ? 0 : 1,
@@ -433,7 +434,7 @@ export function generatePlan(req: PlanRequest, all: BuiltExercise[]): Plan {
   if (!best) {
     const highOnly = req.parts.filter((x) => x.priority === 'high');
     const fallbackParts = highOnly.length && highOnly.length < req.parts.length ? highOnly : req.parts.length > 1 ? [sortedParts(req)[0]!] : [];
-    const short = `선택 부위를 모두 넣기엔 ${Math.max(1, Math.ceil((minNeeded - targetSec!) / 60))}분 부족`;
+    const short = `선택 부위를 모두 넣기엔 ${isFinite(minNeeded) ? Math.max(1, Math.ceil((minNeeded - targetSec!) / 60)) : 1}분 부족`;
     if (fallbackParts.length) {
       const sub = generatePlan({ ...req, parts: fallbackParts.map(({ part, priority }) => ({ part, priority })) }, all);
       if (sub.status === 'too_short') return { ...sub, missingParts: req.parts.map((x) => x.part), reasons: [short, ...sub.reasons] };

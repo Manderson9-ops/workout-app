@@ -129,6 +129,23 @@ describe('등급 고르기 (BLUEPRINT 3.3)', () => {
     expect(resolveGrade(get('leg_press'), '하체', '중급')).toMatchObject({ value: 'B', estimated: true });
     expect(resolveGrade(get('leg_press'), '하체', '중급', undefined, 'S')).toMatchObject({ value: 'S', source: 'USER' });
   });
+  it('D-074: 사용자가 직접 추가한 커스텀 운동은 기본 최고 등급 S', () => {
+    const customEx = { id: 'custom_push', name_ko: '내 푸시업', part: '가슴', family: 'custom_push', muscles: ['대흉근'], pattern: 'H_PUSH', mechanics: 'compound', equipment: ['bodyweight'], custom: true, grades: [], guide: [] } as unknown as BuiltExercise;
+    const r = resolveGrade(customEx, '가슴', '중급');
+    expect(r.value).toBe('S');
+    expect(r.source).toBe('USER');
+    expect(r.estimated).toBe(false);
+  });
+  it('M-33: 푸시업 별칭에 푸쉬업/푸샵 포함 및 신규 맨몸 푸시업 4종', () => {
+    expect(get('push_up').aliases).toContain('푸쉬업');
+    expect(get('push_up').aliases).toContain('푸샵');
+    expect(get('pike_push_up').aliases).toContain('파이크 푸쉬업');
+    expect(get('triceps_push_up').aliases).toContain('삼두 푸쉬업');
+    expect(get('incline_push_up')).toBeDefined();
+    expect(get('decline_push_up')).toBeDefined();
+    expect(get('knee_push_up')).toBeDefined();
+    expect(get('diamond_push_up')).toBeDefined();
+  });
   it('딥스: 가슴 부위이면서 삼두 등급(B)으로 삼두 후보', () => {
     const dip = get('dip') as BuiltExercise;
     expect(eligibleParts(dip)).toEqual(['가슴', '삼두']);

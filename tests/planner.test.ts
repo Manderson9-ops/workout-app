@@ -222,6 +222,27 @@ describe('특수 상황', () => {
     const ids = generatePlan(r, real).blocks.flatMap((b) => b.items.map((i) => i.exerciseId));
     expect(ids).toEqual(expect.arrayContaining(['farmers_walk', 'towel_pull_up']));
   });
+  it('D-074: 사용자가 직접 추가한 운동은 최고 등급 S로 플랜에 최우선 배정', () => {
+    const customChest = {
+      id: 'my_custom_press',
+      name_ko: '내 커스텀 가슴 운동',
+      family: 'my_custom_press',
+      part: '가슴',
+      muscles: ['대흉근'],
+      pattern: 'H_PUSH',
+      mechanics: 'compound',
+      equipment: ['bodyweight'],
+      custom: true,
+      grades: [],
+      guide: []
+    } as unknown as BuiltExercise;
+    const pool = [customChest, ...real];
+    const r: PlanRequest = { parts: [{ part: '가슴', priority: 'high' }], level: '중급', targetMinutes: 30 };
+    const p = generatePlan(r, pool);
+    const firstExercise = p.blocks[0]!.items[0]!;
+    expect(firstExercise.exerciseId).toBe('my_custom_press');
+    expect(firstExercise.grade).toBe('S');
+  });
 });
 
 // ---------- 무작위 검증 500건 (고정 시드) ----------

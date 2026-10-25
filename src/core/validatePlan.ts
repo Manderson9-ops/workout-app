@@ -107,7 +107,7 @@ export function validatePlan(plan: Plan, req: PlanRequest, all: BuiltExercise[])
   const EQR: Record<string, number> = { cable: 0, machine: 0, smith: 1, dumbbell: 2, bodyweight: 3, band: 4, barbell: 5, other: 6 };
   const rankKey = (i: (typeof items)[number]) => {
     const e = byId.get(i.exerciseId)!;
-    return [i.locked ? 0 : 1, GRADES.indexOf(i.grade), i.estimated ? 1 : 0, i.estimated ? (e.staple?.[i.part] ?? 99) : 0, fav.has(e.id) ? 0 : 1, recent.has(e.id) ? 0 : 1, Math.min(...e.equipment.map((q) => EQR[q]!))];
+    return [i.locked ? 0 : 1, GRADES.indexOf(i.grade), i.gradeSource === 'USER' ? 0 : 1, i.estimated ? 1 : 0, i.estimated ? (e.staple?.[i.part] ?? 99) : 0, fav.has(e.id) ? 0 : 1, recent.has(e.id) ? 0 : 1, Math.min(...e.equipment.map((q) => EQR[q]!))];
   };
   for (const { part } of req.parts) {
     const mine = items.filter((i) => i.part === part && byId.has(i.exerciseId));

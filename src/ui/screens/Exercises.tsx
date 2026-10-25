@@ -4,7 +4,7 @@ import type { AppState } from '../store';
 import { mutate, historyOf } from '../store';
 import { catalog, families, videoUrl, sourceVideos } from '../catalog';
 import { PARTS, EQUIPMENT, EQUIPMENT_LABEL, LEVELS } from '../../core/types';
-import type { Part, Equipment, Mechanics } from '../../core/types';
+import type { Part, Equipment, Mechanics, BuiltExercise } from '../../core/types';
 import { resolveGrade, eligibleParts, patternFor } from '../../core/exercises';
 import { matchesQuery } from '../../core/search';
 import { lastSets } from '../../core/session';
@@ -111,16 +111,16 @@ export function Exercises({ s }: { s: AppState }) {
   );
 }
 
-function AddCustom({ s, onClose }: { s: AppState; onClose: () => void }) {
+export function AddCustom({ s, initialPart, onClose, onAdded }: { s: AppState; initialPart?: Part; onClose: () => void; onAdded?: (e: BuiltExercise) => void }) {
   const [name, setName] = useState('');
-  const [part, setPart] = useState<Part>('가슴');
+  const [part, setPart] = useState<Part>(initialPart ?? '가슴');
   const [mech, setMech] = useState<Mechanics>('isolation');
-  const [eq, setEq] = useState<Equipment>('machine');
+  const [eq, setEq] = useState<Equipment>('bodyweight');
   const [uni, setUni] = useState(false);
   const exists = catalog(s.custom).some((e) => e.name_ko === name.trim());
   return (
     <Sheet title="운동 직접 추가" onClose={onClose}>
-      <label>이름</label><input value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} aria-label="운동 이름" />
+      <label>이름</label><input value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} aria-label="운동 이름" placeholder="예: 푸시업 변형, 친업" />
       {exists && <p class="small t-warn">같은 이름의 운동이 이미 있어요</p>}
       <label>부위</label><select value={part} onChange={(e) => setPart((e.target as HTMLSelectElement).value as Part)} aria-label="부위">{PARTS.map((p) => <option key={p}>{p}</option>)}</select>
       <div class="grid2">
@@ -128,10 +128,15 @@ function AddCustom({ s, onClose }: { s: AppState; onClose: () => void }) {
         <div><label>장비</label><select value={eq} onChange={(e) => setEq((e.target as HTMLSelectElement).value as Equipment)} aria-label="장비">{EQUIPMENT.map((x) => <option key={x} value={x}>{EQUIPMENT_LABEL[x]}</option>)}</select></div>
       </div>
       <label class="row"><input type="checkbox" class="ck24" checked={uni} onChange={() => setUni(!uni)} /> 한쪽씩 하는 운동</label>
-      <p class="sub small">직접 추가한 운동은 영상 등급이 없어 "B 추정"으로 시작해요. 상세 화면에서 내 등급을 바꿀 수 있어요.</p>
+      <p class="sub small">직접 추가한 운동은 최고 등급 "S"로 설정되어 플랜 생성에 최우선 반영돼요. (상세 화면에서 변경 가능)</p>
       <button class="primary big" disabled={!name.trim() || exists} onClick={async () => {
         const id = newId('custom').replace(/-/g, '_');
-        await mutate((d) => d.custom.put({ id, name_ko: name.trim(), family: id, part, muscles: [part], pattern: patternFor(part, mech), mechanics: mech, equipment: [eq], unilateral: uni, custom: true, createdAt: new Date().toISOString() }));
+        const item = { id, name_ko: name.trim(), family: id, part, muscles: [part], pattern: patternFor(part, mech), mechanics: mech, equipment: [eq], unilateral: uni, custom: true as const, createdAt: new Date().toISOString() };
+        await mutate(async (d) => {
+          await d.custom.put(item);
+          await d.meta.put({ exerciseId: id, userGrade: 'S' });
+        });
+        onAdded?.({ ...item, grades: [], guide: [] });
         onClose();
       }}>추가</button>
     </Sheet>

@@ -41,6 +41,10 @@ export interface ResolvedGrade {
  */
 export function resolveGrade(e: BuiltExercise, part: Part, level: Level, subGoal?: string, userGrade?: Grade): ResolvedGrade {
   if (userGrade) return { value: userGrade, source: 'USER', estimated: false, others: e.grades };
+  // D-074: 사용자가 직접 추가한 커스텀 운동은 기본 최고 등급 S로 플랜 생성에 최우선 반영
+  if ('custom' in e && (e as { custom?: boolean }).custom) {
+    return { value: 'S', source: 'USER', estimated: false, others: e.grades };
+  }
   const forPart = e.grades.filter((g) => g.purpose_part === part);
   const applicable = forPart.filter((g) => (g.sub_goal_only ? subGoal !== undefined && g.purpose_note === subGoal : true));
   const bySubGoal = subGoal ? applicable.filter((g) => g.purpose_note === subGoal) : [];

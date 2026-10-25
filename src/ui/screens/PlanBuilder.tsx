@@ -26,6 +26,7 @@ import { PartSheet } from '../prioritySheet';
 import { togglePart as togglePartForm, setPartPriority } from '../../core/planForm';
 import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
 import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, groupKindWithNext, mergeWithNextBlock, splitPlanBlock, bulkSets, bulkReps, addToGroup, stepRoundRest, stepTransition, GROUP_MAX, ROUND_REST_MIN, ROUND_REST_MAX, ROUND_REST_STEP, TRANSITION_MIN, TRANSITION_MAX, TRANSITION_STEP, rangeText, changedCount, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
+import { AddCustom } from './Exercises';
 import { Icon } from '../icons';
 
 const PR_LABEL: Record<Priority, string> = { high: '높음', normal: '보통', low: '낮음' };
@@ -68,6 +69,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const setPlan = (p: Plan | null) => { setPlanRaw(p); if (p) sessionStorage.setItem(scopedKey(PLAN_KEY), JSON.stringify(p)); else sessionStorage.removeItem(scopedKey(PLAN_KEY)); };
   const [locks, setLocksRaw] = useState<Set<string>>(() => new Set(JSON.parse(sessionStorage.getItem(scopedKey(LOCK_KEY)) ?? '[]') as string[]));
   const setLocks = (l: Set<string>) => { setLocksRaw(l); sessionStorage.setItem(scopedKey(LOCK_KEY), JSON.stringify([...l])); };
+  const [addCustomOpen, setAddCustomOpen] = useState(false);
   const [picker, setPicker] = useState<{ b: number; i: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [groupAdd, setGroupAdd] = useState<number | null>(null); // 묶음에 운동 추가 중인 블록 번호 (D-051)
@@ -227,12 +229,20 @@ export function PlanBuilder({ s }: { s: AppState }) {
 
   return (
     <main>
-      <ScreenHeader title="플랜 만들기" />
+      <ScreenHeader
+        title="플랜 만들기"
+        actions={<button class="icon-btn round head-add" aria-label="운동 직접 추가" title="운동 직접 추가" onClick={() => setAddCustomOpen(true)}><Icon name="plus" /></button>}
+      />
       {/* PC 넓은 화면: 왼쪽 조건, 오른쪽 결과 (D-030) */}
       <div class="wide-2"><div>
       {/* D-055 3단계: 단계 카드 1 부위·우선순위 → 2 시간·등급·묶음 → 3 결과 */}
       <section class="card step-card" aria-label="1단계 부위·우선순위">
       <div class="card-head"><span class="step-no" aria-hidden="true">1</span><span class="card-title grow">부위·우선순위</span><span class="sub small">{nParts ? `${nParts}개 고름` : '아직 없음'}</span></div>
+      <div class="row" style={{ margin: '4px 0 8px' }}>
+        <button class="btn sub-btn" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setAddCustomOpen(true)}>
+          <Icon name="plus" size={16} /> 내가 원하는 운동 직접 추가 (최고 등급 S로 플랜 반영)
+        </button>
+      </div>
       <p class="sub small step-hint">그림이나 버튼을 누르면 우선순위를 고르는 창이 열려요 · 기본 높음</p>
       {/* 그림 먼저, 버튼은 아래: 버튼 글자가 길어져도 그림 위치가 바뀌지 않게 (연속으로 누를 때 빗나가지 않게) */}
       <BodyMap sel={f.parts} onPart={openPart} />
@@ -439,6 +449,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
         <ExercisePicker s={s} all={all} part={plan.blocks[picker.b]!.items[picker.i]!.part} title="운동 교체"
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setPicker(null)}
+          onAddCustom={() => setAddCustomOpen(true)}
           onPick={(e) => {
             const old = plan.blocks[picker.b]!.items[picker.i]!;
             const g = resolveGrade(e, old.part, s.settings.level, undefined, s.meta.get(e.id)?.userGrade);
@@ -452,13 +463,27 @@ export function PlanBuilder({ s }: { s: AppState }) {
         <ExercisePicker s={s} all={all} title="운동 추가" ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setAdding(false)}
+          onAddCustom={() => setAddCustomOpen(true)}
           onPick={(e) => { addExercise(e); setAdding(false); }} />
       )}
       {groupAdd !== null && plan && plan.blocks[groupAdd] && (
         <ExercisePicker s={s} all={all} title="묶음에 운동 추가" ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setGroupAdd(null)}
+          onAddCustom={() => setAddCustomOpen(true)}
           onPick={(e) => { addToGroupExercise(groupAdd, e); setGroupAdd(null); }} />
+      )}
+      {addCustomOpen && (
+        <AddCustom
+          s={s}
+          initialPart={f.order[0]}
+          onClose={() => setAddCustomOpen(false)}
+          onAdded={(newEx: BuiltExercise) => {
+            if (!f.parts[newEx.part]) togglePart(newEx.part);
+            if (adding && plan) { addExercise(newEx); setAdding(false); }
+            else if (groupAdd !== null && plan) { addToGroupExercise(groupAdd, newEx); setGroupAdd(null); }
+          }}
+        />
       )}
       {saving && plan && (
         <Sheet title="루틴으로 저장" onClose={() => setSaving(false)}>

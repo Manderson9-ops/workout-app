@@ -211,13 +211,14 @@ export function Empty({ title, text = '아직 기록 없음', hint, children, la
 }
 
 /** 운동 고르기 (교체·추가). part가 있으면 그 부위 후보를 등급 순으로 먼저 */
-export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctxIn, onPick, onClose, title }: {
+export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctxIn, onPick, onClose, title, onAddCustom }: {
   s: AppState; all: BuiltExercise[]; part?: Part; exclude?: string[];
   /** D-052: 추가 모드에서 이 부위로 시작 (기억된 부위는 건드리지 않음. 칩을 누르면 평소처럼 기억) */
   startPart?: Part;
   /** 지금 들어 있는 부위 (플랜은 항목의 실제 부위를 넘김). 없으면 빼기 목록 운동의 기본 부위 */
   ctxParts?: Part[];
   onPick: (e: BuiltExercise) => void; onClose: () => void; title: string;
+  onAddCustom?: () => void;
 }) {
   const [q, setQ] = useState('');
   // D-044: 교체는 그 운동의 부위로 시작하고 기억에 손대지 않음. 추가는 마지막으로 고른 부위로 시작
@@ -250,6 +251,11 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
   return (
     <Sheet onClose={onClose} title={title}>
       <input placeholder="검색 (초성 가능: ㄹㅍㄷ)" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} aria-label="운동 검색" />
+      {onAddCustom && (
+        <button class="btn sub-btn" style={{ margin: '8px 0 0', width: '100%', justifyContent: 'center' }} onClick={onAddCustom}>
+          <Icon name="plus" size={14} /> 새 운동 직접 추가 (최고 등급 S)
+        </button>
+      )}
       {ctxParts.length > 0 && <div class="row wrap" role="group" aria-label="지금 들어 있는 부위" style={{ margin: '8px 0 0' }}>
         <span class="sub small">지금 들어 있는 부위</span>
         {ctxParts.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} aria-pressed={p === x} onClick={() => setP(x)}>{x}</button>)}
