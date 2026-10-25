@@ -532,3 +532,56 @@ describe('목표 시간 없음 + 부위 간 겹침', () => {
     expect(validatePlan(p, q, synth)).toEqual([]);
   });
 });
+
+describe('장비 프리셋 플랜 생성 (D-076)', () => {
+  it('맨몸 프리셋: 모든 운동이 bodyweight 또는 other 장비만 사용', () => {
+    const q: PlanRequest = {
+      parts: [{ part: '가슴', priority: 'high' }],
+      level: '중급',
+      targetMinutes: 45,
+      equipment: ['bodyweight', 'other'],
+    };
+    const p = generatePlan(q, real);
+    expect(p.blocks.length).toBeGreaterThan(0);
+    for (const b of p.blocks) {
+      for (const it of b.items) {
+        const ex = real.find((e) => e.id === it.exerciseId)!;
+        expect(ex.equipment.every((eq) => eq === 'bodyweight' || eq === 'other')).toBe(true);
+      }
+    }
+  });
+
+  it('케이블 프리셋: 모든 운동이 cable, bodyweight, other 장비만 사용', () => {
+    const q: PlanRequest = {
+      parts: [{ part: '가슴', priority: 'high' }, { part: '삼두', priority: 'high' }],
+      level: '중급',
+      targetMinutes: 45,
+      equipment: ['cable', 'bodyweight', 'other'],
+    };
+    const p = generatePlan(q, real);
+    expect(p.blocks.length).toBeGreaterThan(0);
+    for (const b of p.blocks) {
+      for (const it of b.items) {
+        const ex = real.find((e) => e.id === it.exerciseId)!;
+        expect(ex.equipment.every((eq) => ['cable', 'bodyweight', 'other'].includes(eq))).toBe(true);
+      }
+    }
+  });
+
+  it('덤벨+바벨 프리셋: 모든 운동이 dumbbell, barbell, bodyweight, other 장비만 사용', () => {
+    const q: PlanRequest = {
+      parts: [{ part: '가슴', priority: 'high' }, { part: '등', priority: 'high' }],
+      level: '중급',
+      targetMinutes: 45,
+      equipment: ['dumbbell', 'barbell', 'bodyweight', 'other'],
+    };
+    const p = generatePlan(q, real);
+    expect(p.blocks.length).toBeGreaterThan(0);
+    for (const b of p.blocks) {
+      for (const it of b.items) {
+        const ex = real.find((e) => e.id === it.exerciseId)!;
+        expect(ex.equipment.every((eq) => ['dumbbell', 'barbell', 'bodyweight', 'other'].includes(eq))).toBe(true);
+      }
+    }
+  });
+});

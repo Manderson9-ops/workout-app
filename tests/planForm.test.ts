@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { togglePart, setPartPriority } from '../src/core/planForm';
+import { togglePart, setPartPriority, resolveEquipmentForPreset, EQUIPMENT_PRESETS } from '../src/core/planForm';
 import type { PartsForm } from '../src/core/planForm';
+import { EQUIPMENT } from '../src/core/types';
 
 describe('플랜 부위 고르기 (D-043)', () => {
   const empty: PartsForm = { parts: {}, order: [] };
@@ -27,5 +28,28 @@ describe('플랜 부위 고르기 (D-043)', () => {
     const f = { ...empty, minutes: 60 };
     expect(setPartPriority(f, '등', 'low')).toBe(f);
     expect(togglePart(f, '등').minutes).toBe(60);
+  });
+});
+
+describe('플랜 장비 프리셋 선택 (D-076)', () => {
+  it('4가지 선택 값(기구 전체, 맨몸, 케이블, 덤벨+바벨)이 정의되어 있음', () => {
+    expect(EQUIPMENT_PRESETS.map((p) => p.label)).toEqual(['기구 전체', '맨몸', '케이블', '덤벨+바벨']);
+  });
+
+  it('기구 전체: 사용자 설정 또는 전체 장비 반환', () => {
+    expect(resolveEquipmentForPreset('all')).toEqual([...EQUIPMENT]);
+    expect(resolveEquipmentForPreset('all', ['machine', 'cable'])).toEqual(['machine', 'cable']);
+  });
+
+  it('맨몸: 오직 맨몸과 기타만 반환', () => {
+    expect(resolveEquipmentForPreset('bodyweight')).toEqual(['bodyweight', 'other']);
+  });
+
+  it('케이블: 케이블과 맨몸/기타 반환', () => {
+    expect(resolveEquipmentForPreset('cable')).toEqual(['cable', 'bodyweight', 'other']);
+  });
+
+  it('덤벨+바벨: 덤벨, 바벨과 맨몸/기타 반환', () => {
+    expect(resolveEquipmentForPreset('free_weight')).toEqual(['dumbbell', 'barbell', 'bodyweight', 'other']);
   });
 });

@@ -23,7 +23,8 @@ import { go } from '../nav';
 import { useDragSort } from '../dragSort';
 import { BodyMap } from '../bodyMapView';
 import { PartSheet } from '../prioritySheet';
-import { togglePart as togglePartForm, setPartPriority } from '../../core/planForm';
+import { togglePart as togglePartForm, setPartPriority, resolveEquipmentForPreset, EQUIPMENT_PRESETS } from '../../core/planForm';
+import type { EquipmentPreset } from '../../core/planForm';
 import { SESSION_CAP, MAX_SETS_BY_LEVEL } from '../../core/volume';
 import { stepSets, stepReps, moveBlock, moveBlockTo, addBlock, regenerateWithLocks, groupKindWithNext, mergeWithNextBlock, splitPlanBlock, bulkSets, bulkReps, addToGroup, stepRoundRest, stepTransition, GROUP_MAX, ROUND_REST_MIN, ROUND_REST_MAX, ROUND_REST_STEP, TRANSITION_MIN, TRANSITION_MAX, TRANSITION_STEP, rangeText, changedCount, KEEP_ALL, SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX } from '../../core/planEdit';
 import { AddCustom } from './Exercises';
@@ -34,10 +35,10 @@ const KEY = 'planBuilder.v1';
 const PLAN_KEY = 'planBuilder.plan';
 const LOCK_KEY = 'planBuilder.locks';
 
-interface Form { parts: Partial<Record<Part, Priority>>; order: Part[]; minGrade: Grade; minutes?: number; groupings: Grouping[]; prefer: boolean }
+interface Form { parts: Partial<Record<Part, Priority>>; order: Part[]; minGrade: Grade; minutes?: number; groupings: Grouping[]; prefer: boolean; equipPreset?: EquipmentPreset }
 const loadForm = (): Form => {
-  try { const f = JSON.parse(lsGet(KEY) ?? ''); if (f?.order) return f; } catch { /* 처음 */ }
-  return { parts: {}, order: [], minGrade: 'B', minutes: 60, groupings: ['superset'], prefer: false };
+  try { const f = JSON.parse(lsGet(KEY) ?? ''); if (f?.order) return { equipPreset: 'all', ...f }; } catch { /* 처음 */ }
+  return { parts: {}, order: [], minGrade: 'B', minutes: 60, groupings: ['superset'], prefer: false, equipPreset: 'all' };
 };
 
 /** 화면에서 세트·교체·삭제로 바꾼 뒤 시간 다시 계산 */
@@ -99,7 +100,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const request = (form: Form = f): PlanRequest => ({
     parts: form.order.filter((p) => form.parts[p]).map((p) => ({ part: p, priority: form.parts[p]! })),
     level: s.settings.level, minGrade: form.minGrade, targetMinutes: form.minutes, groupings: form.groupings,
-    groupingPreference: form.prefer ? 'prefer' : 'when_needed', equipment: s.settings.equipment,
+    groupingPreference: form.prefer ? 'prefer' : 'when_needed',
+    equipment: resolveEquipmentForPreset(form.equipPreset ?? 'all', s.settings.equipment),
     excluded: [...s.meta.values()].filter((m) => m.excluded).map((m) => m.exerciseId),
     favorites: [...s.meta.values()].filter((m) => m.favorite).map((m) => m.exerciseId),
     userGrades: Object.fromEntries([...s.meta.values()].filter((m) => m.userGrade).map((m) => [m.exerciseId, m.userGrade!])),
@@ -272,12 +274,37 @@ export function PlanBuilder({ s }: { s: AppState }) {
       </div>
       </section>
       <section class="card step-card" aria-label="2단계 시간·등급·묶음">
-      <div class="card-head"><span class="step-no" aria-hidden="true">2</span><span class="card-title grow">시간·등급·묶음</span><span class="sub small">{f.minutes ? `${f.minutes}분` : '제한 없음'} · {f.minGrade} 이상</span></div>
+      <div class="card-head">
+        <span class="step-no" aria-hidden="true">2</span>
+        <span class="card-title grow">시간·기구·등급</span>
+        <span class="sub small">
+          {f.minutes ? `${f.minutes}분` : '제한 없음'} · {EQUIPMENT_PRESETS.find((p) => p.id === (f.equipPreset ?? 'all'))?.label ?? '기구 전체'} · {f.minGrade} 이상
+        </span>
+      </div>
       <label class="first">운동 시간</label>
       <div class="row wrap">
         {[30, 45, 60, 75, 90].map((m) => <button key={m} class={`chip ${f.minutes === m ? 'on' : ''}`} onClick={() => update({ minutes: m })}>{m}분</button>)}
         <button class={`chip ${f.minutes === undefined ? 'on' : ''}`} onClick={() => update({ minutes: undefined })}>제한 없음</button>
       </div>
+      <label>운동 기구</label>
+      <div class="row wrap" role="group" aria-label="운동 기구">
+        {EQUIPMENT_PRESETS.map((p) => {
+          const on = (f.equipPreset ?? 'all') === p.id;
+          return (
+            <button
+              key={p.id}
+              class={`chip ${on ? 'on' : ''}`}
+              aria-pressed={on}
+              onClick={() => update({ equipPreset: p.id })}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+      <p class="sub small step-hint">
+        {EQUIPMENT_PRESETS.find((p) => p.id === (f.equipPreset ?? 'all'))?.desc}
+      </p>
       <div class="grid2">
         <div><label>최소 등급</label>
           <select value={f.minGrade} onChange={(e) => update({ minGrade: (e.target as HTMLSelectElement).value as Grade })} aria-label="최소 등급">
