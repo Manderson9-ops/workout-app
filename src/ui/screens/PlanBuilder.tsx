@@ -69,6 +69,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const setPlan = (p: Plan | null) => { setPlanRaw(p); if (p) sessionStorage.setItem(scopedKey(PLAN_KEY), JSON.stringify(p)); else sessionStorage.removeItem(scopedKey(PLAN_KEY)); };
   const [locks, setLocksRaw] = useState<Set<string>>(() => new Set(JSON.parse(sessionStorage.getItem(scopedKey(LOCK_KEY)) ?? '[]') as string[]));
   const setLocks = (l: Set<string>) => { setLocksRaw(l); sessionStorage.setItem(scopedKey(LOCK_KEY), JSON.stringify([...l])); };
+  const [viewMode, setViewMode] = useState<'summary' | 'detail'>('summary');
   const [addCustomOpen, setAddCustomOpen] = useState(false);
   const [picker, setPicker] = useState<{ b: number; i: number } | null>(null);
   const [adding, setAdding] = useState(false);
@@ -118,6 +119,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
     diag('plan', { v: performance.now() - t0 });
     const noop = !!plan && p.reasons[0] === KEEP_ALL;
     setPlan(p);
+    setViewMode('summary');
     if (noop) setShowReasons(true); // 그대로 둔 이유가 보이게
     else setName(defaultName(req));
   };
@@ -301,17 +303,41 @@ export function PlanBuilder({ s }: { s: AppState }) {
       {plan && (
         <section aria-label="생성된 플랜">
           <div class="panel step-card result-card">{/* .card 아님: 아래 운동 카드 목록(.card)과 구분 */}
-          <div class="card-head"><span class="step-no" aria-hidden="true">3</span><h2 class="card-title grow">{plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : plan.status === 'reduced' ? '결과 · 플랜 (일부 부위만)' : '결과 · 플랜'}</h2>
-            </div>
+          <div class="card-head">
+            <span class="step-no" aria-hidden="true">3</span>
+            <h2 class="card-title grow">
+              {plan.blocks.length === 0 ? '플랜을 만들 수 없어요' : viewMode === 'summary' ? '1단계 · 추천 운동 제안' : (plan.status === 'reduced' ? '2단계 · 구체적인 플랜 (일부 부위만)' : '2단계 · 구체적인 플랜')}
+            </h2>
+          </div>
           {plan.blocks.length > 0 && (() => {
             const items = plan.blocks.flatMap((b) => b.items);
             const sets = items.reduce((n, i) => n + i.sets, 0);
             return (
-              <div class="metrics3 plan-metrics" aria-label="플랜 요약">
-                <Metric label="예상 시간" value={mmss(plan.estimatedSec)} status={plan.targetSec ? `목표 ${Math.round(plan.targetSec / 60)}분` : '제한 없음'} />{/* 예상 시간은 여기 한 곳만 (분:초) */}
-                <Metric label="세트" parts={[[sets, '세트']]} status={`웜업 제외`} />
-                <Metric label="운동" parts={[[items.length, '개']]} status={`블록 ${plan.blocks.length}개`} />
-              </div>
+              <>
+                <div class="row tab-switcher" role="tablist" style={{ gap: '6px', margin: '8px 0 10px' }}>
+                  <button
+                    role="tab"
+                    class={`chip grow ${viewMode === 'summary' ? 'on' : ''}`}
+                    aria-selected={viewMode === 'summary'}
+                    onClick={() => setViewMode('summary')}
+                  >
+                    📋 1. 추천 운동 ({items.length}개)
+                  </button>
+                  <button
+                    role="tab"
+                    class={`chip grow ${viewMode === 'detail' ? 'on' : ''}`}
+                    aria-selected={viewMode === 'detail'}
+                    onClick={() => setViewMode('detail')}
+                  >
+                    ⚙️ 2. 구체적인 플랜 (세트·휴식)
+                  </button>
+                </div>
+                <div class="metrics3 plan-metrics" aria-label="플랜 요약">
+                  <Metric label="예상 시간" value={mmss(plan.estimatedSec)} status={plan.targetSec ? `목표 ${Math.round(plan.targetSec / 60)}분` : '제한 없음'} />{/* 예상 시간은 여기 한 곳만 (분:초) */}
+                  <Metric label="세트" parts={[[sets, '세트']]} status={`웜업 제외`} />
+                  <Metric label="운동" parts={[[items.length, '개']]} status={`블록 ${plan.blocks.length}개`} />
+                </div>
+              </>
             );
           })()}
           <p class="sr-only" aria-live="polite">{moved?.msg ?? (groupMsg || dnd.msg)}</p>
@@ -329,7 +355,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
             </div>
           )}
           {plan.blocks.length > 0 && <p class="sub small">{plan.warmup.label ? `${plan.warmup.label} · ` : ''}휴식 다관절 {plan.rest.compound}초 · 단관절 {plan.rest.isolation}초{plan.blocks.some((b) => b.kind !== 'single') ? ` · 묶음 라운드 후 ${plan.rest.round}초` : ''}</p>}
-          {plan.blocks.length > 0 && (
+          {plan.blocks.length > 0 && viewMode === 'detail' && (
             <div class="row wrap bulk-row">
               {labeled('모든 운동 세트', stepper('모든 운동 세트', rangeText(plan.blocks.flatMap((b) => b.items), 'sets'),
                 { aria: '모든 운동 세트 줄이기', off: bulkOff('sets', -1), on: () => bulkDo('sets', -1) },
@@ -339,8 +365,104 @@ export function PlanBuilder({ s }: { s: AppState }) {
                 { aria: '모든 운동 횟수 늘리기', off: bulkOff('reps', 1), on: () => bulkDo('reps', 1) }))}
             </div>
           )}
+          {plan.blocks.length > 0 && viewMode === 'summary' && (
+            <p class="sub small" style={{ margin: '4px 0 0' }}>
+              조건에 맞춰 추천된 종목입니다. 종목을 확인·교체하고 아래 버튼을 눌러 구체적인 플랜을 완성하세요.
+            </p>
+          )}
           </div>
-          {plan.blocks.map((b, bi) => (
+
+          {/* 1단계: 추천 운동 안내 / 제안 모드 */}
+          {viewMode === 'summary' && (
+            <div>
+              {plan.blocks.map((b, bi) => (
+                <div class="card" key={blockKey(b)} style={{ margin: '8px 0', padding: '12px 14px' }}>
+                  {b.kind !== 'single' && (
+                    <div class="row between" style={{ marginBottom: '6px' }}>
+                      <span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span>
+                    </div>
+                  )}
+                  {b.items.map((it, ii) => (
+                    <div key={it.exerciseId} class={ii ? 'plan-item next' : 'plan-item'} style={{ marginTop: ii ? '8px' : 0 }}>
+                      <div class="row between" style={{ alignItems: 'center' }}>
+                        <div class="grow" style={{ minWidth: 0 }}>
+                          <div class="row" style={{ alignItems: 'center', gap: '6px' }}>
+                            <GradeBadge g={{ value: it.grade, source: it.gradeSource, estimated: it.estimated }} />
+                            <strong style={{ fontSize: '15px' }}>{it.name}</strong>
+                          </div>
+                          <div class="pill" style={{ marginTop: '4px', display: 'inline-block' }}>{it.why}</div>
+                        </div>
+                        <div class="row" style={{ gap: '6px', flexShrink: 0 }}>
+                          <button
+                            class={locks.has(it.exerciseId) ? 'chip on' : 'chip'}
+                            aria-pressed={locks.has(it.exerciseId)}
+                            style={{ height: '36px', minWidth: '40px', padding: '0 8px' }}
+                            onClick={() => {
+                              const n = new Set(locks);
+                              if (n.has(it.exerciseId)) n.delete(it.exerciseId);
+                              else n.add(it.exerciseId);
+                              setLocks(n);
+                            }}
+                          >
+                            {locks.has(it.exerciseId) ? <><Icon name="lock" size={14} />잠금됨</> : '잠금'}
+                          </button>
+                          <button style={{ height: '36px', padding: '0 10px' }} onClick={() => setPicker({ b: bi, i: ii })}>교체</button>
+                          <button class="danger" style={{ height: '36px', padding: '0 10px' }} aria-label={`${it.name} 삭제`} onClick={() => editItem(bi, ii, () => null)}>삭제</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              <div class="row gap4" style={{ margin: '8px 0' }}>
+                <button class="grow" onClick={() => setAdding(true)}>+ 운동 추가</button>
+                <button class="grow" onClick={() => generate(false)}>🔄 다른 추천 조합</button>
+              </div>
+
+              {/* 구체적인 플랜 만들기 유도 CTA */}
+              <div class="panel" style={{ padding: '16px', margin: '14px 0 10px', background: 'var(--card2)', textAlign: 'center', borderRadius: 'var(--r-card)', border: '1px solid var(--acc-soft)' }}>
+                <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
+                  이 운동들로 플랜을 확정하시겠어요?
+                </div>
+                <p class="sub small" style={{ margin: '0 0 12px' }}>
+                  추천 운동을 바탕으로 세트 수, 횟수, 휴식을 설정하는 구체적인 플랜을 만듭니다.
+                </p>
+                <button
+                  class="primary big"
+                  style={{ width: '100%', justifyContent: 'center', fontSize: '16px', fontWeight: 700 }}
+                  onClick={() => setViewMode('detail')}
+                >
+                  👉 구체적인 플랜 만들기 (세트·휴식 설정)
+                </button>
+              </div>
+
+              <button class="ghost" onClick={() => setShowReasons(!showReasons)}><Icon name="chevron" size={16} class={`rot${showReasons ? ' open' : ''}`} />이렇게 짠 이유</button>
+              {showReasons && <ul class="reasons">{plan.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
+
+              <div class="row plan-save">
+                <button class="grow" onClick={() => generate(true)}>다시 추천{locks.size ? ` (잠금 ${locks.size}개)` : ''}</button>
+                <button class="grow" onClick={() => setSaving(true)}>루틴 저장</button>
+                <button class="primary grow" onClick={async () => {
+                  const r = await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec, plan.warmup.seconds);
+                  setPlan(null);
+                  await startRoutine(s, r);
+                }}>바로 시작</button>
+              </div>
+            </div>
+          )}
+
+          {/* 2단계: 구체적인 플랜 / 세부 설정 모드 */}
+          {viewMode === 'detail' && (
+            <div>
+              <div class="row between" style={{ margin: '6px 0 10px', alignItems: 'center' }}>
+                <button class="ghost small" onClick={() => setViewMode('summary')}>
+                  ← 1단계: 추천 운동 목록 다시 보기
+                </button>
+                <span class="sub small">세트·횟수·휴식을 자유롭게 조절하세요</span>
+              </div>
+
+              {plan.blocks.map((b, bi) => (
             <div class="card" key={blockKey(b)} {...dnd.itemAttrs(bi)}>
               {plan.blocks.length > 1 && <div class="row between">{moveBtns(bi)}{b.kind === 'single' && <span class="pill">휴식 {b.restSec}초 · {mmss(b.timeSec)}</span>}</div>}
               {b.kind !== 'single' && <div class="row between"><span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span><span class="pill">라운드 후 휴식 {b.roundRestSec}초 · {mmss(b.timeSec)}</span></div>}
@@ -442,6 +564,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
             <button class="grow" onClick={() => generate(true)}>다시 생성{locks.size ? ` (잠금 ${locks.size}개 유지)` : ''}</button>
             {plan.blocks.length > 0 && <button class="primary grow" onClick={() => setSaving(true)}>저장</button>}
           </div>
+            </div>
+          )}
         </section>
       )}
 
