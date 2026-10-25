@@ -121,7 +121,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
     diag('plan', { v: performance.now() - t0 });
     const noop = !!plan && p.reasons[0] === KEEP_ALL;
     setPlan(p);
-    setViewMode('summary');
+    if (!plan) setViewMode('summary');
     if (noop) setShowReasons(true); // 그대로 둔 이유가 보이게
     else setName(defaultName(req));
   };
@@ -322,7 +322,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
         <button class={`chip ${f.prefer ? 'on' : ''}`} aria-pressed={f.prefer} onClick={() => update({ prefer: !f.prefer })}>묶음 우선</button>
       </div>
       <div class="step-go">
-        <button class="primary big" disabled={!nParts} onClick={() => generate(false)}>{nParts ? '플랜 만들기' : '부위를 먼저 고르세요'}</button>
+        <button class="primary big" disabled={!nParts} onClick={() => { setViewMode('summary'); generate(false); }}>{nParts ? '플랜 만들기' : '부위를 먼저 고르세요'}</button>
       </div>
       </section>
 
@@ -410,72 +410,69 @@ export function PlanBuilder({ s }: { s: AppState }) {
                   style={{ margin: '8px 0', padding: '12px 14px' }}
                 >
                   {b.kind !== 'single' && (
-                    <div class="row between" style={{ marginBottom: '6px' }}>
+                    <div class="row between" style={{ marginBottom: '8px', alignItems: 'center' }}>
                       <span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span>
+                      <span class="pill">라운드 후 휴식 {b.roundRestSec ?? plan.rest.round}초</span>
                     </div>
                   )}
                   {b.items.map((it, ii) => (
-                    <div key={it.exerciseId} class={ii ? 'plan-item next' : 'plan-item'} style={{ marginTop: ii ? '8px' : 0 }}>
-                      <div class="row between" style={{ alignItems: 'center', gap: '6px' }}>
-                        <div class="row" style={{ alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-                          {plan.blocks.length > 1 && (
-                            <span class="row gap4" style={{ alignItems: 'center', flexShrink: 0 }}>
-                              <button
-                                {...dnd.handleProps(bi)}
-                                aria-label={`${blockName(b)} 순서 옮기기, 지금 ${bi + 1}번째 (끌어서 놓거나 ↑↓ 키)`}
-                                class="ghost drag-handle"
-                                style={{
-                                  width: '32px',
-                                  minWidth: '32px',
-                                  height: '38px',
-                                  padding: 0,
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '20px',
-                                  touchAction: 'none',
-                                  cursor: 'grab',
-                                }}
-                              >
-                                ≡
-                              </button>
-                              <button
-                                class="ghost"
-                                data-move={blockKey(b)}
-                                data-dir="-1"
-                                aria-label={`${blockName(b)} 위로 (지금 ${bi + 1}번째)`}
-                                disabled={bi === 0}
-                                onClick={() => move(bi, -1)}
-                                style={{ width: '26px', minWidth: '26px', height: '36px', padding: 0 }}
-                              >
-                                ↑
-                              </button>
-                              <button
-                                class="ghost"
-                                data-move={blockKey(b)}
-                                data-dir="1"
-                                aria-label={`${blockName(b)} 아래로 (지금 ${bi + 1}번째)`}
-                                disabled={bi === plan.blocks.length - 1}
-                                onClick={() => move(bi, 1)}
-                                style={{ width: '26px', minWidth: '26px', height: '36px', padding: 0 }}
-                              >
-                                ↓
-                              </button>
-                            </span>
-                          )}
-                          <div class="grow" style={{ minWidth: 0 }}>
-                            <div class="row" style={{ alignItems: 'center', gap: '6px' }}>
-                              <GradeBadge g={{ value: it.grade, source: it.gradeSource, estimated: it.estimated }} />
-                              <strong style={{ fontSize: '15px' }}>{it.name}</strong>
-                            </div>
-                            <div class="pill" style={{ marginTop: '4px', display: 'inline-block' }}>{it.why}</div>
+                    <div key={it.exerciseId} class={ii ? 'plan-item next' : 'plan-item'} style={{ marginTop: ii ? '10px' : 0 }}>
+                      <div class="row between" style={{ alignItems: 'center', gap: '8px' }}>
+                        {plan.blocks.length > 1 && (
+                          <div class="row gap4" style={{ alignItems: 'center', flexShrink: 0 }}>
+                            <button
+                              {...dnd.handleProps(bi)}
+                              class="ghost drag-handle"
+                              style={{
+                                minWidth: '44px',
+                                minHeight: '44px',
+                                padding: 0,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '20px',
+                                touchAction: 'none',
+                                cursor: 'grab',
+                              }}
+                            >
+                              ≡
+                            </button>
+                            <button
+                              class="ghost"
+                              data-move={blockKey(b)}
+                              data-dir="-1"
+                              aria-label={`${blockName(b)} 위로 (지금 ${bi + 1}번째)`}
+                              disabled={bi === 0}
+                              onClick={() => move(bi, -1)}
+                              style={{ minWidth: '44px', minHeight: '44px', padding: 0 }}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              class="ghost"
+                              data-move={blockKey(b)}
+                              data-dir="1"
+                              aria-label={`${blockName(b)} 아래로 (지금 ${bi + 1}번째)`}
+                              disabled={bi === plan.blocks.length - 1}
+                              onClick={() => move(bi, 1)}
+                              style={{ minWidth: '44px', minHeight: '44px', padding: 0 }}
+                            >
+                              ↓
+                            </button>
                           </div>
+                        )}
+                        <div class="grow" style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <GradeBadge g={{ value: it.grade, source: it.gradeSource, estimated: it.estimated }} />
+                          <strong style={{ fontSize: '15px' }}>{it.name}</strong>
                         </div>
-                        <div class="row" style={{ gap: '6px', flexShrink: 0 }}>
+                      </div>
+                      <div class="row between wrap" style={{ alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                        <div class="pill" style={{ margin: 0 }}>{it.why}</div>
+                        <div class="row gap4" style={{ alignItems: 'center', flexShrink: 0 }}>
                           <button
                             class={locks.has(it.exerciseId) ? 'chip on' : 'chip'}
                             aria-pressed={locks.has(it.exerciseId)}
-                            style={{ height: '36px', minWidth: '40px', padding: '0 8px' }}
+                            style={{ minWidth: '44px', minHeight: '44px', padding: '0 10px' }}
                             onClick={() => {
                               const n = new Set(locks);
                               if (n.has(it.exerciseId)) n.delete(it.exerciseId);
@@ -483,10 +480,22 @@ export function PlanBuilder({ s }: { s: AppState }) {
                               setLocks(n);
                             }}
                           >
-                            {locks.has(it.exerciseId) ? <><Icon name="lock" size={14} />잠금됨</> : '잠금'}
+                            {locks.has(it.exerciseId) ? <><Icon name="lock" size={16} />잠금됨</> : '잠금'}
                           </button>
-                          <button style={{ height: '36px', padding: '0 10px' }} onClick={() => setPicker({ b: bi, i: ii })}>교체</button>
-                          <button class="danger" style={{ height: '36px', padding: '0 10px' }} aria-label={`${it.name} 삭제`} onClick={() => editItem(bi, ii, () => null)}>삭제</button>
+                          <button
+                            style={{ minWidth: '44px', minHeight: '44px', padding: '0 12px' }}
+                            onClick={() => setPicker({ b: bi, i: ii })}
+                          >
+                            교체
+                          </button>
+                          <button
+                            class="danger"
+                            style={{ minWidth: '44px', minHeight: '44px', padding: '0 12px' }}
+                            aria-label={`${it.name} 삭제`}
+                            onClick={() => editItem(bi, ii, () => null)}
+                          >
+                            삭제
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -520,8 +529,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
               {showReasons && <ul class="reasons">{plan.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
 
               <div class="row plan-save">
-                <button class="grow" onClick={() => generate(true)}>다시 추천{locks.size ? ` (잠금 ${locks.size}개)` : ''}</button>
-                <button class="grow" onClick={() => setSaving(true)}>루틴 저장</button>
+                <button class="grow" onClick={() => generate(true)}>다시 생성{locks.size ? ` (잠금 ${locks.size}개 유지)` : ''}</button>
+                <button class="grow" onClick={() => setSaving(true)}>저장</button>
                 <button class="primary grow" onClick={async () => {
                   const r = await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec, plan.warmup.seconds);
                   setPlan(null);
@@ -683,8 +692,33 @@ export function PlanBuilder({ s }: { s: AppState }) {
           onClose={() => setAddCustomOpen(false)}
           onAdded={(newEx: BuiltExercise) => {
             if (!f.parts[newEx.part]) togglePart(newEx.part);
-            if (adding && plan) { addExercise(newEx); setAdding(false); }
-            else if (groupAdd !== null && plan) { addToGroupExercise(groupAdd, newEx); setGroupAdd(null); }
+            if (picker && plan) {
+              const old = plan.blocks[picker.b]!.items[picker.i]!;
+              const g = resolveGrade(newEx, old.part, s.settings.level, undefined, s.meta.get(newEx.id)?.userGrade);
+              editItem(picker.b, picker.i, () => ({
+                ...old,
+                exerciseId: newEx.id,
+                name: newEx.name_ko,
+                reps: newEx.measure === 'time' ? 0 : targetReps(newEx),
+                ...(newEx.measure === 'time' ? { seconds: newEx.default_seconds ?? 30 } : { seconds: undefined }),
+                grade: g.value,
+                gradeSource: g.source,
+                estimated: g.estimated,
+                substituted: false,
+                why: `${old.part} ${g.value} (직접 교체)`,
+              }));
+              const nl = new Set(locks);
+              nl.delete(plan.blocks[picker.b]!.items[picker.i]!.exerciseId);
+              nl.add(newEx.id);
+              setLocks(nl);
+              setPicker(null);
+            } else if (adding && plan) {
+              addExercise(newEx);
+              setAdding(false);
+            } else if (groupAdd !== null && plan) {
+              addToGroupExercise(groupAdd, newEx);
+              setGroupAdd(null);
+            }
           }}
         />
       )}

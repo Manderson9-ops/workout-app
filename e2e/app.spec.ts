@@ -424,6 +424,7 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  await page.getByRole('button', { name: /구체적인 플랜 만들기/ }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
   const first = (await planSec.locator('.card').nth(0).locator('strong').allTextContents())[0]!;
   const plus = planSec.getByRole('button', { name: `${first} 세트 늘리기` });
@@ -489,6 +490,7 @@ test('플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 �
   await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  await page.getByRole('button', { name: /구체적인 플랜 만들기/ }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
   const est = async () => { const t = (await estMetric(planSec).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
   // 다른 부위(코어) 운동을 뒤에 추가
@@ -531,6 +533,7 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  await page.getByRole('button', { name: /구체적인 플랜 만들기/ }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
   const est = async () => { const t = (await estMetric(planSec).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
   // 묶음 밖의 단일 카드를 하나 두려고 코어 운동을 뒤에 추가
@@ -699,7 +702,7 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByText('하체 45분').first()).toBeVisible();
 });
-test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본 휴식', async ({ page }) => {
+test('직접 추가한 운동을 플랜에서 최고 등급 S(D-074)로 반영 및 교체 쓰기, 설정의 기본 휴식', async ({ page }) => {
   await page.getByRole('link', { name: '종목' }).click();
   await page.getByRole('button', { name: '운동 직접 추가' }).click(); // 제목 줄 원형 + 버튼 (0.9.3 검토)
   await page.getByLabel('운동 이름').fill('우리 헬스장 로우 머신');
@@ -710,10 +713,13 @@ test('직접 추가한 운동을 플랜에서 교체로 쓰기, 설정의 기본
   await page.getByRole('link', { name: '플랜' }).click();
   await pickPart(page, '등');
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
-  await page.getByRole('region', { name: '생성된 플랜' }).getByRole('button', { name: '교체' }).first().click();
-  await page.getByLabel('운동 검색').last().fill('우리 헬스장');
-  await page.getByRole('dialog').getByRole('button', { name: '우리 헬스장 로우 머신' }).click();
+  // D-074: 직접 추가한 운동은 최고 등급 S로 플랜에 최우선 배정됨
   await expect(page.getByRole('region', { name: '생성된 플랜' }).getByText('우리 헬스장 로우 머신', { exact: true })).toBeVisible();
+  // 교체 동작도 확인: 2번째 운동을 다른 운동으로 교체
+  await page.getByRole('region', { name: '생성된 플랜' }).getByRole('button', { name: '교체' }).nth(1).click();
+  await page.getByLabel('운동 검색').last().fill('바벨');
+  await page.getByRole('dialog').getByRole('button', { name: /바벨\s*로우/ }).first().click();
+  await expect(page.getByRole('region', { name: '생성된 플랜' })).toContainText('바벨로우');
   await page.getByRole('link', { name: '설정' }).click();
   await page.getByRole('button', { name: '상급' }).click();
   await expect(page.getByRole('button', { name: '상급' })).toHaveAttribute('aria-pressed', 'true');
@@ -1656,6 +1662,7 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  await page.getByRole('button', { name: /구체적인 플랜 만들기/ }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
   const cards = planSec.locator('.card');
   expect(await cards.count()).toBeGreaterThan(1);
@@ -1742,6 +1749,7 @@ test('플랜 바로 고치기 (D-036): 시간 운동 초 −/+ 가 예상 시간
   await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  await page.getByRole('button', { name: /구체적인 플랜 만들기/ }).click();
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
   const est = async () => { const t = (await estMetric(planSec).textContent())!; const m = t.match(/(\d+):(\d{2})/)!; return Number(m[1]) * 60 + Number(m[2]); };
 
