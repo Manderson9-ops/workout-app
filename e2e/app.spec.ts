@@ -2034,7 +2034,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   const gear = page.getByRole('link', { name: '설정', exact: true });
   await expect(gear.locator('.ndot')).toHaveCount(1);
   await expect(gear).toHaveAttribute('aria-describedby', 'new-dot-desc');
-  await expect(page.getByRole('navigation', { name: '주 메뉴' }).locator('.ndot')).toHaveCount(2); // 0.9.2 = 기록 탭, 0.9.1 = 운동 탭 (0.9.3 = 홈, 지금 홈이라 점 없음), 0.9.0 은 탭이 아니라 설정 버튼
+  await expect(page.getByRole('navigation', { name: '주 메뉴' }).locator('.ndot')).toHaveCount(3); // 0.9.12 = 플랜 탭, 0.9.2 = 기록 탭, 0.9.1 = 운동 탭 (0.9.3 = 홈, 지금 홈이라 점 없음), 0.9.0 은 탭이 아니라 설정 버튼
   await gear.click();
   const aboutRow = page.getByRole('link', { name: /앱 정보·업데이트 내역/ });
   await expect(aboutRow).toContainText('새');

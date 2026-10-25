@@ -3,12 +3,12 @@ import type { AppState } from '../store';
 import { db, mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
 import { NumInput, ExercisePicker } from '../components';
-import { softDelete } from '../../db/db';
+import { newId, softDelete } from '../../db/db';
 import { withoutStamp } from '../../core/syncStamp';
 import { appendExercise } from '../../core/session';
 import type { Workout } from '../../core/session';
 import { targetReps } from '../../core/time';
-import { toLocalInput, fromLocalInput, durationMin, setTimes, moveStart, patchSet, patchSetByKey, keyOf, withKeys, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, EDIT_LIMITS } from '../../core/workoutEdit';
+import { toLocalInput, fromLocalInput, durationMin, setTimes, moveStart, patchSet, patchSetByKey, keyOf, withKeys, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, EDIT_LIMITS, createManualWorkout } from '../../core/workoutEdit';
 import { go } from '../nav';
 import { HeadButtons, BackButton } from '../header';
 import { Icon } from '../icons';
@@ -22,7 +22,10 @@ import { askConfirm } from '../confirm';
  * - 저장 때 DB의 지금 값을 다시 읽어, 편집하는 동안 다른 기기가 바꿨거나 지웠으면 물음
  */
 export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
-  const [orig] = useState<Workout | undefined>(() => s.workouts.find((x) => x.id === id));
+  const isNew = id === 'new';
+  const [newIdVal] = useState(() => newId('w'));
+  const targetId = isNew ? newIdVal : id;
+  const [orig] = useState<Workout | undefined>(() => (isNew ? createManualWorkout(newIdVal) : s.workouts.find((x) => x.id === id)));
   const [draft, setDraftState] = useState<Workout | undefined>(() => (orig ? withKeys(JSON.parse(JSON.stringify(orig)) as Workout) : undefined));
   const cur = useRef(draft);
   const setDraft = (fn: (d: Workout) => Workout) => { if (!cur.current) return; const n = fn(cur.current); cur.current = n; setDraftState(n); };
@@ -35,8 +38,8 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
   const name = (eid: string) => byId.get(eid)?.name_ko ?? eid;
-  const detail = `#/stats/w/${encodeURIComponent(id)}`;
-  const dirty = () => !!cur.current && !!orig && !sameWorkout(cur.current, orig);
+  const detail = `#/stats/w/${encodeURIComponent(targetId)}`;
+  const dirty = () => !!cur.current && !!orig && (isNew ? (cur.current.blocks.length > 0 || !sameWorkout(cur.current, orig)) : !sameWorkout(cur.current, orig));
 
   useEffect(() => {
     document.documentElement.classList.add('editing');
@@ -49,34 +52,44 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
   if (!orig.endedAt) return <main><p>진행 중인 운동은 운동 화면에서 고쳐요.</p><button onClick={() => go('#/workout')}>운동 화면으로</button></main>;
   if (orig.pendingMerge) return <main><p>다른 기기에서 늦게 온 기록은 홈에서 합치기/지우기를 골라 주세요.</p><button onClick={() => go('#/')}>홈으로</button></main>;
 
-  const cancel = async () => { await flushPending(); if (!dirty() || await askConfirm({ title: '고친 내용을 버릴까요?', ok: '버리기', cancel: '계속 고치기', danger: true })) go(detail); };
+  const cancel = async () => {
+    await flushPending();
+    if (!dirty() || await askConfirm({
+      title: isNew ? '작성 중인 기록을 버릴까요?' : '고친 내용을 버릴까요?',
+      ok: '버리기',
+      cancel: isNew ? '계속 작성' : '계속 고치기',
+      danger: true,
+    })) go(isNew ? '#/stats' : detail);
+  };
   const save = async () => {
     if (busy) return;
     setBusy(true);
     try {
       await flushPending(); // 입력 중인 숫자(0.3초 늦춘 저장)를 먼저 초안에 반영
       if (!fromLocalInput(startText)) { setErr('시작 날짜와 시각을 골라 주세요'); return; }
-      if (!dirty()) { go(detail); return; }
+      if (!isNew && !dirty()) { go(detail); return; }
       const out = finalizeEdit(cur.current!, new Date().toISOString());
       // 운동 시간(길이)을 안 바꿨으면 원래 1분 미만 기록도 저장 가능 (시작만 옮긴 경우 포함)
-      const timesSame = Date.parse(out.endedAt!) - Date.parse(out.startedAt) === Date.parse(orig.endedAt!) - Date.parse(orig.startedAt);
+      const timesSame = !isNew && Date.parse(out.endedAt!) - Date.parse(out.startedAt) === Date.parse(orig.endedAt!) - Date.parse(orig.startedAt);
       const problem = editProblem(out, Date.now(), name, { allowShort: timesSame });
       if (problem) { setErr(problem); return; }
-      // 저장소의 지금 값과 비교. 앱 안 확인 창은 기다리는 동안 동기화가 계속 돌므로,
-      // 답한 뒤 다시 읽어 사용자가 동의한 그 상태 그대로일 때만 저장 (그새 또 바뀌면 다시 물음)
-      let agreed: { w?: Workout } | null = null; // 사용자가 덮어쓰기에 동의한 그 상태 (w 없음 = 지워진 상태)
-      for (;;) {
-        const now = await db.workouts.get(id);
-        if (now && sameWorkout(now, orig)) break;
-        if (agreed && (agreed.w ? !!now && sameWorkout(now, agreed.w) : !now)) break;
-        const yes = now
-          ? await askConfirm({ title: '다른 기기에서 이 기록이 바뀌었어요', message: '고치는 동안 바뀌었어요. 내 수정으로 덮어쓸까요?', ok: '덮어쓰기', cancel: '계속 고치기', danger: true })
-          : await askConfirm({ title: '다른 기기에서 이 기록이 지워졌어요', message: '고치는 동안 지워졌어요. 내 수정으로 되살려 저장할까요?', ok: '되살려 저장', cancel: '계속 고치기' });
-        if (!yes) return;
-        agreed = { w: now };
+      if (!isNew) {
+        // 저장소의 지금 값과 비교. 앱 안 확인 창은 기다리는 동안 동기화가 계속 돌므로,
+        // 답한 뒤 다시 읽어 사용자가 동의한 그 상태 그대로일 때만 저장 (그새 또 바뀌면 다시 물음)
+        let agreed: { w?: Workout } | null = null; // 사용자가 덮어쓰기에 동의한 그 상태 (w 없음 = 지워진 상태)
+        for (;;) {
+          const now = await db.workouts.get(id);
+          if (now && sameWorkout(now, orig)) break;
+          if (agreed && (agreed.w ? !!now && sameWorkout(now, agreed.w) : !now)) break;
+          const yes = now
+            ? await askConfirm({ title: '다른 기기에서 이 기록이 바뀌었어요', message: '고치는 동안 바뀌었어요. 내 수정으로 덮어쓸까요?', ok: '덮어쓰기', cancel: '계속 고치기', danger: true })
+            : await askConfirm({ title: '다른 기기에서 이 기록이 지워졌어요', message: '고치는 동안 지워졌어요. 내 수정으로 되살려 저장할까요?', ok: '되살려 저장', cancel: '계속 고치기' });
+          if (!yes) return;
+          agreed = { w: now };
+        }
       }
       await mutate((d) => d.workouts.put(withoutStamp(out as never) as unknown as Workout));
-      go(detail);
+      go(isNew ? `#/stats/w/${encodeURIComponent(out.id)}` : detail);
     } finally { setBusy(false); }
   };
 
@@ -86,11 +99,11 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
   return (
     <main>
       <div class="scr-backrow">
-        <BackButton label="취소" aria="수정 취소하고 돌아가기" onClick={() => void cancel()} />
+        <BackButton label="취소" aria={isNew ? '기록 작성 취소하고 돌아가기' : '수정 취소하고 돌아가기'} onClick={() => void cancel()} />
         {/* 설정 버튼은 두지 않음: 이 화면은 취소/저장으로만 떠남 (고친 내용을 모르고 떠나지 않게) */}
         <HeadButtons settings={false} />
       </div>
-      <h1>운동 기록 수정</h1>
+      <h1>{isNew ? '운동 기록 직접 작성' : '운동 기록 수정'}</h1>
       <label>운동 이름</label>
       <input aria-label="운동 이름" maxLength={EDIT_LIMITS.nameMax} value={draft.name} onInput={(e) => { const v = (e.target as HTMLInputElement).value; setDraft((d) => ({ ...d, name: v })); }} />
       <div class="row wrap" style={{ gap: '8px', marginTop: '8px' }}>
@@ -105,6 +118,8 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
         </div>
       </div>
       <p class="sub small">세트 번호(1, 2…)를 누르면 웜업(W)으로 바뀌고, 다시 누르면 돌아와요.</p>
+
+      {isNew && draft.blocks.length === 0 && <p class="sub" style={{ margin: '16px 0 8px' }}>아래 "+ 운동 추가"를 눌러 운동과 세트를 추가해 주세요.</p>}
 
       {draft.blocks.map((b, bi) => b.items.map((it, ii) => {
         const ex = name(it.exerciseId);
@@ -145,7 +160,7 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
         <button class="grow" onClick={() => void cancel()}>취소</button>
         <button class="primary grow" disabled={busy} onClick={() => void save()}>저장</button>
       </div>
-      <button class="danger" style={{ marginTop: '12px' }} onClick={async () => { if (await askConfirm({ title: '이 운동 기록을 지울까요?', message: '되돌릴 수 없어요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'workouts', id)); go('#/stats'); } }}>이 기록 삭제</button>
+      {!isNew && <button class="danger" style={{ marginTop: '12px' }} onClick={async () => { if (await askConfirm({ title: '이 운동 기록을 지울까요?', message: '되돌릴 수 없어요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'workouts', id)); go('#/stats'); } }}>이 기록 삭제</button>}
 
       {picker && (
         <ExercisePicker s={s} all={all} title="운동 추가" exclude={draft.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}

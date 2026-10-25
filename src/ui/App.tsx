@@ -114,6 +114,7 @@ export function App() {
   else if (path.startsWith('/settings/about')) screen = <AboutScreen />;
   else if (path.startsWith('/settings/watch')) screen = <WatchScreen s={s} />;
   else if (path.startsWith('/settings')) screen = <SettingsScreen s={s} />;
+  else if (path === '/stats/new') screen = <WorkoutEdit key={path} s={s} id="new" />;
   else if (path.startsWith('/stats/w/') && path.endsWith('/edit')) screen = <WorkoutEdit key={path} s={s} id={decodeURIComponent(path.slice(9, -5))} />;
   else if (path.startsWith('/stats/w/')) screen = <WorkoutDetail s={s} id={decodeURIComponent(path.slice(9))} />;
   else if (path.startsWith('/stats')) screen = <Stats s={s} />;

@@ -8,6 +8,25 @@ import type { Workout, WorkoutBlock, SetLog } from './session';
 export const EDIT_LIMITS = { nameMax: 60, weight: 1000, reps: 1000, seconds: 3600, rir: 10, maxMinutes: 12 * 60, memoMax: 2000 } as const;
 
 const p2 = (n: number) => String(n).padStart(2, '0');
+
+/**
+ * 새로 직접 작성하는 운동(D-078).
+ * 기본값: 시작은 nowMs 기준 45분 전(초 00), 끝은 nowMs(초 00), 운동 이름은 'YYYY.MM.DD 운동', 빈 blocks.
+ */
+export function createManualWorkout(id: string, nowMs: number = Date.now()): Workout {
+  const d = new Date(nowMs);
+  const name = `${d.getFullYear()}.${p2(d.getMonth() + 1)}.${p2(d.getDate())} 운동`;
+  const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), 0, 0);
+  const start = new Date(end.getTime() - 45 * 60000);
+  return {
+    id,
+    name,
+    startedAt: start.toISOString(),
+    endedAt: end.toISOString(),
+    blocks: [],
+    timer: null,
+  };
+}
 /** ISO → <input type="datetime-local"> 값 (이 기기 시간대) */
 export function toLocalInput(iso: string): string {
   const d = new Date(iso);

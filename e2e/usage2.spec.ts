@@ -275,3 +275,57 @@ test('묶음 카드: 운동 글자(A·B)와 등급 배지를 구분 ("등급 S" 
   expect(lx!.x).toBeLessThan(bx!.x);
   await checkScreen(page, 'u15-group-grade-badge');
 });
+
+test('D-078 기록 탭에서 운동 기록 직접 작성 (진입, 종목 추가, 세트 입력, 저장 및 상세 확인)', async ({ page }) => {
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '기록', exact: true })).toBeVisible();
+
+  // 헤더의 운동 기록 직접 작성 버튼 클릭
+  const addBtn = page.getByRole('button', { name: '운동 기록 직접 작성' }).first();
+  await expect(addBtn).toBeVisible();
+  await addBtn.click();
+
+  await expect(page.getByRole('heading', { name: '운동 기록 직접 작성' })).toBeVisible();
+  await checkScreen(page, 'd078-manual-workout-form');
+
+  // 운동 추가
+  await page.getByRole('button', { name: '+ 운동 추가' }).click();
+  const picker = page.getByRole('dialog', { name: '운동 추가' });
+  await expect(picker).toBeVisible();
+  await picker.getByRole('textbox', { name: '운동 검색' }).fill('바벨 벤치프레스');
+  await picker.getByRole('button', { name: '바벨 벤치프레스', exact: true }).click();
+
+  // 바벨 벤치프레스 카드 및 기본 세트 확인
+  await expect(page.getByText('바벨 벤치프레스', { exact: true })).toBeVisible();
+
+  // 세트 추가
+  await page.getByRole('button', { name: '바벨 벤치프레스 세트 추가' }).click();
+
+  // 저장
+  await page.getByRole('button', { name: '저장', exact: true }).click();
+
+  // 저장 후 운동 상세 화면으로 이동 확인
+  await expect(page.locator('main')).toContainText('바벨 벤치프레스');
+  await checkScreen(page, 'd078-manual-workout-detail');
+
+  // 기록 목록으로 돌아가서 카드 확인
+  await page.getByRole('button', { name: '기록', exact: true }).click();
+  await expect(page.getByText('바벨 벤치프레스')).toBeVisible();
+});
+
+test('D-078 빈 기록 상태에서 직접 작성 진입 및 취소 확인', async ({ page }) => {
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '기록', exact: true })).toBeVisible();
+
+  // 빈 상태의 직접 작성 버튼
+  const emptyAdd = page.getByRole('button', { name: '직접 작성', exact: true });
+  await expect(emptyAdd).toBeVisible();
+  await emptyAdd.click();
+
+  await expect(page.getByRole('heading', { name: '운동 기록 직접 작성' })).toBeVisible();
+
+  // 수정 없이 취소 클릭 시 확인창 없이 바로 기록 탭으로 복귀
+  await page.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '기록', exact: true })).toBeVisible();
+});
+

@@ -214,14 +214,27 @@ export function Stats({ s }: { s: AppState }) {
 
   return (
     <main>
-      <ScreenHeader title="기록" />
+      <ScreenHeader
+        title="기록"
+        actions={<button class="icon-btn round head-add" aria-label="운동 기록 직접 작성" title="운동 기록 직접 작성" onClick={() => go('#/stats/new')}><Icon name="plus" /></button>}
+      />
       <RecordFixCard s={s} byId={byId} />
       <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
       <RecoveryCard m={rec} night={night} />
       <PartSets done={done} byId={byId} today={today} />
 
-      <h2>운동 기록</h2>
-      {!sorted.length && <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 주별 카드로 쌓여요"><button class="primary" onClick={() => go('#/workout')}>운동 시작</button></Empty>}
+      <div class="row between" style={{ alignItems: 'center', margin: '20px 0 10px' }}>
+        <h2 style={{ margin: 0 }}>운동 기록</h2>
+        <button class="ghost" style={{ minHeight: '44px', padding: '0 12px' }} aria-label="운동 기록 직접 작성" onClick={() => go('#/stats/new')}>+ 직접 작성</button>
+      </div>
+      {!sorted.length && (
+        <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 주별 카드로 쌓여요. 과거 운동을 직접 기록할 수도 있어요.">
+          <div class="row" style={{ gap: '8px' }}>
+            <button class="primary" onClick={() => go('#/workout')}>운동 시작</button>
+            <button onClick={() => go('#/stats/new')}>직접 작성</button>
+          </div>
+        </Empty>
+      )}
       {groups.map((g) => (
         <section key={g.ws} aria-label={groupTitle(g.ws)}>
           <h3 class="wk-head">{groupTitle(g.ws)}</h3>

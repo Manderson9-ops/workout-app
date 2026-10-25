@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { planToRoutine, startWorkout, finishWorkout } from '../src/core/session';
 import type { Workout } from '../src/core/session';
-import { toLocalInput, fromLocalInput, durationMin, setTimes, patchSet, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, withKeys, keyOf, patchSetByKey, moveStart } from '../src/core/workoutEdit';
+import { toLocalInput, fromLocalInput, durationMin, setTimes, patchSet, appendDoneSet, deleteSet, deleteItem, editProblem, finalizeEdit, sameWorkout, withKeys, keyOf, patchSetByKey, moveStart, createManualWorkout } from '../src/core/workoutEdit';
 import { makeBackup, parseBackup } from '../src/core/backup';
 import { summarize } from '../src/core/stats';
 
@@ -119,5 +119,39 @@ describe('끝낸 운동 고치기 (D-035)', () => {
     const s = appendDoneSet(w, 0, 0).blocks[0]!.items[0]!.sets[1]!;
     expect(s).toMatchObject({ seconds: 50, done: true });
     expect(s.reps).toBeUndefined();
+  });
+  it('새 운동 직접 작성(D-078): 기본 45분 길이, 날짜 이름, 빈 블록, 검사 및 finalizeEdit', () => {
+    const now = Date.parse('2026-10-26T14:30:00.000Z');
+    const w = createManualWorkout('w-new', now);
+    expect(w.id).toBe('w-new');
+    expect(w.name).toMatch(/2026\.10\.26 운동/);
+    expect(durationMin(w)).toBe(45);
+    expect(w.blocks).toEqual([]);
+    expect(w.timer).toBeNull();
+
+    // 블록이 비어있으면 저장 거절
+    expect(editProblem(w, now)).toMatch(/운동이 하나도 없어요/);
+
+    // 종목과 세트 추가 후 저장 검사 통과
+    const withItem: Workout = {
+      ...w,
+      blocks: [{
+        kind: 'single',
+        items: [{
+          exerciseId: 'bench-press',
+          target: { sets: 1, reps: 10 },
+          sets: [{ warmup: false, done: true, weight: 60, reps: 10 }],
+        }],
+        restSec: 90,
+        roundRestSec: 120,
+        transitionSec: 10,
+      }],
+    };
+    expect(editProblem(withItem, now)).toBeNull();
+
+    // finalizeEdit 후 doneAt 할당 및 정상 운동 객체 생성
+    const finalized = finalizeEdit(withItem, '2026-10-26T15:00:00.000Z');
+    expect(finalized.editedAt).toBe('2026-10-26T15:00:00.000Z');
+    expect(finalized.blocks[0]!.items[0]!.sets[0]!.doneAt).toBeDefined();
   });
 });
