@@ -403,7 +403,12 @@ export function PlanBuilder({ s }: { s: AppState }) {
           {viewMode === 'summary' && (
             <div>
               {plan.blocks.map((b, bi) => (
-                <div class="card" key={blockKey(b)} style={{ margin: '8px 0', padding: '12px 14px' }}>
+                <div
+                  class="card"
+                  key={blockKey(b)}
+                  {...dnd.itemAttrs(bi)}
+                  style={{ margin: '8px 0', padding: '12px 14px' }}
+                >
                   {b.kind !== 'single' && (
                     <div class="row between" style={{ marginBottom: '6px' }}>
                       <span class="badge kind">{b.kind === 'superset' ? '슈퍼세트' : '컴파운드 세트'}{b.twoStations ? ' · 기구 두 개' : ''}</span>
@@ -411,13 +416,60 @@ export function PlanBuilder({ s }: { s: AppState }) {
                   )}
                   {b.items.map((it, ii) => (
                     <div key={it.exerciseId} class={ii ? 'plan-item next' : 'plan-item'} style={{ marginTop: ii ? '8px' : 0 }}>
-                      <div class="row between" style={{ alignItems: 'center' }}>
-                        <div class="grow" style={{ minWidth: 0 }}>
-                          <div class="row" style={{ alignItems: 'center', gap: '6px' }}>
-                            <GradeBadge g={{ value: it.grade, source: it.gradeSource, estimated: it.estimated }} />
-                            <strong style={{ fontSize: '15px' }}>{it.name}</strong>
+                      <div class="row between" style={{ alignItems: 'center', gap: '6px' }}>
+                        <div class="row" style={{ alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+                          {plan.blocks.length > 1 && (
+                            <span class="row gap4" style={{ alignItems: 'center', flexShrink: 0 }}>
+                              <button
+                                {...dnd.handleProps(bi)}
+                                aria-label={`${blockName(b)} 순서 옮기기, 지금 ${bi + 1}번째 (끌어서 놓거나 ↑↓ 키)`}
+                                class="ghost drag-handle"
+                                style={{
+                                  width: '32px',
+                                  minWidth: '32px',
+                                  height: '38px',
+                                  padding: 0,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '20px',
+                                  touchAction: 'none',
+                                  cursor: 'grab',
+                                }}
+                              >
+                                ≡
+                              </button>
+                              <button
+                                class="ghost"
+                                data-move={blockKey(b)}
+                                data-dir="-1"
+                                aria-label={`${blockName(b)} 위로 (지금 ${bi + 1}번째)`}
+                                disabled={bi === 0}
+                                onClick={() => move(bi, -1)}
+                                style={{ width: '26px', minWidth: '26px', height: '36px', padding: 0 }}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                class="ghost"
+                                data-move={blockKey(b)}
+                                data-dir="1"
+                                aria-label={`${blockName(b)} 아래로 (지금 ${bi + 1}번째)`}
+                                disabled={bi === plan.blocks.length - 1}
+                                onClick={() => move(bi, 1)}
+                                style={{ width: '26px', minWidth: '26px', height: '36px', padding: 0 }}
+                              >
+                                ↓
+                              </button>
+                            </span>
+                          )}
+                          <div class="grow" style={{ minWidth: 0 }}>
+                            <div class="row" style={{ alignItems: 'center', gap: '6px' }}>
+                              <GradeBadge g={{ value: it.grade, source: it.gradeSource, estimated: it.estimated }} />
+                              <strong style={{ fontSize: '15px' }}>{it.name}</strong>
+                            </div>
+                            <div class="pill" style={{ marginTop: '4px', display: 'inline-block' }}>{it.why}</div>
                           </div>
-                          <div class="pill" style={{ marginTop: '4px', display: 'inline-block' }}>{it.why}</div>
                         </div>
                         <div class="row" style={{ gap: '6px', flexShrink: 0 }}>
                           <button
