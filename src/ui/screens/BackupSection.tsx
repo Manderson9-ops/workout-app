@@ -60,7 +60,7 @@ export function BackupSection({ s }: { s: AppState }) {
       <p class="sub small">운동 기록은 이 아이폰 안에만 저장돼요. 홈 화면 아이콘을 지우거나 폰을 바꾸면 사라지니 백업 파일을 가끔 저장하세요. 공유 → "파일에 저장" → 구글 드라이브를 고르면 PC에서도 볼 수 있어요.</p>
       <p class="small">마지막 백업: {st.lastBackupAt ? dateTimeText(st.lastBackupAt, Date.now()) : '없음'}</p>
       <div class="row wrap">
-        <button class="primary" onClick={async () => { const r = await saveBackupFile(); setMsg({ text: SAVE_MESSAGE[r], ok: r !== 'cancelled' }); }}>백업 파일 저장</button>
+        <button class="tonal" onClick={async () => { const r = await saveBackupFile(); setMsg({ text: SAVE_MESSAGE[r], ok: r !== 'cancelled' }); }}>백업 파일 저장</button>
         <button onClick={() => fileRef.current?.click()}>백업 불러오기</button>
         <input ref={fileRef} type="file" accept="application/json,.json" aria-label="백업 파일 고르기" tabIndex={-1} style={{ display: 'none' }} onChange={onFile} />
       </div>

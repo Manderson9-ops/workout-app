@@ -53,7 +53,7 @@ export function RemoteCards({ s }: { s: AppState }) {
           <div><strong>늦게 온 기록</strong> · {c.name}</div>
           <p class="sub small">운동을 다른 기기로 가져간 뒤 원래 기기에서 기록한 세트 {doneSets(c)}개예요. 합치기 전에는 통계에 넣지 않아요.</p>
           <div class="row wrap">
-            <button class="primary" disabled={!canMerge} onClick={async () => {
+            <button class="tonal" disabled={!canMerge} onClick={async () => {
               await mutate(async (d) => {
                 if (orig) { const cur = (await d.workouts.get(orig.id))!; await d.workouts.put(mergeLate(cur, c)); }
                 await softDelete(d, 'workouts', c.id);

@@ -230,7 +230,7 @@ export function Stats({ s }: { s: AppState }) {
       {!sorted.length && (
         <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 주별 카드로 쌓여요. 과거 운동을 직접 기록할 수도 있어요.">
           <div class="row" style={{ gap: '8px' }}>
-            <button class="primary" onClick={() => go('#/workout')}>운동 시작</button>
+            <button class="tonal" onClick={() => go('#/workout')}>운동 시작</button>
             <button onClick={() => go('#/stats/new')}>직접 작성</button>
           </div>
         </Empty>
@@ -313,7 +313,7 @@ function Bodyweight({ s, today }: { s: AppState; today: string }) {
         <input class="date" type="date" aria-label="체중 날짜" style={{ width: '100%', marginBottom: '6px' }} value={date} max={today} onInput={(e) => { setDate((e.target as HTMLInputElement).value || today); setKg(undefined); kgRef.current = null; }} />
         <div class="row">
           <div class="grow" style={{ minWidth: 0 }}><NumInput label="체중" value={kg ?? existing} suffix="kg" onChange={(v) => { kgRef.current = v; setKg(v); }} /></div>
-          <button class="primary" onClick={save}>{existing !== undefined ? '고치기' : '기록'}</button>
+          <button class="tonal" onClick={save}>{existing !== undefined ? '고치기' : '기록'}</button>
         </div>
         {err && <p role="alert" class="small" style={{ color: 'var(--bad)' }}>{err}</p>}
         <LineChart label="체중" unit="kg" points={sorted.slice(-30).map((b) => ({ label: md(b.date), value: b.kg }))} />

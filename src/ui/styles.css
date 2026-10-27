@@ -20,6 +20,8 @@
   --r-in: 8px; --r-btn: 12px; --r-card: 20px; --r-sheet: 24px; --r-pill: 999px;
   /* 그림자: 떠 있는 것(탭 바·시트·알림)에만 */
   --shadow-float: 0 10px 30px rgba(0, 0, 0, .55);
+  /* D-079 면 분리: 상자 실선 대신 아주 옅은 안쪽 링 + 1~2px 바닥 그림자 (어두운 화면에서 가이드 shadow-sm·ring-1 에 해당) */
+  --surface-ring: inset 0 0 0 1px rgba(255, 255, 255, .05), 0 1px 2px rgba(0, 0, 0, .35);
   /* 겹침: 떠 있는 탭 바 바탕(살짝 비침), 탭 바 아래 가림막의 투명 끝, 시트 뒤 어둡게 */
   --nav-bg: rgba(22, 27, 34, .92); --scrim-clear: rgba(14, 17, 22, 0); --backdrop: rgba(0, 0, 0, .6);
   /* 요일 색 (D-054): 일요일 빨강, 토요일 파랑 */
@@ -51,7 +53,7 @@ p { margin: 6px 0; }
 .row.wrap { flex-wrap: wrap; }
 .between { justify-content: space-between; }
 .grow { flex: 1; min-width: 0; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px; margin: 12px 0; }
+.card { background: var(--card); border: 1px solid transparent; box-shadow: var(--surface-ring); border-radius: var(--r-card); padding: 20px; margin: 12px 0; }
 .card.active { border-color: var(--acc); }
 button, .btn { min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: var(--r-btn); border: 1px solid var(--line); background: var(--card2); color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
 button:disabled { opacity: .45; }
@@ -135,7 +137,8 @@ html.phone-view .fb-toast { max-width: 406px; margin: 0 auto; }
 .card-link { display: block; color: inherit; text-decoration: none; min-height: 44px; }
 /* 끝낸 운동 수정 중에는 메뉴·운동 중 배너를 숨김 (고친 내용을 모르고 떠나지 않게, 취소/저장으로만) */
 html.editing .nav, html.editing .banner { display: none; }
-html.editing main { padding-bottom: 40px; }
+html.editing main { padding-bottom: 96px; }
+html.editing .toast { bottom: calc(16px + var(--safe-b)); } /* 메뉴가 없으니 맨 아래로, 아래 여백(96px)이 취소/저장을 가리지 않게 함 */
 /* 끝낸 운동 수정 화면의 세트 줄 */
 .edit-set { display: grid; grid-template-columns: 44px minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 0.8fr) 44px 44px; gap: 4px; align-items: center; margin-top: 6px; }
 .edit-set > button { min-width: 44px; padding: 0; }
@@ -221,14 +224,14 @@ a.license-link { display: inline-block; min-height: 44px; line-height: 44px; }
 /* D-048: 내 루틴 목록 */
 .routine-card .routine-name { margin: 0 0 4px; }
 .routine-parts { gap: 4px; }
-.tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--card2); border: 1px solid var(--line); color: var(--text); }
+.tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--card2); border: 0; color: var(--text); }
 .routine-when { text-align: right; white-space: nowrap; margin-left: 8px; }
 .routine-when div:first-child { color: var(--text); font-weight: 600; }
 .routine-preview { margin-top: 4px; }
-.routine-card.is-hidden { opacity: .75; border-style: dashed; }
+.routine-card.is-hidden { opacity: .75; border: 1px dashed var(--line); box-shadow: none; }
 .routine-tools { margin: 4px 0 2px; }
 .search-row input { flex: 1; }
-.toast { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-space) + 8px); z-index: 30; max-width: 620px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--card3); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 6px 8px 6px 14px; box-shadow: var(--shadow-float); }
+.toast { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-space) + 8px); z-index: 30; max-width: 620px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--card3); border: 1px solid transparent; border-radius: var(--r-btn); padding: 6px 8px 6px 16px; box-shadow: var(--surface-ring), var(--shadow-float); }
 .toast .ghost { color: var(--acc-text); font-weight: 700; }
 button.back { margin-bottom: 4px; }
 .toast .ghost { white-space: nowrap; flex-shrink: 0; }
@@ -290,7 +293,7 @@ button.back { margin-bottom: 4px; }
 .bodyheat .bm-muscle { cursor: default; }
 .bm-legend .lg-h0 { background: var(--map-off); } .bm-legend .lg-h1 { background: var(--map-1); } .bm-legend .lg-h2 { background: var(--map-2); } .bm-legend .lg-h3 { background: var(--map-3); }
 .wk-head { font-size: 14px; color: var(--sub); margin: 14px 0 6px; font-weight: 600; }
-button.wcard { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; font-weight: 400; justify-content: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px; margin: 12px 0; min-height: 56px; }
+button.wcard { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; font-weight: 400; justify-content: flex-start; background: var(--card); border: 1px solid transparent; box-shadow: var(--surface-ring); border-radius: var(--r-card); padding: 20px; margin: 12px 0; min-height: 56px; }
 button.wcard.dim { opacity: .6; }
 .wc-main { flex: 1; min-width: 0; }
 .wc-title { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
@@ -302,7 +305,7 @@ button.wcard.dim { opacity: .6; }
 .ptag { font-size: 12px; border: 1px solid var(--acc); color: var(--acc-text); border-radius: 8px; padding: 1px 8px; }
 .wc-ex { font-size: 13px; color: var(--text); overflow-wrap: anywhere; line-height: 1.5; }
 .wc-ex.more { color: var(--sub); }
-.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin-top: 8px; text-align: center; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; margin-top: 8px; text-align: center; }
 .cal-wd { padding: 4px 0; }
 .cal-day { min-width: 0; padding: 0; border-radius: 10px; background: transparent; border: 2px solid transparent; color: var(--sub); opacity: 1; flex-direction: column; gap: 3px; font-weight: 500; }
 .cal-day.sun { color: var(--sun); } .cal-day.sat { color: var(--sat); }
@@ -331,7 +334,7 @@ button.wcard.dim { opacity: .6; }
 .eyebrow { margin: 6px 0 0; color: var(--sub); font-size: 13px; font-weight: 600; }
 .head-btns { display: flex; gap: 8px; flex: none; padding-top: 2px; }
 .icon-btn { min-width: 44px; min-height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--text); position: relative; }
-.icon-btn.round { width: 44px; height: 44px; border-radius: 50%; background: var(--card2); border: 1px solid var(--line); text-decoration: none; }
+.icon-btn.round { width: 44px; height: 44px; border-radius: 50%; background: var(--card2); border: 1px solid transparent; box-shadow: var(--surface-ring); text-decoration: none; }
 .icon-btn.round[aria-current="page"] { color: var(--acc); background: var(--acc-soft); border-color: transparent; }
 .icon-btn .ndot { top: 6px; right: 6px; }
 .head-actions { margin: 8px 0 0; flex-wrap: wrap; }
@@ -385,7 +388,7 @@ a.card-tap:active { background: var(--card2); }
 .empty-hint { margin: 4px 0 0; }
 .empty-actions { margin-top: 12px; }
 /* 처음 1회 작은 알림 (저장 안내) */
-.notice { display: flex; gap: 10px; align-items: flex-start; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-btn); padding: 12px; margin: 8px 0 12px; }
+.notice { display: flex; gap: 12px; align-items: flex-start; background: var(--card2); border: 1px solid transparent; box-shadow: var(--surface-ring); border-radius: var(--r-btn); padding: 12px; margin: 8px 0 12px; }
 .notice strong { font-size: 15px; }
 .notice p { margin: 4px 0 0; }
 .notice-ico { color: var(--acc); margin-top: 1px; }
@@ -458,7 +461,7 @@ html.editing .nav-scrim { display: none; }
 .wk-main { --dock-h: 60px; padding-bottom: calc(var(--nav-space) + var(--dock-h) + 40px); } /* 도크 높이만큼 비워 마지막 카드가 도크 위로 올라옴 */
 .wk-actions { justify-content: flex-end; }
 .wk-finish { min-width: 88px; }
-.wk-metrics { padding: 14px 16px 12px; margin: 12px 0; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); } /* .card 가 아님: 운동 카드 목록(.card)과 구분 */
+.wk-metrics { padding: 16px 20px 12px; margin: 12px 0; background: var(--card); border: 1px solid transparent; box-shadow: var(--surface-ring); border-radius: var(--r-card); } /* .card 가 아님: 운동 카드 목록(.card)과 구분 */
 .metrics3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .metrics3 .num { font-size: 26px; }
 .wk-metrics .metrics3 .metric:first-child .num { color: var(--acc); }
@@ -523,7 +526,7 @@ button.tonal { background: var(--acc-soft); border-color: transparent; color: va
 /* 휴식 타이머 알약 + 현재 세트 완료 (아래 메뉴 바로 위) */
 .timer { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-space) + 8px); z-index: 25; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .timer > * { pointer-events: auto; }
-.rest-pill { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 8px; border-radius: var(--r-pill); background: var(--card3); border: 1px solid var(--line); box-shadow: var(--shadow-float); }
+.rest-pill { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 8px; border-radius: var(--r-pill); background: var(--card3); border: 1px solid transparent; box-shadow: var(--surface-ring), var(--shadow-float); }
 .rest-pill.end { background: var(--ok); border-color: var(--ok); color: var(--on-ok); }
 .ring { flex: none; }
 .ring-bg { fill: none; stroke: var(--card2); stroke-width: 4; }
@@ -650,7 +653,7 @@ h2.card-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--sub);
 .plan-save { margin-top: 12px; }
 .gap4 { gap: 4px; }
 button.chip.full { width: 100%; }
-.panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); margin: 12px 0; }
+.panel { background: var(--card); border: 1px solid transparent; box-shadow: var(--surface-ring); border-radius: var(--r-card); margin: 12px 0; }
 .nudge .nudge-plate { min-width: 44px; padding: 0 10px; margin-left: auto; }
 .level-chip { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 .wk-head > .grow, .wk-title > .grow, .wk-item-head > .grow { min-width: 0; }
@@ -664,7 +667,7 @@ button.chip.full { width: 100%; }
 .pw-ex b { font-variant-numeric: tabular-nums; }
 .skel-head { min-height: 56px; display: flex; align-items: center; margin-bottom: 8px; }
 .skel-title-text { margin: 0; }
-.skel-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); padding: 16px; margin: 12px 0; display: grid; gap: 12px; }
+.skel-card { background: var(--card); border: 1px solid transparent; box-shadow: var(--surface-ring); border-radius: var(--r-card); padding: 20px; margin: 12px 0; display: grid; gap: 12px; }
 .skel-bar { height: 14px; border-radius: var(--r-in); background: var(--card2); }
 .skel-title { width: 45%; height: 30px; }
 .skel-bar.w40 { width: 40%; } .skel-bar.w60 { width: 60%; } .skel-bar.w80 { width: 80%; }
@@ -672,7 +675,7 @@ button.chip.full { width: 100%; }
 @keyframes skel-pulse { from { opacity: .55; } to { opacity: 1; } }
 .scr-titlerow > .head-add { flex: none; margin-top: 2px; }
 /* D-056 휴식 안내 한 줄: 도크 위에 떠 있음 (도크 높이에 안 들어감), 글은 누르기 통과, 닫기만 누름 */
-.timer .rest-hint { position: absolute; left: 0; right: 0; bottom: 100%; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; padding: 0 4px 0 12px; min-height: 48px; border-radius: var(--r-btn); background: var(--card3); border: 1px solid var(--line); box-shadow: var(--shadow-float); font-size: 14px; color: var(--text); pointer-events: none; }
+.timer .rest-hint { position: absolute; left: 0; right: 0; bottom: 100%; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; padding: 0 4px 0 12px; min-height: 48px; border-radius: var(--r-btn); background: var(--card3); border: 1px solid transparent; box-shadow: var(--surface-ring), var(--shadow-float); font-size: 14px; color: var(--text); pointer-events: none; }
 .timer .rest-hint .icon { color: var(--acc); flex: none; }
 .timer .rest-hint button { pointer-events: auto; flex: none; }
 .alert-guide { margin-top: 12px; padding: 0 14px; border-radius: var(--r-btn); background: var(--card2); }
@@ -689,7 +692,7 @@ button.chip.full { width: 100%; }
 .bm-muscle.rc-busy { fill: var(--rec-busy); } .bm-muscle.rc-almost { fill: var(--rec-almost); } .bm-muscle.rc-ok { fill: var(--rec-ok); }
 .bm-legend .lg-rc-busy { background: var(--rec-busy); } .bm-legend .lg-rc-almost { background: var(--rec-almost); } .bm-legend .lg-rc-ok { background: var(--rec-ok); }
 .rec-list { display: grid; gap: 6px; margin: 8px 0; }
-.rec-row { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--card2); border: 1px solid var(--line); border-radius: var(--r-btn); text-align: left; color: var(--text); }
+.rec-row { width: 100%; min-height: 48px; display: flex; align-items: center; gap: 10px; padding: 6px 12px; background: var(--card2); border: 1px solid transparent; box-shadow: var(--surface-ring); border-radius: var(--r-btn); text-align: left; color: var(--text); }
 .rec-row .rec-part { font-weight: 700; min-width: 64px; }
 .rec-row .rec-left { margin-left: auto; color: var(--sub); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rc-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: var(--r-pill); font-size: 13px; font-weight: 700; white-space: nowrap; }
@@ -761,3 +764,30 @@ button.chip.full { width: 100%; }
 .grp-letter { color: var(--acc-text); }
 .badge.grade-tag { font-size: 12px; padding: 1px 6px; }
 .badge.grade-tag .grade-k { font-weight: 500; margin-right: 2px; }
+
+/* ===== D-079 UX/UI 가이드 반영 (docs/uxui/UXUI_DB.md · npm run uxui:audit) ===== */
+/* M07 한글 줄바꿈: 단어 단위로 넘기고(keep-all), 긴 영문·숫자만 넘칠 때 자름. 제목은 줄 길이 고르게 */
+html, body { word-break: keep-all; overflow-wrap: break-word; }
+h1, h2, h3, .card-title, .empty-text, .next-name, .wn-h, .set-group-title, .sheet-head h3 { text-wrap: balance; }
+/* M16 키보드 초점 링 (손가락 탭에는 안 보임) */
+:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline-offset: 0; }
+/* M13 눌러서 알려 주는 오류: 버튼은 막지 않고, 빈 칸으로 옮겨 빨간 테두리 + 한 줄 이유 */
+.field-err { margin: 8px 0 0; color: var(--bad-fg); font-size: 14px; font-weight: 600; }
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--bad); box-shadow: 0 0 0 1px var(--bad); }
+.is-invalid { border-radius: var(--r-btn); box-shadow: 0 0 0 2px var(--bad); }
+/* M09 입력 폼은 1열 (숫자 타일·필터 같은 비입력 2열은 그대로) */
+.grid2.form-1col { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+/* M14 위험 버튼: 빨간 글자 + 누르거나 올리면 옅은 빨강 배경 */
+button.danger:active { background: var(--bad-soft); border-color: transparent; }
+@media (hover: hover) { button.danger:hover { background: var(--bad-soft); } }
+/* M06 PC 넓은 화면은 카드 안쪽 여백 24 */
+@media (min-width: 900px) { html:not(.phone-view) .card, html:not(.phone-view) button.wcard, html:not(.phone-view) .skel-card { padding: 24px; } }
+/* M20 상태 바뀜 보간 + 눌림 + M17 운동 중 점 펄스. 움직임 줄이기 설정이면 모두 끔 */
+@media (prefers-reduced-motion: no-preference) {
+  button, .btn, a, input, select, textarea { transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, transform .12s ease; }
+  button:not(:disabled):not(.drag-handle):active, .btn:active { transform: scale(.98); } /* 끌기 손잡이는 누른 채 끌므로 크기 유지 (44pt) */
+  .ndot.live { animation: live-pulse 1.6s ease-in-out infinite; }
+  .nav a { transition: none; } /* 탭 선택 표시는 즉시 (이전 탭 배경이 남아 두 탭이 켜져 보이지 않게) */
+}
+@keyframes live-pulse { 0%, 100% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 2px var(--ok-soft); } 50% { box-shadow: 0 0 0 2px var(--bg), 0 0 0 6px var(--ok-soft); } }

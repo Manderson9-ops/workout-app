@@ -32,7 +32,7 @@ function DescribeCard({ cfg }: { cfg: { url: string; key: string } | null | unde
       setFail('복사하지 못했어요. 아래 "손으로 만들기" 안내대로 만들어 주세요 (주소·키는 [주소 복사]·[키 복사])');
     }
   };
-  const btn = (id: PromptId, label: string) => <button class={id === 'A' ? 'primary' : ''} disabled={!cfg} onClick={() => void copyPrompt(id)}>{label}</button>;
+  const btn = (id: PromptId, label: string) => <button class={id === 'A' ? 'tonal' : ''} disabled={!cfg} onClick={() => void copyPrompt(id)}>{label}</button>;
   return (
     <section class="card" aria-label="iOS 27 설명으로 만들기" data-testid="describe-card">
       <div class="card-head"><span class="card-title grow">iOS 27: 설명으로 만들기 (가장 쉬움)</span><span class="chip-s" data-testid="describe-untested">실기기 시험 전</span></div>

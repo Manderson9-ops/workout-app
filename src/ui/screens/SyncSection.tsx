@@ -53,7 +53,7 @@ export function SyncSection({ s }: { s: AppState }) {
       {cfg && !on && step === 'idle' && (
         <>
           <p class="small">처음 연결할 때는 <strong>기록이 많은 기기(보통 폰)부터</strong> 연결하세요.</p>
-          <button class="primary" onClick={() => setStep('backup')}>동기화 연결하기</button>
+          <button class="tonal" onClick={() => setStep('backup')}>동기화 연결하기</button>
         </>
       )}
       {cfg && !on && step === 'backup' && (
@@ -97,7 +97,7 @@ export function SyncSection({ s }: { s: AppState }) {
         <>
           <p class="small">{st.phase === 'syncing' ? '동기화 중…' : st.phase === 'error' ? `오류: ${syncErrorText(st.error)}` : `동기화됨 · ${ago(st.lastOkAt)}`}{st.pending ? ` · 보낼 것 ${st.pending}건` : ''}</p>
           <div class="row wrap">
-            <button class="primary" disabled={st.phase === 'syncing'} onClick={() => void syncNow('manual')}>지금 동기화</button>
+            <button class="tonal" disabled={st.phase === 'syncing'} onClick={() => void syncNow('manual')}>지금 동기화</button>
             <button class="danger" onClick={async () => { if (await askConfirm({ title: '동기화를 끌까요?', message: '이 기기 기록은 그대로 남아요.', ok: '끄기', danger: true })) { await disableSync(); setOn(false); } }}>끄기</button>
           </div>
         </>
@@ -106,7 +106,7 @@ export function SyncSection({ s }: { s: AppState }) {
         <div class="card" role="alert" style={{ margin: '8px 0' }}>
           <p class="small">서버 기록이 예전 상태로 되돌려졌어요. 이 기기에만 있던 수정 {st.stash}건이 따로 보관돼 있어요.</p>
           <div class="row wrap">
-            <button class="primary" onClick={() => void reuploadStash()}>다시 올리기</button>
+            <button class="tonal" onClick={() => void reuploadStash()}>다시 올리기</button>
             <button onClick={async () => { if (await askConfirm({ title: '보관한 수정을 버릴까요?', ok: '버리기', danger: true })) await discardStash(); }}>버리기</button>
           </div>
         </div>

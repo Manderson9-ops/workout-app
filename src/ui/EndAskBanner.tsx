@@ -50,7 +50,7 @@ export function EndAskBanner({ active }: { active: Workout | undefined }) {
         </div>
       </div>
       <div class="end-ask-btns">
-        <button class="primary" onClick={() => void finishFromBanner(active.id)}>
+        <button class="tonal" onClick={() => void finishFromBanner(active.id)}>
           {none ? '끝내기' : `끝내기 (마지막 세트 + 3분 · ${whenText(endAtLastSet(active, now), now)})`}
         </button>
         <div class="row">

@@ -46,7 +46,7 @@ export function OneRMCalculator() {
   const t = w && reps && reps >= 1 && reps <= 50 ? oneRMTable(w, reps) : undefined;
   return (
     <div>
-      <div class="grid2">
+      <div class="grid2 form-1col">
         <div><label>무게</label><NumInput label="1RM 계산 무게" value={w} suffix="kg" onChange={setW} /></div>
         <div><label>횟수</label><NumInput integer label="1RM 계산 횟수" value={reps} suffix="회" onChange={setReps} /></div>
       </div>

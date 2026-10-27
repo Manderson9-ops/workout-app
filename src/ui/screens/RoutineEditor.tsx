@@ -13,6 +13,7 @@ import type { Part } from '../../core/types';
 import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts, stepItemSets, stepItemReps } from '../../core/routineEdit';
 import { startRoutine } from '../actions';
 import { go, editReturnTo } from '../nav';
+import { focusField } from '../formError';
 import { paceLabelOf, takeFitOnOpen } from '../pace';
 import { FitSheet, PaceLine } from './FitSheet';
 import { HeadButtons, BackButton } from '../header';
@@ -25,6 +26,8 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
   const [r, setR] = useState<Routine | undefined>(r0);
   const [picker, setPicker] = useState<{ b: number; i: number } | { add: Part | undefined } | null>(null);
   const [msg, setMsg] = useState('');
+  const [startTried, setStartTried] = useState(false);
+  const addBtn = useRef<HTMLButtonElement>(null);
   // 내 시간에 맞추기 창 (D-067). 카드의 [맞추기]로 왔으면 바로 열림
   const [fit, setFit] = useState(() => takeFitOnOpen(id));
   const flip = useRef(false); // 같은 안내가 반복돼도 다시 읽히게 보이지 않는 글자를 번갈아 붙임
@@ -79,6 +82,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
       </>
     );
   };
+  const startErr = startTried && !r.blocks.length; // 운동 없이 [저장하고 시작]을 누른 뒤에만, 운동을 넣으면 사라짐
   const partCount = routineParts(r, (id) => byId.get(id)?.part);
   const partOf = (b: RoutineBlock) => new Set(b.items.map((i) => byId.get(i.exerciseId)?.part));
   return (
@@ -181,11 +185,15 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         );
       })}
       </div>
-      <button class="big" onClick={() => setPicker({ add: undefined })}>+ 운동 추가</button>
+      <button class={`big${startErr ? ' is-invalid' : ''}`} ref={addBtn} aria-describedby={startErr ? 'routine-empty-err' : undefined} onClick={() => setPicker({ add: undefined })}>+ 운동 추가</button>
       <div class="row" style={{ marginTop: '12px' }}>
-        <button class="grow" onClick={async () => { await save(); go(editReturnTo()); }}>저장</button>
-        <button class="primary grow" disabled={!r.blocks.length} onClick={async () => { await save(); await startRoutine(s, saved()); }}>저장하고 시작</button>
+        <button class="grow" onClick={async () => { await save(); go(editReturnTo()); }}>루틴 저장하기</button>
+        <button class="primary grow" aria-describedby={startErr ? 'routine-empty-err' : undefined} onClick={async () => {
+          if (!r.blocks.length) { setStartTried(true); focusField(addBtn.current); return; }
+          await save(); await startRoutine(s, saved());
+        }}>저장하고 시작</button>
       </div>
+      {startErr && <p class="field-err" id="routine-empty-err" role="alert">운동을 1개 이상 추가해 주세요</p>}
       {fit && <FitSheet s={s} r={r} byId={byId} onClose={() => setFit(false)} onApply={async (next) => { setFit(false); setR(next); await save(next); say('내 시간에 맞춰 저장했어요'); }} />}
       {picker && (
         <ExercisePicker s={s} all={all} title={'add' in picker ? '운동 추가' : '운동 교체'}

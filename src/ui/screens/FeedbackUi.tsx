@@ -13,6 +13,7 @@ import { APP_VERSION } from '../../core/version';
 import { softDelete } from '../../db/db';
 import { askConfirm } from '../confirm';
 import { dateTimeText } from '../../core/dateText';
+import { focusField } from '../formError';
 
 const openers = new Set<() => void>();
 /** 화면 제목 줄 오른쪽 원형 "개선" 버튼 (D-055). 시트는 FeedbackButton이 App 맨 위에서 띄움 (머리 안에 고정 시트를 두면 위치가 틀어질 수 있어서) */
@@ -26,8 +27,9 @@ export function FeedbackButton({ s }: { s: AppState }) {
   const box = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (open) setTimeout(() => box.current?.focus(), 50); }, [open]);
   const [text, setText] = useState('');
+  const [tried, setTried] = useState(false); // 저장을 눌러 본 뒤에만 빈 칸 오류 표시
   const [done, setDone] = useState('');
-  useEffect(() => { const f = () => { setDone(''); setOpen(true); }; openers.add(f); return () => { openers.delete(f); }; }, []);
+  useEffect(() => { const f = () => { setDone(''); setTried(false); setOpen(true); }; openers.add(f); return () => { openers.delete(f); }; }, []);
   // 반영됨·보류 알림 (CHANGELOG 반영 뒤 한 번)
   useEffect(() => {
     const show = () => { const n = lsGet(FB_NOTICE_KEY); if (n) { lsRemove(FB_NOTICE_KEY); setDone(n); } };
@@ -36,13 +38,16 @@ export function FeedbackButton({ s }: { s: AppState }) {
   useEffect(() => { if (!done) return; const t = setTimeout(() => setDone(''), 6000); return () => clearTimeout(t); }, [done]);
   const screen = location.hash || '#/';
   const active = activeOf(s);
+  const textErr = tried && !text.trim() ? '내용을 적어 주세요' : '';
   return (
     <>
       {open && (
         <Sheet title="개선 메모" onClose={() => setOpen(false)}>
           <p class="sub small">지금 화면({screen}){active ? ` · 운동 「${active.name}」` : ''}에서 불편한 점·바라는 점을 적어 주세요. PC로 전달돼 다음 개선에 반영돼요.</p>
-          <textarea ref={box} aria-label="개선 메모 내용" rows={5} maxLength={FB_TEXT_MAX} value={text} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)} style={{ width: '100%', boxSizing: 'border-box', fontSize: '16px' }} />
-          <button class="primary" style={{ marginTop: '8px' }} disabled={!text.trim()} onClick={async () => {
+          <textarea ref={box} aria-label="개선 메모 내용" rows={5} maxLength={FB_TEXT_MAX} value={text} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)} aria-invalid={textErr ? 'true' : undefined} aria-describedby={textErr ? 'fb-text-err' : undefined} style={{ width: '100%', boxSizing: 'border-box', fontSize: '16px' }} />
+          {textErr && <p class="field-err" id="fb-text-err" role="alert">{textErr}</p>}
+          <button class="primary" style={{ marginTop: '8px' }} onClick={async () => {
+            if (!text.trim()) { setTried(true); focusField(box.current); return; }
             const fb: Feedback = {
               id: newFeedbackId(new Date(), deviceId(), usedFeedbackIds(s.feedback.map((f) => f.id), (await db.tombs.where('table').equals('feedback').toArray()).map((t) => t.id))),
               createdAt: new Date().toISOString(), screen: screen.slice(0, 200),
@@ -50,8 +55,8 @@ export function FeedbackButton({ s }: { s: AppState }) {
               text: text.trim().slice(0, FB_TEXT_MAX), status: '접수',
             };
             await mutate((d) => d.feedback.put(fb));
-            setText(''); setDone(`저장했어요 (${fb.id})`); setOpen(false);
-          }}>저장</button>
+            setText(''); setTried(false); setDone(`저장했어요 (${fb.id})`); setOpen(false);
+          }}>메모 저장하기</button>
         </Sheet>
       )}
       {done && <div role="status" class="fb-toast row between"><span>{done}</span><button type="button" class="ghost icon-btn" aria-label="알림 닫기" onClick={() => setDone('')}><Icon name="close" size={18} /></button></div>}

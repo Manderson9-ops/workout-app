@@ -20,6 +20,7 @@ import type { StepBtn } from '../components';
 import { ScreenHeader } from '../header';
 import { savePlanAsRoutine, startRoutine } from '../actions';
 import { go } from '../nav';
+import { focusField } from '../formError';
 import { useDragSort } from '../dragSort';
 import { BodyMap } from '../bodyMapView';
 import { PartSheet } from '../prioritySheet';
@@ -230,6 +231,10 @@ export function PlanBuilder({ s }: { s: AppState }) {
     );
   };
   const nParts = f.order.filter((p) => f.parts[p]).length;
+  // 부위 없이 [플랜 만들기]를 누르면 오류 표시 (부위를 고르면 사라짐)
+  const [partErr, setPartErr] = useState(false);
+  const partsBox = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (nParts) setPartErr(false); }, [nParts]);
 
   return (
     <main>
@@ -250,19 +255,20 @@ export function PlanBuilder({ s }: { s: AppState }) {
       <p class="sub small step-hint">그림이나 버튼을 누르면 우선순위를 고르는 창이 열려요 · 기본 높음</p>
       {/* 그림 먼저, 버튼은 아래: 버튼 글자가 길어져도 그림 위치가 바뀌지 않게 (연속으로 누를 때 빗나가지 않게) */}
       <BodyMap sel={f.parts} onPart={openPart} />
-      <div class="row wrap" role="group" aria-label="부위">
+      <div class={`row wrap${partErr ? ' is-invalid' : ''}`} role="group" aria-label="부위" ref={partsBox} aria-describedby={partErr ? 'plan-parts-err' : undefined}>
         {PARTS.map((p) => {
           const pr = f.parts[p];
           return <button key={p} class={`chip ${pr ? 'p-' + pr : ''}`} onClick={() => openPart(p)} aria-pressed={!!pr} aria-haspopup="dialog" aria-label={`${p} ${pr ? PR_LABEL[pr] : '선택 안 함'}`}>{p}{pr ? ` · ${PR_LABEL[pr]}` : ''}</button>;
         })}
       </div>
+      {partErr && <p class="field-err" id="plan-parts-err" role="alert">부위를 1개 이상 골라 주세요</p>}
       {busyParts(rec, PARTS.filter((p) => f.parts[p])).map((r) => (
         <p key={r.part} class="rec-note" role="note" data-testid="plan-rec-note"><Icon name="info" size={18} /><span>{topicJosa(r.part)} {agoText(r.elapsedH)}에 했어요 · 회복 추정 약 {r.remainingH}시간 남음 (앱 판단 추정, 막지 않아요)</span></p>
       ))}
       {partSheet && <PartSheet part={partSheet} pr={f.parts[partSheet]} onPick={(x) => setPriority(partSheet, x)}
         onRemove={() => { if (f.parts[partSheet]) togglePart(partSheet); setPartSheet(null); }} onClose={() => setPartSheet(null)} />}
       <label>분할 템플릿으로 채우기 (선택)</label>
-      <div class="grid2">
+      <div class="grid2 form-1col">
         <select value={tpl} onChange={(e) => setTpl((e.target as HTMLSelectElement).value)} aria-label="분할 템플릿">
           <option value="">템플릿 고르기</option>
           {templates.filter((t) => t.generatable).map((t) => <option key={t.id} value={t.id}>{t.name}{t.grades.length ? ` (${t.grades.filter((g) => !g.sub_goal_only).map((g) => g.value + (g.levels.length ? ' ' + g.levels.join('·') : '')).join(', ')})` : ''}</option>)}
@@ -305,7 +311,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
       <p class="sub small step-hint">
         {EQUIPMENT_PRESETS.find((p) => p.id === (f.equipPreset ?? 'all'))?.desc}
       </p>
-      <div class="grid2">
+      <div class="grid2 form-1col">
         <div><label>최소 등급</label>
           <select value={f.minGrade} onChange={(e) => update({ minGrade: (e.target as HTMLSelectElement).value as Grade })} aria-label="최소 등급">
             {GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
@@ -322,7 +328,10 @@ export function PlanBuilder({ s }: { s: AppState }) {
         <button class={`chip ${f.prefer ? 'on' : ''}`} aria-pressed={f.prefer} onClick={() => update({ prefer: !f.prefer })}>묶음 우선</button>
       </div>
       <div class="step-go">
-        <button class="primary big" disabled={!nParts} onClick={() => { setViewMode('summary'); generate(false); }}>{nParts ? '플랜 만들기' : '부위를 먼저 고르세요'}</button>
+        <button class={plan ? 'big' : 'primary big'} aria-describedby={partErr ? 'plan-parts-err' : undefined} onClick={() => {
+          if (!nParts) { setPartErr(true); focusField(partsBox.current?.querySelector<HTMLElement>('button') ?? null); return; }
+          setViewMode('summary'); generate(false);
+        }}>플랜 만들기</button>
       </div>
       </section>
 
@@ -509,7 +518,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
               </div>
 
               {/* 구체적인 플랜 만들기 유도 CTA */}
-              <div class="panel" style={{ padding: '16px', margin: '14px 0 10px', background: 'var(--card2)', textAlign: 'center', borderRadius: 'var(--r-card)', border: '1px solid var(--acc-soft)' }}>
+              <div class="panel" style={{ padding: '16px', margin: '14px 0 10px', background: 'var(--card2)', textAlign: 'center', borderRadius: 'var(--r-card)' }}>
                 <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '4px' }}>
                   이 운동들로 플랜을 확정하시겠어요?
                 </div>
@@ -530,8 +539,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
 
               <div class="row plan-save">
                 <button class="grow" onClick={() => generate(true)}>다시 생성{locks.size ? ` (잠금 ${locks.size}개 유지)` : ''}</button>
-                <button class="grow" onClick={() => setSaving(true)}>저장</button>
-                <button class="primary grow" onClick={async () => {
+                <button class="grow" onClick={() => setSaving(true)}>루틴으로 저장</button>
+                <button class="tonal grow" onClick={async () => {
                   const r = await savePlanAsRoutine(name || '내 루틴', plan.blocks, plan.estimatedSec, plan.warmup.seconds);
                   setPlan(null);
                   await startRoutine(s, r);
@@ -650,7 +659,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
           {showReasons && <ul class="reasons">{plan.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
           <div class="row plan-save">
             <button class="grow" onClick={() => generate(true)}>다시 생성{locks.size ? ` (잠금 ${locks.size}개 유지)` : ''}</button>
-            {plan.blocks.length > 0 && <button class="primary grow" onClick={() => setSaving(true)}>저장</button>}
+            {plan.blocks.length > 0 && <button class="primary grow" onClick={() => setSaving(true)}>루틴으로 저장</button>}
           </div>
             </div>
           )}

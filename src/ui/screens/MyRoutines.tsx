@@ -18,6 +18,7 @@ import { minutes, MenuSheet, Empty, Sheet } from '../components';
 import { Icon } from '../icons';
 import { ScreenHeader } from '../header';
 import { go, setEditReturn } from '../nav';
+import { focusField } from '../formError';
 import { askChoice, askConfirm } from '../confirm';
 import { lsGet, lsSet } from '../appName';
 import { fullText, dateText } from '../../core/dateText';
@@ -51,7 +52,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
   // '숨긴 루틴 보기'로 오면(#/routines?hidden) 숨긴 구역을 펼친 채로
   const [showHidden, setShowHidden] = useState(() => mode === 'all' && location.hash.includes('hidden'));
   const [toast, setToast] = useState<Toast>(null);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 7000); return () => clearTimeout(t); }, [toast]);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
   // 숨긴 카드가 사라져 초점이 갈 곳이 없으므로 [되돌리기]로 옮김 (키보드·화면 읽기)
   const undoRef = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => { if (toast?.undo) undoRef.current?.focus(); }, [toast]);
@@ -88,11 +89,8 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
   const fitFrom = (r: Routine) => { setFitOnOpen(r.id); edit(r); };
   // 같은 이름 루틴 (D-067): 보이는 루틴 중 이름이 같은 것, 오래된(먼저 만든) 쪽에 [이름 바꾸기]/[숨기기]
   const dups = mode === 'pick' ? [] : duplicateNames(visible);
-  const [rename, setRename] = useState<{ r: Routine; name: string } | null>(null);
-  const hideOld = async (r: Routine) => {
-    const ok = await askConfirm({ title: '오래된 루틴을 숨길까요?', message: `「${r.name}」 (만든 날 ${dateText(r.createdAt, now, { weekday: false })})\n목록에서만 숨겨요. 루틴과 운동 기록은 남고 "숨긴 루틴"에서 되돌릴 수 있어요.`, ok: '숨기기' });
-    if (ok) await hide(r);
-  };
+  const [rename, setRename] = useState<{ r: Routine; name: string; tried?: boolean } | null>(null); // tried = 이름 바꾸기를 눌러 본 뒤에만 빈 칸 오류 표시
+  const renameBox = useRef<HTMLInputElement>(null);
   const saveRename = async () => {
     if (!rename) return;
     const name = rename.name.trim();
@@ -131,7 +129,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
             <button class="danger" onClick={async () => { if (await askConfirm({ title: '루틴을 완전히 지울까요?', message: `「${r.name}」 · 되돌릴 수 없어요. 운동 기록은 남아요.`, ok: '완전 삭제', danger: true })) await removeForever(r); }} aria-label={`${r.name} 완전 삭제`}>완전 삭제</button>
           </> : <>
             {items.length
-              ? <button class="primary grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}><Icon name="play" size={18} />시작</button>
+              ? <button class="tonal grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}><Icon name="play" size={18} />시작</button>
               /* 운동이 없는 루틴: 시작 대신 운동 넣기 */
               : <button class="grow" onClick={() => edit(r)} aria-label={`${r.name} 운동 넣기`}>+ 운동 넣기</button>}
             {/* 운동 탭(고르기)은 편집만 바로 (D-053), 홈·내 루틴은 ⋯ 안에 편집·지우기 (D-055) */}
@@ -169,11 +167,14 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
           <span>같은 이름 루틴이 {g.older.length + 1}개 있어요: 「{g.name}」. 오래된 것(만든 날 {dateText(o.createdAt, now, { weekday: false })}, {use.get(o.id) ? `마지막 ${sinceText(use.get(o.id)!.lastAt, now)}` : '아직 안 함'})을 정리할까요?</span>
           <span class="row">
             <button onClick={() => setRename({ r: o, name: `${o.name} (이전)` })} aria-label={`오래된 「${o.name}」 이름 바꾸기`}>이름 바꾸기</button>
-            <button onClick={() => void hideOld(o)} aria-label={`오래된 「${o.name}」 숨기기`}>숨기기</button>
+            <button onClick={() => void hide(o)} aria-label={`오래된 「${o.name}」 숨기기`}>숨기기</button>
           </span>
         </div>
       )))}
-      {visible.length > 0 && !shown.length && <Empty label="검색 결과 없음" text={`"${q}"에 맞는 루틴이 없어요`} hint="다른 이름·부위로 찾아보세요" />}
+      {visible.length > 0 && !shown.length && <Empty label="검색 결과 없음" text={`"${q}"에 맞는 루틴이 없어요`} hint="다른 이름·부위로 찾아보세요">
+        {/* 가이드 A05: 검색 0건은 [검색어 지우기] 로 진짜 0건과 구분 */}
+        <button class="tonal" onClick={() => { setQ(''); requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[aria-label="루틴 검색"]')?.focus()); }}>검색어 지우기</button>
+      </Empty>}
       <div class="wide-cards">{shown.map((r) => card(r))}</div>
       {mode === 'home' && visible.length > 0 && (sorted.length > 3 || hidden.length > 0) && (
         <button class="big" onClick={() => go('#/routines')}>내 루틴 모두 보기 ({visible.length}개{hidden.length ? ` · 숨김 ${hidden.length}개` : ''})</button>
@@ -187,10 +188,16 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
       {rename && (
         <Sheet title="루틴 이름 바꾸기" onClose={() => setRename(null)} modal trap>
           <p class="sub small">「{rename.r.name}」 (만든 날 {dateText(rename.r.createdAt, now, { weekday: false })})</p>
-          <input value={rename.name} aria-label="새 루틴 이름" onInput={(e) => setRename({ ...rename, name: (e.target as HTMLInputElement).value })} />
+          {(() => {
+            const err = rename.tried && !rename.name.trim();
+            return <>
+              <input ref={renameBox} value={rename.name} aria-label="새 루틴 이름" aria-invalid={err ? 'true' : undefined} aria-describedby={err ? 'rename-err' : undefined} onInput={(e) => setRename({ ...rename, name: (e.target as HTMLInputElement).value })} />
+              {err && <p class="field-err" id="rename-err" role="alert">루틴 이름을 적어 주세요</p>}
+            </>;
+          })()}
           <div class="row" style={{ marginTop: '10px' }}>
             <button class="big grow" onClick={() => setRename(null)}>취소</button>
-            <button class="big grow primary" disabled={!rename.name.trim()} onClick={() => void saveRename()}>이름 바꾸기</button>
+            <button class="big grow primary" onClick={() => { if (!rename.name.trim()) { setRename({ ...rename, tried: true }); focusField(renameBox.current); return; } void saveRename(); }}>이름 바꾸기</button>
           </div>
         </Sheet>
       )}
@@ -198,7 +205,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
         { label: '편집', aria: `${menu.name} 편집`, run: () => edit(menu) },
         { label: '지우기…', aria: `${menu.name} 지우기`, danger: true, run: () => void remove(menu) },
       ]} />}
-      {/* 결과 알림: 화면 아래 고정, 숨기기는 [되돌리기] (7초 뒤 사라짐) */}
+      {/* 결과 알림: 화면 아래 고정, 숨기기는 [되돌리기] (5초 뒤 사라짐) */}
       <div class="sr-only" role="status" aria-live="polite">{toast?.text ?? ''}</div>
       {toast && (
         <div class={`toast${activeOf(s) ? ' above-banner' : ''}`}>
@@ -215,7 +222,7 @@ export function RoutinesScreen({ s }: { s: AppState }) {
   return (
     <main>
       <ScreenHeader back={{ label: '홈', onClick: () => go('#/') }} title="내 루틴">
-        <div class="row head-actions"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜</button></div>
+        <div class="row head-actions"><button onClick={() => void newRoutine()}>+ 직접</button><button class="tonal" onClick={() => go('#/plan')}>+ 플랜</button></div>
       </ScreenHeader>
       <RoutineList s={s} mode="all" />
     </main>

@@ -64,7 +64,7 @@ export function FitSheet({ s, r, byId, onApply, onClose }: { s: AppState; r: Rou
       {/* 아래 버튼은 창 아래에 붙어 있음 (PC에서 목록이 길어도 바로 보임) */}
       <div class="row sheet-foot fit-foot">
         <button class="big grow" onClick={onClose}>취소</button>
-        <button class="big grow primary" disabled={!changed} onClick={() => onApply(f.routine)}>적용</button>
+        <button class="big grow primary" disabled={!changed} onClick={() => onApply(f.routine)}>맞춘 루틴 적용하기</button>
       </div>
     </Sheet>
   );

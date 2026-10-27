@@ -59,7 +59,7 @@ function UpdateBanner({ active, onWorkout }: { active: boolean; onWorkout: boole
     return (
       <div class="upd-banner small-b" role="status" aria-label="새 버전 안내">
         <Icon name="sparkle" size={18} /><span class="grow upd-short">새 버전 준비됨</span>
-        <button class="ghost" onClick={later}>나중에</button><button class="primary" onClick={go}>적용</button>
+        <button class="ghost" onClick={later}>나중에</button><button class="tonal" onClick={go}>지금 적용</button>
       </div>
     );
   }
@@ -76,7 +76,7 @@ function UpdateBanner({ active, onWorkout }: { active: boolean; onWorkout: boole
       </div>
       <div class="row upd-btns">
         <button class="ghost grow" onClick={later}>나중에</button>
-        <button class="primary grow" onClick={go}>지금 적용</button>
+        <button class="tonal grow" onClick={go}>지금 적용</button>
       </div>
     </div>
   );

@@ -7,7 +7,7 @@
  *  4) 웜업으로 보이는 첫 세트(그날 최고 무게의 50% 이하·15회 이상) → W
  * [그대로 두기]나 고르지 않은 항목은 이 기기에 기억해 다시 묻지 않음
  */
-import { useMemo, useState } from 'preact/hooks';
+import { useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf } from '../store';
 import type { Exercise } from '../../core/types';
@@ -19,6 +19,7 @@ import type { WarmupFix } from '../../core/warmupGuess';
 import { fixEndsIn, deleteEmptyIn, fixWarmupsIn } from '../../db/recordFix';
 import { askConfirm } from '../confirm';
 import { showToast } from '../toast';
+import { focusField } from '../formError';
 import { lsGet, lsSet } from '../appName';
 import { dateText, timeText, dateTimeText, daysAgo } from '../../core/dateText';
 
@@ -56,17 +57,20 @@ async function fixWarmups(list: WarmupFix[]): Promise<number> {
 
 interface Row { key: string; text: string; sub?: string }
 
-function Section({ title, note, rows, okLabel, confirmTitle, confirmMsg, run, onSeen, testId }: {
-  title: string; note: string; rows: Row[]; okLabel: string; confirmTitle: string; confirmMsg: (n: number) => string;
+function Section({ title, note, rows, okLabel, confirmTitle, confirmMsg, run, onSeen, testId, danger }: {
+  title: string; note: string; rows: Row[]; okLabel: string; danger?: boolean; confirmTitle: string; confirmMsg: (n: number) => string;
   run: (keys: Set<string>) => Promise<number>; onSeen: (keys: string[]) => void; testId: string;
 }) {
   const [off, setOff] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+  const secRef = useRef<HTMLDivElement>(null);
   if (!rows.length) return null;
   const picked = rows.filter((r) => !off.has(r.key));
-  const toggle = (k: string) => { const s = new Set(off); if (s.has(k)) s.delete(k); else s.add(k); setOff(s); };
+  const toggle = (k: string) => { const s = new Set(off); if (s.has(k)) s.delete(k); else s.add(k); setOff(s); setErr(false); };
   const go = async () => {
-    if (!picked.length || busy) return;
+    if (busy) return;
+    if (!picked.length) { setErr(true); focusField(secRef.current?.querySelector<HTMLElement>('input[type=checkbox]') ?? null); return; }
     if (!(await askConfirm({ title: confirmTitle, message: `${confirmMsg(picked.length)}\n\n${picked.slice(0, 8).map((r) => `· ${r.text}`).join('\n')}${picked.length > 8 ? `\n외 ${picked.length - 8}건` : ''}`, ok: okLabel }))) return;
     setBusy(true);
     try {
@@ -76,7 +80,7 @@ function Section({ title, note, rows, okLabel, confirmTitle, confirmMsg, run, on
     } finally { setBusy(false); }
   };
   return (
-    <div class="fix-sec" data-testid={testId}>
+    <div class="fix-sec" data-testid={testId} ref={secRef}>
       <h3 class="fix-title">{title} <span class="sub small">{rows.length}건</span></h3>
       <p class="sub small">{note}</p>
       <ul class="fix-list">
@@ -89,9 +93,10 @@ function Section({ title, note, rows, okLabel, confirmTitle, confirmMsg, run, on
           </li>
         ))}
       </ul>
+      {err && <p class="field-err" role="alert" id={`${testId}-err`}>고칠 항목을 1개 이상 골라 주세요</p>}
       <div class="row">
         <button class="grow" disabled={busy} onClick={() => onSeen(rows.map((r) => r.key))}>그대로 두기</button>
-        <button class="primary grow" disabled={busy || !picked.length} onClick={() => void go()}>{okLabel} ({picked.length}건)</button>
+        <button class={`${danger ? 'danger' : 'tonal'} grow`} disabled={busy} onClick={() => void go()}>{okLabel} ({picked.length}건)</button>
       </div>
     </div>
   );
@@ -124,7 +129,7 @@ export function RecordFixCard({ s, byId }: { s: AppState; byId: Map<string, Exer
         rows={longs.map((f) => ({ key: endKey('long', f), text: `${day(f.startedAt)} ${f.name}`, sub: `${endChangeText(f)}${f.stragglers ? ` · 떨어진 세트 ${f.stragglers}개는 그대로` : ''}` }))}
         okLabel="긴 기록 고치기" confirmTitle="긴 기록의 끝난 시각을 고칠까요?" confirmMsg={(n) => `${n}건의 끝난 시각을 이어서 한 마지막 세트 + 3분으로 바꿔요. 세트 기록은 그대로예요.`}
         run={(keys) => fixEnds(longs.filter((f) => keys.has(endKey('long', f))))} onSeen={onSeen} />
-      <Section testId="fix-empty" title="완료한 세트가 없는 기록" note="세트를 하나도 완료하지 않은 기록이에요. 지우면 되돌릴 수 없어요."
+      <Section testId="fix-empty" danger title="완료한 세트가 없는 기록" note="세트를 하나도 완료하지 않은 기록이에요. 지우면 되돌릴 수 없어요."
         rows={empty.map((w) => ({ key: emptyKey(w), text: `${day(w.startedAt)} ${w.name}`, sub: `${at(w.startedAt, w.startedAt)} 시작 · 완료 세트 0개` }))}
         okLabel="지우기" confirmTitle="빈 기록을 지울까요?" confirmMsg={(n) => `완료 세트가 없는 기록 ${n}건을 지워요. 되돌릴 수 없어요.`}
         run={(keys) => deleteEmpty(empty.filter((w) => keys.has(emptyKey(w))))} onSeen={onSeen} />

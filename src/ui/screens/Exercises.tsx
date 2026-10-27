@@ -1,5 +1,5 @@
 import { scopedKey } from '../appName';
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf } from '../store';
 import { catalog, families, videoUrl, sourceVideos } from '../catalog';
@@ -18,6 +18,7 @@ import { Icon } from '../icons';
 import { setMeta } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import { go } from '../nav';
+import { focusField } from '../formError';
 import { askConfirm } from '../confirm';
 import { groupOf } from '../../core/volume';
 import { sinceText, axisText, dateText } from '../../core/dateText';
@@ -105,7 +106,16 @@ export function Exercises({ s }: { s: AppState }) {
             );
           })}
         </div>
-      ) : <Empty label="검색 결과 없음" text="검색 결과가 없어요" hint="다른 이름·초성으로 찾거나 필터를 풀어 보세요" />}
+      ) : (
+        // 가이드 A05(2026-10-28): 필터 결과 0건은 진짜 0건과 구분해 [필터 초기화] 를 줌
+        <Empty label="검색 결과 없음" text="검색 결과가 없어요" hint="다른 이름·초성으로 찾거나 필터를 풀어 보세요">
+          {(q || part || favOnly || videoOnly || active2 > 0) && <button class="tonal" onClick={() => {
+            setQ(''); setPart(undefined); setFavOnly(false); setVideoOnly(false); setEquip(''); setMinG(''); setMuscle('');
+            remember({ q: '', part: undefined, favOnly: false, videoOnly: false, equip: '', minG: '', muscle: '' });
+            requestAnimationFrame(() => document.querySelector<HTMLInputElement>('input[aria-label="운동 검색"]')?.focus()); // 버튼이 사라지므로 초점을 검색 칸으로
+          }}>필터 초기화</button>}
+        </Empty>
+      )}
       {adding && <AddCustom s={s} onClose={() => setAdding(false)} />}
     </main>
   );
@@ -118,18 +128,24 @@ export function AddCustom({ s, initialPart, onClose, onAdded }: { s: AppState; i
   const [eq, setEq] = useState<Equipment>('bodyweight');
   const [uni, setUni] = useState(false);
   const exists = catalog(s.custom).some((e) => e.name_ko === name.trim());
+  // 검증 시점: 입력 중에는 조용히, 이름칸을 벗어나거나 [운동 추가하기]를 누른 뒤에만 오류 표시
+  const [touched, setTouched] = useState(false);
+  const [tried, setTried] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const nameErr = !name.trim() ? (tried ? '운동 이름을 적어 주세요' : '') : exists && (touched || tried) ? '같은 이름의 운동이 이미 있어요' : '';
   return (
     <Sheet title="운동 직접 추가" onClose={onClose}>
-      <label>이름</label><input value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} aria-label="운동 이름" placeholder="예: 푸시업 변형, 친업" />
-      {exists && <p class="small t-warn">같은 이름의 운동이 이미 있어요</p>}
+      <label>이름</label><input ref={nameRef} value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onBlur={() => setTouched(true)} aria-label="운동 이름" placeholder="예: 푸시업 변형, 친업" aria-invalid={nameErr ? 'true' : undefined} aria-describedby={nameErr ? 'custom-name-err' : undefined} />
+      {nameErr && <p class="field-err" id="custom-name-err" role="alert">{nameErr}</p>}
       <label>부위</label><select value={part} onChange={(e) => setPart((e.target as HTMLSelectElement).value as Part)} aria-label="부위">{PARTS.map((p) => <option key={p}>{p}</option>)}</select>
-      <div class="grid2">
+      <div class="grid2 form-1col">
         <div><label>종류</label><select value={mech} onChange={(e) => setMech((e.target as HTMLSelectElement).value as Mechanics)} aria-label="종류"><option value="compound">다관절</option><option value="isolation">단관절</option></select></div>
         <div><label>장비</label><select value={eq} onChange={(e) => setEq((e.target as HTMLSelectElement).value as Equipment)} aria-label="장비">{EQUIPMENT.map((x) => <option key={x} value={x}>{EQUIPMENT_LABEL[x]}</option>)}</select></div>
       </div>
       <label class="row"><input type="checkbox" class="ck24" checked={uni} onChange={() => setUni(!uni)} /> 한쪽씩 하는 운동</label>
       <p class="sub small">직접 추가한 운동은 최고 등급 "S"로 설정되어 플랜 생성에 최우선 반영돼요. (상세 화면에서 변경 가능)</p>
-      <button class="primary big" disabled={!name.trim() || exists} onClick={async () => {
+      <button class="primary big" onClick={async () => {
+        if (!name.trim() || exists) { setTried(true); focusField(nameRef.current); return; }
         const id = newId('custom').replace(/-/g, '_');
         const item = { id, name_ko: name.trim(), family: id, part, muscles: [part], pattern: patternFor(part, mech), mechanics: mech, equipment: [eq], unilateral: uni, custom: true as const, createdAt: new Date().toISOString() };
         await mutate(async (d) => {
@@ -138,7 +154,7 @@ export function AddCustom({ s, initialPart, onClose, onAdded }: { s: AppState; i
         });
         onAdded?.({ ...item, grades: [], guide: [] });
         onClose();
-      }}>추가</button>
+      }}>운동 추가하기</button>
     </Sheet>
   );
 }

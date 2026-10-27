@@ -86,7 +86,7 @@ async function makeRoutine(page: Page, parts: string[], minutes: string) {
   for (const [k, p] of parts.entries()) await pickPart(page, p, k === 1 ? '보통' : undefined);
   await page.getByRole('button', { name: minutes }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await page.getByRole('button', { name: '저장만' }).click();
 }
 
@@ -127,7 +127,7 @@ test('핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3�
   await expect(page.getByRole('dialog', { name: '운동 교체' })).toBeVisible();
   await touchTargets(page);
   await page.getByRole('button', { name: '닫기' }).click();
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await expect(page.getByLabel('루틴 이름')).toHaveValue('등+삼두 45분');
   await page.getByRole('button', { name: '저장만' }).click();
 
@@ -192,7 +192,7 @@ test('운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취�
   await pickPart(page, '이두');
   await page.getByRole('button', { name: '60분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   const doneBtn = page.getByRole('button', { name: '현재 세트 완료' });
   await expect(doneBtn).toBeVisible();
@@ -522,7 +522,7 @@ test('플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 �
   await cards.nth(0).getByRole('button', { name: /^묶음 풀기: / }).click();
   await expect(cards.nth(0).locator('.badge.kind')).toHaveCount(0);
   // 저장하고 시작 → 운동 화면에도 슈퍼세트
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await expect(page.getByText('슈퍼세트').first()).toBeVisible();
   await endWorkout(page);
@@ -606,7 +606,7 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   await expect(planSec.getByRole('button', { name: '플랭크 세트 늘리기', exact: true })).toBeFocused();
   await checkScreen(page, '62-plan-bulk-group');
   // 저장하고 시작 → 운동 화면에 추가한 운동
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await expect(page.getByText('플랭크').first()).toBeVisible();
   // 바꾼 라운드 후 휴식이 운동 화면에 그대로
@@ -662,7 +662,7 @@ test('내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 
   await answer(page, '완전 삭제');
   await expect(list.getByRole('button', { name: /숨긴 루틴/ })).toHaveCount(0);
   // 검색어가 남은 채 개수가 줄어도 검색창·지우기 버튼은 남음 (루틴 5개 → 검색 → 숨겨 4개)
-  for (const n of ['A', 'B', 'C']) { await page.getByRole('button', { name: '+ 직접' }).click(); await page.getByLabel('루틴 이름').fill('빈 ' + n); await page.getByRole('button', { name: '저장', exact: true }).click(); }
+  for (const n of ['A', 'B', 'C']) { await page.getByRole('button', { name: '+ 직접' }).click(); await page.getByLabel('루틴 이름').fill('빈 ' + n); await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click(); }
   await page.getByRole('button', { name: /^내 루틴 모두 보기/ }).click();
   await expect(list.locator('.routine-card:not(.is-hidden)')).toHaveCount(5);
   await expect(list.getByRole('group', { name: '루틴 빈 A' }).getByRole('button', { name: '빈 A 운동 넣기' })).toBeVisible(); // 운동 없는 루틴은 시작 대신 운동 넣기
@@ -709,7 +709,7 @@ test('직접 추가한 운동을 플랜에서 최고 등급 S(D-074)로 반영 �
   await page.getByLabel('부위').selectOption('등');
   await page.getByLabel('종류').selectOption('compound');
   await touchTargets(page);
-  await page.getByRole('button', { name: '추가', exact: true }).click();
+  await page.getByRole('button', { name: '운동 추가하기', exact: true }).click();
   await page.getByRole('link', { name: '플랜' }).click();
   await pickPart(page, '등');
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
@@ -742,7 +742,7 @@ test('루틴 직접 만들기·편집: 운동 추가, 목표 횟수, 슈퍼세�
   await expect(page.getByText('슈퍼세트', { exact: true })).toBeVisible();
   await expect(page.getByText('묶음 안 전환')).toBeVisible();
   await checkScreen(page, '09-routine-editor');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await expect(page.getByRole('heading', { name: '팔 루틴' })).toBeVisible();
   await expect(page.getByText(/약 \d+분/).first()).toBeVisible();
 });
@@ -809,7 +809,7 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
   const finalGr = await reps(cards.nth(0));
   await checkScreen(page, '63-routine-part-add');
   // 저장 → 다시 편집: 값 유지
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await routineMenu(page, '부위 추가 루틴', '편집');
   await expect(page.getByRole('button', { name: '홈', exact: true })).toBeVisible(); // 홈·내 루틴에서 연 편집은 홈으로
   const cards2 = page.locator('main .card');
@@ -821,7 +821,9 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
 
 test('시간이 너무 짧으면 이유를 보여줌, 부위 없이 만들 수 없음', async ({ page }) => {
   await page.getByRole('link', { name: '플랜' }).click();
-  await expect(page.getByRole('button', { name: '부위를 먼저 고르세요' })).toBeDisabled();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click(); // 부위 없이: 막지 않고 오류 + 부위 칸으로 이동
+  await expect(page.getByRole('alert').filter({ hasText: '부위를 1개 이상 골라 주세요' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '생성된 플랜' })).toHaveCount(0);
   for (const p of ['하체', '등', '가슴']) await pickPart(page, p);
   await page.getByRole('button', { name: '30분' }).click();
   await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
@@ -1232,7 +1234,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await pc.getByRole('button', { name: '+ 운동 추가' }).click();
   await pc.getByLabel('운동 검색').fill('해머 컬');
   await pc.getByRole('dialog').getByRole('button').filter({ hasText: '해머 컬' }).first().click();
-  await pc.getByRole('button', { name: '저장', exact: true }).click();
+  await pc.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await syncNowOn(pc);
   await syncNowOn(page);
   await page.getByRole('link', { name: '홈' }).click();
@@ -1271,7 +1273,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await page.locator('.routine-card').first().getByRole('button', { name: / 메뉴$/ }).click();
   await page.getByRole('dialog').getByRole('button', { name: / 편집$/ }).click();
   await page.getByLabel('루틴 이름').fill('PC에서 짠 루틴');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await page.getByRole('link', { name: '설정' }).click();
   await page.getByRole('button', { name: '지금 동기화' }).click();
   await expect(page.getByLabel('PC와 폰 동기화')).toContainText('인터넷에 연결되지 않았어요');
@@ -1309,7 +1311,7 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   expect(res!.x).toBeGreaterThan(form!.x + form!.width - 5);
   await checkScreen(pc, '19-pc-plan');
   // 저장하고 시작 → 무게 입력 후 Enter = 다음 칸(횟수), Ctrl+Enter = 현재 세트 완료
-  await pc.getByRole('button', { name: '저장', exact: true }).click();
+  await pc.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await pc.getByRole('button', { name: '저장하고 시작' }).click();
   const w = pc.locator('input[aria-label$="1세트 무게"]').first();
   await w.click(); await w.fill('40'); await w.press('Enter');
@@ -1354,7 +1356,7 @@ test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙
   await expect(page.getByText(/#\/workout/)).toBeVisible();
   await page.getByLabel('개선 메모 내용').fill('휴식 끝 소리가 작아요');
   await checkScreen(page, '21-feedback-sheet');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '메모 저장하기', exact: true }).click();
   await page.getByRole('link', { name: '설정' }).click();
   const card = page.getByLabel(/^개선 메모 FB-\d{8}-[a-z0-9]+-\d{8}$/i).filter({ hasText: '휴식 끝 소리가 작아요' });
   await expect(card).toContainText('휴식 끝 소리가 작아요');
@@ -1368,7 +1370,7 @@ test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙
   await page.getByRole('button', { name: '개선 메모 쓰기' }).click();
   await expect(page.getByLabel('개선 메모 내용')).toBeFocused();
   await page.getByLabel('개선 메모 내용').fill('두 번째');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '메모 저장하기', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: /저장했어요 \(FB-\d{8}-[a-z0-9]+-\d{8}\)/i })).toBeVisible();
   await expect(page.getByLabel(/^개선 메모 FB-/).filter({ hasText: '두 번째' })).toHaveCount(1);
 });
@@ -1401,10 +1403,10 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await checkScreen(page, '23-workout-edit');
   // 잘못된 값은 저장 안 됨
   await page.locator('input[aria-label$=" 1세트 RIR"]').first().fill('15');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기록 저장하기', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('RIR');
   await page.locator('input[aria-label$=" 1세트 RIR"]').first().fill('2');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기록 저장하기', exact: true }).click();
   await expect(page.getByRole('heading', { name: '등 (고침)' })).toBeVisible();
   await expect(page.getByText(/에 고침$/)).toBeVisible();
   await expect(page.getByText(/42\.5kg × \d+회 · RIR 2/)).toBeVisible();
@@ -1441,7 +1443,7 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await expect(page.getByLabel('홈에서 뺌 기록')).toBeVisible();
   await page.getByRole('button', { name: '수정', exact: true }).click();
   await page.getByLabel('운동 이름').fill('등 (고침)2');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기록 저장하기', exact: true }).click();
   await expect(page.getByRole('heading', { name: '등 (고침)2' })).toBeVisible();
   await expect(page.getByLabel('홈에서 뺌 기록')).toBeVisible();
   // 2) 기록 상세에서 "홈에 다시 보이기" → 홈에 다시 나타남
@@ -1477,7 +1479,7 @@ test('수정 화면: 입력 중 세트를 지워도 값이 옆 세트로 가지 
   await f1.click(); await page.keyboard.type('9');
   await page.locator('button[aria-label$=" 1세트 지우기"]').first().evaluate((b: HTMLButtonElement) => b.click());
   await expect(page.locator('input[aria-label$=" 1세트 무게"]').first()).toHaveValue('50');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기록 저장하기', exact: true }).click();
   await expect(page).toHaveURL(/#\/stats\/w\/[^/]+$/);
   await expect(page.getByText(/9월 28일/)).toBeVisible();
   await expect(page.getByText(/50kg × \d+회/).first()).toBeVisible();
@@ -1629,7 +1631,7 @@ test('기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바�
   await recentMenu(card, '수정');
   await page.getByLabel('운동 이름').fill('내 수정 1');
   await remote('다른 기기 A');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기록 저장하기', exact: true }).click();
   await expect(sheet.getByRole('heading', { name: '다른 기기에서 이 기록이 바뀌었어요' })).toBeVisible();
   await remote('다른 기기 B');
   await answer(page, '덮어쓰기');
@@ -1643,14 +1645,14 @@ test('기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바�
   await page.getByRole('button', { name: '수정', exact: true }).click();
   await page.getByLabel('운동 이름').fill('내 수정 2');
   await remote('다른 기기 C');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기록 저장하기', exact: true }).click();
   await answer(page, '계속 고치기');
   await expect(page).toHaveURL(/\/edit$/);
   expect((await stored())!.name).toBe('내 수정 1');
 
   // 지워짐 → 되살려 저장
   await remote(null);
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기록 저장하기', exact: true }).click();
   await expect(sheet.getByRole('heading', { name: '다른 기기에서 이 기록이 지워졌어요' })).toBeVisible();
   await answer(page, '되살려 저장');
   await expect(page).toHaveURL(/#\/stats\/w\//);
@@ -1714,7 +1716,7 @@ test('플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바�
   await expect(cards.nth(0)).toContainText('스미스머신 JM프레스');
   await checkScreen(page, '20-plan-edit');
 
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await expect(page).toHaveURL(/#\/workout/);
   // 첫 블록 = 추가한 JM프레스: 내 운동 DB 정보 버튼(강조)
@@ -1826,7 +1828,7 @@ test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 �
   await checkScreen(page, '24-plan-drag');
   const p1 = await namesOf(cards);
 
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await expect(page).toHaveURL(/#\/workout/);
   const main = page.locator('main');
@@ -1878,7 +1880,7 @@ test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 �
   await dragTo(page, rcards.nth(2).locator('.drag-handle'), rcards.nth(0), touch);
   await expect.poll(rn).toEqual([r0[2], r0[0], r0[1]]);
   await checkScreen(page, '26-routine-drag');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await routineMenu(page, '끌기 루틴', '편집');
   await expect(async () => expect(await rn()).toEqual([r0[2], r0[0], r0[1]])).toPass({ timeout: 5000 });
 });
@@ -2136,7 +2138,7 @@ test('D-055 새 버전 배너: 버전·바뀐 점 한 줄·[지금 적용][나�
   await expect(page.getByRole('navigation', { name: '주 메뉴' }).getByRole('link', { name: '운동' })).toHaveAttribute('aria-describedby', 'wk-dot-desc'); // 운동 중 점
   await page.getByRole('link', { name: '홈', exact: true }).click();
   await expect(banner).toContainText('새 버전 준비됨');
-  await banner.getByRole('button', { name: '적용' }).click();
+  await banner.getByRole('button', { name: '지금 적용' }).click();
   await expect(page.getByRole('dialog', { name: '운동 중이에요' })).toBeVisible();
   await answer(page, '취소');
   await expect(banner).toBeVisible();
@@ -2400,7 +2402,7 @@ test('D-055 3단계 운동 화면: 시간 운동 지난번(초), 고친 지난 �
   await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
   await page.getByRole('dialog', { name: '운동 추가' }).getByLabel('운동 검색').fill('플랭크');
   await page.getByRole('dialog', { name: '운동 추가' }).getByRole('button', { name: '플랭크', exact: true }).click();
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await page.getByRole('button', { name: '저장만' }).click();
   await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
   await expect(page.getByRole('button', { name: '끝내기', exact: true })).not.toHaveClass(/danger-fill/);
@@ -2420,7 +2422,7 @@ test('D-055 3단계 운동 화면: 시간 운동 지난번(초), 고친 지난 �
   // 지난 기록을 60kg × 8 로 고침
   await recentMenu(page.getByRole('group', { name: /^최근 운동 / }).first(), '수정');
   await page.locator(`input[aria-label="${first} 1세트 무게"]`).first().fill('60');
-  await page.getByRole('button', { name: '저장', exact: true }).click();
+  await page.getByRole('button', { name: '기록 저장하기', exact: true }).click();
   await page.getByRole('link', { name: '홈', exact: true }).click();
   // 2회차: 지난번 = 고친 값 60×8, 플랭크 지난번 = 초, 55kg × 8 은 갱신 아님 (고친 60 기준)
   await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
@@ -2939,7 +2941,7 @@ test.describe('D-058 애플워치 연동', () => {
     await pickPart(page, '이두');
     await page.getByRole('button', { name: '60분' }).click();
     await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
-    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
     await page.getByRole('button', { name: '저장하고 시작' }).click();
     await expect(page.getByRole('button', { name: '현재 세트 완료' })).toBeVisible();
     // 오늘 하루 보내기를 아직 안 한 상태로 바꿈 → 운동을 끝낼 때 하루 보내기가 끼어들면 안 됨 (운동 보내기 한 번만)

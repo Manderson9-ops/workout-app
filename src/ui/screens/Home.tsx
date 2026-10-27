@@ -187,7 +187,7 @@ export function Home({ s }: { s: AppState }) {
       {backupDue(s.settings.lastBackupAt, history.length, Date.now()) && <BackupBanner s={s} />}
       {s.routines.length > 0 ? (
         <>
-          <div class="row between sec-head"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="primary" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
+          <div class="row between sec-head"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="tonal" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
           <RoutineList s={s} mode="home" nextId={!active ? next?.routine.id : undefined} />
         </>
       ) : null}

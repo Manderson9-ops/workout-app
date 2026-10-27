@@ -32,6 +32,18 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
   /** 세트·운동을 지우거나 더하는 동작: 입력 중인 숫자를 먼저 반영한 뒤 */
   const act = async (fn: (d: Workout) => Workout) => { await flushPending(); setDraft(fn); };
   const [err, setErr] = useState('');
+  // 운동 빼기는 묻지 않고 바로 빼고 5초 [되돌리기] (D-079, 가이드 Undo). 저장 전 초안이라 기록은 아직 그대로. 그사이 다른 것을 고치면 되돌리기는 사라짐
+  const [undo, setUndo] = useState<{ text: string; before: Workout; after: Workout } | null>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (undo && draft !== undo.after) setUndo(null); }, [draft]);
+  useEffect(() => { if (!undo) return; undoRef.current?.focus(); const t = setTimeout(() => { if (document.activeElement === undoRef.current) addRef.current?.focus(); setUndo(null); }, 5000); return () => clearTimeout(t); }, [undo]);
+  const removeItem = async (bi: number, ii: number, ex: string) => {
+    await flushPending();
+    const before = cur.current; if (!before) return;
+    setDraft((d) => deleteItem(d, bi, ii));
+    setUndo({ text: `${ex}을(를) 뺐어요`, before, after: cur.current! });
+  };
   const [busy, setBusy] = useState(false);
   const [picker, setPicker] = useState(false);
   const [startText, setStartText] = useState(() => (orig ? toLocalInput(orig.startedAt) : ''));
@@ -106,17 +118,11 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
       <h1>{isNew ? '운동 기록 직접 작성' : '운동 기록 수정'}</h1>
       <label>운동 이름</label>
       <input aria-label="운동 이름" maxLength={EDIT_LIMITS.nameMax} value={draft.name} onInput={(e) => { const v = (e.target as HTMLInputElement).value; setDraft((d) => ({ ...d, name: v })); }} />
-      <div class="row wrap" style={{ gap: '8px', marginTop: '8px' }}>
-        <div class="grow">
-          <label>시작</label>
-          <input type="datetime-local" aria-label="시작 날짜와 시각" max={nowLocal} value={startText}
-            onInput={(e) => onStart((e.target as HTMLInputElement).value)} onChange={(e) => onStart((e.target as HTMLInputElement).value)} />
-        </div>
-        <div style={{ width: '120px' }}>
-          <label>운동 시간(분)</label>
-          <NumInput integer label="운동 시간(분)" suffix="분" pendingKey="ed-min" value={mins} onChange={(v) => setDraft((d) => setTimes(d, d.startedAt, v ?? 0))} />
-        </div>
-      </div>
+      <label>시작 일시</label>
+      <input type="datetime-local" aria-label="시작 날짜와 시각" max={nowLocal} value={startText}
+        onInput={(e) => onStart((e.target as HTMLInputElement).value)} onChange={(e) => onStart((e.target as HTMLInputElement).value)} />
+      <label>운동 시간(분)</label>
+      <NumInput integer label="운동 시간(분)" suffix="분" pendingKey="ed-min" value={mins} onChange={(v) => setDraft((d) => setTimes(d, d.startedAt, v ?? 0))} />
       <p class="sub small">세트 번호(1, 2…)를 누르면 웜업(W)으로 바뀌고, 다시 누르면 돌아와요.</p>
 
       {isNew && draft.blocks.length === 0 && <p class="sub" style={{ margin: '16px 0 8px' }}>아래 "+ 운동 추가"를 눌러 운동과 세트를 추가해 주세요.</p>}
@@ -127,7 +133,7 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
         let n = 0;
         return (
           <div class="card" key={`${bi}-${ii}-${it.exerciseId}`} role="group" aria-label={`${ex} 세트 고치기`}>
-            <div class="row between"><strong>{ex}</strong><button class="danger" aria-label={`${ex} 운동 지우기`} onClick={async () => { if (await askConfirm({ title: '운동을 지울까요?', message: `${ex}와(과) 그 세트를 이 기록에서 지워요.`, ok: '지우기', danger: true })) void act((d) => deleteItem(d, bi, ii)); }}>운동 지우기</button></div>
+            <div class="row between"><strong>{ex}</strong><button class="danger" aria-label={`${ex} 운동 지우기`} onClick={() => void removeItem(bi, ii, ex)}>운동 지우기</button></div>
             <div class="edit-set sub small" aria-hidden="true"><span>세트</span><span>무게(kg)</span><span>{timeBased ? '시간(초)' : '횟수'}</span><span>RIR</span><span>완료</span><span /></div>
             {it.sets.map((x, k) => {
               const key = keyOf(x);
@@ -150,15 +156,22 @@ export function WorkoutEdit({ s, id }: { s: AppState; id: string }) {
           </div>
         );
       }))}
-      <button class="big" onClick={() => void flushPending().then(() => setPicker(true))}>+ 운동 추가</button>
+      <button class="big" ref={addRef} onClick={() => void flushPending().then(() => setPicker(true))}>+ 운동 추가</button>
 
       <label style={{ marginTop: '10px', display: 'block' }}>메모</label>
       <textarea aria-label="운동 메모" rows={3} maxLength={EDIT_LIMITS.memoMax} value={draft.memo ?? ''} style={{ width: '100%', boxSizing: 'border-box', fontSize: '16px' }} onInput={(e) => { const v = (e.target as HTMLTextAreaElement).value; setDraft((d) => ({ ...d, memo: v })); }} />
 
+      <p class="sr-only" role="status" aria-live="polite">{undo?.text ?? ''}</p>
+      {undo && (
+        <div class="toast">
+          <span class="grow">{undo.text}</span>
+          <button ref={undoRef} class="ghost" onClick={() => { const u = undo; setUndo(null); setDraft(() => u.before); }}>되돌리기</button>
+        </div>
+      )}
       {err && <p role="alert" style={{ color: 'var(--warn)' }}>{err}</p>}
       <div class="row" style={{ marginTop: '12px' }}>
         <button class="grow" onClick={() => void cancel()}>취소</button>
-        <button class="primary grow" disabled={busy} onClick={() => void save()}>저장</button>
+        <button class="primary grow" disabled={busy} onClick={() => void save()}>기록 저장하기</button>
       </div>
       {!isNew && <button class="danger" style={{ marginTop: '12px' }} onClick={async () => { if (await askConfirm({ title: '이 운동 기록을 지울까요?', message: '되돌릴 수 없어요.', ok: '지우기', danger: true })) { await mutate((d) => softDelete(d, 'workouts', id)); go('#/stats'); } }}>이 기록 삭제</button>}
 

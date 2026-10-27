@@ -35,7 +35,7 @@ export function DiagSection({ s, part }: { s: AppState; part?: 'send' | 'diag' }
       {showSend && <>
       <h2>PC로 보내기</h2>
       <p class="sub small">운동 기록과 진단 기록을 파일 하나로 보내요. 공유 → "파일에 저장" → Google Drive → <strong>WORK_OUT_APP → sync → inbox</strong> (처음 한 번만 고르면 다음부터 기억해요). PC에서 "동기화 파일 확인해 줘"라고 하면 검사 후 요약해 드려요.</p>
-      <button class="primary" onClick={async () => { const r = await saveBackupFile(); if (r === 'shared' || r === 'downloaded') diag('send', { m: `파일 (${r})`, ok: true }); setMsg(SAVE_MESSAGE[r].replace('백업 파일', 'PC로 보낼 파일')); }}>PC로 보내기 (파일)</button>
+      <button class="tonal" onClick={async () => { const r = await saveBackupFile(); if (r === 'shared' || r === 'downloaded') diag('send', { m: `파일 (${r})`, ok: true }); setMsg(SAVE_MESSAGE[r].replace('백업 파일', 'PC로 보낼 파일')); }}>PC로 보내기 (파일)</button>
       {msg && <p role="status" class="small">{msg}</p>}
       <AutoSendSection />
       <SyncSection s={s} />

@@ -1,9 +1,10 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { getSendConfig, saveSendConfig, clearSendConfig, pingSend, sendNow, lastSentAt, hasPending, useSendState, getSendState, retryBlocked, blockedReason } from '../autoSend';
 import { maskKey } from '../../core/autoSendConfig';
 import { IS_PREVIEW } from '../appName';
 import { askConfirm } from '../confirm';
 import { dateTimeText } from '../../core/dateText';
+import { focusField } from '../formError';
 
 const when = (t?: string) => (t ? dateTimeText(t, Date.now()) : '없음');
 
@@ -22,6 +23,8 @@ export function AutoSendSection() {
   if (IS_PREVIEW) return <><h2>자동 보내기</h2><p class="sub small">미리 보기 판은 PC(구글 드라이브)로 보내지 않아요. 데이터는 본판 → 미리 보기 한 방향이에요 (본판에서 백업 저장 → 여기서 불러오기).</p></>;
   const [cfg, setCfg] = useState(getSendConfig());
   const [text, setText] = useState('');
+  const [tried, setTried] = useState(false); // 저장을 눌러 본 뒤에만 빈 칸 오류 표시
+  const box = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<{ t: string; ok: boolean } | null>(null);
   const st = useSendState();
   return (
@@ -33,18 +36,20 @@ export function AutoSendSection() {
           <p class="small">연결됨 · 키 {maskKey(cfg.key)} · 마지막 보냄 {when(lastSentAt())}{hasPending() ? ' · 보낼 것 있음' : ''}{retryBlocked() ? ` · 자동 재시도 멈춤: ${blockedReason()} ("지금 보내기"로 다시)` : ''}</p>
           <div class="row wrap">
             <button onClick={async () => { const r = await pingSend(); setMsg({ t: r.message, ok: r.ok }); }}>연결 확인</button>
-            <button class="primary" disabled={st.phase === 'sending'} onClick={async () => { const ok = await sendNow('manual'); setMsg({ t: ok ? 'PC로 보냈어요' : `보내지 못했어요: ${getSendState().error ?? ''}`, ok }); }}>지금 보내기</button>
+            <button class="tonal" disabled={st.phase === 'sending'} onClick={async () => { const ok = await sendNow('manual'); setMsg({ t: ok ? 'PC로 보냈어요' : `보내지 못했어요: ${getSendState().error ?? ''}`, ok }); }}>지금 보내기</button>
             <button class="danger" onClick={async () => { if (await askConfirm({ title: '자동 보내기를 끌까요?', message: '이 기기에서 설정이 지워져요.', ok: '끄기', danger: true })) { clearSendConfig(); setCfg(undefined); setMsg({ t: '자동 보내기를 껐어요', ok: true }); } }}>끄기</button>
           </div>
         </>
       ) : (
         <>
           <p class="sub small">PC의 <strong>WORK_OUT_APP\sync\설정.txt</strong> 두 번째 줄(https://…#…)을 아이폰 파일 앱(구글 드라이브)에서 복사해 붙여넣으세요. 연결되면 그 파일은 지워 주세요.</p>
-          <input aria-label="자동 보내기 설정 붙여넣기" type="text" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellcheck={false} style={{ WebkitTextSecurity: 'disc' } as Record<string, string>} placeholder="https://script.google.com/…#…" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} />
-          <button class="primary" style={{ marginTop: '6px' }} disabled={!text.trim()} onClick={async () => {
+          <input ref={box} aria-label="자동 보내기 설정 붙여넣기" aria-invalid={tried && !text.trim() ? 'true' : undefined} aria-describedby={tried && !text.trim() ? 'send-cfg-err' : undefined} type="text" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellcheck={false} style={{ WebkitTextSecurity: 'disc' } as Record<string, string>} placeholder="https://script.google.com/…#…" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} />
+          {tried && !text.trim() && <p class="field-err" id="send-cfg-err" role="alert">설정 글(https://…#…)을 붙여 넣어 주세요</p>}
+          <button class="tonal" style={{ marginTop: '8px' }} onClick={async () => {
+            if (!text.trim()) { setTried(true); focusField(box.current); return; }
             const r = saveSendConfig(text);
             if (!r.ok) { setMsg({ t: r.error, ok: false }); return; }
-            setText(''); setCfg(getSendConfig());
+            setText(''); setTried(false); setCfg(getSendConfig());
             const p = await pingSend();
             setMsg({ t: p.ok ? '연결됐어요. 이제 설정.txt를 지워 주세요' : `저장했지만 연결 확인 실패: ${p.message}`, ok: p.ok });
           }}>저장하고 연결 확인</button>
