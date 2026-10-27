@@ -5,7 +5,7 @@
 | typecheck | 오류 0 (`tsc --noEmit`) |
 | decisions:check | 불일치 0 (`tools/check_decisions.ts`) |
 | npm test | 단위 662 + 플랜 72 = 734 전수 통과 (`--testTimeout=20000`. 기본 5초에서는 PC 부하로 `preview.test.ts`·`routineList.test.ts` 시간 초과 1~2건, 단독 재실행 통과) |
-| E2E (iPhone 13 WebKit·Chromium + PC 1280) | 170/170 통과 (2026-10-28 01:01, 버전 올리기 전 — 버전 올리기는 `src/ui` 를 바꾸지 않음) |
+| E2E (iPhone 13 WebKit·Chromium + PC 1280) | 버전 올린 뒤 07:2x 전체 169/170 — 실패 1 = `app.spec.ts:2530` D-056 휴식 진동(chromium, `.rest-pill.end` 5초 안 안 보임, 시간 의존). 단독 3회×2엔진 6/6 통과 → 부하 흔들림으로 판단. 버전 올리기 전 01:01 전체 170/170 |
 | UX/UI 감사 게이트 | `node tools/uxui_audit.ts --gate` exit 0 — PASS 22 · INFO 4 · JUDGED 11 · N/A 12 (기준선 FAIL 13) |
 | build:next | 정상 |
 | 독립 검토 (Opus) | 9.55 / 10 (PASS-with-findings, 지적 3건 반영) — `docs/reviews/d079-uxui.md` |
