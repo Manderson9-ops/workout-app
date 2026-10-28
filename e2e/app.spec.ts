@@ -2543,7 +2543,8 @@ test.describe('D-056 휴식 끝 진동', () => {
     await shift((total - 5) * 1000);
     await expect.poll(calls).toEqual([1]); // 10초 전 짧게
     await shift((total + 1) * 1000);
-    await expect(page.locator('.rest-pill.end')).toBeVisible();
+    // 전체 실행 부하 때 5초 안에 못 그리는 일이 있어(단독 6/6 통과) 휴식 끝 표시만 넉넉히 기다림
+    await expect(page.locator('.rest-pill.end')).toBeVisible({ timeout: 15000 });
     await expect.poll(calls).toEqual([1, 3]); // 끝에 3번
     await page.waitForTimeout(800);
     expect(await calls()).toEqual([1, 3]); // 다시 울리지 않음
@@ -2558,7 +2559,7 @@ test.describe('D-056 휴식 끝 진동', () => {
     // 늦게 돌아옴: 끝난 지 30초 지나서 화면을 봄 → 진동 안 함 (소리·깜빡임은 그대로)
     const t2 = Number((await page.getByLabel(/휴식 남은 시간/).getAttribute('aria-label'))!.match(/\d+/)![0]);
     await shift((t2 + 30) * 1000);
-    await expect(page.locator('.rest-pill.end')).toBeVisible();
+    await expect(page.locator('.rest-pill.end')).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(500);
     expect((await calls()).filter((p) => p === 3)).toEqual([]);
   });
@@ -2817,7 +2818,8 @@ test.describe('D-058 애플워치 연동', () => {
         { id: `en-${d}`, type: 'energy', day: d, t0, p: [sa, 0, 120], rx },
         { id: `dy-${day(Date.now())}`, type: 'daily', day: day(Date.now()), sleepMin: 330, rhr: 56, hrv: 48.4, rx },
       ];
-      await new Promise<void>((res, rej) => { const tx = db.transaction('health', 'readwrite'); for (const r of rows) tx.objectStore('health').put(r); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
+      // 앞 단계 행을 지우고 넣음: 40분 운동이 자정을 걸치면 day 가 바뀌어 'few' 행이 덮이지 않고 남음(00:00~00:40 실행 때 24 → 27)
+      await new Promise<void>((res, rej) => { const tx = db.transaction('health', 'readwrite'); const st = tx.objectStore('health'); st.clear(); for (const r of rows) st.put(r); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); });
       db.close();
     }, mode);
     await putHealth('few');

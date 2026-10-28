@@ -58,6 +58,8 @@ export default defineConfig({
   test: {
     // 커버리지 계측 중에는 코드가 2~3배 느려지므로 시간 측정 관문은 계측 없는 실행(npm run test:plans)에서만 판정
     env: { COVERAGE_RUN: process.argv.includes('--coverage') ? '1' : '' },
+    // 모듈을 새로 불러오는 시험(preview·routineList)이 PC 부하 때 기본 5초를 넘김 — 단독 실행은 통과
+    testTimeout: 20000,
     include: process.env.SAMPLES_OUT ? ['tools/**/*.gen.ts'] : ['tests/**/*.test.ts'],
     coverage: {
       provider: 'v8',
