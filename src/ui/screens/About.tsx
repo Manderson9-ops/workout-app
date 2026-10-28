@@ -13,6 +13,19 @@ import { ScreenHeader } from '../header';
 import { Icon } from '../icons';
 import { go } from '../nav';
 
+/** 펼쳐서 보여 주는 최근 버전 수 (D-079 2차 2단계: 나머지는 "이전 버전 N개" 안) */
+const NEW_N = 3;
+
+function ChangeItem({ e, open }: { e: (typeof CHANGELOG)[number]; open: boolean }) {
+  return (
+    <details class="card cl-item" open={open}>
+      <summary><span class="cl-ver">{displayVersion(e.version)}</span><span class="sub">{koDate(e.date)}</span>{e.version === APP_VERSION && <span class="chip-s acc">지금</span>}</summary>
+      <ChangeLines lines={e.changes} full />
+      {e.where && e.where !== '#/settings/about' && <button class="wn-go" onClick={() => go(e.where!)} aria-label={`${displayVersion(e.version)} 바뀐 곳 보러 가기`}>보러 가기 <Icon name="chevron" size={18} /></button>}
+    </details>
+  );
+}
+
 /**
  * 버전 표시 (D-055 검토 A5): 화면에는 숫자만("0.9.0"), 판은 따로 "판: 본판 / β 미리 보기" 칩.
  * "-preview" 꼬리표는 개발 단계 표시라 아래 작은 "빌드 이름" 줄에만 보여 줌 (본판인데 미리 보기로 읽히지 않게)
@@ -47,13 +60,13 @@ export function AboutScreen() {
 
       <h2>업데이트 내역</h2>
       <div class="changelog">
-        {CHANGELOG.map((e, i) => (
-          <details key={e.version} class="card cl-item" open={i === 0}>
-            <summary><span class="cl-ver">{displayVersion(e.version)}</span><span class="sub">{koDate(e.date)}</span>{e.version === APP_VERSION && <span class="chip-s acc">지금</span>}</summary>
-            <ChangeLines lines={e.changes} full />
-            {e.where && e.where !== '#/settings/about' && <button class="wn-go" onClick={() => go(e.where!)} aria-label={`${displayVersion(e.version)} 바뀐 곳 보러 가기`}>보러 가기 <Icon name="chevron" size={18} /></button>}
+        {CHANGELOG.slice(0, NEW_N).map((e) => <ChangeItem key={e.version} e={e} open />)}
+        {CHANGELOG.length > NEW_N && (
+          <details class="card cl-older" data-testid="cl-older">
+            <summary>이전 버전 {CHANGELOG.length - NEW_N}개</summary>
+            <div class="changelog">{CHANGELOG.slice(NEW_N).map((e) => <ChangeItem key={e.version} e={e} open={false} />)}</div>
           </details>
-        ))}
+        )}
       </div>
       <p class="sub small"><a href={`${import.meta.env.BASE_URL}THIRD_PARTY_LICENSES.txt`} target="_blank" rel="noopener" class="license-link">오픈소스 고지</a> (인체 근육 그림: react-native-body-highlighter, MIT)</p>
     </main>

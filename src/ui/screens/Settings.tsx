@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { phoneView, setPhoneView } from '../view';
 import type { AppState } from '../store';
@@ -9,10 +9,13 @@ import type { Level, Equipment } from '../../core/types';
 import { APP_VERSION } from '../../core/version';
 import { setMeta } from '../actions';
 import type { Settings } from '../../db/db';
-import { BackupSection } from './BackupSection';
+import { BackupSection, ResetSection } from './BackupSection';
 import { FeedbackList } from './FeedbackUi';
 import { DiagSection } from './DiagSection';
-import { go } from '../nav';
+import { go, dropQuery } from '../nav';
+import { getSendConfig, blockedReason } from '../autoSend';
+import { useSyncStatus, syncErrorText } from '../sync';
+import { dateTimeText } from '../../core/dateText';
 import { ScreenHeader } from '../header';
 import { Icon } from '../icons';
 import { hasNewDot } from '../whatsNew';
@@ -25,13 +28,36 @@ import { permissionText, deniedText, delayedResultText } from '../../core/notify
 import type { NotifyPermission } from '../../core/notify';
 import type { AudioMode } from '../device';
 
-/** 설정 묶음: 섹션 제목 + 카드. card=false 면 안의 카드들을 그대로 (카드 안 카드 방지) */
-function SetGroup({ title, children, card = true }: { title: string; children: ComponentChildren; card?: boolean }) {
+const OPEN_KEY = 'settings.open.v1';
+const readStored = (): Record<string, boolean> => {
+  try { const v = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; }
+};
+/** #/settings?open=<groupKey> : 도착할 때 한 묶음만 열어 줌 (저장소에는 쓰지 않음) */
+const queryOpen = (): string | null => {
+  if (!location.hash.startsWith('#/settings?')) return null; // 다른 화면 주소의 ?open= 은 이 화면 몫이 아님
+  const q = location.hash.split('?')[1];
+  return q ? new URLSearchParams(q).get('open') : null;
+};
+
+/** 설정 묶음 (아이폰 설정식 아코디언): 제목 + 한 줄 현재 상태. card=false 면 안의 카드들을 그대로 (카드 안 카드 방지) */
+function SetGroup({ gkey, title, summary, open, onToggle, children, card = true }: { gkey: string; title: string; summary: string; open: boolean; onToggle: (k: string, o: boolean) => void; children: ComponentChildren; card?: boolean }) {
   return (
-    <section class="set-group" aria-label={title}>
-      <h2 class="set-group-title">{title}</h2>
-      {card ? <div class="card set-card">{children}</div> : children}
-    </section>
+    <details class="card set-group" open={open} data-group={gkey} onToggle={(e) => { const o = (e.currentTarget as HTMLDetailsElement).open; if (o !== open) onToggle(gkey, o); }}>
+      <summary><span class="grow"><b class="set-group-title">{title}</b><span class="sub small set-sum">{summary}</span></span></summary>
+      <section class="set-body" aria-label={title}>
+        {card ? <div class="set-card">{children}</div> : children}
+      </section>
+    </details>
+  );
+}
+
+/** 3줄 넘는 설명: 첫 문장은 굵게 보이고 나머지는 "자세히" 안으로 (글은 지우지 않음) */
+function Lead({ lead, children }: { lead: string; children: ComponentChildren }) {
+  return (
+    <div class="set-lead">
+      <p class="sub small"><b>{lead}</b></p>
+      <details class="set-more"><summary>자세히</summary><p class="sub small">{children}</p></details>
+    </div>
   );
 }
 
@@ -40,6 +66,29 @@ export function SettingsScreen({ s }: { s: AppState }) {
   const put = (p: Partial<Settings>) => mutate((d) => d.settings.put({ ...st, ...p, key: 'main' }));
   const all = catalog(s.custom);
   const excluded = [...s.meta.values()].filter((m) => m.excluded);
+  const [init] = useState(readStored); // 저장된 펼침 상태는 처음 한 번만 읽음
+  const stored = useRef<Record<string, boolean>>(init);
+  // 동기화·백업: 자동 보내기가 멈췄거나 동기화 오류면 요약 줄에 먼저 보임. 들어올 때 이미 그렇다면 처음부터 열려 있고(저장소에는 쓰지 않음),
+  // 화면을 보는 중에 새로 생기면 저절로 열지 않고 요약 줄에만 보임
+  const syncSt = useSyncStatus();
+  const blocked = !IS_PREVIEW && getSendConfig() ? blockedReason() : undefined;
+  const syncWarn = [blocked ? `자동 보내기 멈춤 · ${blocked}` : '', syncSt.phase === 'error' ? `동기화 안 됨 · ${syncErrorText(syncSt.error)}` : ''].filter(Boolean);
+  const [openSet, setOpenSet] = useState<Record<string, boolean>>(() => {
+    const k = queryOpen();
+    return { ...init, ...(k ? { [k]: true } : {}), ...(syncWarn.length ? { sync: true } : {}) };
+  });
+  // 주소의 ?open= 은 한 번 쓰면 걷어 내서 뒤로 가기가 사용자가 연·닫은 상태를 따르게 함
+  useEffect(() => {
+    const eat = () => { const k = queryOpen(); if (k) { setOpenSet((p) => (p[k] ? p : { ...p, [k]: true })); dropQuery('#/settings'); } };
+    eat();
+    window.addEventListener('hashchange', eat);
+    return () => window.removeEventListener('hashchange', eat);
+  }, []);
+  const onToggle = (k: string, o: boolean) => {
+    setOpenSet((p) => ({ ...p, [k]: o }));
+    stored.current = { ...stored.current, [k]: o };
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify(stored.current)); } catch { /* 저장 못 해도 화면은 동작 */ }
+  };
   const [pv, setPv] = useState(phoneView());
   const [am, setAm] = useState<AudioMode>(audioMode());
   const [hp, setHp] = useState(hapticOn());
@@ -85,7 +134,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
         <Icon name="chevron" size={18} class="card-more" />
       </a>
       {/* D-055 3단계: 묶음 카드 (운동 / 소리·화면 / 동기화·백업 / 데이터 / 앱 정보·도구), 컨트롤과 이름은 그대로 */}
-      <SetGroup title="운동">
+      <SetGroup gkey="workout" title="운동" summary={`${st.level} · 휴식 ${st.rest.compound}초`} open={!!openSet.workout} onToggle={onToggle}>
         <label>내 수준 (영상 등급이 수준별로 다를 때 사용)</label>
         <div class="row wrap">{LEVELS.map((l) => <button key={l} class={`chip ${st.level === l ? 'on' : ''}`} aria-pressed={st.level === l} onClick={() => put({ level: l as Level })}>{l}</button>)}</div>
         <label>쓸 수 있는 장비 (없는 장비 운동은 플랜에서 빠짐)</label>
@@ -112,14 +161,14 @@ export function SettingsScreen({ s }: { s: AppState }) {
         ))}
       </SetGroup>
 
-      <SetGroup title="소리·화면">
+      <SetGroup gkey="sound" title="소리·화면" summary={`소리 ${st.soundOn ? '켬' : '끔'} · 진동 ${hp ? '켬' : '끔'}`} open={!!openSet.sound} onToggle={onToggle}>
         <label>휴식 끝 알림</label>
         <div class="row wrap">
           <button class={`chip ${st.soundOn ? 'on' : ''}`} aria-pressed={st.soundOn} onClick={() => put({ soundOn: !st.soundOn })}>소리 {st.soundOn ? '켬' : '끔'}</button>
           <button class={`chip ${hp ? 'on' : ''}`} aria-pressed={hp} onClick={() => { setHapticOn(!hp); setHp(!hp); }}>휴식 끝 진동 {hp ? '켬' : '끔'}</button>
           <button class={`chip ${st.keepAwake ? 'on' : ''}`} aria-pressed={st.keepAwake} onClick={() => put({ keepAwake: !st.keepAwake })}>운동 중 화면 켜 두기 {st.keepAwake ? '켬' : '끔'}</button>
         </div>
-        <p class="sub small">진동(이 기기만): 휴식이 끝나면 3번, 10초 전에는 짧게 한 번. 소리 켬/끔과 따로예요. 안드로이드는 진동이 오고, 아이폰은 애플 제한으로 버튼을 누르지 않은 순간에는 진동이 안 올 수 있어요.</p>
+        <Lead lead="진동(이 기기만): 휴식이 끝나면 3번, 10초 전에는 짧게 한 번.">소리 켬/끔과 따로예요. 안드로이드는 진동이 오고, 아이폰은 애플 제한으로 버튼을 누르지 않은 순간에는 진동이 안 올 수 있어요.</Lead>
         <div class="alert-test">
           <button onClick={testAlert}>소리·진동 시험</button>
           {testMsg && <p class="sub small" role="status" data-testid="alert-test-result">{testMsg}</p>}
@@ -129,9 +178,9 @@ export function SettingsScreen({ s }: { s: AppState }) {
           <option value="mix">음악 계속 · 알림음만 위에 (기본)</option>
           <option value="solo">앱 소리 우선 · 음악이 멈춤</option>
         </select>
-        <p class="sub small">{am === 'mix'
-          ? '음악을 멈추지 않고 알림음이 음악 위로 울려요. 단, 아이폰 무음 모드(무음 스위치)에서는 휴식 끝 알림음이 안 나요 (실기기 확인). 아이폰은 진동도 안 올 수 있어요.'
-          : '무음 모드에서도 알림음이 나지만, 앱을 누르면 다른 앱 음악이 멈춰요 (0.8.4까지의 동작).'}</p>
+        <Lead lead={am === 'mix' ? '음악을 멈추지 않고 알림음이 음악 위로 울려요. 단, 아이폰 무음 모드(무음 스위치)에서는 휴식 끝 알림음이 안 나요.' : '무음 모드에서도 알림음이 나지만, 앱을 누르면 다른 앱 음악이 멈춰요.'}>{am === 'mix'
+          ? '실기기에서 확인한 내용이에요. 아이폰은 진동도 안 올 수 있어요.'
+          : '앱 소리가 우선이라 무음 모드에서도 알림음이 나요. 0.8.4 버전까지는 이렇게 동작했어요.'}</Lead>
         <details class="alert-guide" data-testid="guide-music">
           <summary>음악 들으며 휴식 알림 받기</summary>
           <ol>
@@ -159,7 +208,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
             </>
           ) : <p class="sub small" data-testid="notify-perm">{permissionText('unsupported')}</p>}
         </section>
-        <p class="sub small">화면을 잠그거나 다른 앱으로 가면 휴식 끝 알림음·진동이 오지 않아요 (웹앱 한계, 위 알림(실험)도 늦거나 안 올 수 있어요). 앱으로 돌아오면 남은 시간은 정확해요.</p>
+        <Lead lead="화면을 잠그거나 다른 앱으로 가면 휴식 끝 알림음·진동이 오지 않아요.">웹앱의 한계예요. 위의 알림(실험)도 늦거나 안 올 수 있어요. 앱으로 돌아오면 남은 시간은 정확해요.</Lead>
         <label class="row small check-row">
           <input type="checkbox" class="ck24" aria-label="폰 화면으로 보기" checked={pv} onChange={(e) => { const v = (e.target as HTMLInputElement).checked; setPhoneView(v); setPv(v); }} />
           폰 화면으로 보기 (PC에서 폰과 똑같은 모양으로 확인)
@@ -167,7 +216,7 @@ export function SettingsScreen({ s }: { s: AppState }) {
         <p class="sub small">PC 키보드: 숫자 입력 뒤 Enter = 다음 칸, 운동 중 Ctrl+Enter = 현재 세트 완료</p>
       </SetGroup>
 
-      <SetGroup title="동기화·백업" card={false}>
+      <SetGroup gkey="sync" title="동기화·백업" summary={[...syncWarn, st.lastBackupAt ? `마지막 백업 ${dateTimeText(st.lastBackupAt, Date.now())}` : '아직 백업 없음 · 백업·자동 보내기·워치'].join(' · ')} open={!!openSet.sync} onToggle={onToggle} card={false}>
         <a class="card row-link" href="#/settings/watch" aria-label={`애플워치 연동${s.health.some((r) => r.type !== 'canary') ? ', 받은 기록 있음' : ''}`}>
           <Icon name="watch" />
           <span class="grow"><span class="rl-title">애플워치 연동</span><span class="sub rl-sub">{s.health.some((r) => r.type !== 'canary') ? '받은 기록 있음 · 상태 보기' : '아이폰 단축어로 심박·수면 보내기'}</span></span>
@@ -177,12 +226,13 @@ export function SettingsScreen({ s }: { s: AppState }) {
         <div class="card set-card"><DiagSection s={s} part="send" /></div>
       </SetGroup>
 
-      <SetGroup title="데이터" card={false}>
+      <SetGroup gkey="data" title="데이터" summary={`개선 메모 ${s.feedback.length}개 · 진단 기록 · 모든 데이터 지우기`} open={!!openSet.data} onToggle={onToggle} card={false}>
         <div class="card set-card"><FeedbackList s={s} /></div>
         <div class="card set-card"><DiagSection s={s} part="diag" /></div>
+        <div class="card set-card"><ResetSection /></div>
       </SetGroup>
 
-      <SetGroup title="앱 정보·도구">
+      <SetGroup gkey="tools" title="앱 정보·도구" summary={'계산기 · 회복 팁 · 오픈소스 고지'} open={!!openSet.tools} onToggle={onToggle}>
         <button onClick={() => go('#/tools')}>원판 계산기 · 1RM 계산기</button>
         <button onClick={() => go('#/recovery')}>회복 팁 · 근거 논문</button>
         <p class="sub small"><a href={`${import.meta.env.BASE_URL}THIRD_PARTY_LICENSES.txt`} target="_blank" rel="noopener" class="license-link">오픈소스 고지</a> (인체 근육 그림: react-native-body-highlighter, MIT)</p>

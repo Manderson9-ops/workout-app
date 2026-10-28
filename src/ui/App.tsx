@@ -40,8 +40,10 @@ export function useHash(): string {
   const [h, set] = useState(location.hash || '#/');
   useEffect(() => {
     const on = () => { set(location.hash || '#/'); window.scrollTo(0, 0); };
+    const sync = () => set(location.hash || '#/'); // dropQuery: 쿼리만 걷어 낸 것 (이동 아님)
     window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
+    window.addEventListener('hashsync', sync);
+    return () => { window.removeEventListener('hashchange', on); window.removeEventListener('hashsync', sync); };
   }, []);
   return h;
 }
@@ -113,11 +115,11 @@ export function App() {
   else if (path.startsWith('/workout')) screen = <WorkoutScreen s={s} />;
   else if (path.startsWith('/settings/about')) screen = <AboutScreen />;
   else if (path.startsWith('/settings/watch')) screen = <WatchScreen s={s} />;
-  else if (path.startsWith('/settings')) screen = <SettingsScreen s={s} />;
+  else if (path.startsWith('/settings')) screen = <SettingsScreen key={path.split('?')[0]} s={s} />; // ?open= 은 화면이 스스로 읽고 걷어 냄 (다시 그리지 않음)
   else if (path === '/stats/new') screen = <WorkoutEdit key={path} s={s} id="new" />;
   else if (path.startsWith('/stats/w/') && path.endsWith('/edit')) screen = <WorkoutEdit key={path} s={s} id={decodeURIComponent(path.slice(9, -5))} />;
   else if (path.startsWith('/stats/w/')) screen = <WorkoutDetail s={s} id={decodeURIComponent(path.slice(9))} />;
-  else if (path.startsWith('/stats')) screen = <Stats s={s} />;
+  else if (path.startsWith('/stats')) screen = <Stats key={path.split('?')[0]} s={s} />; // ?tab= 은 화면이 스스로 읽고 걷어 냄 (다시 그리지 않음)
   else if (path.startsWith('/tools')) screen = <ToolsScreen />;
   else if (path.startsWith('/recovery/papers')) screen = <RecoveryPapers key={path} query={path.split('?')[1] ?? ''} />;
   else if (path.startsWith('/recovery')) screen = <RecoveryTips s={s} />;

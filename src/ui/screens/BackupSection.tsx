@@ -65,7 +65,17 @@ export function BackupSection({ s }: { s: AppState }) {
         <input ref={fileRef} type="file" accept="application/json,.json" aria-label="백업 파일 고르기" tabIndex={-1} style={{ display: 'none' }} onChange={onFile} />
       </div>
       {msg && <p role="status" class="small" style={{ color: msg.ok ? 'var(--ok)' : 'var(--bad)' }}>{msg.text}</p>}
-      <details style={{ marginTop: '10px' }}>
+    </>
+  );
+}
+
+/** 설정 '데이터' 묶음의 "모든 데이터 지우기 (초기화)" (D-079 2차 검토: 백업 영역이 아니라 사용자가 찾는 '데이터'에 둠) */
+export function ResetSection() {
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  return (
+    <>
+      <h2>초기화</h2>
+      <details>
         <summary class="small sub" style={{ minHeight: '44px', display: 'flex', alignItems: 'center' }}>모든 데이터 지우기 (초기화)</summary>
         <p class="small">운동 기록·루틴·체중·설정이 모두 지워지고 되돌릴 수 없어요. 먼저 백업 파일을 저장하세요.</p>
         <button class="danger" onClick={async () => {
@@ -82,6 +92,7 @@ export function BackupSection({ s }: { s: AppState }) {
           await resetAll(); setMsg({ text: '모든 데이터를 지웠어요', ok: true });
         }}>모든 데이터 지우기</button>
       </details>
+      {msg && <p role="status" class="small" style={{ color: msg.ok ? 'var(--ok)' : 'var(--bad)' }}>{msg.text}</p>}
     </>
   );
 }

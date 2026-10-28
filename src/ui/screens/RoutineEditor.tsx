@@ -5,6 +5,7 @@ import { catalog } from '../catalog';
 import type { Routine, RoutineBlock, RoutineItem } from '../../core/session';
 import { routineEstimate, mergeWithNext, splitBlock, applyRestToAll, moveRoutineBlock } from '../../core/session';
 import { useDragSort } from '../dragSort';
+import { remapIndex } from '../../core/reorder';
 import { targetReps } from '../../core/time';
 import { ExercisePicker, Labeled, MiniStepper, mmss } from '../components';
 import type { StepBtn } from '../components';
@@ -17,6 +18,7 @@ import { focusField } from '../formError';
 import { paceLabelOf, takeFitOnOpen } from '../pace';
 import { FitSheet, PaceLine } from './FitSheet';
 import { HeadButtons, BackButton } from '../header';
+import { Icon } from '../icons';
 import { SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX, rangeText, ROUND_REST_MIN, ROUND_REST_MAX, ROUND_REST_STEP, TRANSITION_MIN, TRANSITION_MAX, TRANSITION_STEP } from '../../core/planEdit';
 
 const KIND_LABEL: Record<RoutineBlock['kind'], string> = { single: '일반', superset: '슈퍼세트', compound: '컴파운드 세트' };
@@ -26,25 +28,28 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
   const [r, setR] = useState<Routine | undefined>(r0);
   const [picker, setPicker] = useState<{ b: number; i: number } | { add: Part | undefined } | null>(null);
   const [msg, setMsg] = useState('');
+  const [open, setOpen] = useState<number | null>(null); // D-079 2차 3단계: 펼친 카드는 하나 (블록 번호)
+  const [menu, setMenu] = useState<number | null>(null); // ⋯ 메뉴가 열린 카드
   const [startTried, setStartTried] = useState(false);
   const addBtn = useRef<HTMLButtonElement>(null);
   // 내 시간에 맞추기 창 (D-067). 카드의 [맞추기]로 왔으면 바로 열림
   const [fit, setFit] = useState(() => takeFitOnOpen(id));
   const flip = useRef(false); // 같은 안내가 반복돼도 다시 읽히게 보이지 않는 글자를 번갈아 붙임
-  const pendingFocus = useRef<string | null>(null); // 운동을 추가한 뒤 초점을 줄 버튼의 aria-label
+  const pendingFocus = useRef<string | null>(null); // 운동을 추가·옮긴 뒤 초점을 줄 버튼의 aria-label ('__add__' = + 운동 추가)
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
   const rest = s.settings.rest;
   // 블록 끌어서 순서 바꾸기 (D-037)
-  const dnd = useDragSort(r?.blocks.length ?? 0, (from, to) => { setMsg(''); setR((cur) => (cur ? moveRoutineBlock(cur, from, to) : cur)); },
+  const dnd = useDragSort(r?.blocks.length ?? 0, (from, to) => { setMsg(''); setR((cur) => (cur ? moveRoutineBlock(cur, from, to) : cur)); setMenu(null); setOpen((o) => (o === null ? o : remapIndex(o, from, to))); },
     (i) => r?.blocks[i]?.items.map((it) => byId.get(it.exerciseId)?.name_ko ?? it.exerciseId).join(' + ') ?? '');
   // 운동을 추가하면 새 카드가 생김: 그 운동의 '세트 늘리기'로 초점 (D-052)
   useLayoutEffect(() => {
     const want = pendingFocus.current;
     if (!want) return;
-    const btn = [...document.querySelectorAll<HTMLButtonElement>('button[aria-label]')].find((x) => x.getAttribute('aria-label') === want);
-    if (btn) { btn.focus(); pendingFocus.current = null; }
-  }, [r]);
+    pendingFocus.current = null;
+    if (want === '__add__') { addBtn.current?.focus(); return; }
+    [...document.querySelectorAll<HTMLButtonElement>('button[aria-label]')].find((x) => x.getAttribute('aria-label') === want)?.focus();
+  }, [r, picker]);
   if (!r) return <main><p>루틴을 찾을 수 없어요.</p><button onClick={() => go('#/')}>홈으로</button></main>;
   const restFor = (exId: string) => (byId.get(exId)?.mechanics === 'compound' ? rest.compound : rest.isolation);
   const setBlock = (bi: number, fn: (b: RoutineBlock) => RoutineBlock | null) =>
@@ -54,7 +59,15 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
   const saved = (x: Routine = r): Routine => ({ ...x, estimatedSec: routineEstimate(x, byId, rest.between) + (x.warmupSec ?? 0), updatedAt: new Date().toISOString() });
   const save = async (x: Routine = r) => { await mutate((d) => d.routines.put(saved(x))); };
   const pl = r.blocks.length ? paceLabelOf(s, r) : undefined;
-  const move = (bi: number, dir: -1 | 1) => { setMsg(''); setR(moveRoutineBlock(r, bi, bi + dir)); };
+  const move = (bi: number, dir: -1 | 1) => {
+    const to = bi + dir;
+    if (to < 0 || to >= r.blocks.length) return; // 끝에서 더 못 옮김: 아무것도 안 바꿈 (펼친 카드도 그대로)
+    setMsg(''); setR(moveRoutineBlock(r, bi, to)); setMenu(null); setOpen((o) => (o === null ? o : remapIndex(o, bi, to)));
+    // 옮긴 카드의 같은 버튼으로 초점. 끝에 닿아 그 버튼이 꺼지면 반대 방향 버튼으로
+    const atEnd = dir === -1 ? to === 0 : to === r.blocks.length - 1;
+    pendingFocus.current = `${to + 1}번 블록 ${(atEnd ? -dir : dir) === -1 ? '위로' : '아래로'}`;
+  };
+  const moreLabel = (b: RoutineBlock) => `운동 메뉴: ${blockName(b)}`;
   const nameOf = (it: RoutineItem) => byId.get(it.exerciseId)?.name_ko ?? it.exerciseId;
   const blockName = (b: RoutineBlock) => b.items.map(nameOf).join(' + ');
   const sgn = (d: number) => (d > 0 ? '+1' : '-1');
@@ -105,30 +118,55 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         })}
       </div>
       <p class="sub small" style={{ margin: '0 0 4px' }}>파란색 = 이미 들어 있는 부위 · 누르면 그 부위 운동을 골라 추가</p>
-      <p class="sub small bulk-h" style={{ margin: '16px 0 0' }}>한 번에 바꾸기</p>
-      <div class="row wrap bulk-row">
-        <Labeled label="모든 블록 휴식">
-          <button onClick={() => setR(applyRestToAll(r, rest.isolation, rest.round))}>짧게 {rest.isolation}초</button>
-          <button onClick={() => setR(applyRestToAll(r, rest.compound, rest.round))}>길게 {rest.compound}초</button>
-        </Labeled>
-      </div>
-      {r.blocks.length > 0 && (
-        <div class="row wrap bulk-row">
-          {bulkSteps(['모든 운동 세트', '모든 운동 횟수'], ['모든 운동 세트', '모든 운동 횟수'], r.blocks.flatMap((b) => b.items))}
-        </div>
-      )}
+      <details class="card set-group bulk-more">
+        <summary><span class="grow"><b class="set-group-title">한 번에 바꾸기</b><span class="sub small set-sum">모든 운동의 휴식·세트·횟수를 한꺼번에</span></span></summary>
+        <section class="set-body" aria-label="한 번에 바꾸기">
+          <div class="row wrap bulk-row">
+            <Labeled label="모든 블록 휴식">
+              <button onClick={() => setR(applyRestToAll(r, rest.isolation, rest.round))}>짧게 {rest.isolation}초</button>
+              <button onClick={() => setR(applyRestToAll(r, rest.compound, rest.round))}>길게 {rest.compound}초</button>
+            </Labeled>
+          </div>
+          {r.blocks.length > 0 && (
+            <div class="row wrap bulk-row">
+              {bulkSteps(['모든 운동 세트', '모든 운동 횟수'], ['모든 운동 세트', '모든 운동 횟수'], r.blocks.flatMap((b) => b.items))}
+            </div>
+          )}
+        </section>
+      </details>
       <p class="sr-only" aria-live="polite">{msg || dnd.msg}</p>
       {!r.blocks.length && <div class="empty">운동을 추가해 주세요</div>}
       <div class="wide-cards-lg">
       {r.blocks.map((b, bi) => {
         const next = r.blocks[bi + 1];
         const canMerge = !!next && b.items.length + next.items.length <= 4;
+        const isOpen = open === bi;
         const samePart = next ? [...partOf(b)].every((p) => partOf(next).has(p)) && partOf(b).size === 1 : false;
         return (
-          <div class="card" key={bi} {...dnd.itemAttrs(bi)}>
+          <div class="card rt-card" key={bi} {...dnd.itemAttrs(bi)}>
+            <div class="rt-head">
+              {r.blocks.length > 1 && <button {...dnd.handleProps(bi)}>≡</button>}
+              <button class="rt-toggle" aria-expanded={isOpen} onClick={() => { setMenu(null); setOpen(isOpen ? null : bi); }}>
+                <span class="rt-title"><strong>{blockName(b)}</strong>{b.kind !== 'single' && <span class="badge kind">{KIND_LABEL[b.kind]}</span>}<Icon name="chevron" size={18} class="rt-chev" /></span>
+                <span class="sub small rt-sum">{rangeText(b.items, 'sets')} × {rangeText(b.items, 'reps')} · {b.kind === 'single' ? '휴식' : '라운드 휴식'} {b.kind === 'single' ? b.restSec : b.roundRestSec}초</span>
+              </button>
+              <button class="ghost rt-more" aria-label={moreLabel(b)} aria-expanded={menu === bi} onClick={() => setMenu(menu === bi ? null : bi)}>⋯</button>
+            </div>
+            {menu === bi && (
+              <div class="rt-menu" role="group" aria-label={moreLabel(b)}>
+                {b.items.map((it, ii) => (
+                  <div class="row wrap" key={ii}>
+                    {b.items.length > 1 && <span class="sub small grow">{nameOf(it)}</span>}
+                    <button aria-label={`교체: ${nameOf(it)}`} onClick={() => { setMenu(null); setPicker({ b: bi, i: ii }); }}>교체</button>
+                    <button class="danger" aria-label={`삭제: ${nameOf(it)}`} onClick={() => { setMenu(null); const nb = r.blocks[bi + 1] ?? r.blocks[bi - 1]; pendingFocus.current = b.items.length > 1 ? moreLabel({ ...b, items: b.items.filter((_, z) => z !== ii) }) : nb ? moreLabel(nb) : '__add__'; setBlock(bi, (x) => { const items = x.items.filter((_, z) => z !== ii); return { ...x, kind: items.length === 1 ? 'single' : x.kind, restSec: items.length === 1 ? restFor(items[0]!.exerciseId) : x.restSec, items }; }); if (b.items.length === 1) setOpen((o) => (o === null || o === bi ? null : o > bi ? o - 1 : o)); }}>삭제</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {isOpen && <>
             <div class="row between">
-              <span class="row" style={{ gap: '4px' }}>{r.blocks.length > 1 && <button {...dnd.handleProps(bi)}>≡</button>}<span class="sub small" aria-label={`${bi + 1}번 블록`}>{bi + 1} </span><span class="badge kind">{KIND_LABEL[b.kind]}</span></span>
-              <div class="row"><button aria-label={`${bi + 1}번 블록 위로`} onClick={() => move(bi, -1)}>↑</button><button aria-label={`${bi + 1}번 블록 아래로`} onClick={() => move(bi, 1)}>↓</button></div>
+              <span class="sub small" aria-label={`${bi + 1}번 블록`}>{bi + 1}번 블록</span>
+              <div class="row"><button aria-label={`${bi + 1}번 블록 위로`} disabled={bi === 0} onClick={() => move(bi, -1)}>↑</button><button aria-label={`${bi + 1}번 블록 아래로`} disabled={bi === r.blocks.length - 1} onClick={() => move(bi, 1)}>↓</button></div>
             </div>
             {b.kind !== 'single' && (
               <div class="row wrap group-bulk">
@@ -156,10 +194,6 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
                     </>
                   )}
                 </div>
-                <div class="row wrap" style={{ marginTop: '4px' }}>
-                  <button aria-label={`교체: ${nameOf(it)}`} onClick={() => setPicker({ b: bi, i: ii })}>교체</button>
-                  <button class="danger" aria-label={`삭제: ${nameOf(it)}`} onClick={() => setBlock(bi, (x) => { const items = x.items.filter((_, z) => z !== ii); return { ...x, kind: items.length === 1 ? 'single' : x.kind, restSec: items.length === 1 ? restFor(items[0]!.exerciseId) : x.restSec, items }; })}>삭제</button>
-                </div>
               </div>
             ))}
             <div class="row" style={{ marginTop: '8px' }}>
@@ -178,9 +212,10 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
               </div>
             )}
             <div class="row wrap" style={{ marginTop: '6px' }}>
-              {canMerge && <button onClick={() => setR(mergeWithNext(r, bi, samePart ? 'compound' : 'superset'))}>다음 운동과 {samePart ? '컴파운드 세트' : '슈퍼세트'}로 묶기</button>}
-              {b.items.length > 1 && <button onClick={() => setR(splitBlock(r, bi, restFor))}>묶음 풀기</button>}
+              {canMerge && <button onClick={() => { setR(mergeWithNext(r, bi, samePart ? 'compound' : 'superset')); setMenu(null); setOpen(bi); }}>다음 운동과 {samePart ? '컴파운드 세트' : '슈퍼세트'}로 묶기</button>}
+              {b.items.length > 1 && <button onClick={() => { setR(splitBlock(r, bi, restFor)); setMenu(null); setOpen(bi); }}>묶음 풀기</button>}
             </div>
+            </>}
           </div>
         );
       })}
@@ -194,21 +229,23 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
         }}>저장하고 시작</button>
       </div>
       {startErr && <p class="field-err" id="routine-empty-err" role="alert">운동을 1개 이상 추가해 주세요</p>}
-      {fit && <FitSheet s={s} r={r} byId={byId} onClose={() => setFit(false)} onApply={async (next) => { setFit(false); setR(next); await save(next); say('내 시간에 맞춰 저장했어요'); }} />}
+      {fit && <FitSheet s={s} r={r} byId={byId} onClose={() => setFit(false)} onApply={async (next, toOf) => { setFit(false); setR(next); setMenu(null); setOpen((o) => (o !== null && o < next.blocks.length ? toOf(o) : null)); await save(next); say('내 시간에 맞춰 저장했어요'); }} />}
       {picker && (
         <ExercisePicker s={s} all={all} title={'add' in picker ? '운동 추가' : '운동 교체'}
           part={'add' in picker ? undefined : byId.get(r.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part}
           startPart={'add' in picker ? picker.add : undefined}
           exclude={r.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
-          onClose={() => setPicker(null)}
+          onClose={() => { if (!('add' in picker)) pendingFocus.current = moreLabel(r.blocks[picker.b]!); setPicker(null); }}
           onPick={(e) => {
             const reps = e.measure === 'time' ? 0 : targetReps(e);
             const seconds = e.measure === 'time' ? e.default_seconds ?? 30 : undefined;
             if ('add' in picker) {
+              setOpen(r.blocks.length); setMenu(null);
               setR({ ...r, blocks: [...r.blocks, { kind: 'single', items: [{ exerciseId: e.id, sets: 3, reps, ...(seconds ? { seconds } : {}) }], restSec: restFor(e.id), roundRestSec: rest.round, transitionSec: rest.transition }] });
               pendingFocus.current = `${e.name_ko} 세트 늘리기`;
               say(`${e.name_ko}: 추가했어요`);
             } else {
+              setOpen(picker.b);
               const oldName = nameOf(r.blocks[picker.b]!.items[picker.i]!);
               setItem(picker.b, picker.i, (y) => ({ exerciseId: e.id, sets: y.sets, reps, ...(seconds ? { seconds } : {}) }));
               pendingFocus.current = `${e.name_ko} 세트 늘리기`;

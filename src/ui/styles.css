@@ -798,3 +798,73 @@ button.danger:active { background: var(--bad-soft); border-color: transparent; }
 .status-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--sdot, var(--dim)); }
 .status-pill.acc { --sdot: var(--acc); color: var(--text); }
 .status-pill.ok { --sdot: var(--ok); }
+
+/* D-079 2차 2단계 */
+.set-group { padding: 0; margin-top: 12px; }
+.set-group > summary { display: flex; align-items: center; min-height: 56px; padding: 8px 16px; cursor: pointer; list-style: none; width: 100%; box-sizing: border-box; }
+.set-group > summary::-webkit-details-marker { display: none; }
+.set-group > summary::after { content: '›'; content: '›' / ''; margin-left: 8px; color: var(--sub); font-size: 22px; transition: transform .15s; }
+.set-group[open] > summary::after { transform: rotate(90deg); }
+.set-group-title { display: block; font-size: 17px; font-weight: 700; }
+.set-sum { display: block; margin-top: 2px; }
+.set-body { padding: 0 16px 16px; }
+.set-body > .card { background: var(--card2); border-color: transparent; }
+.set-lead { margin: 8px 0; }
+.set-lead > p { margin: 0; }
+.set-more > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--sub); font-size: 14px; list-style: none; }
+.set-more > summary::-webkit-details-marker { display: none; }
+.set-more > summary::before { content: '›'; content: '›' / ''; margin-right: 6px; transition: transform .15s; }
+.set-more[open] > summary::before { transform: rotate(90deg); }
+.set-more > p { margin: 0 0 8px; }
+.tip-intro { margin: 8px 0; }
+.tip-intro > p { margin: 0; }
+.tip-more { margin-top: 4px; }
+.tip-more > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--acc-text); font-size: 14px; list-style: none; }
+.tip-more > summary::-webkit-details-marker { display: none; }
+.tip-more > summary::before { content: '›'; content: '›' / ''; margin-right: 6px; transition: transform .15s; }
+.tip-more[open] > summary::before { transform: rotate(90deg); }
+.cl-older { padding: 0; }
+.cl-older > summary { display: flex; align-items: center; min-height: 52px; padding: 0 16px; cursor: pointer; list-style: none; font-weight: 600; }
+.cl-older > summary::-webkit-details-marker { display: none; }
+.cl-older > summary::after { content: '›'; content: '›' / ''; margin-left: auto; color: var(--dim); font-size: 20px; transition: transform .15s; }
+.cl-older[open] > summary::after { transform: rotate(90deg); }
+.cl-older > .changelog { padding: 0 8px 8px; }
+.cl-older .cl-item { background: var(--card2); border-color: transparent; }
+.tip-card h2 { margin: 0 0 2px; }
+.tip-card .rule-head { margin-bottom: 2px; }
+.tip-card .tip-text { margin: 2px 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.tip-card .tip-more { margin-top: 0; }
+.tip-card .tip-more[open] { padding-bottom: 12px; }
+.cl-item { position: relative; }
+.cl-item[open] > .wn-go { position: absolute; top: 4px; right: 40px; margin: 0; }
+.tip-card { padding: 8px 16px 0; margin: 6px 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; }
+.tip-card > * { flex: 1 1 100%; min-width: 0; }
+.tip-card > h2 { flex: 0 1 auto; }
+.tip-card > .rule-head { flex: 0 0 auto; margin: 0; }
+.tip-intro { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; }
+.tip-intro > .set-more { flex: 1 1 auto; }
+.tip-intro > .set-more[open] { flex-basis: 100%; }
+.tip-card > h2 { font-size: 16px; }
+
+/* D-079 2차 3단계 (M19 훑어보기 · M02 위계): 루틴 편집 카드는 한 줄 요약으로 접고, 플랜 고급 설정은 접음 */
+.rt-head { display: flex; align-items: center; gap: 8px; }
+.rt-toggle { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; min-height: 52px; padding: 6px 8px; background: transparent; border: 0; text-align: left; color: inherit; }
+.rt-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 17px; }
+.rt-sum { display: block; }
+.rt-more { flex: 0 0 auto; min-width: 44px; min-height: 44px; font-size: 22px; line-height: 1; }
+.rt-menu { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 8px; padding: 8px; border-radius: var(--r-btn); background: var(--card2); }
+.rt-card > .row, .rt-card > div:not(.rt-head):not(.rt-menu) { margin-top: 8px; }
+.plan-adv { margin: 12px 0 0; }
+.plan-adv > summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--sub); font-size: 14px; list-style: none; }
+.plan-adv > summary::-webkit-details-marker { display: none; }
+.plan-adv > summary::before { content: '›'; content: '›' / ''; margin-right: 6px; transition: transform .15s; }
+.plan-adv[open] > summary::before { transform: rotate(90deg); }
+
+/* D-079 2차 검토 수정 */
+.rt-title { width: 100%; }
+.rt-chev { margin-left: auto; flex: 0 0 auto; color: var(--dim); transition: transform .15s; }
+.rt-toggle[aria-expanded="true"] .rt-chev { transform: rotate(90deg); }
+.tip-card.is-open .tip-text { display: block; -webkit-line-clamp: unset; line-clamp: unset; overflow: visible; }
+.tip-conflict { margin: 2px 0; }
+/* 보러 가기: 좁은 폰(480px 이하)에서는 제목 줄 옆에 띄우면 날짜·'지금' 칩과 겹침(320px 실측) → 글 아래 흐름 안에 둠 */
+@media (max-width: 480px) { .cl-item[open] > .wn-go { position: static; margin: 8px 16px 12px; } }

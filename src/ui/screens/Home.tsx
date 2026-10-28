@@ -69,7 +69,7 @@ function ThisWeekCard({ s }: { s: AppState }) {
   // 링크 이름에 탭 이름(홈·플랜·운동·기록·종목)을 넣지 않음: 탭 링크와 헷갈리지 않게
   const label = never ? '이번 주 요약: 아직 없음. 자세히 보기' : `이번 주 요약: ${cur.count}회, 작업 세트 ${cur.sets}개, 한 요일 ${days.filter((d) => cur.days.has(d)).map((d) => WD[days.indexOf(d)]).join('·') || '없음'}. 자세히 보기`;
   return (
-    <Card title="이번 주" href="#/stats" label={label} testid="home-week">
+    <Card title="이번 주" href="#/stats?tab=summary" label={label} testid="home-week">
       <div class="metrics2">
         {/* 증감은 기록 탭 타일과 같은 Delta (D-055 검토 R3) */}
         <Metric label="운동" value={never ? undefined : cur.count} unit="회" status={never ? '아직 기록 없음' : undefined} statusClass="tile-delta">{never ? undefined : <Delta cur={cur.count} prev={prev.count} />}</Metric>
@@ -179,7 +179,7 @@ export function Home({ s }: { s: AppState }) {
           ))}
       </div>
       {recText && (
-        <a class="card rec-home" href="#/stats" data-testid="home-recovery" aria-label={`회복 상태 (추정): ${recText}. 자세히 보기`}>
+        <a class="card rec-home" href="#/stats?tab=summary" data-testid="home-recovery" aria-label={`회복 상태 (추정): ${recText}. 자세히 보기`}>
           <Icon name="sync" size={20} /><span class="grow rec-txt"><span class="sub small">회복 (추정) </span>{recText}</span><Icon name="chevron" size={18} />
         </a>
       )}

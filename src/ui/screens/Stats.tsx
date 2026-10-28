@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
@@ -22,7 +22,7 @@ import { startRoutine, setHomeHidden } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import type { Routine } from '../../core/session';
 import { HOME_HIDDEN_LABEL } from '../../core/session';
-import { go } from '../nav';
+import { go, dropQuery } from '../nav';
 import { askConfirm } from '../confirm';
 import { Icon } from '../icons';
 import { axisText, weekRangeText, dateText, dateTimeText, timeRangeText, fullText, fullDateText } from '../../core/dateText';
@@ -174,14 +174,14 @@ function PartWeekSheet({ part, rows, week, onClose }: { part: Part; rows: PartWe
 type StatsTab = 'summary' | 'log' | 'analysis';
 const STATS_TABS: { id: StatsTab; label: string; q: string }[] = [{ id: 'summary', label: '요약', q: 'summary' }, { id: 'log', label: '운동 기록', q: 'log' }, { id: 'analysis', label: '분석', q: 'analysis' }];
 const TAB_KEY = 'stats.tab.v1';
+function hashTab(): StatsTab | null {
+  if (!location.hash.startsWith('#/stats?')) return null; // 다른 화면 주소의 ?tab= 은 이 화면 몫이 아님
+  try { const v = new URLSearchParams(location.hash.split('?')[1] ?? '').get('tab'); return STATS_TABS.find((t) => t.q === v)?.id ?? null; } catch { return null; }
+}
 /** 주소의 ?tab= 이 먼저, 없으면 기기에 저장된 값, 없으면 요약 */
 function readTab(): StatsTab {
-  const ok = (v: string | null | undefined): StatsTab | null => (STATS_TABS.find((t) => t.q === v)?.id ?? null);
-  try {
-    const q = location.hash.split('?')[1];
-    const fromHash = ok(new URLSearchParams(q ?? '').get('tab'));
-    if (fromHash) return fromHash;
-  } catch { /* 무시 */ }
+  const fromHash = hashTab();
+  if (fromHash) return fromHash;
   try { const v = localStorage.getItem(TAB_KEY); const t = STATS_TABS.find((x) => x.id === v)?.id; if (t) return t; } catch { /* 무시 */ }
   return 'summary';
 }
@@ -230,6 +230,22 @@ export function Stats({ s }: { s: AppState }) {
   }
   const [tab, setTab] = useState<StatsTab>(readTab);
   const pickTab = (t: StatsTab) => { setTab(t); try { localStorage.setItem(TAB_KEY, t); } catch { /* 저장 불가면 이번 방문만 기억 */ } };
+  // 주소의 ?tab= 은 한 번 쓰면 고른 탭으로 저장하고 주소에서 걷어 냄 → 뒤로 가기·같은 탭 다시 누르기가 사용자가 마지막에 본 탭을 따름
+  useEffect(() => {
+    const eat = () => { const t = hashTab(); if (t) { pickTab(t); dropQuery('#/stats'); } };
+    eat();
+    window.addEventListener('hashchange', eat);
+    return () => window.removeEventListener('hashchange', eat);
+  }, []);
+  /** 탭 목록 화살표 키 (← → Home End): 고른 탭으로 옮기고 초점도 그 탭으로 (선택된 탭만 Tab 키가 닿음) */
+  const tabKey = (e: KeyboardEvent, i: number) => {
+    const n = STATS_TABS.length;
+    const to = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    pickTab(STATS_TABS[to]!.id);
+    document.getElementById(`stats-tab-${STATS_TABS[to]!.id}`)?.focus();
+  };
   const thisWs = weekStart(today);
   const groupTitle = (ws: string) => (ws === thisWs ? '이번 주' : ws === addDays(thisWs, -7) ? '지난주' : weekRange(ws));
 
@@ -240,8 +256,8 @@ export function Stats({ s }: { s: AppState }) {
         actions={<button class="icon-btn round head-add" aria-label="운동 기록 직접 작성" title="운동 기록 직접 작성" onClick={() => go('#/stats/new')}><Icon name="plus" /></button>}
       />
       <div class="row tab-switcher" role="tablist" aria-label="기록 보기" style={{ gap: '6px', margin: '4px 0 10px' }}>
-        {STATS_TABS.map((t) => (
-          <button key={t.id} role="tab" id={`stats-tab-${t.id}`} aria-controls={`stats-panel-${t.id}`} class={`chip grow ${tab === t.id ? 'on' : ''}`} aria-selected={tab === t.id} onClick={() => pickTab(t.id)}>{t.label}</button>
+        {STATS_TABS.map((t, i) => (
+          <button key={t.id} role="tab" id={`stats-tab-${t.id}`} aria-controls={tab === t.id ? `stats-panel-${t.id}` : undefined} tabIndex={tab === t.id ? 0 : -1} class={`chip grow ${tab === t.id ? 'on' : ''}`} aria-selected={tab === t.id} onClick={() => pickTab(t.id)} onKeyDown={(e) => tabKey(e, i)}>{t.label}</button>
         ))}
       </div>
 
@@ -252,9 +268,14 @@ export function Stats({ s }: { s: AppState }) {
           <RecoveryCard m={rec} night={night} />
           <div class="row between" style={{ alignItems: 'center', margin: '20px 0 10px' }}>
             <h2 style={{ margin: 0 }}>최근 운동</h2>
-            <button class="ghost" style={{ minHeight: '44px', padding: '0 12px' }} onClick={() => pickTab('log')}>전체 기록 보기</button>
+            <button class="ghost" style={{ minHeight: '44px', padding: '0 12px' }} onClick={() => { pickTab('log'); document.getElementById('stats-tab-log')?.focus(); }}>전체 기록 보기</button>
           </div>
-          {!sorted.length && <p class="sub small">아직 끝낸 운동이 없어요</p>}
+          {!sorted.length && (
+            <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 최근 3개가 보여요.">
+              <button class="tonal" onClick={() => go('#/workout')}>운동 시작</button>
+              <button onClick={() => go('#/stats/new')}>직접 작성</button>
+            </Empty>
+          )}
           {take(3).map(card)}
         </div>
       )}

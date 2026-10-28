@@ -85,7 +85,7 @@ function codeHash(): string {
 }
 
 /** L-01 WebKit 줄 끝 문장부호 상한: 측정값보다 늘면 실패 (줄면 이 값도 내림). mapping runtime_gates 와 같은 값 */
-const WEBKIT_PUNCT_MAX = 32; // 시험 데이터 시각을 고정한 뒤 측정값 (늘면 실패, 줄면 이 값도 내림)
+const WEBKIT_PUNCT_MAX = 24; // 시험 데이터 시각을 고정하고, 펼친 상태까지 재서 같은 자리를 한 번만 센 측정값 (늘면 실패, 줄면 이 값도 내림)
 type Obj = Record<string, unknown>;
 const MIN = 60_000, DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -115,9 +115,14 @@ async function visit(page: Page, h: string, view: string, rows: Row[]) {
   await expect(page.locator('main h1').first()).toBeVisible();
   await snap(page, view, h, rows);
 }
+/** 접힌 곳을 모두 펼친 상태도 잰다 (measure 는 보이는 요소만 세므로, 접힌 안의 버튼·글이 44pt·주 버튼·문장부호 측정에서 빠지지 않게) */
+const openAll = (page: Page, sel = 'details') => page.evaluate((s) => { document.querySelectorAll<HTMLDetailsElement>(s).forEach((d) => { d.open = true; }); }, sel);
+const EXPANDED: Record<string, [string, string]> = { '#/plan': ['details.plan-adv', '고급 설정 펼침'], '#/settings': ['details', '모든 묶음 펼침'], '#/recovery': ['details.tip-more', '팁 펼침'], '#/settings/about': ['details', '이전 버전 펼침'] };
 async function tour(page: Page, view: string, rows: Row[]) {
   for (const h of SCREENS) {
     await visit(page, h, view, rows);
+    const ex = EXPANDED[h];
+    if (ex) { await openAll(page, ex[0]); await snap(page, view, `${h} (${ex[1]})`, rows); }
     if (h === '#/stats') { // 기록 탭은 세 탭을 각각 잰다 (요약 → 운동 기록 → 분석 → 요약)
       for (const [tab, suffix] of [['운동 기록', 'log'], ['분석', 'analysis']] as const) { await page.getByRole('tab', { name: tab }).click(); await snap(page, view, `#/stats_${suffix}`, rows); }
       await page.getByRole('tab', { name: '요약' }).click();
@@ -150,6 +155,10 @@ test('D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실
   await page.getByRole('dialog').getByRole('button', { name: / 편집$/ }).click();
   await expect(page).toHaveURL(/#\/routine\/[^/]+$/);
   await snap(page, 'phone', '#/routine/:id', rows);
+  await page.locator('.rt-toggle').first().click(); // 카드 하나 펼침 + ⋯ 메뉴 + 한 번에 바꾸기 열림
+  await page.getByRole('button', { name: /^운동 메뉴: / }).first().click();
+  await openAll(page, 'details.bulk-more');
+  await snap(page, 'phone', '#/routine/:id (카드 펼침·⋯ 메뉴)', rows);
   // 운동 중 화면
   await page.evaluate(() => { location.hash = '#/'; });
   await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();
@@ -238,6 +247,7 @@ test('D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실
   const fixCard = page.getByTestId('record-fix');
   await expect(fixCard).toBeVisible();
   await fixCard.getByRole('button', { name: '정리하기' }).click(); // 접힌 한 줄 → 펼친 4구역도 잰다
+  await expect(fixCard.getByRole('button', { name: '접기' })).toBeFocused(); // 누른 버튼이 사라져도 초점이 접기로 (L2)
   for (const id of ['fix-end', 'fix-long', 'fix-empty', 'fix-warm']) await expect(fixCard.getByTestId(id)).toBeVisible();
   rows.push(await measure(page, '#/stats (기록 정리 카드 4구역)', 'phone'));
   const fixRow = rows[rows.length - 1]!;
@@ -265,7 +275,8 @@ test('D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실
     line_boxes: { value: rows.reduce((n, r) => n + r.lineBoxes, 0), evidence: rows.filter((r) => r.lineBoxes).map((r) => `${r.view} ${r.screen}: ${r.lineBoxes}`) },
     focus_ring: { value: ring, evidence: ['운동 화면 Tab 1회'] },
     validation_on_blur: { value: onBlur, evidence: ['운동 직접 추가: 입력 중 경고 0 → blur 뒤 경고, 빈 이름 클릭 → 오류·초점'] },
-    punct_breaks: { value: rows.reduce((n, r) => n + r.punct.length, 0), evidence: rows.flatMap((r) => r.punct.map((p) => `${r.view} ${r.screen} ${p}`)) },
+    // 펼친 상태 행이 같은 글을 다시 재므로, 같은 화면(괄호 앞 이름)·같은 글 마디는 한 번만 센다 (자리 수 기준)
+    punct_breaks: (() => { const seen = new Set<string>(); const evidence = rows.flatMap((r) => r.punct.map((p) => `${r.view} ${r.screen.replace(/ \(.*$/, '')} ${p}`)).filter((e) => !seen.has(e) && !!seen.add(e)); return { value: evidence.length, evidence }; })(),
   };
   // 엔진별 자세한 값 (조사용): 실패해도 남김. reports/uxui-runtime.json 은 아래 expect 가 모두 통과한 뒤에만 씀 (실패한 실행이 새 code_hash 를 남기지 않게)
   mkdirSync('test-results', { recursive: true });
@@ -339,6 +350,7 @@ test('N9 개선 메모: 빈 내용으로 저장 → 알림 + 글 칸으로 초�
 test('N9 자동 보내기: 빈 설정으로 [저장하고 연결 확인] → 알림 + 입력 칸으로 초점', async ({ page }) => {
   await startUp(page);
   await page.getByRole('link', { name: '설정' }).click();
+  { const g = page.locator('details.set-group').filter({ has: page.locator(':scope > summary', { hasText: '동기화·백업' }) }); await g.locator(':scope > summary').click(); }
   await page.getByRole('button', { name: '저장하고 연결 확인' }).click();
   await expect(page.getByRole('alert').filter({ hasText: '설정 글(https://…#…)을 붙여 넣어 주세요' })).toBeVisible();
   await expect(page.getByLabel('자동 보내기 설정 붙여넣기')).toBeFocused();
@@ -371,4 +383,170 @@ test('A05 루틴 검색 0건: [검색어 지우기] → 목록이 돌아오고 �
   await expect(search).toHaveValue('');
   await expect(search).toBeFocused();
   await expect(page.getByText('가슴 루틴', { exact: true }).first()).toBeVisible();
+});
+
+
+// ---- D-079 2차 검토 수정 (M1·M2·M3·L1·L2·L3) ----
+const blk = (ex: string) => ({ kind: 'single', items: [{ exerciseId: ex, sets: 3, reps: 10 }], restSec: 90, roundRestSec: 120, transitionSec: 10 });
+
+test('M1·L1·L2 루틴 편집: 끝에서 ↑↓ 는 꺼짐·펼침 유지 / 이동·삭제·묶기 뒤 펼친 번호 / ⋯ 메뉴 교체·삭제 / 초점', async ({ page }) => {
+  await startUp(page);
+  await idbPut(page, 'routines', [{ id: 'r-m', name: '이동 시험', createdAt: iso(Date.now()), updatedAt: iso(Date.now()), warmupSec: 0, blocks: [blk('barbell_curl'), blk('rope_pushdown'), blk('back_squat')] }]);
+  await page.reload();
+  await expect(page.locator('main h1').first()).toBeVisible();
+  await page.evaluate(() => { location.hash = '#/routine/r-m'; });
+  const cards = page.locator('.rt-card');
+  await expect(cards).toHaveCount(3);
+  const names = () => cards.locator('.rt-title strong').allTextContents();
+  const [a, b, c] = await names() as [string, string, string];
+  const tog = (i: number) => cards.nth(i).locator('.rt-toggle');
+  const more = (n: string) => page.getByRole('button', { name: `운동 메뉴: ${n}`, exact: true });
+
+  // 첫 카드 펼침: ↑ 는 꺼져 있고 목록·펼침 그대로
+  await tog(0).click();
+  await expect(tog(0)).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('button', { name: '1번 블록 위로', exact: true })).toBeDisabled();
+  await expect(tog(0)).toHaveAttribute('aria-expanded', 'true');
+  expect(await names()).toEqual([a, b, c]);
+  // ↓ : 2번째로 옮겨도 펼침이 따라가고 초점은 같은 ↓ 버튼
+  await page.getByRole('button', { name: '1번 블록 아래로', exact: true }).click();
+  expect(await names()).toEqual([b, a, c]);
+  await expect(tog(1)).toHaveAttribute('aria-expanded', 'true');
+  await expect(tog(0)).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: '2번 블록 아래로', exact: true })).toBeFocused();
+  // 맨 아래에 닿으면 ↓ 가 꺼지고 초점은 ↑ 로
+  await page.getByRole('button', { name: '2번 블록 아래로', exact: true }).click();
+  expect(await names()).toEqual([b, c, a]);
+  await expect(page.getByRole('button', { name: '3번 블록 아래로', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '3번 블록 위로', exact: true })).toBeFocused();
+  await expect(tog(2)).toHaveAttribute('aria-expanded', 'true');
+
+  // ⋯ 메뉴: 카드마다 다른 이름, 열려 있는 메뉴는 하나, 교체 창을 닫으면 초점이 ⋯ 로
+  await more(b).click();
+  await expect(page.locator('.rt-menu')).toHaveCount(1);
+  await expect(more(b)).toHaveAttribute('aria-expanded', 'true');
+  await expect(more(b)).not.toHaveAttribute('aria-haspopup', /.*/);
+  await page.getByRole('button', { name: `교체: ${b}`, exact: true }).click();
+  const sheet = page.getByRole('dialog', { name: '운동 교체' });
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: '닫기' }).click();
+  await expect(page.locator('.rt-menu')).toHaveCount(0);
+  await expect(more(b)).toBeFocused();
+  // 교체: 고른 운동의 [세트 늘리기] 로 초점
+  await more(b).click();
+  await page.getByRole('button', { name: `교체: ${b}`, exact: true }).click();
+  await sheet.locator('.list-item').first().click();
+  await expect(page.locator('.rt-menu')).toHaveCount(0);
+  expect((await names())[0]).not.toBe(b);
+  await expect(page.locator(':focus')).toHaveAttribute('aria-label', /세트 늘리기$/);
+  // 삭제: 펼친 카드(3번째)의 번호가 2번째로 당겨지고 초점은 다음 카드의 ⋯ 로
+  await tog(2).click();
+  await more(c).click();
+  await page.getByRole('button', { name: `삭제: ${c}`, exact: true }).click();
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator('.rt-menu')).toHaveCount(0);
+  await expect(tog(1)).toHaveAttribute('aria-expanded', 'true');
+  await expect(more(a)).toBeFocused();
+  // 묶기: 다른 카드의 ⋯ 메뉴가 열려 있어도 닫히고, 묶인 카드가 펼쳐짐 / 풀기도 같음
+  await tog(0).click();
+  await more(a).click();
+  await expect(page.locator('.rt-menu')).toHaveCount(1);
+  await page.getByRole('button', { name: /로 묶기$/ }).click();
+  await expect(cards).toHaveCount(1);
+  await expect(page.locator('.rt-menu')).toHaveCount(0);
+  await expect(tog(0)).toHaveAttribute('aria-expanded', 'true');
+  await more((await names())[0]!).click();
+  await page.getByRole('button', { name: '묶음 풀기' }).click();
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator('.rt-menu')).toHaveCount(0);
+  await expect(tog(0)).toHaveAttribute('aria-expanded', 'true');
+});
+
+test('M2·M3·L3 바로 가기·설정 묶음 기억·멈춤 경고·기록 탭 키보드', async ({ page }) => {
+  await startUp(page);
+  const grp = (k: string) => page.locator(`details[data-group="${k}"]`);
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('settings.open.v1') ?? '{}') as Record<string, boolean>);
+  // 설정 묶음 펼침은 새로고침 뒤에도 기억
+  await page.evaluate(() => { location.hash = '#/settings'; });
+  await grp('workout').locator(':scope > summary').click();
+  await expect(grp('workout')).toHaveJSProperty('open', true);
+  expect((await stored()).workout).toBe(true);
+  await page.reload();
+  await expect(grp('workout')).toHaveJSProperty('open', true);
+  await grp('workout').locator(':scope > summary').click();
+  await page.reload();
+  await expect(grp('workout')).toHaveJSProperty('open', false);
+  expect((await stored()).workout).toBe(false);
+  // ?open= : 그 묶음만 열고 저장하지 않음
+  await page.evaluate(() => { location.hash = '#/'; });
+  await page.getByTestId('home-week').waitFor(); // 홈이 실제로 그려진 뒤 다음 주소로 (바로 이어 바꾸면 WebKit 에서 앞 화면이 새로 만들어지지 않음)
+  await page.evaluate(() => { location.hash = '#/settings?open=sound'; });
+  await expect(grp('sound')).toHaveJSProperty('open', true);
+  await expect(grp('workout')).toHaveJSProperty('open', false);
+  expect((await stored()).sound).toBeUndefined();
+  // 플랜 수준 → 설정 '운동' 묶음이 열린 채로
+  await page.evaluate(() => { location.hash = '#/plan'; });
+  await page.locator('details.plan-adv').waitFor();
+  await openAll(page, 'details.plan-adv');
+  await page.getByRole('button', { name: /설정에서 변경/ }).click();
+  await expect(page).toHaveURL(/#\/settings$/); // ?open= 은 쓰고 나면 걷어 냄 (N2)
+  await expect(grp('workout')).toHaveJSProperty('open', true);
+  // 기록 탭: 마지막 탭이 '운동 기록'이어도 홈 이번 주 → 요약, 회복 팁의 체중 안내 → 분석
+  await page.evaluate(() => { location.hash = '#/stats'; });
+  await page.getByRole('tab', { name: '운동 기록' }).click();
+  await page.evaluate(() => { location.hash = '#/'; });
+  await page.getByTestId('home-week').click();
+  await expect(page).toHaveURL(/#\/stats$/); // ?tab= 은 쓰고 나면 걷어 내 뒤로 가기가 사용자가 고른 탭을 따름 (N2)
+  await expect(page.getByRole('tab', { name: '요약' })).toHaveAttribute('aria-selected', 'true');
+  // N2: 요약으로 들어와 '운동 기록'을 고르고 기록 하나를 열었다가 뒤로 → 고른 '운동 기록' 탭
+  await page.getByRole('tab', { name: '운동 기록' }).click();
+  await expect(page.getByRole('tab', { name: '운동 기록' })).toHaveAttribute('aria-selected', 'true');
+  await page.evaluate(() => { location.hash = '#/stats/w/none'; });
+  await expect(page.getByRole('tab')).toHaveCount(0); // 기록 화면이 실제로 내려간 뒤 뒤로 (안 기다리면 WebKit 에서 다시 그려지지 않은 채 통과할 수 있음)
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/stats$/);
+  await expect(page.getByRole('tab', { name: '운동 기록' })).toHaveAttribute('aria-selected', 'true');
+  // 분석 탭에서 하단 '기록'을 다시 눌러도 튀지 않음
+  await page.getByRole('tab', { name: '분석' }).click();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(page.getByRole('tab', { name: '분석' })).toHaveAttribute('aria-selected', 'true');
+  await page.evaluate(() => { location.hash = '#/recovery'; });
+  await page.getByTestId('tip-AR-11').getByRole('link', { name: '기록 → 분석 탭 → 체중' }).click();
+  await expect(page).toHaveURL(/#\/stats$/);
+  await expect(page.getByRole('tab', { name: '분석' })).toHaveAttribute('aria-selected', 'true');
+  // 탭 목록: 선택된 탭만 Tab 키가 닿고, 화살표로 옮기며, aria-controls 는 그려진 패널을 가리킴
+  await page.evaluate(() => { location.hash = '#/'; });
+  await page.getByTestId('home-week').waitFor(); // 홈이 실제로 그려진 뒤 다음 주소로 (바로 이어 바꾸면 WebKit 에서 앞 화면이 새로 만들어지지 않음)
+  await page.evaluate(() => { location.hash = '#/stats?tab=summary'; });
+  await expect(page).toHaveURL(/#\/stats$/); // ?tab= 을 다 쓴 뒤 키보드 조작
+  const tabs = page.getByRole('tab');
+  await expect(tabs.nth(0)).toHaveAttribute('tabindex', '0');
+  await expect(tabs.nth(1)).toHaveAttribute('tabindex', '-1');
+  const ctl = await tabs.nth(0).getAttribute('aria-controls');
+  await expect(page.locator(`#${ctl}`)).toHaveCount(1);
+  await tabs.nth(0).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.nth(1)).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(tabs.nth(2)).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(tabs.nth(0)).toBeFocused();
+  await page.getByRole('button', { name: '전체 기록 보기' }).click();
+  await expect(tabs.nth(1)).toBeFocused();
+  // 자동 보내기가 멈추면 '동기화·백업' 요약 줄 맨 앞에 보이고 그 묶음이 저절로 열림 (저장하지는 않음)
+  await page.evaluate(() => { localStorage.setItem('send.cfg', 'https://script.google.com/macros/s/AKfycbzTESTaaaaaaaaaaaaaaaaaaaa/exec#SECRETKEY1234567890ABCDEFGH'); localStorage.setItem('send.blocked', 'bad_key'); location.hash = '#/'; });
+  await page.getByTestId('home-week').waitFor(); // 홈이 실제로 그려진 뒤 다음 주소로 (바로 이어 바꾸면 WebKit 에서 앞 화면이 새로 만들어지지 않음)
+  await page.evaluate(() => { location.hash = '#/settings'; });
+  await expect(grp('sync').locator(':scope > summary .set-sum')).toHaveText(/^자동 보내기 멈춤 · /);
+  await expect(grp('sync')).toHaveJSProperty('open', true);
+  expect((await stored()).sync).toBeUndefined();
+  // N5: 화면을 보는 중에 경고가 새로 생기면 요약 줄에만 보이고 저절로 열지는 않음
+  await page.evaluate(() => { localStorage.removeItem('send.cfg'); localStorage.removeItem('send.blocked'); location.hash = '#/'; });
+  await page.getByTestId('home-week').waitFor(); // 홈이 실제로 그려진 뒤 다음 주소로 (바로 이어 바꾸면 WebKit 에서 앞 화면이 새로 만들어지지 않음)
+  await page.evaluate(() => { location.hash = '#/settings'; });
+  await expect(grp('sync')).toHaveJSProperty('open', false);
+  await page.evaluate(() => { localStorage.setItem('send.cfg', 'https://script.google.com/macros/s/AKfycbzTESTaaaaaaaaaaaaaaaaaaaa/exec#SECRETKEY1234567890ABCDEFGH'); localStorage.setItem('send.blocked', 'bad_key'); });
+  await expect(grp('sync').locator(':scope > summary .set-sum')).toHaveText(/^자동 보내기 멈춤 · /, { timeout: 5000 });
+  await expect(grp('sync')).toHaveJSProperty('open', false);
 });

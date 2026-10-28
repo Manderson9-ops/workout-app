@@ -24,7 +24,7 @@ export function PaceLine({ pl, onFit, name }: { pl: PaceLabel; onFit?: () => voi
   );
 }
 
-export function FitSheet({ s, r, byId, onApply, onClose }: { s: AppState; r: Routine; byId: Map<string, Exercise>; onApply: (next: Routine) => void; onClose: () => void }) {
+export function FitSheet({ s, r, byId, onApply, onClose }: { s: AppState; r: Routine; byId: Map<string, Exercise>; onApply: (next: Routine, toOf: (from: number) => number) => void; onClose: () => void }) {
   const [target, setTarget] = useState(() => targetOf(s, r));
   const pace = paceOf(s);
   const partOf = (id: string) => byId.get(id)?.part;
@@ -64,7 +64,7 @@ export function FitSheet({ s, r, byId, onApply, onClose }: { s: AppState; r: Rou
       {/* 아래 버튼은 창 아래에 붙어 있음 (PC에서 목록이 길어도 바로 보임) */}
       <div class="row sheet-foot fit-foot">
         <button class="big grow" onClick={onClose}>취소</button>
-        <button class="big grow primary" disabled={!changed} onClick={() => onApply(f.routine)}>맞춘 루틴 적용하기</button>
+        <button class="big grow primary" disabled={!changed} onClick={() => onApply(f.routine, (from) => f.rows.find((x) => x.fromBlock === from)?.toBlock ?? from)}>맞춘 루틴 적용하기</button>
       </div>
     </Sheet>
   );

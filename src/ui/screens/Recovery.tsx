@@ -3,6 +3,7 @@
  * 규칙 글·라벨·상충은 docs/research/운동회복_논문DB.md 그대로 (data/recovery_rules.json). 제목 한 줄과 계산만 앱이 씀
  */
 import { useState } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
 import papersFile from '../../../data/recovery_papers.json';
 import type { AppState } from '../store';
 import type { Paper, Rule } from '../../core/recoveryData';
@@ -44,7 +45,7 @@ function RefChips({ r }: { r: Rule }) {
 function ProteinBox({ s }: { s: AppState }) {
   const last = [...s.bodyweight].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
   if (!last) {
-    return <p class="rec-note" role="note"><Icon name="info" size={18} /><span>체중을 기록하면 계산해 드려요 (기록 탭 → 체중). 하루 1.6 g/kg, 여유 범위 1.4~2.2 g/kg</span></p>;
+    return <p class="rec-note" role="note"><Icon name="info" size={18} /><span>체중을 기록하면 계산해 드려요. <a href="#/stats?tab=analysis">기록 → 분석 탭 → 체중</a>에서 적을 수 있어요. 하루 <span style={{ whiteSpace: 'nowrap' }}>1.6 g/kg</span>, 여유 범위 <span style={{ whiteSpace: 'nowrap' }}>1.4~2.2 g/kg</span></span></p>;
   }
   const t = proteinTarget(last.kg);
   return (
@@ -55,23 +56,49 @@ function ProteinBox({ s }: { s: AppState }) {
   );
 }
 
+/** 근거끼리 엇갈리는 규칙(주의·상충에 '상충'이 든 것)은 그 문장을 접힌 안이 아니라 보이는 글로 */
+function conflictSplit(c?: string): { flag?: string; rest?: string } {
+  if (!c) return {};
+  const parts = c.split('. ');
+  const raw = parts.find((x) => x.includes('상충'));
+  if (!raw) return { rest: c };
+  const flag = raw.replace(/^상충\s*[:：]\s*/, ''); // 배지가 이미 "상충 주의"라 앞의 "상충:"은 뺌 (겹말 방지)
+  const rest = parts.filter((x) => x !== raw).join('. ');
+  return { flag: flag.endsWith('.') ? flag : `${flag}.`, ...(rest ? { rest } : {}) };
+}
+
+function TipCard({ r, children }: { r: Rule; children?: ComponentChildren }) {
+  const [open, setOpen] = useState(false); // 펼치면 본문 줄 제한을 풀기 위해 (:has() 대신 상태)
+  const { flag, rest } = conflictSplit(r.conflict);
+  return (
+    <section class={`card tip-card${open ? ' is-open' : ''}`} aria-label={TIP_TITLES[r.id]} data-testid={`tip-${r.id}`}>
+      <h2>{TIP_TITLES[r.id]}</h2>
+      <div class="rule-head"><span class="sub small">{r.id}</span><LabelChips label={r.label} /></div>
+      {children}
+      <p class="tip-text">{r.text}</p>
+      {flag && <p class="sub small tip-conflict"><strong>상충 주의</strong> · {flag}</p>}
+      <details class="tip-more" onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+        <summary>전체 보기·근거 (논문 {r.papers.length}편)</summary>
+        <p class="sub small">라벨: {r.label}</p>
+        {rest && <p class="sub small"><strong>주의·상충:</strong> {rest}</p>}
+        <RefChips r={r} />
+      </details>
+    </section>
+  );
+}
+
 export function RecoveryTips({ s }: { s: AppState }) {
   const tips = Object.keys(TIP_TITLES).map((id) => ruleById(id)).filter((r): r is Rule => !!r);
   return (
     <main>
       <ScreenHeader back={back} title="회복 팁" />
-      <p class="sub small">근거 논문 {PAPERS.length}편에서 고른 팁이에요. 배지: <span class="lbl-chip research">연구 근거</span> 논문 수치가 직접 뒷받침 · <span class="lbl-chip app">앱 판단 추정</span> 방향은 맞지만 수치·적용은 앱이 정한 보수적 추정</p>
-      {tips.map((r) => (
-        <section class="card tip-card" key={r.id} aria-label={TIP_TITLES[r.id]} data-testid={`tip-${r.id}`}>
-          <h2>{TIP_TITLES[r.id]}</h2>
-          <div class="rule-head"><span class="sub small">{r.id}</span><LabelChips label={r.label} /></div>
-          {r.id === 'AR-11' && <ProteinBox s={s} />}
-          <p>{r.text}</p>
-          <p class="sub small">라벨: {r.label}</p>
-          {r.conflict && <p class="sub small"><strong>주의·상충:</strong> {r.conflict}</p>}
-          <RefChips r={r} />
-        </section>
-      ))}
+      <div class="tip-intro">
+        <p class="sub small"><b>근거 논문 {PAPERS.length}편에서 고른 팁이에요.</b></p>
+        <details class="set-more"><summary>배지 설명</summary>
+          <p class="sub small">배지: <span class="lbl-chip research">연구 근거</span> 논문 수치가 직접 뒷받침 · <span class="lbl-chip app">앱 판단 추정</span> 방향은 맞지만 수치·적용은 앱이 정한 보수적 추정</p>
+        </details>
+      </div>
+      {tips.map((r) => <TipCard key={r.id} r={r}>{r.id === 'AR-11' && <ProteinBox s={s} />}</TipCard>)}
       <a class="card row-link" href="#/recovery/papers"><Icon name="info" /><span class="grow"><span class="rl-title">근거 논문 전체 보기</span><span class="sub rl-sub">{PAPERS.length}편 · 인용순·최신순</span></span><Icon name="chevron" size={18} /></a>
     </main>
   );

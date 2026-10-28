@@ -7,7 +7,7 @@
  *  4) 웜업으로 보이는 첫 세트(그날 최고 무게의 50% 이하·15회 이상) → W
  * [그대로 두기]나 고르지 않은 항목은 이 기기에 기억해 다시 묻지 않음
  */
-import { useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf } from '../store';
 import type { Exercise } from '../../core/types';
@@ -105,6 +105,11 @@ function Section({ title, note, rows, okLabel, confirmTitle, confirmMsg, run, on
 export function RecordFixCard({ s, byId }: { s: AppState; byId: Map<string, Exercise> }) {
   const [seen, setSeen] = useState(() => new Set(seenList()));
   const [open, setOpen] = useState(false); // D-079 2차: 기록 탭 맨 위를 한 줄로 (펼쳐야 목록)
+  // 정리하기 ↔ 접기: 누른 버튼이 사라지므로 바뀐 쪽 버튼으로 초점을 옮김
+  const toggle = useRef<HTMLButtonElement>(null);
+  const moved = useRef(false);
+  useEffect(() => { if (moved.current) toggle.current?.focus(); }, [open]);
+  const flip = (o: boolean) => { moved.current = true; setOpen(o); };
   const onSeen = (keys: string[]) => { if (!keys.length) return; remember(keys); setSeen(new Set(seenList())); };
   const now = Date.now();
   const c = useMemo(() => {
@@ -121,13 +126,13 @@ export function RecordFixCard({ s, byId }: { s: AppState; byId: Map<string, Exer
   const n = ends.length + longs.length + empty.length + warms.length;
   if (!open) return (
     <section class="card fix-card row between" aria-label="기록 정리" data-testid="record-fix">
-      <p class="small" style={{ margin: 0 }}><b>고칠 만한 기록 {n}건</b><span class="sub"> · 끝난 시각·빈 기록·웜업</span></p>
-      <button class="tonal" aria-expanded={false} onClick={() => setOpen(true)}>정리하기</button>
+      <p class="small" style={{ margin: 0 }}><b>고칠 만한 기록 {n}건</b><span class="sub"> · {[ends.length ? '끝난 시각' : '', longs.length ? '긴 기록' : '', empty.length ? '빈 기록' : '', warms.length ? '웜업' : ''].filter(Boolean).join('·')}</span></p>
+      <button ref={toggle} class="tonal" aria-expanded={false} onClick={() => flip(true)}>정리하기</button>
     </section>
   );
   return (
     <section class="card fix-card" aria-label="기록 정리" data-testid="record-fix">
-      <div class="card-head"><span class="card-title">기록 정리 (한 번만)</span><button class="ghost" aria-expanded={true} onClick={() => setOpen(false)}>접기</button></div>
+      <div class="card-head"><span class="card-title">기록 정리 (한 번만)</span><button ref={toggle} class="ghost" aria-expanded={true} onClick={() => flip(false)}>접기</button></div>
       <p class="sub small"><b>고를 것만 남기고 확인하면 고쳐요.</b> 그대로 두면 다시 묻지 않아요.</p>
       <Section testId="fix-end" title="끝난 시각이 늦은 기록" note="마지막 세트 뒤 15분 넘게 지나 끝낸 기록이에요. 끝난 시각을 마지막 세트 + 3분으로 바꿔요."
         rows={ends.map((f) => ({ key: endKey('end', f), text: `${day(f.startedAt)} ${f.name}`, sub: `${endChangeText(f)} (마지막 세트 ${at(f.lastAt, f.startedAt)})` }))}

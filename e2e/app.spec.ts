@@ -21,6 +21,29 @@ async function endWorkout(p: Page) {
   await p.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' }).click();
 }
 
+/** D-079 2차 2단계: 설정 묶음은 접혀 있음 → 필요한 묶음을 먼저 연다 (이미 열려 있으면 그대로) */
+async function openSet(p: Page, name: string) {
+  const g = p.locator('details.set-group').filter({ has: p.locator(':scope > summary', { hasText: name }) });
+  if (!(await g.evaluate((e) => (e as HTMLDetailsElement).open))) await g.locator(':scope > summary').click();
+}
+/** D-079 2차 3단계: 플랜의 고급 설정(최소 등급·수준·세트 방식)은 접혀 있음 → 연다 */
+async function openAdv(p: Page) {
+  const g = p.locator('details.plan-adv');
+  if (!(await g.evaluate((e) => (e as HTMLDetailsElement).open))) await g.locator(':scope > summary').click();
+}
+/** 루틴 편집의 운동 카드는 접혀 있음(하나만 펼침) → 그 카드를 연다. 이미 열려 있으면 그대로 */
+async function openCard(c: Locator) {
+  const t = c.locator('.rt-toggle');
+  if ((await t.getAttribute('aria-expanded')) !== 'true') await t.click();
+}
+async function openCardNamed(p: Page, name: string) {
+  await openCard(p.locator('.rt-card').filter({ has: p.locator('.rt-title', { hasText: name }) }).first());
+}
+/** '한 번에 바꾸기'는 접혀 있음 → 연다 */
+async function openBulk(p: Page) {
+  const g = p.locator('details.bulk-more');
+  if (!(await g.evaluate((e) => (e as HTMLDetailsElement).open))) await g.locator(':scope > summary').click();
+}
 /** 앱 안 확인 창(D-038·D-039)에서 버튼 하나 누름. 확인 창은 aria-modal 시트 */
 async function answer(p: Page, button: string) {
   await p.locator('.sheet[aria-modal="true"]').getByRole('button', { name: button, exact: true }).click();
@@ -305,6 +328,7 @@ test('운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링�
 
 test('D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 → 짧은 이유·삼두 더해서 다시 만들기, 종목 탭 주/보조 근육·근육 필터', async ({ page }) => {
   await page.getByRole('link', { name: '플랜' }).click();
+  await openAdv(page);
   await expect(page.getByTestId('level-rule')).toHaveText('중급: 운동당 최대 4세트(앱 기준) · 한 근육은 한 번에 11세트까지(연구 근거, 보조로 쓰이면 0.5세트로 셈)');
   await pickPart(page, '하체');
   await page.getByRole('button', { name: '75분' }).click();
@@ -463,6 +487,7 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   await expect(am).toHaveValue('mix');
   const sessionType = () => page.evaluate(() => (navigator as Navigator & { audioSession?: { type: string } }).audioSession?.type ?? 'none');
   expect(await sessionType()).toBe('auto'); // 누르기 전에는 바꾸지 않음
+  await openSet(page, '소리·화면'); // (묶음 펼치기 = 첫 누름이라 이 뒤부터 transient)
   await page.locator('main h1').first().click();
   expect(await sessionType()).toBe('transient');
   await am.selectOption('solo');
@@ -721,6 +746,7 @@ test('직접 추가한 운동을 플랜에서 최고 등급 S(D-074)로 반영 �
   await page.getByRole('dialog').getByRole('button', { name: /바벨\s*로우/ }).first().click();
   await expect(page.getByRole('region', { name: '생성된 플랜' })).toContainText('바벨로우');
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '운동');
   await page.getByRole('button', { name: '상급' }).click();
   await expect(page.getByRole('button', { name: '상급' })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: '운동 사이 늘리기' }).click();
@@ -736,6 +762,7 @@ test('루틴 직접 만들기·편집: 운동 추가, 목표 횟수, 슈퍼세�
     await page.getByLabel('운동 검색').fill(q);
     await page.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
   }
+  await openCardNamed(page, '해머 컬');
   await page.getByRole('button', { name: '해머 컬 목표 횟수 늘리기', exact: true }).click();
   await expect(page.getByText('13회', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /다음 운동과 슈퍼세트로 묶기/ }).click();
@@ -780,26 +807,32 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
   // 기억된 부위(마지막으로 고른 부위)는 부위 버튼으로는 바뀌지 않음
   expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.endsWith('picker.part')).length)).toBe(0);
   // 앞의 두 운동 묶기
+  await openCard(page.locator('.rt-card').first());
   await page.getByRole('button', { name: /다음 운동과 슈퍼세트로 묶기/ }).first().click();
-  const cards = page.locator('main .card');
+  const cards = page.locator('main .rt-card');
   await expect(cards).toHaveCount(2);
-  const sets = async (c: Locator) => (await c.locator('span:not(.val)').filter({ hasText: /^\d+세트$/ }).allTextContents()).map((x) => parseInt(x, 10));
+  const sets = async (c: Locator) => { await openCard(c); return (await c.locator('span:not(.val)').filter({ hasText: /^\d+세트$/ }).allTextContents()).map((x) => parseInt(x, 10)); };
   const g0 = await sets(cards.nth(0)), o0 = await sets(cards.nth(1));
   // 묶음 카드에는 이 묶음 세트·횟수가 항상 보이고, 단일 카드에는 없음
+  await openCard(cards.nth(0));
   await expect(cards.nth(0).getByText('이 묶음 세트', { exact: true })).toBeVisible();
+  await openCard(cards.nth(1));
   await expect(cards.nth(1).getByText('이 묶음 세트', { exact: true })).toHaveCount(0);
+  await openCard(cards.nth(0));
   await cards.nth(0).getByRole('button', { name: /세트 모두 늘리기$/ }).click();
   expect(await sets(cards.nth(0))).toEqual(g0.map((x) => x + 1));
   expect(await sets(cards.nth(1))).toEqual(o0);
   await expect(page.locator('p.sr-only[aria-live="polite"]')).toContainText('묶음 운동 2개 세트 +1');
   // 이 묶음 횟수 -1
-  const reps = async (c: Locator) => (await c.locator('span:not(.val)').filter({ hasText: /^\d+회$/ }).allTextContents()).map((x) => parseInt(x, 10));
+  const reps = async (c: Locator) => { await openCard(c); return (await c.locator('span:not(.val)').filter({ hasText: /^\d+회$/ }).allTextContents()).map((x) => parseInt(x, 10)); };
   const gr0 = await reps(cards.nth(0)), or0 = await reps(cards.nth(1));
+  await openCard(cards.nth(0));
   await cards.nth(0).getByRole('button', { name: /횟수 모두 줄이기$/ }).click();
   expect(await reps(cards.nth(0))).toEqual(gr0.map((x) => x - 1));
   expect(await reps(cards.nth(1))).toEqual(or0);
   // 모든 운동 세트 +1: 전부 바뀜
   const g1 = await sets(cards.nth(0)), o1 = await sets(cards.nth(1));
+  await openBulk(page);
   await page.getByRole('button', { name: '모든 운동 세트 늘리기' }).click();
   expect(await sets(cards.nth(0))).toEqual(g1.map((x) => x + 1));
   expect(await sets(cards.nth(1))).toEqual(o1.map((x) => x + 1));
@@ -812,7 +845,7 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
   await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await routineMenu(page, '부위 추가 루틴', '편집');
   await expect(page.getByRole('button', { name: '홈', exact: true })).toBeVisible(); // 홈·내 루틴에서 연 편집은 홈으로
-  const cards2 = page.locator('main .card');
+  const cards2 = page.locator('main .rt-card');
   await expect(cards2).toHaveCount(2);
   expect(await sets(cards2.nth(0))).toEqual(finalG);
   expect(await sets(cards2.nth(1))).toEqual(finalO);
@@ -833,6 +866,7 @@ test('시간이 너무 짧으면 이유를 보여줌, 부위 없이 만들 수 �
 
 test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 −/+', async ({ page }) => {
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '운동');
   await page.getByRole('button', { name: '운동 사이 늘리기' }).click(); // 60 → 75
   await page.getByRole('button', { name: '단관절 세트 간 줄이기' }).click(); // 90 → 75
   await page.getByRole('link', { name: '홈' }).click();
@@ -842,7 +876,8 @@ test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 �
     await page.getByLabel('운동 검색').fill(q);
     await page.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
   }
-  await expect(page.getByText('75초').first()).toBeVisible(); // 새로 추가한 단관절 블록 = 설정값
+  await expect(page.locator('.rt-sum', { hasText: '75초' }).first()).toBeVisible(); // 새로 추가한 단관절 블록 = 설정값
+  await openCardNamed(page, '해머 컬');
   for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '해머 컬 세트 줄이기', exact: true }).click(); // 해머 컬 1세트
   await page.getByRole('button', { name: '저장하고 시작' }).click();
   await expect(page).toHaveURL(/#\/workout/);
@@ -949,6 +984,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
 
   // 도구: 원판 100kg (20kg 바) → 25 + 15, 원판 [15,10]만 → 60kg = 10 + 10, 1RM 100×5 → 116.7
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '앱 정보·도구');
   await page.getByRole('button', { name: '원판 계산기 · 1RM 계산기' }).click();
   await page.getByLabel('원판 계산 목표 무게', { exact: true }).fill('100');
   await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 25 + 15');
@@ -965,6 +1001,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
 
   // 백업 저장 → 모든 데이터 지우기 → 불러오기 → 다시 백업: 내용 100% 일치 (7.1)
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await expect(page.getByText('마지막 백업: 없음')).toBeVisible();
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
   expect(dl.suggestedFilename()).toMatch(/^workout-backup-\d{8}-\d{4}\.json$/);
@@ -972,6 +1009,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await expect(page.getByText(/백업 파일을 내려받았어요/)).toBeVisible();
   await expect(page.getByText('마지막 백업: 없음')).toHaveCount(0);
   await checkScreen(page, '13-settings-backup');
+  await openSet(page, '데이터'); // 초기화는 '데이터' 묶음에 있음 (D-079 2차 검토 L4)
   await page.getByText('모든 데이터 지우기 (초기화)').click();
   await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
   await answer(page, '지우기');
@@ -980,6 +1018,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await page.getByLabel('백업 파일 고르기').setInputFiles(file);
   await answer(page, '바꾸기');
   await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
@@ -994,6 +1033,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
   // 다른 앱 파일·깨진 파일은 거절, 기존 데이터 유지
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await page.getByLabel('백업 파일 고르기').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"app":"other"}') });
   await expect(page.getByText(/불러오지 못했어요: 이 앱의 백업 파일이 아니에요/)).toBeVisible();
   const broken = JSON.parse(readFileSync(file, 'utf8')); broken.data.workouts[0].blocks = [{}]; delete broken.counts;
@@ -1012,6 +1052,8 @@ test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, �
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await endWorkout(page);
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '데이터');
+  await openSet(page, '동기화·백업'); // [PC로 보내기 (파일)] 은 이 묶음
   const box = page.getByLabel('진단 요약');
   await expect(box).toContainText('11 플랜 속도');
   await expect(box).toContainText('오류 없음');
@@ -1059,6 +1101,7 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
     await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body.key === KEY && !badKey ? (body.ping ? { ok: true, ping: true } : { ok: true, name: 'auto-x.json' }) : { ok: false, error: 'bad_key' }) });
   });
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await page.getByLabel('자동 보내기 설정 붙여넣기').fill(`https://evil.example.com/x/exec#${KEY}`);
   await page.getByRole('button', { name: '저장하고 연결 확인' }).click();
   await expect(page.getByText('구글 Apps Script 주소(/exec)가 아니에요')).toBeVisible();
@@ -1084,6 +1127,7 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   expect(JSON.stringify(sent.file)).not.toContain(KEY);
   expect(await page.content()).not.toContain(KEY);
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
   expect(readFileSync(await dl.path(), 'utf8')).not.toContain(KEY);
   // 실패 → 안내, 다음에 앱을 열 때 다시 보냄
@@ -1096,6 +1140,7 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   await page.reload();
   await expect.poll(() => got.length).toBe(n + 1);
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await expect(page.getByLabel('자동 보내기')).not.toContainText('보낼 것 있음');
   // 보내는 도중 앱이 닫혀도(새로고침) 다음에 열 때 다시 보냄 (검토 1차 막는 문제 1)
   hang = true;
@@ -1109,6 +1154,7 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   await expect.poll(() => page.evaluate(() => localStorage.getItem('send.pending'))).toBeNull();
   // 인터넷이 끊겼다가 다시 연결되면 자동으로 다시 보냄 (막는 문제 2)
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await page.context().setOffline(true); fail = true; // Chromium은 가짜 서버가 오프라인에도 응답하므로 함께 끊음
   await page.getByRole('button', { name: '지금 보내기' }).click();
   await expect(page.getByText(/보내지 못했어요: 인터넷에 연결되지 않았어요/)).toBeVisible();
@@ -1131,6 +1177,7 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   await expect.poll(() => page.evaluate(() => localStorage.getItem('send.pending'))).toBeNull();
   // 다시 해도 안 되는 오류(키 틀림)는 자동 재시도를 멈춤 (데이터 낭비 방지)
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   badKey = true;
   await page.getByRole('button', { name: '지금 보내기' }).click();
   await expect(page.getByText(/보내지 못했어요: 키가 맞지 않아요/)).toBeVisible();
@@ -1142,6 +1189,7 @@ test('P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, �
   badKey = false;
   // 끄기
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await page.getByRole('button', { name: '끄기' }).click();
   await answer(page, '끄기');
   await expect.poll(() => page.evaluate(() => localStorage.getItem('send.cfg'))).toBeNull();
@@ -1180,6 +1228,7 @@ test('S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 �
   await page.goto('./#/');
   await expect(page.getByRole('heading', { name: '예전 루틴' })).toBeVisible();
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '운동');
   await expect(page.getByRole('button', { name: '상급' })).toHaveAttribute('aria-pressed', 'true');
   const info = await page.evaluate(async () => new Promise<{ ver: number; stamped: boolean }>((res) => {
     const o = indexedDB.open('workout-app');
@@ -1217,12 +1266,13 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
     await p.evaluate(([u, k]) => localStorage.setItem('send.cfg', `${u}#${k}`), [URL_, KEY]);
     await p.reload();
     await p.getByRole('link', { name: '설정' }).click();
+    await openSet(p, '동기화·백업');
     await p.getByRole('button', { name: '동기화 연결하기' }).click();
     await p.getByRole('button', { name: '이미 저장했어요' }).click();
     await p.getByRole('button', { name: '연결 시작' }).click();
     await expect(p.getByLabel('PC와 폰 동기화')).toContainText('동기화됨');
   };
-  const syncNowOn = async (p: Page) => { await p.getByRole('link', { name: '설정' }).click(); await p.getByRole('button', { name: '지금 동기화' }).click(); await expect(p.getByLabel('PC와 폰 동기화')).toContainText('동기화됨'); };
+  const syncNowOn = async (p: Page) => { await p.getByRole('link', { name: '설정' }).click(); await openSet(p, '동기화·백업'); await p.getByRole('button', { name: '지금 동기화' }).click(); await expect(p.getByLabel('PC와 폰 동기화')).toContainText('동기화됨'); };
   // 폰 = 기본 page (아이폰 크기), PC = 새 창 (넓은 화면)
   const pcCtx = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
   const pc = await pcCtx.newPage();
@@ -1280,6 +1330,7 @@ test('PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용
   await page.getByLabel('루틴 이름').fill('PC에서 짠 루틴');
   await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await page.getByRole('button', { name: '지금 동기화' }).click();
   await expect(page.getByLabel('PC와 폰 동기화')).toContainText('인터넷에 연결되지 않았어요');
   down = false;
@@ -1338,6 +1389,7 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   await checkScreen(pc, '20-pc-workout');
   // 폰 화면으로 보기
   await pc.getByRole('link', { name: '설정' }).click();
+  await openSet(pc, '소리·화면');
   await pc.getByLabel('폰 화면으로 보기').check();
   const main = await pc.locator('main').boundingBox();
   expect(main!.width).toBeLessThanOrEqual(430);
@@ -1348,6 +1400,7 @@ test('S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 �
   const tb2 = await pc.locator('.timer').boundingBox();
   expect(tb2!.width).toBeLessThanOrEqual(430);
   await pc.getByRole('link', { name: '설정' }).click();
+  await openSet(pc, '소리·화면');
   await pc.getByLabel('폰 화면으로 보기').uncheck();
   await ctx.close();
 });
@@ -1363,6 +1416,7 @@ test('S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙
   await checkScreen(page, '21-feedback-sheet');
   await page.getByRole('button', { name: '메모 저장하기', exact: true }).click();
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '데이터');
   const card = page.getByLabel(/^개선 메모 FB-\d{8}-[a-z0-9]+-\d{8}$/i).filter({ hasText: '휴식 끝 소리가 작아요' });
   await expect(card).toContainText('휴식 끝 소리가 작아요');
   await expect(card).toContainText('접수');
@@ -1550,6 +1604,7 @@ test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동�
 
   // 백업 파일 하나 만들어 둠
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
   const file = await dl.path();
   const restoreWith = async () => { await page.getByLabel('백업 파일 고르기').setInputFiles(file); await answer(page, '바꾸기'); };
@@ -1558,6 +1613,7 @@ test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동�
   await page.evaluate(() => localStorage.setItem('sync.on', '1'));
   const resetTo = async (pick: string | null) => {
     await page.getByRole('link', { name: '설정' }).click();
+    await openSet(page, '데이터');
     const summary = page.getByText('모든 데이터 지우기 (초기화)');
     if (!(await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).isVisible())) await summary.click();
     await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
@@ -1598,6 +1654,7 @@ test('앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동�
 
   // 5) 동기화 꺼진 채 불러오기(확인 한 번) → 루틴이 돌아옴 → 삭제 확인에서 "지우기"만 지움
   await page.getByRole('link', { name: '설정' }).click();
+  await openSet(page, '동기화·백업');
   await restoreWith();
   await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
   await page.getByRole('link', { name: '홈' }).click();
@@ -1879,8 +1936,8 @@ test('끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 �
     await page.getByLabel('운동 검색').fill(q);
     await page.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
   }
-  const rcards = page.locator('main .card');
-  const rn = () => page.locator('main .card').evaluateAll((els) => els.map((e) => e.querySelector('strong')?.textContent?.trim() ?? ''));
+  const rcards = page.locator('main .rt-card');
+  const rn = () => page.locator('main .rt-card').evaluateAll((els) => els.map((e) => e.querySelector('.rt-title strong')?.textContent?.trim() ?? ''));
   const r0 = await rn();
   await dragTo(page, rcards.nth(2).locator('.drag-handle'), rcards.nth(0), touch);
   await expect.poll(rn).toEqual([r0[2], r0[0], r0[1]]);
@@ -1901,8 +1958,8 @@ test('끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으�
     await pc.getByLabel('운동 검색').fill(q);
     await pc.getByRole('dialog').getByRole('button').filter({ hasText: q }).first().click();
   }
-  const cards = pc.locator('main .card');
-  const rn = () => pc.locator('main .card').evaluateAll((els) => els.map((e) => e.querySelector('strong')?.textContent?.trim() ?? ''));
+  const cards = pc.locator('main .rt-card');
+  const rn = () => pc.locator('main .rt-card').evaluateAll((els) => els.map((e) => e.querySelector('.rt-title strong')?.textContent?.trim() ?? ''));
   const r0 = await rn();
   const b0 = (await cards.nth(0).boundingBox())!, b1 = (await cards.nth(1).boundingBox())!;
   expect(Math.abs(b0.y - b1.y), '2단 배치').toBeLessThan(4);
@@ -2013,13 +2070,14 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await sheet.getByRole('button', { name: '0.9.0 바뀐 곳 보러 가기' }).click(); // 0.9.0 의 where = 앱 정보
   await expect(page).toHaveURL(/#\/settings\/about$/);
   await expect(sheet).toHaveCount(0);
-  // 앱 정보: 버전 칩(본판), 마지막 업데이트 날짜, 버전별 바뀐 점(최신만 펼침), 오픈소스 고지
+  // 앱 정보: 버전 칩(본판), 마지막 업데이트 날짜, 버전별 바뀐 점(최근 3개만 펼침), 오픈소스 고지
   await expect(page.getByRole('heading', { name: '앱 정보' })).toBeVisible();
   await expect(page.getByTestId('about-version')).toHaveText(SHOWN_VERSION);
   await expect(page.getByTestId('about-edition')).toHaveText('판: 본판');
   await expect(page.getByLabel('지금 버전')).toContainText(`빌드 이름 ${APP_VERSION}`);
   await expect(page.getByLabel('지금 버전')).toContainText('마지막 업데이트');
-  await expect(page.locator('details.cl-item[open]')).toHaveCount(1);
+  await expect(page.locator('details.cl-item[open]')).toHaveCount(3); // 최근 3개 버전만 펼침, 나머지는 "이전 버전 N개" 안
+  await expect(page.getByTestId('cl-older')).not.toHaveAttribute('open', '');
   await expect(page.getByRole('link', { name: '오픈소스 고지' })).toBeVisible();
   await page.getByRole('button', { name: '새 버전 확인' }).click();
   await expect(page.getByLabel('지금 버전').getByRole('status')).toHaveText(`지금 최신 버전이에요 (${SHOWN_VERSION})`); // 서버 version.json 과 비교
@@ -2060,6 +2118,7 @@ test('D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버�
   await expect(page.getByRole('link', { name: '설정', exact: true }).locator('.ndot')).toHaveCount(1);
   await page.getByRole('link', { name: '설정', exact: true }).click();
   await expect(aboutRow).not.toHaveAttribute('aria-label', /새 기능 있음/);
+  await openSet(page, '동기화·백업');
   await page.getByRole('link', { name: /^애플워치 연동/ }).click();
   await expect(page.getByRole('heading', { name: '애플워치 연동' })).toBeVisible();
   await page.getByRole('link', { name: '홈', exact: true }).click();
@@ -2162,7 +2221,7 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await endWorkout(page);
   await expect(page.getByTestId('home-week')).toContainText('1회');
-  await expect(page.getByTestId('home-week')).toHaveAttribute('href', '#/stats');
+  await expect(page.getByTestId('home-week')).toHaveAttribute('href', '#/stats?tab=summary'); // 마지막으로 본 탭이 아니라 요약 탭으로 (M2)
   // 다음 운동 (앱 판단): 하나뿐인 루틴을 오늘 했으면 그대로 보이고 이유 줄 "오늘 이미 했어요"
   await expect(next).toContainText('오늘 이미 했어요');
   // 390×844 첫 화면: 백업 알림은 다음 운동 아래, [▶ 시작]은 탭 바 위에 다 보임 (검토 A3)
@@ -2335,6 +2394,7 @@ test('D-055 3단계 플랜 단계 카드(1 부위 → 2 시간·등급 → 3 결
   await expect(s1).toContainText('아직 없음');
   await expect(s1.getByRole('group', { name: '부위' })).toBeVisible();
   await expect(s2.getByRole('button', { name: '45분' })).toBeVisible();
+  await openAdv(page);
   await expect(s2.getByLabel('최소 등급')).toBeVisible();
   await pickPart(page, '등');
   await expect(s1).toContainText('1개 고름');
@@ -2364,6 +2424,7 @@ test('D-055 3단계 플랜 단계 카드(1 부위 → 2 시간·등급 → 3 결
 
 test('D-055 3단계 설정 묶음 카드: 운동·소리·화면·동기화·백업·데이터·앱 정보, 컨트롤 그대로', async ({ page }) => {
   await page.getByRole('link', { name: '설정', exact: true }).click();
+  for (const g of ['운동', '소리·화면', '동기화·백업', '데이터', '앱 정보·도구']) await openSet(page, g);
   for (const g of ['운동', '소리·화면', '동기화·백업', '데이터', '앱 정보·도구']) await expect(page.getByRole('region', { name: g, exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: '운동', exact: true }).getByRole('button', { name: '중급' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('region', { name: '소리·화면' }).getByLabel('폰 화면으로 보기')).toBeVisible();
@@ -2495,6 +2556,7 @@ test.describe('D-056 휴식 끝 진동', () => {
   type HW = Window & { __wkTest?: boolean; __hapticCalls?: { pulses: number; method: string }[]; __dn?: () => number };
   test('설정: 휴식 끝 진동 켜기/끄기(이 기기만), [소리·진동 시험] 결과 글, 숨긴 스위치는 초점·스크롤에 영향 없음, 안내 카드', async ({ page }) => {
     await page.getByRole('link', { name: '설정', exact: true }).click();
+    await openSet(page, '소리·화면');
     const grp = page.getByRole('region', { name: '소리·화면' });
     await grp.getByRole('button', { name: '휴식 끝 진동 켬' }).click();
     await expect(grp.getByRole('button', { name: '휴식 끝 진동 끔' })).toHaveAttribute('aria-pressed', 'false');
@@ -2592,6 +2654,7 @@ test.describe('D-056 검토: 진동 끔·소리 끔, 실험 알림', () => {
   test('진동 끔이면 첫 휴식 안내는 벨소리 이야기, 소리 끔 + 진동 켬이면 10초 전 진동은 그대로', async ({ page }) => {
     await page.addInitScript(() => { (window as NW).__wkTest = true; });
     await page.getByRole('link', { name: '설정', exact: true }).click();
+    await openSet(page, '소리·화면');
     const grp = page.getByRole('region', { name: '소리·화면' });
     await grp.getByRole('button', { name: '휴식 끝 진동 켬' }).click();
     await makeRoutine(page, ['이두'], '30분');
@@ -2600,6 +2663,7 @@ test.describe('D-056 검토: 진동 끔·소리 끔, 실험 알림', () => {
     await expect(page.getByRole('note', { name: '휴식 알림 안내' })).toHaveText('무음 모드면 알림음이 안 나요 · 벨소리 모드로 두면 음악 위로 들려요');
     // 소리 끔 + 진동 켬
     await page.getByRole('link', { name: '설정', exact: true }).click();
+    await openSet(page, '소리·화면');
     await grp.getByRole('button', { name: '휴식 끝 진동 끔' }).click();
     await grp.getByRole('button', { name: '소리 켬' }).click();
     await page.reload(); // 새 문서에서 __wkTest 다시
@@ -2613,6 +2677,7 @@ test.describe('D-056 검토: 진동 끔·소리 끔, 실험 알림', () => {
     const sec = page.getByRole('region', { name: '휴식 끝 알림으로 받기 (실험)' });
     if (browserName !== 'chromium') {
       await page.getByRole('link', { name: '설정', exact: true }).click();
+      await openSet(page, '소리·화면');
       await expect(sec).toBeVisible();
       await expect(sec.getByTestId('notify-perm')).toBeVisible(); // 켜기 버튼 또는 "쓸 수 없어요" 안내
       return;
@@ -2622,6 +2687,7 @@ test.describe('D-056 검토: 진동 끔·소리 끔, 실험 알림', () => {
     await page.addInitScript(() => { (window as NW).__wkTest = true; Object.defineProperty(Notification, 'permission', { get: () => 'granted', configurable: true }); Notification.requestPermission = async () => 'granted'; });
     await page.reload();
     await page.getByRole('link', { name: '설정', exact: true }).click();
+    await openSet(page, '소리·화면');
     await expect(sec.getByTestId('guide-notify')).not.toHaveAttribute('open', '');
     await sec.getByTestId('guide-notify').locator('summary').click();
     await expect(sec).toContainText('홈 화면에 추가한 앱에서만');
@@ -2653,6 +2719,7 @@ test.describe('D-056 검토: 진동 끔·소리 끔, 실험 알림', () => {
     expect((await calls()).filter((c) => c.startsWith('휴식 끝|'))).toHaveLength(1);
     // 끄면 다시 끔
     await page.getByRole('link', { name: '설정', exact: true }).click();
+    await openSet(page, '소리·화면');
     await sec.getByRole('button', { name: '휴식 끝 알림 켬' }).click();
     await expect(sec.getByRole('button', { name: '휴식 끝 알림 끔' })).toBeVisible();
   });
@@ -2697,7 +2764,7 @@ test.describe('D-057 회복', () => {
     // 홈: 한 줄 + 다음 운동(같은 하체 루틴) 안내
     await page.getByRole('link', { name: '홈', exact: true }).click();
     await expect(page.getByTestId('home-recovery')).toContainText(`회복 중: 하체(약 ${left}시간)`);
-    await expect(page.getByTestId('home-recovery')).toHaveAttribute('href', '#/stats');
+    await expect(page.getByTestId('home-recovery')).toHaveAttribute('href', '#/stats?tab=summary');
     await expect(page.getByTestId('next-rec-note')).toContainText('회복 중으로 추정: 하체(약');
     await checkScreen(page, '87-home-recovery');
     // 플랜: 하체를 고르면 안내 (막지 않음)
@@ -2778,6 +2845,7 @@ test.describe('D-057 회복', () => {
     await expect(page.getByTestId('paper-count')).toHaveText('4편');
     // 설정 기본 휴식 옆 "근거" → 세트 간 휴식 논문
     await page.goto('./#/settings');
+    await openSet(page, '운동');
     await page.getByRole('link', { name: '세트 간 휴식 근거 논문' }).click();
     await expect(page.getByTestId('paper-count')).toHaveText(/^\d+편 · 주제 세트 간 휴식$/);
   });
@@ -2786,6 +2854,7 @@ test.describe('D-057 회복', () => {
 test.describe('D-058 애플워치 연동', () => {
   test('기록이 없으면 운동 카드에 심박 줄 없음, 연동 화면은 빈 안내', async ({ page }) => {
     await page.goto('./#/settings');
+    await openSet(page, '동기화·백업');
     await page.getByRole('link', { name: /^애플워치 연동/ }).click();
     await expect(page.getByTestId('watch-status')).toContainText('아직 애플워치 기록을 받지 않았어요');
     await expect(page.getByTestId('watch-last-rx')).toHaveText('마지막 수신: 아직 없음'); // D-071

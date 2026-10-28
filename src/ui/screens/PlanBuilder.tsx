@@ -311,22 +311,25 @@ export function PlanBuilder({ s }: { s: AppState }) {
       <p class="sub small step-hint">
         {EQUIPMENT_PRESETS.find((p) => p.id === (f.equipPreset ?? 'all'))?.desc}
       </p>
-      <div class="grid2 form-1col">
-        <div><label>최소 등급</label>
-          <select value={f.minGrade} onChange={(e) => update({ minGrade: (e.target as HTMLSelectElement).value as Grade })} aria-label="최소 등급">
-            {GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
-          </select></div>
-        <div><label>수준</label><button class="chip on full level-chip" aria-label={`수준 ${s.settings.level}, 설정에서 변경`} title="설정에서 변경" onClick={() => go('#/settings')}>{s.settings.level}<Icon name="chevron" size={14} /></button></div>
-      </div>
-      <p class="sub small" data-testid="level-rule">{s.settings.level}: 운동당 최대 {MAX_SETS_BY_LEVEL[s.settings.level]}세트(앱 기준) · 한 근육은 한 번에 {SESSION_CAP[s.settings.level]}세트까지({s.settings.level === '초보' ? '앱 기준' : '연구 근거'}, 보조로 쓰이면 0.5세트로 셈)</p>
-      <label>세트 방식 (시간이 부족하면 자동으로 묶음)</label>
-      <div class="row wrap">
-        {(['superset', 'compound'] as Grouping[]).map((g) => (
-          <button key={g} class={`chip ${f.groupings.includes(g) ? 'on' : ''}`} aria-pressed={f.groupings.includes(g)}
-            onClick={() => update({ groupings: f.groupings.includes(g) ? f.groupings.filter((x) => x !== g) : [...f.groupings, g] })}>{g === 'superset' ? '슈퍼세트' : '컴파운드 세트'}</button>
-        ))}
-        <button class={`chip ${f.prefer ? 'on' : ''}`} aria-pressed={f.prefer} onClick={() => update({ prefer: !f.prefer })}>묶음 우선</button>
-      </div>
+      <details class="plan-adv">
+        <summary>고급 설정: {f.minGrade} 이상 · {s.settings.level} · {[...f.groupings.map((g) => (g === 'superset' ? '슈퍼세트' : '컴파운드 세트')), ...(f.prefer ? ['묶음 우선'] : [])].join('·') || '묶음 없음'}</summary>
+        <div class="grid2 form-1col">
+          <div><label>최소 등급</label>
+            <select value={f.minGrade} onChange={(e) => update({ minGrade: (e.target as HTMLSelectElement).value as Grade })} aria-label="최소 등급">
+              {GRADES.filter((g) => g !== 'C-').map((g) => <option key={g} value={g}>{g} 이상</option>)}
+            </select></div>
+          <div><label>수준</label><button class="chip on full level-chip" aria-label={`수준 ${s.settings.level}, 설정에서 변경`} title="설정에서 변경" onClick={() => go('#/settings?open=workout')}>{s.settings.level}<Icon name="chevron" size={14} /></button></div>
+        </div>
+        <p class="sub small" data-testid="level-rule">{s.settings.level}: 운동당 최대 {MAX_SETS_BY_LEVEL[s.settings.level]}세트(앱 기준) · 한 근육은 한 번에 {SESSION_CAP[s.settings.level]}세트까지({s.settings.level === '초보' ? '앱 기준' : '연구 근거'}, 보조로 쓰이면 0.5세트로 셈)</p>
+        <label>세트 방식 (시간이 부족하면 자동으로 묶음)</label>
+        <div class="row wrap">
+          {(['superset', 'compound'] as Grouping[]).map((g) => (
+            <button key={g} class={`chip ${f.groupings.includes(g) ? 'on' : ''}`} aria-pressed={f.groupings.includes(g)}
+              onClick={() => update({ groupings: f.groupings.includes(g) ? f.groupings.filter((x) => x !== g) : [...f.groupings, g] })}>{g === 'superset' ? '슈퍼세트' : '컴파운드 세트'}</button>
+          ))}
+          <button class={`chip ${f.prefer ? 'on' : ''}`} aria-pressed={f.prefer} onClick={() => update({ prefer: !f.prefer })}>묶음 우선</button>
+        </div>
+      </details>
       <div class="step-go">
         <button class={plan ? 'big' : 'primary big'} aria-describedby={partErr ? 'plan-parts-err' : undefined} onClick={() => {
           if (!nParts) { setPartErr(true); focusField(partsBox.current?.querySelector<HTMLElement>('button') ?? null); return; }
