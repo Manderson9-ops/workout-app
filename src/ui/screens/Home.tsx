@@ -104,7 +104,7 @@ function NextWorkoutCard({ s, pick, rec }: { s: AppState; pick: NextPick; rec: M
     <Card title="다음 운동" testid="home-next">
       <div class="next-name">{r.name}</div>
       {parts.length > 0 && <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>}
-      <p class={`next-why ${pick.reason === 'doneToday' ? 't-sub' : 't-acc'}`}>{nextReason(pick)}</p>
+      <p class="next-why"><span class={`status-pill ${pick.reason === 'never' ? 'acc' : pick.reason === 'doneToday' ? 'ok' : ''}`}>{nextReason(pick)}</span></p>
       {/* D-067 남은 일: 내 속도 예상이 있으면 앱 기본 예상(약 N분)은 빼고 내 예상만 (앱 기본 예상은 맞추기 창에) */}
       <p class="sub next-meta">운동 {items.length}개{r.estimatedSec && !pl ? ` · 약 ${minutes(r.estimatedSec)}` : ''}</p>
       {/* [시간 맞추기]는 [시작] 아래 보조 자리 (시작 버튼을 밀어 내리지 않게) */}
@@ -187,7 +187,7 @@ export function Home({ s }: { s: AppState }) {
       {backupDue(s.settings.lastBackupAt, history.length, Date.now()) && <BackupBanner s={s} />}
       {s.routines.length > 0 ? (
         <>
-          <div class="row between sec-head"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button class="tonal" onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
+          <div class="row between sec-head"><h2>내 루틴</h2><div class="row"><button onClick={() => void newRoutine()}>+ 직접</button><button onClick={() => go('#/plan')}>+ 플랜 만들기</button></div></div>
           <RoutineList s={s} mode="home" nextId={!active ? next?.routine.id : undefined} />
         </>
       ) : null}

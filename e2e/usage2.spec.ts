@@ -317,6 +317,7 @@ test('D-078 빈 기록 상태에서 직접 작성 진입 및 취소 확인', asy
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await expect(page.getByRole('heading', { name: '기록', exact: true })).toBeVisible();
 
+  await page.getByRole('tab', { name: '운동 기록' }).click();
   // 빈 상태의 직접 작성 버튼
   const emptyAdd = page.getByRole('button', { name: '직접 작성', exact: true });
   await expect(emptyAdd).toBeVisible();

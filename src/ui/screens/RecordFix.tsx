@@ -104,6 +104,7 @@ function Section({ title, note, rows, okLabel, confirmTitle, confirmMsg, run, on
 
 export function RecordFixCard({ s, byId }: { s: AppState; byId: Map<string, Exercise> }) {
   const [seen, setSeen] = useState(() => new Set(seenList()));
+  const [open, setOpen] = useState(false); // D-079 2차: 기록 탭 맨 위를 한 줄로 (펼쳐야 목록)
   const onSeen = (keys: string[]) => { if (!keys.length) return; remember(keys); setSeen(new Set(seenList())); };
   const now = Date.now();
   const c = useMemo(() => {
@@ -117,10 +118,17 @@ export function RecordFixCard({ s, byId }: { s: AppState; byId: Map<string, Exer
   if (!ends.length && !longs.length && !empty.length && !warms.length) return null;
   const day = (iso: string) => dateText(iso, now);
   const name = (id: string) => byId.get(id)?.name_ko ?? id;
+  const n = ends.length + longs.length + empty.length + warms.length;
+  if (!open) return (
+    <section class="card fix-card row between" aria-label="기록 정리" data-testid="record-fix">
+      <p class="small" style={{ margin: 0 }}><b>고칠 만한 기록 {n}건</b><span class="sub"> · 끝난 시각·빈 기록·웜업</span></p>
+      <button class="tonal" aria-expanded={false} onClick={() => setOpen(true)}>정리하기</button>
+    </section>
+  );
   return (
     <section class="card fix-card" aria-label="기록 정리" data-testid="record-fix">
-      <div class="card-head"><span class="card-title">기록 정리 (한 번만)</span></div>
-      <p class="sub small">예전 기록에서 고치면 좋을 것을 찾았어요. 고를 것만 남기고 확인하면 고쳐요. 그대로 두면 다시 묻지 않아요.</p>
+      <div class="card-head"><span class="card-title">기록 정리 (한 번만)</span><button class="ghost" aria-expanded={true} onClick={() => setOpen(false)}>접기</button></div>
+      <p class="sub small"><b>고를 것만 남기고 확인하면 고쳐요.</b> 그대로 두면 다시 묻지 않아요.</p>
       <Section testId="fix-end" title="끝난 시각이 늦은 기록" note="마지막 세트 뒤 15분 넘게 지나 끝낸 기록이에요. 끝난 시각을 마지막 세트 + 3분으로 바꿔요."
         rows={ends.map((f) => ({ key: endKey('end', f), text: `${day(f.startedAt)} ${f.name}`, sub: `${endChangeText(f)} (마지막 세트 ${at(f.lastAt, f.startedAt)})` }))}
         okLabel="끝난 시각 고치기" confirmTitle="끝난 시각을 고칠까요?" confirmMsg={(n) => `${n}건의 끝난 시각을 마지막 세트 + 3분으로 바꿔요. 세트 기록은 그대로예요.`}

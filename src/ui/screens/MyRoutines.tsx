@@ -111,7 +111,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
       <div class={`card routine-card${isHidden ? ' is-hidden' : ''}`} key={r.id} role="group" aria-label={`루틴 ${r.name}`}>
         <div class="row between" style={{ alignItems: 'flex-start' }}>
           <div class="grow">
-            <h3 class="routine-name">{r.name}</h3>{r.id === nextId && <span class="chip-s acc next-tag">다음 운동</span>}
+            <h3 class="routine-name">{r.name}</h3>{r.id === nextId && <span class="status-pill acc next-tag">다음 운동</span>}
             <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>
           </div>
           <div class="routine-when sub small" role="note" aria-label={u ? `마지막으로 한 날 ${when}, 총 ${u.count}회` : '아직 안 한 루틴'}
@@ -129,7 +129,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
             <button class="danger" onClick={async () => { if (await askConfirm({ title: '루틴을 완전히 지울까요?', message: `「${r.name}」 · 되돌릴 수 없어요. 운동 기록은 남아요.`, ok: '완전 삭제', danger: true })) await removeForever(r); }} aria-label={`${r.name} 완전 삭제`}>완전 삭제</button>
           </> : <>
             {items.length
-              ? <button class="tonal grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}><Icon name="play" size={18} />시작</button>
+              ? <button class="grow" onClick={() => startRoutine(s, r)} aria-label={`${r.name} 시작`}><Icon name="play" size={18} />시작</button>
               /* 운동이 없는 루틴: 시작 대신 운동 넣기 */
               : <button class="grow" onClick={() => edit(r)} aria-label={`${r.name} 운동 넣기`}>+ 운동 넣기</button>}
             {/* 운동 탭(고르기)은 편집만 바로 (D-053), 홈·내 루틴은 ⋯ 안에 편집·지우기 (D-055) */}
@@ -222,7 +222,7 @@ export function RoutinesScreen({ s }: { s: AppState }) {
   return (
     <main>
       <ScreenHeader back={{ label: '홈', onClick: () => go('#/') }} title="내 루틴">
-        <div class="row head-actions"><button onClick={() => void newRoutine()}>+ 직접</button><button class="tonal" onClick={() => go('#/plan')}>+ 플랜</button></div>
+        <div class="row head-actions"><button onClick={() => void newRoutine()}>+ 직접</button><button onClick={() => go('#/plan')}>+ 플랜</button></div>
       </ScreenHeader>
       <RoutineList s={s} mode="all" />
     </main>

@@ -127,7 +127,11 @@ function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Ex
             <BodyHeat sets={parts} onPart={(p) => { if (parts[p] > 0) setSheetPart(p); }} />
           </div>
         )}
-        <p class="sub small part-note">옅은 띠 = 연구 참고 범위 10~20세트예요(목표·상한 아님). 부위당 주 10세트 이상에서 근육 증가가 더 컸고(Schoenfeld 외 2017 메타분석), 훈련된 남성에게 12~20세트를 제안한 리뷰도 있어요(Baz-Valle 외 2022). 20세트보다 많은 양은 근거가 적어요. 색 구간(1~4·5~9·10+)과 '주 부위만 세기(웜업 제외)'는 앱 기준이에요.</p>
+        {/* D-079 2차(M19): 굵은 첫머리 한 줄만 보이고 근거는 접음 */}
+        <details class="sub small part-note">
+          <summary style={{ minHeight: '44px', display: 'flex', alignItems: 'center' }}><span><b>옅은 띠 = 연구 참고 10~20세트</b> · 목표·상한 아님 · 근거</span></summary>
+          부위당 주 10세트 이상에서 근육 증가가 더 컸고(Schoenfeld 외 2017 메타분석), 훈련된 남성에게 12~20세트를 제안한 리뷰도 있어요(Baz-Valle 외 2022). 20세트보다 많은 양은 근거가 적어요. 색 구간(1~4·5~9·10+)과 '주 부위만 세기(웜업 제외)'는 앱 기준이에요.
+        </details>
         {activeParts.length > 0 && (
           <>
             <div class="sub small trend-head">최근 4주</div>
@@ -165,6 +169,21 @@ function PartWeekSheet({ part, rows, week, onClose }: { part: Part; rows: PartWe
       </div>
     </Sheet>
   );
+}
+
+type StatsTab = 'summary' | 'log' | 'analysis';
+const STATS_TABS: { id: StatsTab; label: string; q: string }[] = [{ id: 'summary', label: '요약', q: 'summary' }, { id: 'log', label: '운동 기록', q: 'log' }, { id: 'analysis', label: '분석', q: 'analysis' }];
+const TAB_KEY = 'stats.tab.v1';
+/** 주소의 ?tab= 이 먼저, 없으면 기기에 저장된 값, 없으면 요약 */
+function readTab(): StatsTab {
+  const ok = (v: string | null | undefined): StatsTab | null => (STATS_TABS.find((t) => t.q === v)?.id ?? null);
+  try {
+    const q = location.hash.split('?')[1];
+    const fromHash = ok(new URLSearchParams(q ?? '').get('tab'));
+    if (fromHash) return fromHash;
+  } catch { /* 무시 */ }
+  try { const v = localStorage.getItem(TAB_KEY); const t = STATS_TABS.find((x) => x.id === v)?.id; if (t) return t; } catch { /* 무시 */ }
+  return 'summary';
 }
 
 export function Stats({ s }: { s: AppState }) {
@@ -209,6 +228,8 @@ export function Stats({ s }: { s: AppState }) {
     const g = groups[groups.length - 1];
     if (g && g.ws === ws) g.items.push(x); else groups.push({ ws, items: [x] });
   }
+  const [tab, setTab] = useState<StatsTab>(readTab);
+  const pickTab = (t: StatsTab) => { setTab(t); try { localStorage.setItem(TAB_KEY, t); } catch { /* 저장 불가면 이번 방문만 기억 */ } };
   const thisWs = weekStart(today);
   const groupTitle = (ws: string) => (ws === thisWs ? '이번 주' : ws === addDays(thisWs, -7) ? '지난주' : weekRange(ws));
 
@@ -218,73 +239,98 @@ export function Stats({ s }: { s: AppState }) {
         title="기록"
         actions={<button class="icon-btn round head-add" aria-label="운동 기록 직접 작성" title="운동 기록 직접 작성" onClick={() => go('#/stats/new')}><Icon name="plus" /></button>}
       />
-      <RecordFixCard s={s} byId={byId} />
-      <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
-      <RecoveryCard m={rec} night={night} />
-      <PartSets done={done} byId={byId} today={today} />
-
-      <div class="row between" style={{ alignItems: 'center', margin: '20px 0 10px' }}>
-        <h2 style={{ margin: 0 }}>운동 기록</h2>
-        <button class="ghost" style={{ minHeight: '44px', padding: '0 12px' }} aria-label="운동 기록 직접 작성" onClick={() => go('#/stats/new')}>+ 직접 작성</button>
+      <div class="row tab-switcher" role="tablist" aria-label="기록 보기" style={{ gap: '6px', margin: '4px 0 10px' }}>
+        {STATS_TABS.map((t) => (
+          <button key={t.id} role="tab" id={`stats-tab-${t.id}`} aria-controls={`stats-panel-${t.id}`} class={`chip grow ${tab === t.id ? 'on' : ''}`} aria-selected={tab === t.id} onClick={() => pickTab(t.id)}>{t.label}</button>
+        ))}
       </div>
-      {!sorted.length && (
-        <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 주별 카드로 쌓여요. 과거 운동을 직접 기록할 수도 있어요.">
-          <div class="row" style={{ gap: '8px' }}>
-            <button class="tonal" onClick={() => go('#/workout')}>운동 시작</button>
-            <button onClick={() => go('#/stats/new')}>직접 작성</button>
+
+      {tab === 'summary' && (
+        <div role="tabpanel" id="stats-panel-summary" aria-labelledby="stats-tab-summary" aria-label="요약">
+          <RecordFixCard s={s} byId={byId} />
+          <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
+          <RecoveryCard m={rec} night={night} />
+          <div class="row between" style={{ alignItems: 'center', margin: '20px 0 10px' }}>
+            <h2 style={{ margin: 0 }}>최근 운동</h2>
+            <button class="ghost" style={{ minHeight: '44px', padding: '0 12px' }} onClick={() => pickTab('log')}>전체 기록 보기</button>
           </div>
-        </Empty>
+          {!sorted.length && <p class="sub small">아직 끝낸 운동이 없어요</p>}
+          {take(3).map(card)}
+        </div>
       )}
-      {groups.map((g) => (
-        <section key={g.ws} aria-label={groupTitle(g.ws)}>
-          <h3 class="wk-head">{groupTitle(g.ws)}</h3>
-          {g.items.map(card)}
-        </section>
-      ))}
+      {tab === 'log' && (
+        <div role="tabpanel" id="stats-panel-log" aria-labelledby="stats-tab-log" aria-label="운동 기록">
+          <div class="row between" style={{ alignItems: 'center', margin: '20px 0 10px' }}>
+            <h2 style={{ margin: 0 }}>운동 기록</h2>
+            <button class="ghost" style={{ minHeight: '44px', padding: '0 12px' }} aria-label="운동 기록 직접 작성" onClick={() => go('#/stats/new')}>+ 직접 작성</button>
+          </div>
+          {!sorted.length && (
+            <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 주별 카드로 쌓여요. 과거 운동을 직접 기록할 수도 있어요.">
+              <div class="row" style={{ gap: '8px' }}>
+                <button class="tonal" onClick={() => go('#/workout')}>운동 시작</button>
+                <button onClick={() => go('#/stats/new')}>직접 작성</button>
+              </div>
+            </Empty>
+          )}
+          {groups.map((g) => (
+            <section key={g.ws} aria-label={groupTitle(g.ws)}>
+              <h3 class="wk-head">{groupTitle(g.ws)}</h3>
+              {g.items.map(card)}
+            </section>
+          ))}
 
-      <section class="card">
-        <div class="card-head"><span class="card-title">달력</span></div>
-        <div class="row between">
-          <button aria-label="이전 달" onClick={() => move(-1)}>‹</button>
-          <strong>{ym.y}년 {ym.m}월 · {ym.y === Number(today.slice(0, 4)) && ym.m === Number(today.slice(5, 7)) ? '이번 달' : '이 달'} {monthCount}회</strong>
-          <button aria-label="다음 달" onClick={() => move(1)}>›</button>
-        </div>
-        <div class="cal-grid">
-          {WD.map((d, i) => <div key={d} class={`pill cal-wd ${wdClass(i)}`}>{d}</div>)}
-          {Array.from({ length: lead }, (_, i) => <div key={`e${i}`} />)}
-          {Array.from({ length: nDays }, (_, i) => {
-            const n = i + 1; const c = days.get(n) ?? 0;
-            const dt = dateOf(n);
-            return (
-              <button key={n} class={`cal-day ${wdClass((lead + i) % 7)} ${dt === today ? 'is-today' : ''} ${dt > today ? 'future' : ''} ${day === n ? 'sel' : ''}`}
-                aria-label={`${fullDateText(dt)}${c ? `, 운동 ${c}회` : ''}`} aria-pressed={day === n} disabled={!c}
-                onClick={() => setDay(day === n ? null : n)}>
-                <span>{n}</span>{c ? <i class="dot" /> : null}
-              </button>
-            );
-          })}
-        </div>
-        {dayList.map(card)}
-      </section>
-
-      <section class="card">
-        <div class="card-head"><span class="card-title">주간 볼륨</span><span class="sub small">최근 8주</span></div>
-        <BarChart label="최근 8주 주간 볼륨" unit="kg" points={totals.map((t) => ({ label: md(t.week), value: Math.round(t.volume) }))} />
-        <p class="sub small">볼륨 = 무게 × 횟수 합계 (웜업 제외). 이번 주 {totals[totals.length - 1]!.sets}세트 · {totals[totals.length - 1]!.count}회 운동</p>
-      </section>
-
-      {pva && pva.n >= 2 && (
-        <>
-          <section class="card" aria-label="예상 시간 대비 실제">
-            <div class="card-head"><span class="card-title">예상 시간 대비 실제</span></div>
-            <p>최근 {pva.n}회 평균: {Math.abs(pva.avgDiffSec) < 60 ? '예상과 거의 같아요' : `예상보다 ${Math.round(Math.abs(pva.avgDiffSec) / 60)}분 ${pva.avgDiffSec > 0 ? '더 걸려요' : '덜 걸려요'}`} <span class="sub small">(실제 ÷ 예상 = {pva.avgRatio})</span></p>
-            <PairBarChart label="최근 운동 예상 대비 실제 시간" unit="분" points={pvaRows.map((r) => ({ label: r.label, planned: r.plannedMin, actual: r.actualMin }))} />
-            <p class="sub small">플랜의 예상 시간과 비교해요. 차이가 계속 크면 알려 주세요 (시간 계산을 고칠 수 있어요).</p>
+          <section class="card">
+            <div class="card-head"><span class="card-title">달력</span></div>
+            <div class="row between">
+              <button aria-label="이전 달" onClick={() => move(-1)}>‹</button>
+              <strong>{ym.y}년 {ym.m}월 · {ym.y === Number(today.slice(0, 4)) && ym.m === Number(today.slice(5, 7)) ? '이번 달' : '이 달'} {monthCount}회</strong>
+              <button aria-label="다음 달" onClick={() => move(1)}>›</button>
+            </div>
+            <div class="cal-grid">
+              {WD.map((d, i) => <div key={d} class={`pill cal-wd ${wdClass(i)}`}>{d}</div>)}
+              {Array.from({ length: lead }, (_, i) => <div key={`e${i}`} />)}
+              {Array.from({ length: nDays }, (_, i) => {
+                const n = i + 1; const c = days.get(n) ?? 0;
+                const dt = dateOf(n);
+                return (
+                  <button key={n} class={`cal-day ${wdClass((lead + i) % 7)} ${dt === today ? 'is-today' : ''} ${dt > today ? 'future' : ''} ${day === n ? 'sel' : ''}`}
+                    aria-label={`${fullDateText(dt)}${c ? `, 운동 ${c}회` : ''}`} aria-pressed={day === n} disabled={!c}
+                    onClick={() => setDay(day === n ? null : n)}>
+                    <span>{n}</span>{c ? <i class="dot" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+            {dayList.map(card)}
           </section>
-        </>
+        </div>
       )}
+      {tab === 'analysis' && (
+        <div role="tabpanel" id="stats-panel-analysis" aria-labelledby="stats-tab-analysis" aria-label="분석">
+          <PartSets done={done} byId={byId} today={today} />
 
-      <Bodyweight s={s} today={today} />
+          <section class="card">
+            <div class="card-head"><span class="card-title">주간 볼륨</span><span class="sub small">최근 8주</span></div>
+            {totals.some((t) => t.volume > 0)
+              ? <BarChart label="최근 8주 주간 볼륨" unit="kg" points={totals.map((t) => ({ label: md(t.week), value: Math.round(t.volume) }))} />
+              : <p class="sub" style={{ margin: '12px 0' }}>최근 8주 운동 기록이 쌓이면 막대가 보여요</p>}
+            <p class="sub small">볼륨 = 무게 × 횟수 합계 (웜업 제외). 이번 주 {totals[totals.length - 1]!.sets}세트 · {totals[totals.length - 1]!.count}회 운동</p>
+          </section>
+
+          {pva && pva.n >= 2 && (
+            <>
+              <section class="card" aria-label="예상 시간 대비 실제">
+                <div class="card-head"><span class="card-title">예상 시간 대비 실제</span></div>
+                <p>최근 {pva.n}회 평균: {Math.abs(pva.avgDiffSec) < 60 ? '예상과 거의 같아요' : `예상보다 ${Math.round(Math.abs(pva.avgDiffSec) / 60)}분 ${pva.avgDiffSec > 0 ? '더 걸려요' : '덜 걸려요'}`} <span class="sub small">(실제 ÷ 예상 = {pva.avgRatio})</span></p>
+                <PairBarChart label="최근 운동 예상 대비 실제 시간" unit="분" points={pvaRows.map((r) => ({ label: r.label, planned: r.plannedMin, actual: r.actualMin }))} />
+                <p class="sub small">플랜의 예상 시간과 비교해요. 차이가 계속 크면 알려 주세요 (시간 계산을 고칠 수 있어요).</p>
+              </section>
+            </>
+          )}
+
+          <Bodyweight s={s} today={today} />
+        </div>
+      )}
     </main>
   );
 }

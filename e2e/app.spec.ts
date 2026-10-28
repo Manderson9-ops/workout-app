@@ -892,28 +892,27 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByTestId('this-week')).toContainText('1회');
   // D-054: 일요일 시작 달력, 이번 주 요일 띠(7칸, 운동한 날 표시), 월 회수
-  await expect(page.locator('.cal-wd').first()).toHaveText('일');
-  await expect(page.locator('.cal-wd').nth(6)).toHaveText('토');
   const dayStrip = page.getByRole('list', { name: '이번 주 운동한 날' }).getByRole('listitem');
   await expect(dayStrip).toHaveCount(7);
   await expect(dayStrip.first()).toContainText('일');
   await expect(dayStrip.last()).toContainText('토');
   await expect(page.locator('.daydot.did')).toHaveCount(1);
   await expect(page.locator('.daydot.did')).toHaveAttribute('aria-label', /운동함/);
+  await page.getByRole('tab', { name: '운동 기록' }).click();
+  await expect(page.locator('.cal-wd').first()).toHaveText('일');
+  await expect(page.locator('.cal-wd').nth(6)).toHaveText('토');
   await expect(page.getByText(/이번 달 1회/)).toBeVisible();
   const d = new Date();
   const todayBtn = page.getByRole('button', { name: `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일, 운동 1회` }); // 검토 E5 전체 형태
   await expect(todayBtn).toBeEnabled();
   await todayBtn.click();
   await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+  await page.getByRole('tab', { name: '분석' }).click();
   // 부위별 세트: 이두 줄에 1세트, 열 지도, 운동 기록 카드에 종목 줄(최고)
   await expect(page.getByTestId('part-row').filter({ hasText: '이두' })).toContainText('1세트');
   await expect(page.getByTestId('bodyheat')).toBeVisible();
   await expect(page.getByTestId('bodyheat').locator('svg')).toHaveCount(2); // 앞·뒤 나란히
-  await expect(page.getByRole('button', { name: /^팔 테스트,.*세트 1,.*바벨 컬 1세트 최고 30kg × 10회/ }).first()).toBeVisible(); // 카드 요약 이름
   await expect(page.getByRole('group', { name: /부위별 세트 열 지도: .*이두 1세트/ })).toBeVisible();
-  const wcard = page.getByRole('button', { name: /팔 테스트/ }).first();
-  await expect(wcard).toContainText('바벨 컬 · 1세트 · 최고 30kg × 10회');
   // 빈 주: 이전 주로 가면 안내 문구, 다시 이번 주로
   await page.getByRole('button', { name: '이전 주' }).click();
   await expect(page.getByText('이 주에는 운동 기록이 없어요')).toBeVisible();
@@ -931,6 +930,9 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
   await expect(page.getByRole('button', { name: '고치기' })).toBeVisible();
   await checkScreen(page, '10-stats');
+  await page.getByRole('tab', { name: '요약' }).click();
+  await expect(page.getByRole('button', { name: /^팔 테스트,.*세트 1,.*바벨 컬 1세트 최고 30kg × 10회/ }).first()).toBeVisible(); // 카드 요약 이름
+  await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toContainText('바벨 컬 · 1세트 · 최고 30kg × 10회');
   await page.getByRole('button', { name: /팔 테스트/ }).first().click();
   await expect(page.getByRole('heading', { name: '팔 테스트' })).toBeVisible();
   await expect(page.getByText(/30kg × 10회/)).toBeVisible();
@@ -986,7 +988,9 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   const strip = (t: string) => { const j = JSON.parse(t); for (const s of j.data.settings) delete s.lastBackupAt; return j.data; };
   expect(strip(readFileSync(await dl2.path(), 'utf8'))).toEqual(strip(readFileSync(file, 'utf8')));
   await page.getByRole('link', { name: '기록' }).click();
+  await page.getByRole('tab', { name: '요약' }).click();
   await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+  await page.getByRole('tab', { name: '분석' }).click();
   await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
   // 다른 앱 파일·깨진 파일은 거절, 기존 데이터 유지
   await page.getByRole('link', { name: '설정' }).click();
@@ -996,6 +1000,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await page.getByLabel('백업 파일 고르기').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(broken)) });
   await expect(page.getByText(/불러오지 못했어요: 운동 기록 중 형식이 맞지 않는/)).toBeVisible();
   await page.getByRole('link', { name: '기록' }).click();
+  await page.getByRole('tab', { name: '요약' }).click();
   await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
 });
 test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, 끄기', async ({ page }) => {
@@ -1932,15 +1937,18 @@ test('기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안
   });
   await page.reload();
   await page.getByRole('link', { name: '기록' }).click();
+  await page.getByRole('tab', { name: '분석' }).click();
   await expect(page.getByText('이번 주는 아직 운동이 없어요')).toBeVisible();
   await expect(page.getByText('지난주: 이두 1세트')).toBeVisible();
   await expect(page.getByTestId('part-row')).toHaveCount(0);
+  await page.getByRole('tab', { name: '요약' }).click();
   await expect(page.getByTestId('this-week')).toContainText('지난주 같은 요일');
   // 타일 증감은 한 줄 (390px)
   const hs = await page.locator('.tile-delta').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
   expect(hs).toHaveLength(4);
   for (const h of hs) expect(h, '타일 증감 줄 높이(한 줄)').toBeLessThan(24);
   await checkScreen(page, '10b-stats-empty-week');
+  await page.getByRole('tab', { name: '분석' }).click();
   await page.getByRole('button', { name: '운동 시작' }).click();
   await expect(page).toHaveURL(/#\/workout/);
 });
@@ -2375,10 +2383,11 @@ test('D-055 3단계 기록 탭: 부위 막대·몸 그림을 누르면 그 주 �
   await page.getByRole('button', { name: '현재 세트 완료' }).click();
   await endWorkout(page);
   await page.getByRole('link', { name: '기록', exact: true }).click();
+  await page.getByRole('tab', { name: '분석' }).click();
   const bar = page.getByRole('button', { name: /^이두 1세트, 이 주 운동 보기$/ });
   await expect(bar.locator('.band')).toHaveCount(1);
   await expect(page.locator('.band-label')).toHaveText('10~20 참고');
-  await expect(page.getByText(/연구 참고 범위 10~20세트/)).toContainText('목표·상한 아님');
+  await expect(page.locator('.part-note summary')).toContainText('연구 참고 10~20세트 · 목표·상한 아님'); // D-079 2차: 근거는 접힘
   await bar.click();
   const sheet = page.getByRole('dialog', { name: /^이두 · 이번 주/ });
   await expect(sheet).toContainText('작업 세트 1개 · 운동 1개');
@@ -2731,6 +2740,7 @@ test.describe('D-057 회복', () => {
     for (const id of ['AR-04', 'AR-09', 'AR-10', 'AR-11', 'AR-12', 'AR-13', 'AR-14', 'AR-15', 'AR-16']) await expect(page.getByTestId(`tip-${id}`)).toBeVisible();
     // 체중 75kg → 120g (105~165)
     await page.getByRole('link', { name: '기록', exact: true }).click();
+    await page.getByRole('tab', { name: '분석' }).click();
     await page.getByLabel('체중', { exact: true }).fill('75');
     await page.getByRole('button', { name: '기록', exact: true }).click();
     await page.goto('./#/recovery');
@@ -3048,7 +3058,9 @@ test.describe('D-060 날짜·시각 표시 (고정 시각, 한국 시간)', () =
     await card.scrollIntoViewIfNeeded();
     await p8(page, 'p8-home');
     await page.getByRole('link', { name: '기록', exact: true }).click();
+    await page.getByRole('tab', { name: '분석' }).click();
     await expect(page.getByTestId('part-week')).toHaveText('이번 주 · 10월 4일~10일');
+    await page.getByRole('tab', { name: '운동 기록' }).click();
     await expect(page.locator('h3.wk-head').first()).toHaveText('이번 주');
     await expect(page.locator('main .wcard .wc-meta').first()).toHaveText('어제 오후 7:05');
     await page.locator('h3.wk-head').first().scrollIntoViewIfNeeded();
@@ -3070,6 +3082,7 @@ test.describe('D-060 날짜·시각 표시 (고정 시각, 한국 시간)', () =
     await expect(page.locator('main .wcard .wc-meta').first()).toHaveText('10월 7일(수) 오후 7:05');
     await expect(page.locator('.routine-card').first()).toContainText('5일 전');
     await page.getByRole('link', { name: '기록', exact: true }).click();
+    await page.getByRole('tab', { name: '운동 기록' }).click();
     await expect(page.locator('h3.wk-head').first()).toHaveText('지난주');
     // 해가 바뀜: 연도 붙음, 주 제목은 날짜 범위
     await page.clock.setFixedTime(at('2027-01-05T09:00:00'));

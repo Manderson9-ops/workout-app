@@ -116,7 +116,13 @@ async function visit(page: Page, h: string, view: string, rows: Row[]) {
   await snap(page, view, h, rows);
 }
 async function tour(page: Page, view: string, rows: Row[]) {
-  for (const h of SCREENS) await visit(page, h, view, rows);
+  for (const h of SCREENS) {
+    await visit(page, h, view, rows);
+    if (h === '#/stats') { // 기록 탭은 세 탭을 각각 잰다 (요약 → 운동 기록 → 분석 → 요약)
+      for (const [tab, suffix] of [['운동 기록', 'log'], ['분석', 'analysis']] as const) { await page.getByRole('tab', { name: tab }).click(); await snap(page, view, `#/stats_${suffix}`, rows); }
+      await page.getByRole('tab', { name: '요약' }).click();
+    }
+  }
 }
 /** 등 30분 플랜을 만들어 루틴으로 저장 (홈에 루틴이 생김) */
 async function makeRoutine(page: Page, view: string, rows: Row[]) {
@@ -131,6 +137,7 @@ async function makeRoutine(page: Page, view: string, rows: Row[]) {
 }
 
 test('D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실선 0·초점 링·blur 뒤 검증', async ({ page, browser }, info) => {
+  test.setTimeout(120_000); // 기록 탭 3개를 각각 재고 찍어 WebKit 에서 60초를 넘음
   const rows: Row[] = [];
   await startUp(page);
   rows.push(await measure(page, '#/ (빈 홈)', 'phone'));
@@ -230,9 +237,10 @@ test('D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실
   await visit(page, '#/stats', 'phone', rows);
   const fixCard = page.getByTestId('record-fix');
   await expect(fixCard).toBeVisible();
+  await fixCard.getByRole('button', { name: '정리하기' }).click(); // 접힌 한 줄 → 펼친 4구역도 잰다
   for (const id of ['fix-end', 'fix-long', 'fix-empty', 'fix-warm']) await expect(fixCard.getByTestId(id)).toBeVisible();
+  rows.push(await measure(page, '#/stats (기록 정리 카드 4구역)', 'phone'));
   const fixRow = rows[rows.length - 1]!;
-  rows[rows.length - 1] = { ...fixRow, screen: '#/stats (기록 정리 카드 4구역)' };
   const fixPrimary = fixRow.primary;
 
   // PC 넓은 화면 (1280)
@@ -285,6 +293,7 @@ test('N9 기록 정리: 아무것도 안 고르고 누르면 알림 + 첫 체크
   await idbPut(page, 'workouts', [{ id: 'f-late', name: '늦게 끝냄', startedAt: iso(day), endedAt: iso(day + 90 * MIN), timer: null, blocks: [single('barbell_curl', [doneSet(30, 10, day + 20 * MIN), doneSet(30, 10, day + 40 * MIN)])] }]);
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
+  await page.getByTestId('record-fix').getByRole('button', { name: '정리하기' }).click();
   const sec = page.getByTestId('record-fix').getByTestId('fix-end');
   const box = sec.getByRole('checkbox').first();
   await box.uncheck();

@@ -113,6 +113,8 @@ test('D-065·D-070·D-072 기록 정리 카드: 목록 → 확인 → 끝난 시
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   const card = page.getByTestId('record-fix');
+  await expect(card).toContainText(/고칠 만한 기록 \d+건/); // D-079 2차: 접힌 한 줄 (끝난 시각·긴 기록·빈 기록·웜업 합)
+  await card.getByRole('button', { name: '정리하기' }).click();
   await expect(card).toContainText('기록 정리 (한 번만)');
   await expect(card.getByTestId('fix-end')).toContainText('늦게 끝냄');
   await expect(card.getByTestId('fix-long')).toContainText('떨어진 세트 1개는 그대로');
