@@ -3,7 +3,7 @@
  */
 import type { PlanBlock } from './planner';
 import type { Exercise } from './types';
-import { blockTime, DEFAULT_TIME } from './time';
+import { blockTime, DEFAULT_TIME, targetReps } from './time';
 import type { TimedBlock } from './time';
 import { moveItem } from './reorder';
 import { findItem } from './syncMerge';
@@ -19,7 +19,9 @@ export interface SetLog {
   auto?: boolean;
   memo?: string;
 }
-export interface WorkoutItem { exerciseId: string; target: { sets: number; reps: number; seconds?: number }; sets: SetLog[]; skipped?: boolean; memo?: string }
+export interface WorkoutItem { exerciseId: string; target: { sets: number; reps: number; seconds?: number }; sets: SetLog[]; skipped?: boolean; memo?: string;
+  /** D-080 검토: 묶음 밖으로 갈라 교체한 새 운동이 바꾼 원래 운동 id. 끝낼 때 루틴 비교에서 "교체"로 접어 봄 (운동 기록은 그대로) */
+  swappedFrom?: string }
 export interface WorkoutBlock { kind: RoutineBlock['kind']; items: WorkoutItem[]; restSec: number; roundRestSec: number; transitionSec: number }
 export interface Timer { startedAt: number; endsAt: number; label: string; kind: 'set' | 'transition' | 'round' | 'between' | 'warmup' }
 export interface Workout {
@@ -237,45 +239,63 @@ export function setItemMemo(w: Workout, block: number, item: number, memo: strin
   return patchItem(w, block, item, (it) => ({ ...it, memo }));
 }
 
-export function replaceItem(w: Workout, block: number, item: number, exerciseId: string, history: Workout[]): Workout {
+type Target = { reps: number; seconds?: number };
+/**
+ * D-080 교체 때 목표 (횟수·시간 운동이 다르면 새 운동 기본값). 시간→시간·횟수→횟수는 옛 목표를 이어받음.
+ * 시간 운동 = { reps: 0, seconds }, 횟수 운동 = { reps } (seconds 키 없음)
+ */
+export function swapTarget(old: Target, e: Pick<Exercise, 'measure' | 'default_seconds' | 'default_reps' | 'mechanics'>): Target {
+  const timed = e.measure === 'time';
+  if (timed && old.seconds !== undefined) return { reps: old.reps, seconds: old.seconds };
+  if (!timed && old.seconds === undefined) return { reps: old.reps };
+  return timed ? { reps: 0, seconds: e.default_seconds ?? 30 } : { reps: targetReps(e as Exercise) };
+}
+type SwapEx = Pick<Exercise, 'measure' | 'default_seconds' | 'default_reps' | 'mechanics'>;
+
+/** e 를 주면 목표(횟수·시간)를 swapTarget 으로 새 운동에 맞춤. 안 주면 옛 목표 그대로 */
+export function replaceItem(w: Workout, block: number, item: number, exerciseId: string, history: Workout[], e?: SwapEx): Workout {
   const prev = lastSets(history, exerciseId);
   return patchItem(w, block, item, (it) => {
+    const t: Target = e ? swapTarget(it.target, e) : it.target;
     let work = -1;
     return {
       ...it, exerciseId, skipped: false,
+      target: { sets: it.target.sets, reps: t.reps, ...(t.seconds !== undefined ? { seconds: t.seconds } : {}) },
       sets: preMarkWarmup(it.sets.map((s) => {
         if (!s.warmup) work++;
         if (s.done) return s;
         // 웜업 세트는 지난 작업 무게를 받지 않는다. 작업 세트는 작업 세트 순번으로 맞춤
         const p = s.warmup ? undefined : prev[Math.min(work, prev.length - 1)];
-        return { warmup: s.warmup, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : { reps: s.warmup ? s.reps ?? 10 : p?.reps ?? it.target.reps }) };
+        return { warmup: s.warmup, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(t.seconds !== undefined ? { seconds: t.seconds } : { reps: s.warmup ? s.reps ?? 10 : p?.reps ?? t.reps }) };
       }), prev),
     };
   });
 }
 /**
- * D-080 운동 중 바로 교체. 완료 세트가 없으면 replaceItem 과 같다. 완료 세트가 있으면 원래 운동은 완료 세트만 남기고
- * (target.sets = 완료 수), 안 한 작업 세트 수만큼 새 운동을 같은 휴식의 단일 블록으로 바로 다음에 넣는다.
- * 묶음 안에 새 운동을 넣으면 roundOf 가 작업 세트 순번이라 라운드가 어긋나고 같은 운동 두 번은 금지(D-037)라서 묶음 다음에 따로 둔다.
+ * D-080 운동 중 바로 교체. 완료한 작업 세트가 없으면 replaceItem 과 같다(웜업만 끝낸 것 포함). 있으면 원래 운동은 완료 세트만 남기고
+ * (target.sets = 완료한 작업 세트 수, skipped 해제), 안 한 작업 세트 수만큼 새 운동을 같은 휴식의 단일 블록으로 바로 다음에 넣는다
+ * (새 운동 swappedFrom = 원래 운동). 묶음 안에 새 운동을 넣으면 roundOf 가 작업 세트 순번이라 라운드가 어긋나고 같은 운동 두 번은 금지(D-037)라서 묶음 다음에 따로 둔다.
  * 이미 운동에 있는 운동(자기 자신 포함)으로는 바꾸지 않는다 (같은 운동 두 번 금지)
  */
-export function swapItem(w: Workout, block: number, item: number, exerciseId: string, history: Workout[]): Workout {
+export function swapItem(w: Workout, block: number, item: number, exerciseId: string, history: Workout[], e?: SwapEx): Workout {
   const b = w.blocks[block], it = b?.items[item];
   if (!b || !it) return w;
   if (w.blocks.some((x) => x.items.some((y) => y.exerciseId === exerciseId))) return w;
   const done = it.sets.filter((s) => s.done);
-  if (!done.length) return replaceItem(w, block, item, exerciseId, history);
+  const doneWork = done.filter((s) => !s.warmup).length;
+  if (!doneWork) return replaceItem(w, block, item, exerciseId, history, e);
   const prev = lastSets(history, exerciseId);
+  const t: Target = e ? swapTarget(it.target, e) : it.target;
   // 남은 작업 세트가 없어도 새 운동은 1세트 (빈 운동 칸을 만들지 않음)
   const left = Math.max(1, it.sets.filter((s) => !s.done && !s.warmup).length);
   const fresh: WorkoutItem = {
-    exerciseId, target: { ...it.target, sets: left },
+    exerciseId, target: { sets: left, reps: t.reps, ...(t.seconds !== undefined ? { seconds: t.seconds } : {}) }, swappedFrom: it.exerciseId,
     sets: preMarkWarmup(Array.from({ length: left }, (_, k) => {
       const p = prev[Math.min(k, prev.length - 1)];
-      return { warmup: false, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : { reps: p?.reps ?? it.target.reps }) };
+      return { warmup: false, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(t.seconds !== undefined ? { seconds: t.seconds } : { reps: p?.reps ?? t.reps }) };
     }), prev),
   };
-  const kept: WorkoutItem = { ...it, target: { ...it.target, sets: done.length }, sets: done };
+  const kept: WorkoutItem = { ...it, skipped: false, target: { ...it.target, sets: doneWork }, sets: done };
   const blocks = w.blocks.map((x, bi) => (bi === block ? { ...x, items: x.items.map((y, ii) => (ii === item ? kept : y)) } : x));
   blocks.splice(block + 1, 0, { kind: 'single', items: [fresh], restSec: b.restSec, roundRestSec: b.roundRestSec, transitionSec: b.transitionSec });
   return { ...w, blocks };
@@ -283,7 +303,7 @@ export function swapItem(w: Workout, block: number, item: number, exerciseId: st
 /** swapItem 이 새 운동을 묶음 밖으로 따로 빼는 경우인가 (화면에 "묶음 다음에 따로 해요" 알림용) */
 export function swapSplitsGroup(w: Workout, block: number, item: number): boolean {
   const it = w.blocks[block]?.items[item];
-  return !!it && w.blocks[block]!.kind !== 'single' && it.sets.some((s) => s.done);
+  return !!it && w.blocks[block]!.kind !== 'single' && it.sets.some((s) => s.done && !s.warmup);
 }
 export function appendExercise(w: Workout, exerciseId: string, sets: number, reps: number, restSec: number, history: Workout[], seconds?: number): Workout {
   const prev = lastSets(history, exerciseId);

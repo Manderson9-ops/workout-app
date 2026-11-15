@@ -489,10 +489,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
             if (picker.mode === 'swap') {
               // 완료 세트는 남기고 안 한 세트만 새 운동으로 (묶음이면 묶음 다음에 따로). 새 카드를 열어 보여 줌
               const { b, i } = picker;
-              const hadDone = w.blocks[b]!.items[i]!.sets.some((x) => x.done);
+              const hadDone = w.blocks[b]!.items[i]!.sets.some((x) => x.done && !x.warmup);
               if (swapSplitsGroup(w, b, i)) setSwapNote('묶음 다음에 따로 해요');
               if (hadDone) setOpen(b + 1);
-              void upd((cw) => swapItem(cw, b, i, e.id, history));
+              void upd((cw) => swapItem(cw, b, i, e.id, history, e));
             }
             else upd((cw) => appendExercise(cw, e.id, 3, e.measure === 'time' ? 0 : targetReps(e), e.mechanics === 'compound' ? s.settings.rest.compound : s.settings.rest.isolation, history, e.measure === 'time' ? e.default_seconds ?? 30 : undefined));
             setPicker(null);

@@ -3,7 +3,7 @@
  * 루틴으로 시작한 운동이 루틴과 운동 구성이 달라졌는지: 더함·지움(건너뛰고 한 세트도 안 함)·교체·순서 바꿈.
  * 순서는 블록·운동 자리로 비교 (완료 시각 아님). 무게·횟수·세트 수만 바뀐 것은 묻지 않음 (Hevy 방식)
  */
-import type { Routine, RoutineBlock, RoutineItem, Workout, WorkoutItem } from './session';
+import type { Routine, RoutineBlock, RoutineItem, Workout, WorkoutBlock, WorkoutItem } from './session';
 
 export interface RoutineDiff {
   added: string[];
@@ -16,9 +16,38 @@ export interface RoutineDiff {
 /** 운동에 남은 운동: 건너뛰고 완료 세트가 없는 것은 지운 것으로 봄 */
 const present = (it: WorkoutItem) => !(it.skipped && !it.sets.some((s) => s.done));
 
+/** 접은 운동 칸: it = 지금 하는 운동, sets = 합친 세트 수, root = 접혀서 자리를 이어받은 원래 운동(없으면 접히지 않은 칸) */
+export interface FoldItem { it: WorkoutItem; sets: number; root?: string; from?: string }
+export interface FoldBlock { src: WorkoutBlock; items: FoldItem[] }
+
+/**
+ * D-080 검토: 운동 중 ⇄ 로 갈라 둔 교체(새 운동 N.swappedFrom = 원래 운동 X)를 비교·반영용으로만 접는다 (운동 기록은 안 바꿈).
+ * X 의 칸 K 가 운동에 남아 있으면 N 이 K 의 자리(블록·위치)를 차지하고 N 의 블록은 뺀다. 연쇄(X→N1→N2)는 더 접힐 게 없을 때까지 반복.
+ * X 를 못 찾으면 N 은 그대로 둔다
+ */
+export function foldSwaps(w: Workout): FoldBlock[] {
+  const fb: FoldBlock[] = w.blocks.map((b) => ({ src: b, items: b.items.filter(present).map((it) => ({ it, sets: setCount(it), from: it.swappedFrom })) }));
+  for (let guard = 0; guard < 1000; guard++) {
+    let hit = false;
+    outer: for (const nb of fb) for (const n of nb.items) {
+      if (!n.from) continue;
+      for (const kb of fb) {
+        const k = kb.items.find((x) => x !== n && x.it.exerciseId === n.from);
+        if (!k) continue;
+        kb.items[kb.items.indexOf(k)] = { it: n.it, sets: k.sets + n.sets, root: k.root ?? k.it.exerciseId, from: k.from };
+        nb.items.splice(nb.items.indexOf(n), 1);
+        hit = true;
+        break outer;
+      }
+    }
+    if (!hit) break;
+  }
+  return fb.filter((b) => b.items.length);
+}
+
 export function routineDiff(r: Routine, w: Workout): RoutineDiff {
   const rb = r.blocks.map((b) => b.items.map((i) => i.exerciseId)).filter((b) => b.length);
-  const wb = w.blocks.map((b) => b.items.filter(present).map((i) => i.exerciseId)).filter((b) => b.length);
+  const wb = foldSwaps(w).map((b) => b.items.map((f) => f.it.exerciseId));
   const R = new Set(rb.flat()), W = new Set(wb.flat());
   let added = [...new Set(wb.flat().filter((id) => !R.has(id)))];
   let removed = [...new Set(rb.flat().filter((id) => !W.has(id)))];
@@ -82,15 +111,18 @@ export function routineFromWorkout(r: Routine, w: Workout, now: string): Routine
   const old = new Map<string, RoutineItem>();
   for (const b of r.blocks) for (const i of b.items) if (!old.has(i.exerciseId)) old.set(i.exerciseId, i);
   const blocks: RoutineBlock[] = [];
-  for (const b of w.blocks) {
-    const items: RoutineItem[] = b.items.filter(present).map((it) => {
+  for (const b of foldSwaps(w)) {
+    const items: RoutineItem[] = b.items.map((f) => {
+      const it = f.it;
+      // 접힌 교체: 루틴에 있던 원래 운동의 세트 수 (없으면 둘이 한 세트 수), 횟수·초는 새 운동 목표
+      if (f.root !== undefined) return { exerciseId: it.exerciseId, sets: old.get(f.root)?.sets ?? f.sets, reps: it.target.reps, ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : {}) };
       const o = old.get(it.exerciseId);
       const reps = o ? o.reps : it.target.reps;
       const seconds = o ? o.seconds : it.target.seconds;
-      return { exerciseId: it.exerciseId, sets: setCount(it), reps, ...(seconds !== undefined ? { seconds } : {}) };
+      return { exerciseId: it.exerciseId, sets: f.sets, reps, ...(seconds !== undefined ? { seconds } : {}) };
     });
-    if (!items.length) continue;
-    blocks.push({ kind: items.length > 1 ? (b.kind === 'single' ? 'superset' : b.kind) : 'single', items, restSec: b.restSec, roundRestSec: b.roundRestSec, transitionSec: b.transitionSec });
+    const b0 = b.src;
+    blocks.push({ kind: items.length > 1 ? (b0.kind === 'single' ? 'superset' : b0.kind) : 'single', items, restSec: b0.restSec, roundRestSec: b0.roundRestSec, transitionSec: b0.transitionSec });
   }
   return { ...r, blocks, updatedAt: now };
 }

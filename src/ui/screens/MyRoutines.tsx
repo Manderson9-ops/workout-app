@@ -114,7 +114,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
       <div class={`card routine-card${isHidden ? ' is-hidden' : ''}`} key={r.id} role="group" aria-label={`루틴 ${r.name}`}>
         <div class="row between" style={{ alignItems: 'flex-start' }}>
           <div class="grow card-open-wrap">
-            <h3 class="routine-name">{r.name}</h3>{r.id === nextId && <span class="status-pill acc next-tag">다음 운동</span>}
+            <h3 class="routine-name">{r.name}{!isHidden && <Icon name="chevron" size={16} class="routine-chev" />}</h3>{r.id === nextId && <span class="status-pill acc next-tag">다음 운동</span>}
             <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>
             {!isHidden && <button class="card-open" aria-label={`${r.name} 내용 보기`} aria-haspopup="dialog" onClick={() => setPreview(r.id)} />}
           </div>

@@ -123,6 +123,14 @@ describe('깊은 검사: 깨진 백업이 기존 데이터를 지우지 않게 (
   ])('%s → 거절', (_n, mut, msg) => {
     expect(bad(mut)).toMatchObject({ ok: false, error: expect.stringContaining(msg) });
   });
+  it('swappedFrom 문자열은 통과 (없는 옛 백업도 통과), 문자열이 아니면 거절 (D-080 검토)', () => {
+    const f = JSON.parse(JSON.stringify(good()));
+    expect(parseBackup(JSON.stringify(f)).ok).toBe(true);
+    f.data.workouts[0].blocks[0].items[0].swappedFrom = 'bench_press'; f.counts = undefined;
+    expect(parseBackup(JSON.stringify(f)).ok).toBe(true);
+    f.data.workouts[0].blocks[0].items[0].swappedFrom = 5;
+    expect(parseBackup(JSON.stringify(f))).toMatchObject({ ok: false, error: expect.stringContaining('운동 기록') });
+  });
   it('개수가 파일에 적힌 것과 다르면 잘린 파일로 보고 거절', () => {
     const f = good(); f.counts.workouts = 5;
     expect(parseBackup(JSON.stringify(f))).toMatchObject({ ok: false, error: expect.stringContaining('잘렸') });

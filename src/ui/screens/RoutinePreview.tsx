@@ -49,11 +49,22 @@ export function RoutineLines({ s, r, onSwap }: { s: AppState; r: Routine; onSwap
 
 /**
  * 루틴 안 운동 바로 교체: ask() → 교체 창(비슷한 운동 포함) → 고르면 루틴에 저장하고 알림.
- * 되돌리기는 이전 내용을 새 수정 시각으로 다시 저장 (옛 시각 그대로면 동기화가 바꾼 쪽을 다시 덮을 수 있음)
+ * 되돌리기는 이전 루틴 객체를 수정 시각까지 그대로 다시 저장 (바꾸기 자체는 편집 저장처럼 updatedAt = 지금).
+ * 동기화는 수정 시각이 아니라 쪽(HLC) 도장으로 앞뒤를 가리므로 (db/sync.ts strip) 시각을 옛 값으로 두어도 덮이지 않음
  */
 export function useRoutineSwap(s: AppState) {
   const [pick, setPick] = useState<{ rid: string; b: number; i: number } | null>(null);
   const [toast, setToast] = useState<{ text: string; undo: () => void } | null>(null);
+  // 고른 뒤 초점: 바뀐 줄의 ⇄ 버튼 (줄이 새 이름으로 그려지면 옮김)
+  const [focusName, setFocusName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusName) return;
+    const label = `${focusName} 바로 교체`;
+    const el = [...document.querySelectorAll<HTMLElement>('button.pv-swap')].find((x) => x.getAttribute('aria-label') === label);
+    if (el) { el.focus({ preventScroll: true }); setFocusName(null); return; }
+    const t = setTimeout(() => setFocusName(null), 3000);
+    return () => clearTimeout(t);
+  });
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
@@ -66,13 +77,14 @@ export function useRoutineSwap(s: AppState) {
       onPick={(e) => {
         const p = pick;
         setPick(null);
+        setFocusName(e.name_ko);
         const swapped = swapRoutineItem(r, p.b, p.i, e);
         if (swapped === r) return;
         const next: Routine = { ...swapped, updatedAt: new Date().toISOString(), estimatedSec: routineEstimate(swapped, byId, s.settings.rest.between) + (r.warmupSec ?? 0) };
         const oldName = byId.get(oldId)?.name_ko ?? oldId;
         void mutate((d) => d.routines.put(next)).then(() => setToast({
           text: `${oldName} → ${e.name_ko}: 바꿨어요`,
-          undo: () => { setToast(null); void mutate((d) => d.routines.put({ ...r, updatedAt: new Date().toISOString() })); },
+          undo: () => { setToast(null); void mutate((d) => d.routines.put(r)); },
         }));
       }} />
   ) : null;

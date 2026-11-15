@@ -3,8 +3,8 @@
  * bi를 주면 그 블록만, 아니면 루틴 전체. 바뀐 게 없으면 같은 routine 객체를 돌려줌 (버튼 비활성 판단용).
  */
 import type { Routine, RoutineItem } from './session';
+import { swapTarget } from './session';
 import type { Exercise, Part } from './types';
-import { targetReps } from './time';
 import { SETS_MIN, SETS_MAX, REPS_MIN, REPS_MAX, SECS_MIN, SECS_MAX, SECS_STEP } from './planEdit';
 
 /** 버튼 방향을 거스르지 않는 한 칸 이동: 옛 루틴의 범위 밖 값(예: 60회)은 "+"에서 줄어들지 않고 그대로 둠 */
@@ -57,14 +57,14 @@ export function routineParts(r: Routine, partOf: (exerciseId: string) => Part | 
 }
 
 /**
- * D-080: 루틴의 운동 하나 교체 (편집·미리보기·홈이 같이 씀). 세트 수는 유지하고 횟수·초는 새 운동 기본값.
+ * D-080: 루틴의 운동 하나 교체 (편집·미리보기·홈이 같이 씀). 세트 수는 유지.
+ * 횟수·시간 운동이 같으면 횟수·초도 유지, 다르면 새 운동 기본값 (운동 중 교체와 같은 swapTarget).
  * 자리가 없거나 같은 운동이면 같은 routine 객체를 돌려줌
  */
 export function swapRoutineItem(r: Routine, bi: number, ii: number, e: Exercise): Routine {
   const old = r.blocks[bi]?.items[ii];
   if (!old || old.exerciseId === e.id) return r;
-  const reps = e.measure === 'time' ? 0 : targetReps(e);
-  const seconds = e.measure === 'time' ? e.default_seconds ?? 30 : undefined;
-  const item: RoutineItem = { exerciseId: e.id, sets: old.sets, reps, ...(seconds ? { seconds } : {}) };
+  const t = swapTarget({ reps: old.reps, seconds: old.seconds }, e);
+  const item: RoutineItem = { exerciseId: e.id, sets: old.sets, reps: t.reps, ...(t.seconds !== undefined ? { seconds: t.seconds } : {}) };
   return { ...r, blocks: r.blocks.map((b, x) => (x !== bi ? b : { ...b, items: b.items.map((y, z) => (z === ii ? item : y)) })) };
 }

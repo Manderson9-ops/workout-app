@@ -93,15 +93,16 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
 /**
  * 아래에서 올라오는 창. trap = 화면 읽기·키보드용 대화상자(aria-modal, 초점 가두기, Esc로 닫기, 닫으면 연 버튼으로 초점)
  * (확인 창 ConfirmHost는 modal + 자기 키 처리를 씁)
+ * focusClose = 처음 초점을 닫기 버튼에 (검색칸에 주면 아이폰 키보드가 목록을 덮음)
  */
-export function Sheet({ onClose, title, children, modal, trap, cls }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean; cls?: string }) {
+export function Sheet({ onClose, title, children, modal, trap, cls, focusClose }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean; cls?: string; focusClose?: boolean }) {
   const panel = useRef<HTMLDivElement>(null);
   useDialogKeys(trap ? panel : null, onClose);
   return (
     <>
       <div class="sheet-bg" onClick={onClose} />
       <div class={`sheet${cls ? ` ${cls}` : ''}`} role="dialog" aria-label={title} aria-modal={modal || trap ? 'true' : undefined} ref={panel}>
-        <div class="row between sheet-head"><h3>{title}</h3><button class="ghost icon-btn" onClick={onClose} aria-label="닫기"><Icon name="close" size={20} /></button></div>
+        <div class="row between sheet-head"><h3>{title}</h3><button class="ghost icon-btn" onClick={onClose} aria-label="닫기" data-autofocus={focusClose ? true : undefined}><Icon name="close" size={20} /></button></div>
         {children}
       </div>
     </>
@@ -266,7 +267,7 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
     </div>
   );
   return (
-    <Sheet onClose={onClose} title={title}>
+    <Sheet onClose={onClose} title={title} trap focusClose>
       <input placeholder="검색 (초성 가능: ㄹㅍㄷ)" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} aria-label="운동 검색" />
       {onAddCustom && (
         <button class="btn sub-btn" style={{ margin: '8px 0 0', width: '100%', justifyContent: 'center' }} onClick={onAddCustom}>

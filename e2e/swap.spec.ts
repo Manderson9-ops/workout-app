@@ -114,6 +114,7 @@ test('D-080 운동 중 ⇄ 묶음: 완료 세트가 있으면 새 운동은 묶�
   await page.getByRole('button', { name: /^현재 세트 완료/ }).click(); // 1라운드 (A1+B1) 한 번에
   const swap = page.getByRole('button', { name: '인클라인 덤벨 프레스 바로 교체', exact: true });
   await expect(swap).toBeVisible();
+  await expect(page.getByText('1라운드 · 완료').first()).toBeVisible(); // 완료 표시가 그려진 뒤에 찍음
   await checkScreen(page, 'sw4-group');
   await swap.click();
   const dlg = page.getByRole('dialog', { name: '운동 교체' });
@@ -214,4 +215,38 @@ test('D-080 루틴 편집: 펼친 운동 이름 옆 ⇄ 로 ⋯ 메뉴 없이 �
   await dlg.getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: '덤벨 벤치프레스', exact: true }).click();
   await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r5')!.blocks[0]!.items[0]).toMatchObject({ exerciseId: 'db_bench_press', sets: 4 });
+});
+
+test('D-080 검토: 4세트 중 2세트 하고 ⇄ → 끝낼 때 "교체:" 로 묻고, [루틴 업데이트] 뒤 루틴은 제자리·세트 수 그대로', async ({ page }) => {
+  await idbPut(page, 'routines', [routine('r6', '교체 반영', [one('bench_press', 4), one('pull_up', 3)])]);
+  await page.reload();
+  await page.getByRole('button', { name: '교체 반영 시작', exact: true }).first().click();
+  const done = page.getByRole('button', { name: '현재 세트 완료', exact: true });
+  await done.click();
+  await done.click();
+  await page.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
+  const dlg0 = page.getByRole('dialog', { name: '운동 교체' });
+  await dlg0.getByLabel('운동 검색').fill('덤벨 벤치');
+  await dlg0.getByRole('button', { name: '덤벨 벤치프레스', exact: true }).click();
+  await expect(dlg0).toHaveCount(0);
+  expect((await activeWorkout(page)).blocks.map((b) => b.items[0]!.exerciseId)).toEqual(['bench_press', 'db_bench_press', 'pull_up']); // 기록은 갈라져 있음
+
+  await page.getByRole('button', { name: '끝내기', exact: true }).click();
+  await page.getByRole('dialog', { name: '운동을 끝낼까요?' }).getByRole('button', { name: '끝내기' }).click();
+  const ask = page.getByRole('dialog', { name: '루틴에 반영할까요?' });
+  await expect(ask).toContainText('교체: 바벨 벤치프레스 → 덤벨 벤치프레스');
+  await expect(ask).not.toContainText('추가:');
+  await ask.getByRole('button', { name: '루틴 업데이트' }).click();
+  await expect(ask).toHaveCount(0);
+  await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r6')!.blocks[0]!.items[0]!.exerciseId).toBe('db_bench_press');
+  const saved = (await routines(page)).find((r) => r.id === 'r6')!;
+  expect(saved.blocks.map((b) => b.items.map((i) => [i.exerciseId, i.sets]))).toEqual([[['db_bench_press', 4]], [['pull_up', 3]]]);
+
+  await page.goto('./#/routines');
+  const open = page.getByRole('group', { name: '루틴 교체 반영' }).getByRole('button', { name: '교체 반영 내용 보기' });
+  await open.click();
+  const pv = page.getByRole('dialog', { name: '교체 반영 내용' });
+  await expect(pv.locator('.pv-row')).toHaveCount(2);
+  await expect(pv.locator('.pv-row').first()).toContainText('덤벨 벤치프레스');
+  await expect(pv.locator('.pv-row').first()).toContainText('4×');
 });

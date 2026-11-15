@@ -109,7 +109,7 @@ function NextWorkoutCard({ s, pick, rec }: { s: AppState; pick: NextPick; rec: M
       <p class="next-why"><span class={`status-pill ${pick.reason === 'never' ? 'acc' : pick.reason === 'doneToday' ? 'ok' : ''}`}>{nextReason(pick)}</span></p>
       {/* D-067 남은 일: 내 속도 예상이 있으면 앱 기본 예상(약 N분)은 빼고 내 예상만 (앱 기본 예상은 맞추기 창에) */}
       <p class="sub next-meta">운동 {items.length}개{r.estimatedSec && !pl ? ` · 약 ${minutes(r.estimatedSec)}` : ''}</p>
-      {/* [시간 맞추기]는 [시작] 아래 보조 자리 (시작 버튼을 밀어 내리지 않게) */}
+      {/* D-080: [시작]은 운동 줄 다음. [시간 맞추기]는 [시작] 아래 보조 자리 */}
       {pl && <PaceLine pl={pl} />}
       {/* D-080: 운동 전부를 줄로 펼쳐 보이고, 줄마다 ⇄ 로 바로 교체 */}
       {items.length > 0 && <RoutineLines s={s} r={r} onSwap={(b, i) => sw.ask(r.id, b, i)} />}

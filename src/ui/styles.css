@@ -224,6 +224,7 @@ html.sorting, html.sorting * { cursor: grabbing !important; user-select: none; -
 a.license-link { display: inline-block; min-height: 44px; line-height: 44px; }
 /* D-048: 내 루틴 목록 */
 .routine-card .routine-name { margin: 0 0 4px; }
+.routine-card .routine-chev { vertical-align: -3px; margin-left: 4px; color: var(--sub); opacity: .6; }
 .routine-parts { gap: 4px; }
 .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--card2); border: 0; color: var(--text); }
 .routine-when { text-align: right; white-space: nowrap; margin-left: 8px; }

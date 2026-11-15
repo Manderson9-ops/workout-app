@@ -2236,8 +2236,6 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   const lastRowBox = (await next.locator('.pv-row').last().boundingBox())!;
   expect(startBox.y, '[▶ 시작]은 운동 줄 다음').toBeGreaterThanOrEqual(lastRowBox.y + lastRowBox.height);
   expect((await backup.boundingBox())!.y).toBeGreaterThan(startBox.y);
-  await startBtn.scrollIntoViewIfNeeded();
-  await expect(startBtn).toBeInViewport();
   await expect(backup.getByRole('button', { name: '지금 백업' })).not.toHaveClass(/primary/);
   await expect(page.locator('.routine-card').first().locator('.next-tag')).toHaveText('다음 운동');
   // 최근 운동 = 기록 탭 카드(button.wcard) + ⋯

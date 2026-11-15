@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { replaceItem, swapItem, swapSplitsGroup, steps, currentStep, roundOf, roundSteps, completeSet } from '../src/core/session';
+import { replaceItem, swapItem, swapSplitsGroup, swapTarget, steps, currentStep, roundOf, roundSteps, completeSet } from '../src/core/session';
 import type { Workout, SetLog, WorkoutBlock } from '../src/core/session';
 
 const S = (o: Partial<SetLog> = {}): SetLog => ({ warmup: false, done: false, reps: 10, weight: 40, ...o });
@@ -68,11 +68,68 @@ describe('D-080 운동 중 바로 교체 (swapItem)', () => {
     const r = swapItem(w, 0, 0, 'new', []);
     expect(new Set(ids(r)).size).toBe(ids(r).length);
   });
-  it('남은 작업 세트가 없어도 새 운동은 1세트, 시간 운동은 초를 이어받음', () => {
-    const w = wk([blk('single', [{ id: 'old', sets: [D({ reps: undefined, seconds: 30 }), D({ reps: undefined, seconds: 30 })] }])]);
-    w.blocks[0]!.items[0]!.target = { sets: 2, reps: 0, seconds: 30 };
+  it('남은 작업 세트가 없어도 새 운동은 1세트', () => {
+    const w = wk([blk('single', [{ id: 'old', sets: [D(), D()] }])]);
     const r = swapItem(w, 0, 0, 'new', []);
     expect(r.blocks[1]!.items[0]!.sets).toHaveLength(1);
-    expect(r.blocks[1]!.items[0]!.sets[0]!.seconds).toBe(30);
+  });
+  it('웜업만 끝낸 운동은 갈라지 않고 통째로 교체', () => {
+    const w = wk([blk('single', [{ id: 'old', sets: [D({ warmup: true }), S(), S()] }]), blk('single', [{ id: 'z', sets: [S()] }])]);
+    const r = swapItem(w, 0, 0, 'new', []);
+    expect(r.blocks).toHaveLength(2);
+    expect(r.blocks[0]!.items[0]!.exerciseId).toBe('new');
+    expect(r.blocks[0]!.items[0]!.swappedFrom).toBeUndefined();
+    expect(r.blocks[0]!.items[0]!.sets[0]!.done).toBe(true); // 끝낸 웜업은 남음
+    expect(swapSplitsGroup(wk([blk('superset', [{ id: 'a', sets: [D({ warmup: true }), S()] }, { id: 'b', sets: [S(), S()] }])]), 0, 0)).toBe(false);
+  });
+  it('건너뛴 운동에 완료 세트가 있으면 남긴 쪽은 skipped 해제, target.sets = 완료 작업 세트 수, 새 운동은 swappedFrom', () => {
+    const w = wk([blk('single', [{ id: 'old', sets: [D(), S(), S()] }])]);
+    w.blocks[0]!.items[0]!.skipped = true;
+    const r = swapItem(w, 0, 0, 'new', []);
+    expect(r.blocks[0]!.items[0]!.skipped).toBe(false);
+    expect(r.blocks[0]!.items[0]!.target.sets).toBe(1);
+    expect(r.blocks[1]!.items[0]!.swappedFrom).toBe('old');
+    expect(r.blocks[0]!.items[0]!.swappedFrom).toBeUndefined();
+  });
+});
+
+describe('D-080 검토 F2: 횟수·시간 운동 목표 (swapTarget)', () => {
+  const timeEx = { measure: 'time', default_seconds: 45, mechanics: 'isolation' } as never;
+  const timeNoDef = { measure: 'time', mechanics: 'isolation' } as never;
+  const repsEx = { measure: 'reps', mechanics: 'compound', default_reps: [12, 14] } as never; // 13회
+  const timed = () => { const w = wk([blk('single', [{ id: 'old', sets: [D({ reps: undefined, seconds: 30 }), S({ reps: undefined, seconds: 30 }), S({ reps: undefined, seconds: 30 })] }])]); w.blocks[0]!.items[0]!.target = { sets: 3, reps: 0, seconds: 30 }; return w; };
+  const reps = () => wk([blk('single', [{ id: 'old', sets: [D({ reps: 10 }), S({ reps: 10 }), S({ reps: 10 })] }])]);
+
+  it('swapTarget 규칙', () => {
+    expect(swapTarget({ reps: 0, seconds: 30 }, timeEx)).toEqual({ reps: 0, seconds: 30 });
+    expect(swapTarget({ reps: 8 }, repsEx)).toEqual({ reps: 8 });
+    expect(swapTarget({ reps: 0, seconds: 30 }, repsEx)).toEqual({ reps: 13 });
+    expect(swapTarget({ reps: 8 }, timeEx)).toEqual({ reps: 0, seconds: 45 });
+    expect(swapTarget({ reps: 8 }, timeNoDef)).toEqual({ reps: 0, seconds: 30 });
+    expect('seconds' in swapTarget({ reps: 0, seconds: 30 }, repsEx)).toBe(false);
+  });
+  it.each([['swapItem', (w: Workout, e: never) => swapItem(w, 0, 0, 'new', [], e)], ['replaceItem', (w: Workout, e: never) => replaceItem(w, 0, 0, 'new', [], e)]] as const)('%s: 시간 → 횟수는 횟수만(초 없음)', (_n, f) => {
+    const r = f(timed(), repsEx);
+    const it = r.blocks[r.blocks.length - 1]!.items[0]!;
+    const open = it.sets.filter((s) => !s.done);
+    expect(open.length).toBeGreaterThan(0);
+    expect(open.every((s) => s.reps === 13 && !('seconds' in s))).toBe(true);
+    expect(it.target.reps).toBe(13);
+    expect('seconds' in it.target).toBe(false);
+  });
+  it.each([['swapItem', (w: Workout, e: never) => swapItem(w, 0, 0, 'new', [], e)], ['replaceItem', (w: Workout, e: never) => replaceItem(w, 0, 0, 'new', [], e)]] as const)('%s: 횟수 → 시간은 초만(횟수 없음)', (_n, f) => {
+    const r = f(reps(), timeEx);
+    const it = r.blocks[r.blocks.length - 1]!.items[0]!;
+    const open = it.sets.filter((s) => !s.done);
+    expect(open.every((s) => s.seconds === 45 && !('reps' in s))).toBe(true);
+    expect(it.target).toMatchObject({ reps: 0, seconds: 45 });
+  });
+  it('같은 종류끼리는 옛 목표를 이어받음', () => {
+    const t = swapItem(timed(), 0, 0, 'new', [], timeEx);
+    expect(t.blocks[1]!.items[0]!.sets[0]!.seconds).toBe(30);
+    expect(t.blocks[1]!.items[0]!.target.seconds).toBe(30);
+    const w = reps(); w.blocks[0]!.items[0]!.target = { sets: 3, reps: 8 };
+    const r = swapItem(w, 0, 0, 'new', [], repsEx);
+    expect(r.blocks[1]!.items[0]!.sets[0]!.reps).toBe(8);
   });
 });
