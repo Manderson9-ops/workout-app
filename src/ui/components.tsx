@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'preact/hooks';
 import { Icon } from './icons';
 import { registerPending, flushKey, flushValue, historyOf } from './store';
+import { render } from 'preact';
 import type { ComponentChildren } from 'preact';
 import type { BuiltExercise, Part } from '../core/types';
 import { PARTS, EQUIPMENT_LABEL } from '../core/types';
@@ -95,9 +96,9 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
  * (확인 창 ConfirmHost는 modal + 자기 키 처리를 씁)
  * focusClose = 처음 초점을 닫기 버튼에 (검색칸에 주면 아이폰 키보드가 목록을 덮음)
  */
-export function Sheet({ onClose, title, children, modal, trap, cls, focusClose, returnFocus }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean; cls?: string; focusClose?: boolean; returnFocus?: () => HTMLElement | null }) {
+export function Sheet({ onClose, title, children, modal, trap, cls, focusClose, returnFocus, noAutofocus }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean; cls?: string; focusClose?: boolean; returnFocus?: () => HTMLElement | null; /** 창이 다시 떠도 처음 초점을 주지 않음 (바깥에서 초점을 직접 옮길 때) */ noAutofocus?: boolean }) {
   const panel = useRef<HTMLDivElement>(null);
-  useDialogKeys(trap ? panel : null, onClose, returnFocus);
+  useDialogKeys(trap ? panel : null, onClose, returnFocus, !noAutofocus);
   return (
     <>
       <div class="sheet-bg" onClick={onClose} />
@@ -111,9 +112,10 @@ export function Sheet({ onClose, title, children, modal, trap, cls, focusClose, 
 
 /**
  * 대화상자 키: 열릴 때 [data-autofocus](없으면 첫 버튼)에 초점, Tab은 안에서만 돌고, Esc = 닫기, 닫히면 연 곳으로 초점
+ * autofocus = false 면 처음 초점을 주지 않음 (다시 뜬 창에서 바깥이 정확한 자리로 초점을 옮길 때)
  * returnFocus = 닫힐 때 초점을 줄 곳을 직접 정함 (창이 잠시 내려갔다 다시 뜨는 흐름용: 열 때 초점을 잡아 둔 곳이 이미 사라졌을 수 있음). null 이면 초점을 옮기지 않음
  */
-export function useDialogKeys(ref: { current: HTMLElement | null } | null, onClose: () => void, returnFocus?: () => HTMLElement | null) {
+export function useDialogKeys(ref: { current: HTMLElement | null } | null, onClose: () => void, returnFocus?: () => HTMLElement | null, autofocus = true) {
   const close = useRef(onClose);
   close.current = onClose;
   const ret = useRef(returnFocus);
@@ -123,7 +125,7 @@ export function useDialogKeys(ref: { current: HTMLElement | null } | null, onClo
     const back = document.activeElement as HTMLElement | null;
     const focusables = () => [...(ref.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], summary, input, select, textarea, [role="button"][tabindex]') ?? [])].filter((x) => x.offsetParent !== null || x === document.activeElement);
     // 처음 초점: 창 맨 위가 보이게 스크롤하지 않음 (아래 버튼에 초점을 줘도 제목부터 읽히게)
-    (ref.current?.querySelector<HTMLElement>('[data-autofocus]') ?? focusables()[1] ?? focusables()[0])?.focus({ preventScroll: true });
+    if (autofocus) (ref.current?.querySelector<HTMLElement>('[data-autofocus]') ?? focusables()[1] ?? focusables()[0])?.focus({ preventScroll: true });
     if (ref.current) ref.current.scrollTop = 0;
     const k = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); close.current(); return; }
@@ -341,4 +343,24 @@ export function MemoSheet({ title, value, onSave, onClose }: { title: string; va
       </div>
     </Sheet>
   );
+}
+/**
+ * 알림 쌓는 자리: 한 화면에 알림이 둘 이상 뜨면 겹치지 않게 세로로 쌓음 (먼저 뜬 것이 위, 새것이 아래).
+ * 알림은 이 자리 안의 자기 칸에 따로 그려 넣음 (위치·배너 위 띄우기는 .toast-stack 이 정함)
+ */
+export function ToastPortal({ children, aboveBanner }: { children: ComponentChildren; aboveBanner?: boolean }) {
+  const slot = useRef<HTMLDivElement | null>(null);
+  if (!slot.current) { slot.current = document.createElement('div'); slot.current.className = 'toast-slot'; }
+  useLayoutEffect(() => {
+    let host = document.querySelector<HTMLElement>('.toast-stack');
+    if (!host) { host = document.createElement('div'); host.className = 'toast-stack'; document.body.appendChild(host); }
+    const el = slot.current!;
+    host.appendChild(el);
+    return () => { render(null, el); el.remove(); if (host && !host.children.length) host.remove(); };
+  }, []);
+  useLayoutEffect(() => {
+    document.querySelector<HTMLElement>('.toast-stack')?.classList.toggle('above-banner', !!aboveBanner);
+    render(<>{children}</>, slot.current!);
+  });
+  return null;
 }

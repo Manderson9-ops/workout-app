@@ -2,7 +2,7 @@
  * D-080: 루틴 미리보기 창과 운동 줄 (루틴 카드·홈 "다음 운동"이 같이 씀).
  * 줄마다 ⇄ 로 그 자리에서 바로 교체 → 루틴에 바로 저장 + 5초 [되돌리기]
  */
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, activeOf } from '../store';
 import { catalog } from '../catalog';
@@ -10,7 +10,10 @@ import type { Routine } from '../../core/session';
 import { routineEstimate } from '../../core/session';
 import { swapRoutineItem } from '../../core/routineEdit';
 import { lastRecordMap, lastShortText } from '../../core/similar';
-import { ExercisePicker, Sheet } from '../components';
+import { nextSwapWindow } from '../../core/undoWindow';
+import type { SwapWindow } from '../../core/undoWindow';
+import { useToastHold } from '../toastHold';
+import { ExercisePicker, Sheet, ToastPortal } from '../components';
 import { Icon } from '../icons';
 
 /** 교체를 시작한 곳: 미리보기 창 안 / 홈 카드 (초점 찾기를 그 안으로 한정) */
@@ -56,7 +59,13 @@ export function RoutineLines({ s, r, ctx, onSwap }: { s: AppState; r: Routine; c
  */
 export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
   const [pick, setPick] = useState<{ rid: string; b: number; i: number } | null>(null);
-  const [toast, setToast] = useState<{ text: string; undo: () => void } | null>(null);
+  // 되돌리기 창: 알림이 떠 있는 동안 같은 루틴을 또 바꾸면 처음 바꾸기 전 모습을 쥐고 횟수만 셈 (core/undoWindow)
+  const [win, setWinState] = useState<SwapWindow<Routine> | null>(null);
+  const winRef = useRef<SwapWindow<Routine> | null>(null);
+  const setWin = (w: SwapWindow<Routine> | null) => { winRef.current = w; setWinState(w); };
+  // 고른 직후 저장이 끝나기 전에도 창 아래 여백(.has-toast)을 미리 잡아 둠 (저장 뒤 스크롤이 알림에 가리지 않게)
+  const [pending, setPending] = useState(false);
+  const holdProps = useToastHold(!!win, win, () => setWin(null));
   // 초점: 줄이 새 이름으로 그려지면(저장 뒤) 그 줄의 ⇄ 로 옮기고 화면 가운데로 스크롤 (창이 다시 열리며 맨 위로 올라간 뒤에)
   // scroll = 고르기·되돌리기 뒤에는 바뀐 줄을 화면 가운데로, 그냥 닫았을 때는 스크롤 없이 초점만
   const [focus, setFocus] = useState<{ rid: string; name: string; scroll: boolean } | null>(null);
@@ -74,7 +83,6 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
   }, [focus, pick, s.routines]);
   // 줄을 못 찾으면 3초 뒤 포기
   useEffect(() => { if (!focus) return; const t = setTimeout(() => setFocus(null), 3000); return () => clearTimeout(t); }, [focus]);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }, [toast]);
   useEffect(() => { if (!say) return; const t = setTimeout(() => setSay(''), 5000); return () => clearTimeout(t); }, [say]);
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
@@ -91,25 +99,39 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
         // 바뀐 게 없으면 새 이름 줄을 기다리지 않고 연 ⇄ 로 바로 돌아감
         if (swapped === r) { setFocus({ rid: r.id, name: byId.get(oldId)?.name_ko ?? oldId, scroll: false }); return; }
         setFocus({ rid: r.id, name: e.name_ko, scroll: true });
+        setPending(true);
         const next: Routine = { ...swapped, updatedAt: new Date().toISOString(), estimatedSec: routineEstimate(swapped, byId, s.settings.rest.between) + (r.warmupSec ?? 0) };
         const oldName = byId.get(oldId)?.name_ko ?? oldId;
         void mutate((d) => d.routines.put(next)).then(() => {
-          const text = `${oldName} → ${e.name_ko}: 바꿨어요`;
-          setSay(text);
-          setToast({ text, undo: () => { setToast(null); setSay(`되돌렸어요: ${oldName}`); setFocus({ rid: r.id, name: oldName, scroll: true }); void mutate((d) => d.routines.put(r)); } });
-        });
+          const w = nextSwapWindow(winRef.current, r.id, r, oldName, e.name_ko);
+          setWin(w);
+          setSay(w.text);
+        }).finally(() => setPending(false));
       }} />
   ) : null;
   /** inline = 창 안(흐름 안에 붙여 창을 스크롤해도 아래에 남음), 아니면 화면 아래 고정. 글자는 눈에만 (읽기는 live) */
-  const toastNode = (inline = false) => toast && (
-    <div class={inline ? 'pv-toast' : `toast${activeOf(s) ? ' above-banner' : ''}`}>
-      <span aria-hidden="true">{toast.text}</span>
-      <button class="ghost" onClick={toast.undo}>되돌리기</button>
-    </div>
-  );
+  const undo = () => {
+    const w = winRef.current;
+    if (!w) return;
+    setWin(null);
+    setSay(`되돌렸어요: ${w.firstName}`);
+    setFocus({ rid: w.rid, name: w.firstName, scroll: true });
+    void mutate((d) => d.routines.put(w.snap));
+  };
+  const toastNode = (inline = false) => {
+    if (!win) return null;
+    const box = (
+      <div class={inline ? 'pv-toast' : `toast${activeOf(s) ? ' above-banner' : ''}`} {...holdProps}>
+        <span aria-hidden="true">{win.text}</span>
+        <button class="ghost" onClick={undo}>되돌리기</button>
+      </div>
+    );
+    // 홈: 다른 알림(루틴 숨기기)과 겹치지 않게 한 자리에 세로로 쌓음
+    return inline ? box : <ToastPortal aboveBanner={!!activeOf(s)}>{box}</ToastPortal>;
+  };
   /** 화면 읽기 알림칸 (MyRoutines 와 같은 방식). 미리보기 창은 고르기 동안 내려갔다 다시 떠서 알림칸이 새로 만들어지므로 조금 늦게 채움 */
   const live = <LiveRegion text={say} delay={ctx === 'preview'} />;
-  return { ask: (rid: string, b: number, i: number) => setPick({ rid, b, i }), picker, busy: !!picker, hasToast: !!toast, toast: toastNode, live };
+  return { ask: (rid: string, b: number, i: number) => setPick({ rid, b, i }), picker, busy: !!picker, hasToast: !!win || pending, toast: toastNode, live };
 }
 
 /**
@@ -131,12 +153,16 @@ function LiveRegion({ text, delay }: { text: string; delay: boolean }) {
 /** 루틴 미리보기 창 (trap). 교체 창이 떠 있는 동안은 이 창을 잠시 내려 초점·Esc 가 한 창에서만 움직이게 함 */
 export function RoutinePreview({ s, rid, onClose, onStart, onEdit }: { s: AppState; rid: string; onClose: () => void; onStart: (r: Routine) => void; onEdit: (r: Routine) => void }) {
   const sw = useRoutineSwap(s, 'preview');
+  // 고르기 창이 닫혀 이 창이 다시 뜰 때는 [시작]에 초점을 주지 않음 (초점은 바뀐 줄의 ⇄ 로 곧장 감). 처음 열 때만 [시작]
+  const shown = useRef(false);
+  const again = shown.current;
+  useEffect(() => { if (!sw.busy) shown.current = true; });
   const r = s.routines.find((x) => x.id === rid);
   if (!r) return null;
   return (
     <>
       {!sw.busy && (
-        <Sheet title={`${r.name} 내용`} onClose={onClose} trap returnFocus={() => document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] .card-open`) ?? document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] button`)} cls={sw.hasToast ? 'has-toast' : undefined}>
+        <Sheet title={`${r.name} 내용`} onClose={onClose} trap returnFocus={() => document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] .card-open`) ?? document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] button`)} cls={sw.hasToast ? 'has-toast' : undefined} noAutofocus={again}>
           <RoutineLines s={s} r={r} ctx="preview" onSwap={(b, i) => sw.ask(r.id, b, i)} />
           {sw.toast(true)}
           {sw.live}

@@ -891,3 +891,13 @@ button.card-open:active { background: var(--card2); opacity: .5; }
 .routine-preview.tap { cursor: pointer; }
 .wk-swap { flex: none; }
 .rt-swap { flex: none; }
+/* 알림 쌓는 자리 (D-080 5차): 알림이 둘 이상이면 세로로 쌓음 (먼저 뜬 것 위, 새것 아래). 위치 규칙은 단독 .toast 와 같음 */
+.toast-stack { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-space) + 8px); z-index: 30; max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast-stack.above-banner { bottom: calc(var(--nav-space) + 68px); }
+.toast-stack .toast-slot { display: contents; }
+.toast-stack .toast { position: static; margin: 0; max-width: none; pointer-events: auto; }
+html.editing .toast-stack { bottom: calc(16px + var(--safe-b)); }
+@media (min-width: 900px) {
+  html:not(.phone-view) .toast-stack { left: 200px; right: 24px; bottom: 16px; }
+  html:not(.phone-view) .toast-stack.above-banner { bottom: 76px; }
+}

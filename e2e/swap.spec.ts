@@ -175,6 +175,7 @@ test('D-080 루틴 카드 → 내용 보기 → ⇄ 바로 교체: 루틴에 저
   await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
   await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
   await expect(pv.locator('.pv-toast')).toBeVisible();
+  await page.mouse.move(1, 1); // 포인터가 알림 위에 있으면 타이머가 멈춤 (D-080 5차)
   await expect(pv.locator('.pv-toast')).toHaveCount(0, { timeout: 8000 });
   // [시작] 은 루틴을 시작함
   await pv.getByRole('button', { name: '가슴 미리보기 루틴 시작하기' }).click();
@@ -430,4 +431,107 @@ test('D-080 검토 4차: 미리보기에서 한 번 교체한 뒤 닫으면 초�
   await page.keyboard.press('Escape');
   await expect(pv).toHaveCount(0);
   await expect(open).toBeFocused();
+});
+
+/** 비슷한 운동 구역 또는 검색으로 고름 */
+async function pickByName(page: Page, name: string) {
+  const dlg = page.getByRole('dialog', { name: '운동 교체' });
+  await dlg.getByLabel('운동 검색').fill(name);
+  await dlg.getByRole('button', { name: new RegExp(`^${name}`) }).first().click();
+  await expect(dlg).toHaveCount(0);
+}
+
+test('D-080 5차: 미리보기 ⇄ → 고르기 → 다시 뜬 창에서 [시작]은 초점을 받지 않고 바뀐 줄 ⇄ 로 곧장', async ({ page }) => {
+  await idbPut(page, 'routines', [routine('r11', '초점 5차', [one('bench_press', 3), one('plank', 3)])]);
+  await page.goto('./#/routines');
+  await page.reload();
+  await page.getByRole('group', { name: '루틴 초점 5차' }).getByRole('button', { name: '초점 5차 내용 보기' }).click();
+  const pv = page.getByRole('dialog', { name: '초점 5차 내용' });
+  const start = pv.getByRole('button', { name: '초점 5차 루틴 시작하기' });
+  await expect(start).toBeFocused(); // 처음 열 때만 [시작]
+  await pv.getByRole('button', { name: '플랭크 바로 교체', exact: true }).click();
+  await page.evaluate(() => {
+    const w = window as unknown as { __startFocus: number };
+    w.__startFocus = 0;
+    document.addEventListener('focusin', (e) => { if ((e.target as HTMLElement).getAttribute?.('aria-label')?.includes('루틴 시작하기')) w.__startFocus++; }, true);
+  });
+  await pickByName(page, '데드버그');
+  const swapped = pv.getByRole('button', { name: '데드버그 바로 교체', exact: true });
+  await expect(swapped).toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { __startFocus: number }).__startFocus), '[시작]이 초점을 받은 횟수').toBe(0);
+  // 고르지 않고 닫아도 마찬가지
+  await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: '닫기' }).click();
+  await expect(pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true })).toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { __startFocus: number }).__startFocus)).toBe(0);
+});
+
+test('D-080 5차: 알림 시간 안에 두 번 바꾸면 "2개 바꿨어요", [되돌리기] 한 번에 처음 모습(수정 시각까지)으로, 초점은 첫 줄 ⇄', async ({ page }) => {
+  await idbPut(page, 'routines', [routine('r12', '두 번 교체', [one('bench_press', 3), one('plank', 3)])]);
+  await page.goto('./#/routines');
+  await page.reload();
+  const before = (await routines(page)).find((r) => r.id === 'r12')!;
+  await page.getByRole('group', { name: '루틴 두 번 교체' }).getByRole('button', { name: '두 번 교체 내용 보기' }).click();
+  const pv = page.getByRole('dialog', { name: '두 번 교체 내용' });
+  await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
+  await pickByName(page, '덤벨 벤치프레스');
+  await expect(pv.locator('.pv-toast')).toContainText('바벨 벤치프레스 → 덤벨 벤치프레스: 바꿨어요');
+  await pv.getByRole('button', { name: '플랭크 바로 교체', exact: true }).click();
+  await pickByName(page, '데드버그');
+  await expect(pv.locator('.pv-toast')).toContainText('2개 바꿨어요');
+  await expect(pv.locator('.pv-toast')).toHaveCount(1);
+  await page.mouse.move(1, 1);
+  await pv.getByRole('button', { name: '되돌리기' }).click();
+  await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r12')!.blocks[0]!.items[0]!.exerciseId).toBe('bench_press');
+  const back = (await routines(page)).find((r) => r.id === 'r12')!;
+  expect(back.updatedAt).toBe(before.updatedAt);
+  expect(back.blocks).toEqual(before.blocks);
+  expect(back.blocks.map((b) => b.items[0]!.exerciseId)).toEqual(['bench_press', 'plank']);
+  await expect(pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true })).toBeFocused();
+  await expect(pv.getByRole('button', { name: '플랭크 바로 교체', exact: true })).toBeVisible();
+  await expect(pv.locator('.pv-toast')).toHaveCount(0);
+});
+
+test('D-080 5차: 알림에 초점이 있는 동안 5초 타이머는 멈추고, 벗어나면 새 5초 (WCAG 2.2.1)', async ({ page }) => {
+  await idbPut(page, 'routines', [routine('r13', '멈춤 루틴', [one('bench_press', 3), one('plank', 3)])]);
+  await page.goto('./#/routines');
+  await page.reload();
+  await page.getByRole('group', { name: '루틴 멈춤 루틴' }).getByRole('button', { name: '멈춤 루틴 내용 보기' }).click();
+  const pv = page.getByRole('dialog', { name: '멈춤 루틴 내용' });
+  await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
+  await pickByName(page, '덤벨 벤치프레스');
+  await page.mouse.move(1, 1);
+  const toast = pv.locator('.pv-toast');
+  await expect(toast).toBeVisible();
+  await toast.getByRole('button', { name: '되돌리기' }).focus();
+  await page.waitForTimeout(6000);
+  await expect(toast).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  const t0 = Date.now();
+  await expect(toast).toHaveCount(0, { timeout: 7000 });
+  expect(Date.now() - t0, '벗어난 뒤 새 5초').toBeGreaterThan(4000);
+});
+
+test('D-080 5차: 홈에서 루틴 숨기기 알림과 교체 알림이 함께 뜨면 겹치지 않고 세로로 쌓임', async ({ page }) => {
+  await idbPut(page, 'routines', [routine('r14', '홈 쌓기 A', [one('bench_press', 3), one('plank', 3)]), routine('r15', '홈 쌓기 B', [one('pull_up', 3)])]);
+  await page.reload();
+  const next = page.getByTestId('home-next');
+  const nextName = (await next.locator('.next-name').innerText()).trim();
+  const other = nextName === '홈 쌓기 A' ? '홈 쌓기 B' : '홈 쌓기 A';
+  const swapName = nextName === '홈 쌓기 A' ? '플랭크' : '턱걸이';
+  await next.getByRole('button', { name: new RegExp(`^${swapName}.*바로 교체$`) }).first().click();
+  await pickByName(page, '데드버그');
+  const swapToast = page.locator('.toast').filter({ hasText: '바꿨어요' });
+  await expect(swapToast).toBeVisible();
+  await page.getByRole('button', { name: `${other} 메뉴`, exact: true }).click();
+  await page.getByRole('button', { name: `${other} 지우기`, exact: true }).click();
+  await page.getByRole('button', { name: '목록에서만 숨기기', exact: true }).click();
+  const hideToast = page.locator('.toast').filter({ hasText: '목록에서 숨겼어요' });
+  await expect(hideToast).toBeVisible();
+  await expect(swapToast).toBeVisible();
+  const a = (await swapToast.boundingBox())!;
+  const b = (await hideToast.boundingBox())!;
+  const overlap = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  expect(overlap, `알림이 겹침 ${JSON.stringify({ a, b })}`).toBe(false);
+  expect(b.y, '새 알림이 아래').toBeGreaterThan(a.y);
 });

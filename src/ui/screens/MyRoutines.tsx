@@ -14,7 +14,7 @@ import { routineUse, routineParts, sortRoutines, filterRoutines, sinceText } fro
 import type { RoutineSort } from '../../core/routineList';
 import type { Part } from '../../core/types';
 import { newId } from '../../db/db';
-import { minutes, MenuSheet, Empty, Sheet } from '../components';
+import { minutes, MenuSheet, Empty, Sheet, ToastPortal } from '../components';
 import { Icon } from '../icons';
 import { ScreenHeader } from '../header';
 import { go, setEditReturn } from '../nav';
@@ -212,11 +212,14 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
       ]} />}
       {/* 결과 알림: 화면 아래 고정, 숨기기는 [되돌리기] (5초 뒤 사라짐) */}
       <div class="sr-only" role="status" aria-live="polite">{toast?.text ?? ''}</div>
+      {/* 홈 "다음 운동"의 교체 알림과 겹치지 않게 같은 자리에 세로로 쌓음 (새것이 아래) */}
       {toast && (
-        <div class={`toast${activeOf(s) ? ' above-banner' : ''}`}>
-          <span>{toast.text}</span>
-          {toast.undo && <button ref={undoRef} class="ghost" onClick={() => void toast.undo!()}>되돌리기</button>}
-        </div>
+        <ToastPortal aboveBanner={!!activeOf(s)}>
+          <div class={`toast${activeOf(s) ? ' above-banner' : ''}`}>
+            <span>{toast.text}</span>
+            {toast.undo && <button ref={undoRef} class="ghost" onClick={() => void toast.undo!()}>되돌리기</button>}
+          </div>
+        </ToastPortal>
       )}
     </section>
   );
