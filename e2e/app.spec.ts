@@ -470,7 +470,7 @@ test('개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선�
   // 기억된 부위(이두)에 없는 운동을 검색하면 모든 부위에서 찾아 줌
   await dlg.getByLabel('운동 검색').fill('플랭크');
   await expect(dlg.getByRole('status')).toContainText('이두에는 "플랭크" 운동이 없어 모든 부위에서 찾았어요');
-  await expect(dlg.getByRole('button', { name: '플랭크', exact: true })).toBeVisible();
+  await expect(dlg.getByRole('button', { name: /^플랭크 · / })).toBeVisible();
   await dlg.getByRole('button', { name: '닫기' }).click();
   // 교체 창에서 부위를 바꿔도 추가 창의 기억은 그대로 (이두)
   await planSec.getByRole('button', { name: '교체' }).first().click();
@@ -522,7 +522,7 @@ test('플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 �
   await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
   const dlg = page.getByRole('dialog', { name: '운동 추가' });
   await dlg.getByLabel('운동 검색').fill('플랭크');
-  await dlg.getByRole('button', { name: '플랭크', exact: true }).click();
+  await dlg.getByRole('button', { name: /^플랭크 · / }).click();
   const cards = planSec.locator('.card');
   const n0 = await cards.count();
   // 1·2번째(둘 다 이두) → 컴파운드 세트
@@ -565,7 +565,7 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
   const dlg0 = page.getByRole('dialog', { name: '운동 추가' });
   await dlg0.getByLabel('운동 검색').fill('사이드 플랭크');
-  await dlg0.getByRole('button', { name: '사이드 플랭크', exact: true }).click();
+  await dlg0.getByRole('button', { name: /^사이드 플랭크 · / }).click();
   const cards = planSec.locator('.card');
   await cards.nth(0).getByRole('button', { name: /^다음과 묶기 · 컴파운드 세트: / }).click();
   await expect(cards.nth(0).locator('.badge.kind')).toHaveText('컴파운드 세트');
@@ -624,7 +624,7 @@ test('플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶
   await grp.getByRole('button', { name: /^\+ 묶음에 운동 추가/ }).click();
   const dlg = page.getByRole('dialog', { name: '묶음에 운동 추가' });
   await dlg.getByLabel('운동 검색').fill('플랭크');
-  await dlg.getByRole('button', { name: '플랭크', exact: true }).click();
+  await dlg.getByRole('button', { name: /^플랭크 · / }).click();
   await expect(planSec.locator('.card').nth(0)).toContainText('플랭크');
   await expect(planSec.locator('.card').nth(0).locator('.badge.kind')).toBeVisible();
   // 초점은 새로 추가한 운동의 '세트 늘리기'로 (카드가 다시 만들어져도)
@@ -799,7 +799,7 @@ test('루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세
   await expect(dlg.getByRole('group', { name: '모든 부위' }).getByRole('button', { name: '가슴', exact: true })).toHaveAttribute('aria-pressed', 'true');
   const first = dlg.locator('.list-item').first();
   await expect(first).toContainText('가슴');
-  const nm = (await first.getAttribute('aria-label'))!;
+  const nm = ((await first.getAttribute('aria-label'))!).split(' · ')[0]!;
   await first.click();
   await expect(page.getByRole('button', { name: `${nm} 세트 늘리기`, exact: true })).toBeFocused();
   await expect(page.locator('p.sr-only[aria-live="polite"]')).toContainText(`${nm}: 추가했어요`);
@@ -1820,7 +1820,7 @@ test('플랜 바로 고치기 (D-036): 시간 운동 초 −/+ 가 예상 시간
   // 다른 부위(코어)의 시간 운동 추가 → 초 조절
   await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
   await page.getByRole('dialog', { name: '운동 추가' }).getByLabel('운동 검색').fill('플랭크');
-  await page.getByRole('dialog', { name: '운동 추가' }).getByRole('button', { name: '플랭크', exact: true }).click();
+  await page.getByRole('dialog', { name: '운동 추가' }).getByRole('button', { name: /^플랭크 · / }).click();
   const secBox = planSec.getByRole('group', { name: '플랭크 시간' });
   await expect(secBox).toContainText('45초');
   const e0 = await est();
@@ -2473,7 +2473,7 @@ test('D-055 3단계 운동 화면: 시간 운동 지난번(초), 고친 지난 �
   const planSec = page.getByRole('region', { name: '생성된 플랜' });
   await planSec.getByRole('button', { name: '+ 운동 추가' }).click();
   await page.getByRole('dialog', { name: '운동 추가' }).getByLabel('운동 검색').fill('플랭크');
-  await page.getByRole('dialog', { name: '운동 추가' }).getByRole('button', { name: '플랭크', exact: true }).click();
+  await page.getByRole('dialog', { name: '운동 추가' }).getByRole('button', { name: /^플랭크 · / }).click();
   await page.getByRole('button', { name: '루틴으로 저장', exact: true }).click();
   await page.getByRole('button', { name: '저장만' }).click();
   await page.getByRole('button', { name: /^다음 운동으로 시작/ }).click();

@@ -293,7 +293,7 @@ test('D-078 기록 탭에서 운동 기록 직접 작성 (진입, 종목 추가,
   const picker = page.getByRole('dialog', { name: '운동 추가' });
   await expect(picker).toBeVisible();
   await picker.getByRole('textbox', { name: '운동 검색' }).fill('바벨 벤치프레스');
-  await picker.getByRole('button', { name: '바벨 벤치프레스', exact: true }).click();
+  await picker.getByRole('button', { name: /^바벨 벤치프레스 · / }).click();
 
   // 바벨 벤치프레스 카드 및 기본 세트 확인
   await expect(page.getByText('바벨 벤치프레스', { exact: true })).toBeVisible();

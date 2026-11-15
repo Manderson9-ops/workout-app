@@ -250,7 +250,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   );
   /** D-080: ⋯ 메뉴를 거치지 않는 바로 교체 */
   const swapBtn = (bi: number, ii: number) => (
-    <button class="icon-btn round wk-swap" aria-label={`${nameOf(w.blocks[bi]!.items[ii]!.exerciseId)} 바로 교체`} onClick={() => setPicker({ mode: 'swap', b: bi, i: ii })}><Icon name="swap" size={20} /></button>
+    <button class="icon-btn round wk-swap" aria-label={`${nameOf(w.blocks[bi]!.items[ii]!.exerciseId)} 바로 교체`} aria-haspopup="dialog" onClick={() => setPicker({ mode: 'swap', b: bi, i: ii })}><Icon name="swap" size={20} /></button>
   );
   const infoLink = (exId: string) => {
     const ex = byId.get(exId);

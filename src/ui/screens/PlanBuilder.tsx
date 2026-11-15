@@ -139,22 +139,24 @@ export function PlanBuilder({ s }: { s: AppState }) {
     const prio = (k: number): Priority => (d.length <= 2 ? (k === 0 ? 'high' : 'normal') : k < Math.ceil(d.length / 3) ? 'high' : k < Math.ceil((2 * d.length) / 3) ? 'normal' : 'low');
     update({ parts: Object.fromEntries(d.map((p, k) => [p, prio(k)])), order: [...d] });
   };
-  const editItem = (bi: number, ii: number, fn: (i: PlanItem) => PlanItem | null) => {
+  /** 방금 직접 추가한 운동은 아직 화면의 운동 목록(all)에 없으므로 extra 로 넘겨 다시 셈에 쓴다 */
+  const withExtra = (e?: BuiltExercise) => (e && !all.some((x) => x.id === e.id) ? [...all, e] : all);
+  const editItem = (bi: number, ii: number, fn: (i: PlanItem) => PlanItem | null, extra?: BuiltExercise) => {
     if (!plan) return;
     setGroupMsg('');
     const old = plan.blocks[bi]!.items[ii]!;
     const blocks = plan.blocks.map((b, x) => x !== bi ? b : { ...b, items: b.items.map((it, y) => (y === ii ? fn(it) : it)).filter((it): it is PlanItem => !!it) });
-    const next = recompute({ ...plan, blocks }, all);
+    const next = recompute({ ...plan, blocks }, withExtra(extra));
     setPlan(next);
     // 지우거나 바꾼 운동의 잠금은 정리
     const still = new Set(next.blocks.flatMap((b) => b.items.map((i) => i.exerciseId)));
     if (locks.has(old.exerciseId) && !still.has(old.exerciseId)) { const n = new Set(locks); n.delete(old.exerciseId); setLocks(n); }
   };
   // D-051: 일괄·묶음 고치기. 바뀐 게 없으면(끝값) 아무것도 안 함
-  const applyEdit = (next: Plan, msg: string) => {
+  const applyEdit = (next: Plan, msg: string, extra?: BuiltExercise) => {
     if (!plan || next === plan) return;
     setMoved(null);
-    setPlan(recompute(next, all));
+    setPlan(recompute(next, withExtra(extra)));
     flip.current = !flip.current;
     setGroupMsg(msg + (flip.current ? '\u200b' : ''));
   };
@@ -178,7 +180,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
       ...(e.measure === 'time' ? { seconds: e.default_seconds ?? 30 } : {}),
       grade: g.value, gradeSource: g.source, estimated: g.estimated, substituted: false, locked: false, why: `${e.part} ${g.value} (직접 추가)`, rank: 99 };
     if (addToGroup(plan, bi, item) !== plan) pendingFocus.current = `${e.name_ko} 세트 늘리기`;
-    applyEdit(addToGroup(plan, bi, item), `${e.name_ko}: 묶음에 추가했어요`);
+    applyEdit(addToGroup(plan, bi, item), `${e.name_ko}: 묶음에 추가했어요`, e);
   };
   const blockName = (b: PlanBlock) => b.items.map((i) => i.name).join(' + ');
   const blockKey = (b: PlanBlock) => b.items.map((i) => i.exerciseId).join('\u0001');
@@ -199,7 +201,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
       grade: g.value, gradeSource: g.source, estimated: g.estimated, substituted: false, locked: false, why: `${e.part} ${g.value} (직접 추가)`, rank: 99 };
     // 빈 플랜(시간 부족·후보 없음)에 처음 넣으면 웜업도 정해서 정상 플랜으로
     const base: Plan = plan.blocks.length ? plan : { ...plan, status: 'ok', warmup: warmupFor(plan.targetSec !== undefined ? plan.targetSec / 60 : undefined, e.part === '하체', { exercise: e, sets: 1, reps: item.reps, ...(item.seconds !== undefined ? { seconds: item.seconds } : {}) }) };
-    setPlan(recompute(addBlock(base, item), all));
+    setPlan(recompute(addBlock(base, item), withExtra(e)));
   };
   // 묶음에 운동을 추가하면 카드가 다시 만들어져 초점이 풀림: 새 운동의 '세트 늘리기'로 옮김
   useEffect(() => {
@@ -669,7 +671,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
         </section>
       )}
 
-      {picker && plan && (
+      {/* 새 운동 직접 추가 창이 떠 있는 동안은 고르기 창을 내림 (초점·Esc 가 한 창에서만). 상태(picker 등)는 그대로라 추가가 끝나면 이어서 반영하고, 추가 없이 닫으면 다시 보임 */}
+      {picker && plan && !addCustomOpen && (
         <ExercisePicker s={s} all={all} part={plan.blocks[picker.b]!.items[picker.i]!.part} from={plan.blocks[picker.b]!.items[picker.i]!.exerciseId} title="운동 교체"
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setPicker(null)}
@@ -683,14 +686,14 @@ export function PlanBuilder({ s }: { s: AppState }) {
             setPicker(null);
           }} />
       )}
-      {adding && plan && (
+      {adding && plan && !addCustomOpen && (
         <ExercisePicker s={s} all={all} title="운동 추가" ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setAdding(false)}
           onAddCustom={() => setAddCustomOpen(true)}
           onPick={(e) => { addExercise(e); setAdding(false); }} />
       )}
-      {groupAdd !== null && plan && plan.blocks[groupAdd] && (
+      {groupAdd !== null && plan && plan.blocks[groupAdd] && !addCustomOpen && (
         <ExercisePicker s={s} all={all} title="묶음에 운동 추가" ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setGroupAdd(null)}
@@ -718,7 +721,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
                 estimated: g.estimated,
                 substituted: false,
                 why: `${old.part} ${g.value} (직접 교체)`,
-              }));
+              }), newEx);
               const nl = new Set(locks);
               nl.delete(plan.blocks[picker.b]!.items[picker.i]!.exerciseId);
               nl.add(newEx.id);

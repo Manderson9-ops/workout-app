@@ -110,21 +110,34 @@ export function setCount(it: WorkoutItem): number {
 export function routineFromWorkout(r: Routine, w: Workout, now: string): Routine {
   const old = new Map<string, RoutineItem>();
   for (const b of r.blocks) for (const i of b.items) if (!old.has(i.exerciseId)) old.set(i.exerciseId, i);
+  return { ...r, blocks: foldedRoutineBlocks(w, old, false), updatedAt: now };
+}
+
+/**
+ * 접은 운동 칸 → 루틴 블록. 접힌 교체(갈라 교체)는 이번 운동의 실제 세트 수(f.sets = 남긴 세트 + 새 운동 세트), 횟수·초는 새 운동 목표.
+ * dropSkipped = 건너뛴 운동 칸을 뺌 ("다시 하기"용)
+ */
+function foldedRoutineBlocks(w: Workout, old: Map<string, RoutineItem>, dropSkipped: boolean): RoutineBlock[] {
   const blocks: RoutineBlock[] = [];
   for (const b of foldSwaps(w)) {
-    const items: RoutineItem[] = b.items.map((f) => {
+    const items: RoutineItem[] = b.items.filter((f) => !(dropSkipped && f.root === undefined && f.it.skipped)).map((f) => {
       const it = f.it;
-      // 접힌 교체: 루틴에 있던 원래 운동의 세트 수 (없으면 둘이 한 세트 수), 횟수·초는 새 운동 목표
-      if (f.root !== undefined) return { exerciseId: it.exerciseId, sets: old.get(f.root)?.sets ?? f.sets, reps: it.target.reps, ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : {}) };
+      if (f.root !== undefined) return { exerciseId: it.exerciseId, sets: f.sets, reps: it.target.reps, ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : {}) };
       const o = old.get(it.exerciseId);
       const reps = o ? o.reps : it.target.reps;
       const seconds = o ? o.seconds : it.target.seconds;
       return { exerciseId: it.exerciseId, sets: f.sets, reps, ...(seconds !== undefined ? { seconds } : {}) };
     });
+    if (!items.length) continue;
     const b0 = b.src;
     blocks.push({ kind: items.length > 1 ? (b0.kind === 'single' ? 'superset' : b0.kind) : 'single', items, restSec: b0.restSec, roundRestSec: b0.roundRestSec, transitionSec: b0.transitionSec });
   }
-  return { ...r, blocks, updatedAt: now };
+  return blocks;
+}
+
+/** 지난 운동을 새 루틴으로 ("다시 하기"): 갈라 교체는 접어 새 운동이 원래 자리에 한 번만 */
+export function routineFromPastWorkout(w: Workout, id: string, name: string, now: string): Routine {
+  return { id, name, createdAt: now, updatedAt: now, blocks: foldedRoutineBlocks(w, new Map(), true) };
 }
 
 /** 새 루틴으로 저장 */

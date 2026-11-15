@@ -7,7 +7,7 @@ import type { ServerState, SyncRequest } from '../src/core/syncMerge';
 import { syncOnce, getKv, restoreStash, collectMutations, CHUNK } from '../src/db/sync';
 import type { Transport } from '../src/db/sync';
 import { SYNC_TABLES, syncedFields, withoutStamp } from '../src/core/syncStamp';
-import { planToRoutine, startWorkout, moveWorkoutBlock, withHidden, withoutHidden } from '../src/core/session';
+import { planToRoutine, startWorkout, moveWorkoutBlock, withHidden, withoutHidden, swapItem, completeSet } from '../src/core/session';
 import type { Routine, Workout } from '../src/core/session';
 
 let T = 1_750_000_000_000;
@@ -150,6 +150,16 @@ describe('충돌 규칙 (D-029)', () => {
     const orig = all.find((x) => x.id === 'w1')!, copy = all.find((x) => x.pendingMerge === 'w1')!;
     expect(orig.ownerDeviceId).toBe('B');
     expect(copy.blocks[0]!.items[0]!.sets.map((x) => x.weight)).toEqual([62.5]);
+    expect(await view(A)).toEqual(await view(B));
+  });
+  it('D-080: 갈라 교체한 운동의 swappedFrom 이 동기화(서버 왕복) 뒤에도 남음', async () => {
+    const { transport } = server(); const A = dev('A'), B = dev('B');
+    const w0 = startWorkout('w1', R('r1', '등'), '2026-09-30T10:00:00.000Z', []);
+    const w: Workout = { ...swapItem(completeSet(w0, { block: 0, item: 0, set: 0 }, T), 0, 0, 'n', []), ownerDeviceId: 'A', ownerAt: '2026-09-30T10:00:00.000Z', ownerSeq: 1 };
+    expect(w.blocks[1]!.items[0]!.swappedFrom).toBe('a');
+    await A.workouts.put(w); await sync(A, transport); await sync(B, transport);
+    const got = (await B.workouts.get('w1'))!;
+    expect(got.blocks.map((b) => b.items[0]!.swappedFrom)).toEqual([undefined, 'a']);
     expect(await view(A)).toEqual(await view(B));
   });
   it('서버 되돌리기(epoch): 안 보낸 수정은 보관 → 전체 다시 받기 → 다시 올리면 반영', async () => {

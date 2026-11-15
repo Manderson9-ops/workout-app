@@ -290,10 +290,11 @@ export function swapItem(w: Workout, block: number, item: number, exerciseId: st
   const left = Math.max(1, it.sets.filter((s) => !s.done && !s.warmup).length);
   const fresh: WorkoutItem = {
     exerciseId, target: { sets: left, reps: t.reps, ...(t.seconds !== undefined ? { seconds: t.seconds } : {}) }, swappedFrom: it.exerciseId,
-    sets: preMarkWarmup(Array.from({ length: left }, (_, k) => {
+    // 운동 중간이라 이미 몸이 풀렸음: 웜업을 미리 표시하지 않음
+    sets: Array.from({ length: left }, (_, k) => {
       const p = prev[Math.min(k, prev.length - 1)];
       return { warmup: false, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(t.seconds !== undefined ? { seconds: t.seconds } : { reps: p?.reps ?? t.reps }) };
-    }), prev),
+    }),
   };
   const kept: WorkoutItem = { ...it, skipped: false, target: { ...it.target, sets: doneWork }, sets: done };
   const blocks = w.blocks.map((x, bi) => (bi === block ? { ...x, items: x.items.map((y, ii) => (ii === item ? kept : y)) } : x));

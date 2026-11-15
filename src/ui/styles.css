@@ -880,7 +880,7 @@ button.danger:active { background: var(--bad-soft); border-color: transparent; }
 .pv-name { font-weight: 600; overflow-wrap: anywhere; }
 .pv-swap { flex: none; }
 .pv-rest { margin-top: 2px; }
-.pv-toast { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; background: var(--card3); border-radius: var(--r-btn); padding: 6px 8px 6px 16px; }
+.pv-toast { position: sticky; bottom: 0; z-index: 1; box-shadow: 0 0 0 6px var(--card); display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; background: var(--card3); border-radius: var(--r-btn); padding: 6px 8px 6px 16px; }
 .pv-toast .ghost { color: var(--acc-text); font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 /* 루틴 카드: 이름·부위 영역 전체를 누르는 버튼 (제목 글자는 그대로 두고 그 위에 투명하게 덮음) */
 .card-open-wrap { position: relative; min-height: 44px; }

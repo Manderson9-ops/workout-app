@@ -22,6 +22,7 @@ import { startRoutine, setHomeHidden } from '../actions';
 import { newId, softDelete } from '../../db/db';
 import type { Routine } from '../../core/session';
 import { HOME_HIDDEN_LABEL } from '../../core/session';
+import { routineFromPastWorkout } from '../../core/routineDiff';
 import { go, dropQuery } from '../nav';
 import { askConfirm } from '../confirm';
 import { Icon } from '../icons';
@@ -431,10 +432,7 @@ export function WorkoutDetail({ s, id }: { s: AppState; id: string }) {
   if (!w) return <main><p>기록을 찾을 수 없어요.</p><button onClick={() => go('#/stats')}>기록으로</button></main>;
   const sum = summarize(w, byId, s.bodyweight);
   const asRoutine = (): Routine => ({
-    id: newId('r'), name: `${w.name} (다시)`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    blocks: w.blocks.map((b) => ({ kind: b.kind, restSec: b.restSec, roundRestSec: b.roundRestSec, transitionSec: b.transitionSec,
-      items: b.items.filter((i) => !i.skipped).map((i) => ({ exerciseId: i.exerciseId, sets: Math.max(1, i.sets.filter((x) => !x.warmup).length), reps: i.target.reps, ...(i.target.seconds !== undefined ? { seconds: i.target.seconds } : {}) })) }))
-      .filter((b) => b.items.length),
+    ...routineFromPastWorkout(w, newId('r'), `${w.name} (다시)`, new Date().toISOString()),
     ...(w.plannedSec ? { estimatedSec: w.plannedSec } : {}),
   });
   return (

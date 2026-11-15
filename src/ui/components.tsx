@@ -116,7 +116,7 @@ export function useDialogKeys(ref: { current: HTMLElement | null } | null, onClo
   useLayoutEffect(() => {
     if (!ref) return;
     const back = document.activeElement as HTMLElement | null;
-    const focusables = () => [...(ref.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], summary, input, select, textarea') ?? [])].filter((x) => x.offsetParent !== null || x === document.activeElement);
+    const focusables = () => [...(ref.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], summary, input, select, textarea, [role="button"][tabindex]') ?? [])].filter((x) => x.offsetParent !== null || x === document.activeElement);
     // 처음 초점: 창 맨 위가 보이게 스크롤하지 않음 (아래 버튼에 초점을 줘도 제목부터 읽히게)
     (ref.current?.querySelector<HTMLElement>('[data-autofocus]') ?? focusables()[1] ?? focusables()[0])?.focus({ preventScroll: true });
     if (ref.current) ref.current.scrollTop = 0;
@@ -261,7 +261,8 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
   const rest = list.filter(({ e }) => !simIds.has(e.id));
   const nowMs = Date.now();
   const row = (e: BuiltExercise, g: Pick<ResolvedGrade, 'value' | 'source' | 'estimated'>) => (
-    <div class="list-item" key={e.id} onClick={() => onPick(e)} role="button" aria-label={e.name_ko}>
+    <div class="list-item" key={e.id} onClick={() => onPick(e)} role="button" tabIndex={0} aria-label={`${e.name_ko} · ${lastLineText(last.get(e.id), nowMs)}`}
+      onKeyDown={(ev) => { if (ev.target !== ev.currentTarget || (ev.key !== 'Enter' && ev.key !== ' ')) return; ev.preventDefault(); onPick(e); }}>
       <GradeBadge g={g} />
       <div class="grow"><div>{e.name_ko}</div><div class="pill">{e.part} · {e.equipment.map((q2) => EQUIPMENT_LABEL[q2]).join(', ')}</div><div class="pill last-line">{lastLineText(last.get(e.id), nowMs)}</div></div>
     </div>

@@ -82,18 +82,18 @@ test('D-080 운동 중 ⇄: 비슷한 운동 구역 + 지난 기록 → 완료 2
   const rows = sim.getByRole('button');
   expect(await rows.count()).toBeLessThanOrEqual(5);
   // 같은 family 안에서는 해 본 운동이 먼저 + 지난 기록 한 줄
-  await expect(rows.first()).toHaveAttribute('aria-label', '스미스머신 벤치프레스');
+  await expect(rows.first()).toHaveAttribute('aria-label', /^스미스머신 벤치프레스 · 지난번/);
   await expect(rows.first()).toContainText('지난번 70kg×6 · 2일 전');
-  await expect(sim.getByRole('button', { name: '덤벨 벤치프레스', exact: true })).toContainText('아직 안 해 봄');
-  await expect(sim.getByRole('button', { name: '바벨 벤치프레스', exact: true })).toHaveCount(0); // 자기 자신 제외
+  await expect(sim.getByRole('button', { name: /^덤벨 벤치프레스 · / })).toContainText('아직 안 해 봄');
+  await expect(sim.getByRole('button', { name: /^바벨 벤치프레스 · / })).toHaveCount(0); // 자기 자신 제외
   // 전체 목록에는 같은 운동이 한 번 더 나오지 않음
-  await expect(dlg.getByRole('button', { name: '스미스머신 벤치프레스', exact: true })).toHaveCount(1);
+  await expect(dlg.getByRole('button', { name: /^스미스머신 벤치프레스 · / })).toHaveCount(1);
   await checkScreen(page, 'sw2-picker');
   // 검색 중에는 비슷한 운동 구역이 숨음
   await dlg.getByLabel('운동 검색').fill('덤벨 벤치');
   await expect(dlg.getByRole('group', { name: '비슷한 운동' })).toHaveCount(0);
   await dlg.getByLabel('운동 검색').fill('');
-  await dlg.getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: '덤벨 벤치프레스', exact: true }).click();
+  await dlg.getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
   await expect(dlg).toHaveCount(0);
 
   const w = await activeWorkout(page);
@@ -119,7 +119,7 @@ test('D-080 운동 중 ⇄ 묶음: 완료 세트가 있으면 새 운동은 묶�
   await swap.click();
   const dlg = page.getByRole('dialog', { name: '운동 교체' });
   await dlg.getByLabel('운동 검색').fill('덤벨 벤치');
-  await dlg.getByRole('button', { name: '덤벨 벤치프레스', exact: true }).click();
+  await dlg.getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
   await expect(page.getByRole('status').filter({ hasText: '묶음 다음에 따로 해요' })).toBeVisible();
   const w = await activeWorkout(page);
   expect(w.blocks.map((b) => [b.kind, b.items.map((i) => i.exerciseId)])).toEqual([['superset', ['incline_db_press', 'chin_up']], ['single', ['db_bench_press']]]);
@@ -158,11 +158,11 @@ test('D-080 루틴 카드 → 내용 보기 → ⇄ 바로 교체: 루틴에 저
   await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
   const pick = page.getByRole('dialog', { name: '운동 교체' });
   await expect(pick.getByRole('group', { name: '비슷한 운동' })).toBeVisible();
-  await pick.getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: '덤벨 벤치프레스', exact: true }).click();
+  await pick.getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
   await expect(pick).toHaveCount(0);
 
   await expect(pv).toContainText('덤벨 벤치프레스');
-  await expect(pv.getByText('바벨 벤치프레스 → 덤벨 벤치프레스: 바꿨어요')).toBeVisible();
+  await expect(pv.locator('.pv-toast').filter({ hasText: '바벨 벤치프레스 → 덤벨 벤치프레스: 바꿨어요' })).toBeVisible();
   await checkScreen(page, 'sw6-swapped');
   const saved = (await routines(page)).find((r) => r.id === 'r3')!;
   expect(saved.blocks[0]!.items[0]).toMatchObject({ exerciseId: 'db_bench_press', sets: 4 });
@@ -173,9 +173,9 @@ test('D-080 루틴 카드 → 내용 보기 → ⇄ 바로 교체: 루틴에 저
   await expect(pv).toContainText('바벨 벤치프레스');
   // 5초 뒤 알림은 사라짐
   await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
-  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: '덤벨 벤치프레스', exact: true }).click();
-  await expect(pv.getByText('바꿨어요')).toBeVisible();
-  await expect(pv.getByText('바꿨어요')).toHaveCount(0, { timeout: 8000 });
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
+  await expect(pv.locator('.pv-toast')).toBeVisible();
+  await expect(pv.locator('.pv-toast')).toHaveCount(0, { timeout: 8000 });
   // [시작] 은 루틴을 시작함
   await pv.getByRole('button', { name: '가슴 미리보기 루틴 시작하기' }).click();
   await expect(page.getByRole('button', { name: '끝내기', exact: true })).toBeVisible();
@@ -196,7 +196,7 @@ test('D-080 홈 다음 운동 카드: 기존 한 줄은 그대로, 아래에 운
   const pick = page.getByRole('dialog', { name: '운동 교체' });
   await pick.getByLabel('운동 검색').fill('데드버그');
   await pick.getByRole('button', { name: /^데드버그/ }).first().click();
-  await expect(page.getByText('플랭크 → 데드버그: 바꿨어요')).toBeVisible();
+  await expect(page.locator('.toast').filter({ hasText: '플랭크 → 데드버그: 바꿨어요' })).toBeVisible();
   await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r4')!.blocks[2]!.items[0]!.exerciseId).not.toBe('plank');
 });
 
@@ -212,7 +212,7 @@ test('D-080 루틴 편집: 펼친 운동 이름 옆 ⇄ 로 ⋯ 메뉴 없이 �
   await swap.click();
   const dlg = page.getByRole('dialog', { name: '운동 교체' });
   await expect(dlg.getByRole('group', { name: '비슷한 운동' })).toBeVisible();
-  await dlg.getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: '덤벨 벤치프레스', exact: true }).click();
+  await dlg.getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
   await page.getByRole('button', { name: '루틴 저장하기', exact: true }).click();
   await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r5')!.blocks[0]!.items[0]).toMatchObject({ exerciseId: 'db_bench_press', sets: 4 });
 });
@@ -227,7 +227,7 @@ test('D-080 검토: 4세트 중 2세트 하고 ⇄ → 끝낼 때 "교체:" 로 
   await page.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
   const dlg0 = page.getByRole('dialog', { name: '운동 교체' });
   await dlg0.getByLabel('운동 검색').fill('덤벨 벤치');
-  await dlg0.getByRole('button', { name: '덤벨 벤치프레스', exact: true }).click();
+  await dlg0.getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
   await expect(dlg0).toHaveCount(0);
   expect((await activeWorkout(page)).blocks.map((b) => b.items[0]!.exerciseId)).toEqual(['bench_press', 'db_bench_press', 'pull_up']); // 기록은 갈라져 있음
 
@@ -249,4 +249,82 @@ test('D-080 검토: 4세트 중 2세트 하고 ⇄ → 끝낼 때 "교체:" 로 
   await expect(pv.locator('.pv-row')).toHaveCount(2);
   await expect(pv.locator('.pv-row').first()).toContainText('덤벨 벤치프레스');
   await expect(pv.locator('.pv-row').first()).toContainText('4×');
+});
+
+test('D-080 검토 2차: 긴 루틴 미리보기에서 7번째 ⇄ → 고른 뒤 바뀐 줄·[되돌리기]가 화면 안, 초점은 그 줄 ⇄, 되돌리면 옛 줄 ⇄ 와 수정 시각 그대로', async ({ page }) => {
+  const ids = ['pull_up', 'chin_up', 'plank', 'incline_db_press', 'deadlift', 'lat_pulldown', 'bench_press', 'leg_press'];
+  await idbPut(page, 'routines', [routine('r8', '긴 루틴', ids.map((x) => one(x, 3)))]);
+  await page.goto('./#/routines');
+  await page.reload();
+  const before = (await routines(page)).find((r) => r.id === 'r8')!.updatedAt;
+  await page.getByRole('group', { name: '루틴 긴 루틴' }).getByRole('button', { name: '긴 루틴 내용 보기' }).click();
+  const pv = page.getByRole('dialog', { name: '긴 루틴 내용' });
+  await expect(pv.locator('.pv-row')).toHaveCount(8);
+  await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
+  const pick = page.getByRole('dialog', { name: '운동 교체' });
+  await pick.getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
+  await expect(pv.locator('.pv-toast')).toBeVisible();
+  const swapped = pv.getByRole('button', { name: '덤벨 벤치프레스 바로 교체', exact: true });
+  await expect(swapped).toBeInViewport();
+  await expect(swapped).toBeFocused();
+  await expect(pv.getByRole('button', { name: '되돌리기' })).toBeInViewport();
+  await expect(pv.getByRole('status')).toHaveText('바벨 벤치프레스 → 덤벨 벤치프레스: 바꿨어요'); // 화면 읽기용 알림칸
+  await pv.getByRole('button', { name: '되돌리기' }).click();
+  const back = pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true });
+  await expect(back).toBeFocused();
+  await expect(back).toBeInViewport();
+  await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r8')!.blocks[6]!.items[0]!.exerciseId).toBe('bench_press');
+  expect((await routines(page)).find((r) => r.id === 'r8')!.updatedAt).toBe(before);
+  // 고르지 않고 닫으면 그 ⇄ 로 초점이 돌아감
+  await back.click();
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: '닫기' }).click();
+  await expect(back).toBeFocused();
+});
+
+test('D-080 검토 2차: 플랜 교체 → 새 운동 직접 추가 → 추가하면 그 자리에 반영, 추가 없이 닫으면 고르기 창이 다시 보임', async ({ page }) => {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await page.getByRole('button', { name: '등 선택 안 함' }).click();
+  await page.getByRole('dialog', { name: '등 우선순위' }).getByRole('button', { name: '완료' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const plan = page.getByRole('region', { name: '생성된 플랜' });
+  await expect(plan).toBeVisible();
+  await plan.getByRole('button', { name: '교체' }).first().click();
+  const pick = page.getByRole('dialog', { name: '운동 교체' });
+  await pick.getByRole('button', { name: /새 운동 직접 추가/ }).click();
+  const custom = page.getByRole('dialog', { name: '운동 직접 추가' });
+  await expect(custom).toBeVisible();
+  await expect(pick).toHaveCount(0); // 두 창이 겹치지 않음
+  await custom.getByRole('button', { name: '닫기' }).click();
+  await expect(pick).toBeVisible(); // 추가 없이 닫으면 다시 보임
+  await pick.getByRole('button', { name: /새 운동 직접 추가/ }).click();
+  await page.getByLabel('운동 이름').fill('교체용 로우 머신');
+  await page.getByRole('button', { name: '운동 추가하기', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(plan.locator('.card, section, div').filter({ hasText: '교체용 로우 머신' }).first()).toBeVisible();
+  await expect(plan.getByText('교체용 로우 머신', { exact: true })).toHaveCount(1);
+});
+
+test('D-080 검토 2차: 고르기 창 줄의 읽는 이름에 지난 기록, Tab 으로 비슷한 운동 줄에 닿고 Enter 로 고름', async ({ page }) => {
+  await idbPut(page, 'workouts', [past('p1', 2, 'smith_bench_press', 70, 6)]);
+  await idbPut(page, 'routines', [routine('r9', '키보드', [one('bench_press', 3), one('pull_up', 3)])]);
+  await page.goto('./#/routines');
+  await page.reload();
+  await page.getByRole('group', { name: '루틴 키보드' }).getByRole('button', { name: '키보드 내용 보기' }).click();
+  const pv = page.getByRole('dialog', { name: '키보드 내용' });
+  await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
+  const dlg = page.getByRole('dialog', { name: '운동 교체' });
+  const sim = dlg.getByRole('group', { name: '비슷한 운동' });
+  await expect(sim.getByRole('button', { name: /^스미스머신 벤치프레스 · 지난번 70kg×6/ })).toBeVisible();
+  await expect(sim.getByRole('button', { name: /^덤벨 벤치프레스 · 아직 안 해 봄/ })).toBeVisible();
+  const close = dlg.getByRole('button', { name: '닫기' });
+  await close.focus();
+  await page.keyboard.press('Tab'); // 검색칸
+  await page.keyboard.press('Tab'); // 첫 비슷한 운동 줄
+  const first = sim.getByRole('button').first();
+  await expect(first).toBeFocused();
+  const name = (await first.getAttribute('aria-label'))!.split(' · ')[0]!;
+  await page.keyboard.press('Enter');
+  await expect(dlg).toHaveCount(0);
+  await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r9')!.blocks[0]!.items[0]!.exerciseId).not.toBe('bench_press');
+  await expect(pv.locator('.pv-row').first()).toContainText(name);
 });

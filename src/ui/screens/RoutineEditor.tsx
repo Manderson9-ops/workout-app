@@ -26,7 +26,7 @@ const KIND_LABEL: Record<RoutineBlock['kind'], string> = { single: '일반', sup
 export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
   const r0 = s.routines.find((r) => r.id === id);
   const [r, setR] = useState<Routine | undefined>(r0);
-  const [picker, setPicker] = useState<{ b: number; i: number } | { add: Part | undefined } | null>(null);
+  const [picker, setPicker] = useState<{ b: number; i: number; direct?: boolean } | { add: Part | undefined } | null>(null);
   const [msg, setMsg] = useState('');
   const [open, setOpen] = useState<number | null>(null); // D-079 2차 3단계: 펼친 카드는 하나 (블록 번호)
   const [menu, setMenu] = useState<number | null>(null); // ⋯ 메뉴가 열린 카드
@@ -178,7 +178,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
                 <div class="row between">
                   <strong>{b.kind !== 'single' ? `${String.fromCharCode(65 + ii)}. ` : ''}{byId.get(it.exerciseId)?.name_ko ?? it.exerciseId}</strong>
                   {/* D-080: ⋯ 메뉴를 거치지 않고 바로 교체 */}
-                  <button class="icon-btn round rt-swap" aria-label={`${nameOf(it)} 바로 교체`} onClick={() => { setMenu(null); setPicker({ b: bi, i: ii }); }}><Icon name="swap" size={20} /></button>
+                  <button class="icon-btn round rt-swap" aria-label={`${nameOf(it)} 바로 교체`} aria-haspopup="dialog" onClick={() => { setMenu(null); setPicker({ b: bi, i: ii, direct: true }); }}><Icon name="swap" size={20} /></button>
                 </div>
                 <div class="row wrap" style={{ marginTop: '4px' }}>
                   <button aria-label={`${nameOf(it)} 세트 줄이기`} disabled={it.sets <= SETS_MIN} onClick={() => setItem(bi, ii, (y) => stepItemSets(y, -1))}>−</button>
@@ -240,7 +240,7 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
           from={'add' in picker ? undefined : r.blocks[picker.b]!.items[picker.i]!.exerciseId}
           startPart={'add' in picker ? picker.add : undefined}
           exclude={r.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
-          onClose={() => { if (!('add' in picker)) pendingFocus.current = moreLabel(r.blocks[picker.b]!); setPicker(null); }}
+          onClose={() => { if (!('add' in picker)) pendingFocus.current = picker.direct ? `${nameOf(r.blocks[picker.b]!.items[picker.i]!)} 바로 교체` : moreLabel(r.blocks[picker.b]!); setPicker(null); }}
           onPick={(e) => {
             if ('add' in picker) {
               setOpen(r.blocks.length); setMenu(null);

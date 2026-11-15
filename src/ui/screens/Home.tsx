@@ -101,7 +101,7 @@ function NextWorkoutCard({ s, pick, rec }: { s: AppState; pick: NextPick; rec: M
   const items = r.blocks.flatMap((b) => b.items);
   const parts = routineParts(r, (id): Part | undefined => byId.get(id)?.part);
   const pl = items.length ? paceLabelOf(s, r) : undefined;
-  const sw = useRoutineSwap(s);
+  const sw = useRoutineSwap(s, 'home');
   return (
     <Card title="다음 운동" testid="home-next">
       <div class="next-name">{r.name}</div>
@@ -112,8 +112,8 @@ function NextWorkoutCard({ s, pick, rec }: { s: AppState; pick: NextPick; rec: M
       {/* D-080: [시작]은 운동 줄 다음. [시간 맞추기]는 [시작] 아래 보조 자리 */}
       {pl && <PaceLine pl={pl} />}
       {/* D-080: 운동 전부를 줄로 펼쳐 보이고, 줄마다 ⇄ 로 바로 교체 */}
-      {items.length > 0 && <RoutineLines s={s} r={r} onSwap={(b, i) => sw.ask(r.id, b, i)} />}
-      {sw.picker}{sw.toast()}
+      {items.length > 0 && <RoutineLines s={s} r={r} ctx="home" onSwap={(b, i) => sw.ask(r.id, b, i)} />}
+      {sw.picker}{sw.toast()}{sw.live}
       {busyParts(rec, parts).length > 0 && (
         <p class="rec-note" role="note" data-testid="next-rec-note"><Icon name="info" size={18} /><span>회복 중으로 추정: {busyParts(rec, parts).map((x) => `${x.part}(약 ${x.remainingH}시간)`).join(', ')}. 가볍게 하거나 다른 부위를 먼저 해도 돼요</span></p>
       )}
