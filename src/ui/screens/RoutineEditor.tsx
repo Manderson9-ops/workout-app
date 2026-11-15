@@ -11,7 +11,7 @@ import { ExercisePicker, Labeled, MiniStepper, mmss } from '../components';
 import type { StepBtn } from '../components';
 import { PARTS } from '../../core/types';
 import type { Part } from '../../core/types';
-import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts, stepItemSets, stepItemReps } from '../../core/routineEdit';
+import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts, stepItemSets, stepItemReps, swapRoutineItem } from '../../core/routineEdit';
 import { startRoutine } from '../actions';
 import { go, editReturnTo } from '../nav';
 import { focusField } from '../formError';
@@ -175,7 +175,11 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
             )}
             {b.items.map((it, ii) => (
               <div key={ii} style={{ marginTop: '8px' }}>
-                <strong>{b.kind !== 'single' ? `${String.fromCharCode(65 + ii)}. ` : ''}{byId.get(it.exerciseId)?.name_ko ?? it.exerciseId}</strong>
+                <div class="row between">
+                  <strong>{b.kind !== 'single' ? `${String.fromCharCode(65 + ii)}. ` : ''}{byId.get(it.exerciseId)?.name_ko ?? it.exerciseId}</strong>
+                  {/* D-080: ⋯ 메뉴를 거치지 않고 바로 교체 */}
+                  <button class="icon-btn round rt-swap" aria-label={`${nameOf(it)} 바로 교체`} onClick={() => { setMenu(null); setPicker({ b: bi, i: ii }); }}><Icon name="swap" size={20} /></button>
+                </div>
                 <div class="row wrap" style={{ marginTop: '4px' }}>
                   <button aria-label={`${nameOf(it)} 세트 줄이기`} disabled={it.sets <= SETS_MIN} onClick={() => setItem(bi, ii, (y) => stepItemSets(y, -1))}>−</button>
                   <span>{it.sets}세트</span>
@@ -233,21 +237,22 @@ export function RoutineEditor({ s, id }: { s: AppState; id: string }) {
       {picker && (
         <ExercisePicker s={s} all={all} title={'add' in picker ? '운동 추가' : '운동 교체'}
           part={'add' in picker ? undefined : byId.get(r.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part}
+          from={'add' in picker ? undefined : r.blocks[picker.b]!.items[picker.i]!.exerciseId}
           startPart={'add' in picker ? picker.add : undefined}
           exclude={r.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => { if (!('add' in picker)) pendingFocus.current = moreLabel(r.blocks[picker.b]!); setPicker(null); }}
           onPick={(e) => {
-            const reps = e.measure === 'time' ? 0 : targetReps(e);
-            const seconds = e.measure === 'time' ? e.default_seconds ?? 30 : undefined;
             if ('add' in picker) {
               setOpen(r.blocks.length); setMenu(null);
+              const reps = e.measure === 'time' ? 0 : targetReps(e);
+              const seconds = e.measure === 'time' ? e.default_seconds ?? 30 : undefined;
               setR({ ...r, blocks: [...r.blocks, { kind: 'single', items: [{ exerciseId: e.id, sets: 3, reps, ...(seconds ? { seconds } : {}) }], restSec: restFor(e.id), roundRestSec: rest.round, transitionSec: rest.transition }] });
               pendingFocus.current = `${e.name_ko} 세트 늘리기`;
               say(`${e.name_ko}: 추가했어요`);
             } else {
               setOpen(picker.b);
               const oldName = nameOf(r.blocks[picker.b]!.items[picker.i]!);
-              setItem(picker.b, picker.i, (y) => ({ exerciseId: e.id, sets: y.sets, reps, ...(seconds ? { seconds } : {}) }));
+              setR(swapRoutineItem(r, picker.b, picker.i, e));
               pendingFocus.current = `${e.name_ko} 세트 늘리기`;
               say(`${oldName} → ${e.name_ko}: 바꿨어요`);
             }

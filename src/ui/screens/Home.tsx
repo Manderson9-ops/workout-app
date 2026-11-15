@@ -29,6 +29,7 @@ import { ScreenHeader } from '../header';
 import { go, setEditReturn } from '../nav';
 import { paceLabelOf, setFitOnOpen } from '../pace';
 import { PaceLine } from './FitSheet';
+import { RoutineLines, useRoutineSwap } from './RoutinePreview';
 import { askChoice } from '../confirm';
 import { syncEnabled } from '../sync';
 import { headerDateText } from '../../core/dateText';
@@ -100,6 +101,7 @@ function NextWorkoutCard({ s, pick, rec }: { s: AppState; pick: NextPick; rec: M
   const items = r.blocks.flatMap((b) => b.items);
   const parts = routineParts(r, (id): Part | undefined => byId.get(id)?.part);
   const pl = items.length ? paceLabelOf(s, r) : undefined;
+  const sw = useRoutineSwap(s);
   return (
     <Card title="다음 운동" testid="home-next">
       <div class="next-name">{r.name}</div>
@@ -114,6 +116,9 @@ function NextWorkoutCard({ s, pick, rec }: { s: AppState; pick: NextPick; rec: M
       )}
       <button class="primary big" onClick={() => startRoutine(s, r)} aria-label={`다음 운동으로 시작: ${r.name}`}><Icon name="play" size={20} />시작</button>
       {pl && pl.cut > 0 && <button class="ghost next-fit" aria-label={`${r.name} 내 시간에 맞추기`} onClick={() => { setFitOnOpen(r.id); setEditReturn('#/'); go(`#/routine/${encodeURIComponent(r.id)}`); }}>시간 맞추기</button>}
+      {/* D-080: 운동 전부를 줄로 펼쳐 보이고, 줄마다 ⇄ 로 바로 교체 */}
+      {items.length > 0 && <RoutineLines s={s} r={r} onSwap={(b, i) => sw.ask(r.id, b, i)} />}
+      {sw.picker}{sw.toast()}
     </Card>
   );
 }

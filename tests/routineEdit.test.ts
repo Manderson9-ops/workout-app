@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts, stepItemReps } from '../src/core/routineEdit';
+import { bulkRoutineSets, bulkRoutineReps, routineChangedCount, routineParts, stepItemReps, swapRoutineItem } from '../src/core/routineEdit';
 import { rangeText } from '../src/core/planEdit';
 import type { Routine, RoutineBlock, RoutineItem } from '../src/core/session';
 import type { Part } from '../src/core/types';
@@ -83,5 +83,26 @@ describe('routineEdit (D-052)', () => {
   it('rangeText가 루틴 항목에도 쓰임', () => {
     expect(rangeText(r.blocks.flatMap((b) => b.items), 'sets')).toBe('3~4세트');
     expect(rangeText(r.blocks.flatMap((b) => b.items), 'reps')).toBe('10~12회');
+  });
+});
+
+describe('swapRoutineItem (D-080)', () => {
+  const r = routine([blk([it_('a', { sets: 4 }), it_('b', { sets: 5, reps: 12 })]), blk([it_('c')])]);
+  const e = (id: string, o: Record<string, unknown> = {}) => ({ id, name_ko: id, family: id, part: '가슴', muscles: ['pec'], pattern: 'H_PUSH', mechanics: 'compound', equipment: ['barbell'], ...o }) as never;
+  it('세트 수는 유지하고 횟수는 새 운동 기본값 (compound 6~10 → 8)', () => {
+    const n = swapRoutineItem(r, 0, 1, e('x'));
+    expect(n.blocks[0]!.items.map((i) => i.exerciseId)).toEqual(['a', 'x']);
+    expect(n.blocks[0]!.items[1]).toEqual({ exerciseId: 'x', sets: 5, reps: 8 });
+    expect(r.blocks[0]!.items[1]!.exerciseId).toBe('b'); // 원본은 그대로
+    expect(n.blocks[1]).toBe(r.blocks[1]);
+  });
+  it('시간 운동은 기본 초(없으면 30), 횟수 0', () => {
+    expect(swapRoutineItem(r, 1, 0, e('p', { measure: 'time', default_seconds: 45 })).blocks[1]!.items[0]).toEqual({ exerciseId: 'p', sets: 3, reps: 0, seconds: 45 });
+    expect(swapRoutineItem(r, 1, 0, e('p', { measure: 'time' })).blocks[1]!.items[0]!.seconds).toBe(30);
+  });
+  it('자리가 없거나 같은 운동이면 같은 객체', () => {
+    expect(swapRoutineItem(r, 5, 0, e('x'))).toBe(r);
+    expect(swapRoutineItem(r, 0, 9, e('x'))).toBe(r);
+    expect(swapRoutineItem(r, 0, 0, e('a'))).toBe(r);
   });
 });

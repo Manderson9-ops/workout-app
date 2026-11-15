@@ -253,6 +253,38 @@ export function replaceItem(w: Workout, block: number, item: number, exerciseId:
     };
   });
 }
+/**
+ * D-080 운동 중 바로 교체. 완료 세트가 없으면 replaceItem 과 같다. 완료 세트가 있으면 원래 운동은 완료 세트만 남기고
+ * (target.sets = 완료 수), 안 한 작업 세트 수만큼 새 운동을 같은 휴식의 단일 블록으로 바로 다음에 넣는다.
+ * 묶음 안에 새 운동을 넣으면 roundOf 가 작업 세트 순번이라 라운드가 어긋나고 같은 운동 두 번은 금지(D-037)라서 묶음 다음에 따로 둔다.
+ * 이미 운동에 있는 운동(자기 자신 포함)으로는 바꾸지 않는다 (같은 운동 두 번 금지)
+ */
+export function swapItem(w: Workout, block: number, item: number, exerciseId: string, history: Workout[]): Workout {
+  const b = w.blocks[block], it = b?.items[item];
+  if (!b || !it) return w;
+  if (w.blocks.some((x) => x.items.some((y) => y.exerciseId === exerciseId))) return w;
+  const done = it.sets.filter((s) => s.done);
+  if (!done.length) return replaceItem(w, block, item, exerciseId, history);
+  const prev = lastSets(history, exerciseId);
+  // 남은 작업 세트가 없어도 새 운동은 1세트 (빈 운동 칸을 만들지 않음)
+  const left = Math.max(1, it.sets.filter((s) => !s.done && !s.warmup).length);
+  const fresh: WorkoutItem = {
+    exerciseId, target: { ...it.target, sets: left },
+    sets: preMarkWarmup(Array.from({ length: left }, (_, k) => {
+      const p = prev[Math.min(k, prev.length - 1)];
+      return { warmup: false, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(it.target.seconds !== undefined ? { seconds: it.target.seconds } : { reps: p?.reps ?? it.target.reps }) };
+    }), prev),
+  };
+  const kept: WorkoutItem = { ...it, target: { ...it.target, sets: done.length }, sets: done };
+  const blocks = w.blocks.map((x, bi) => (bi === block ? { ...x, items: x.items.map((y, ii) => (ii === item ? kept : y)) } : x));
+  blocks.splice(block + 1, 0, { kind: 'single', items: [fresh], restSec: b.restSec, roundRestSec: b.roundRestSec, transitionSec: b.transitionSec });
+  return { ...w, blocks };
+}
+/** swapItem 이 새 운동을 묶음 밖으로 따로 빼는 경우인가 (화면에 "묶음 다음에 따로 해요" 알림용) */
+export function swapSplitsGroup(w: Workout, block: number, item: number): boolean {
+  const it = w.blocks[block]?.items[item];
+  return !!it && w.blocks[block]!.kind !== 'single' && it.sets.some((s) => s.done);
+}
 export function appendExercise(w: Workout, exerciseId: string, sets: number, reps: number, restSec: number, history: Workout[], seconds?: number): Workout {
   const prev = lastSets(history, exerciseId);
   const item: WorkoutItem = {

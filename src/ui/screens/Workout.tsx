@@ -4,7 +4,7 @@ import { activeOf, historyOf, flushPending, getState } from '../store';
 import { catalog } from '../catalog';
 import type { Workout, Step, SetLog } from '../../core/session';
 import {
-  currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, setWorkoutMemo, addSet, removeSet, skipItem, replaceItem, appendExercise, moveWorkoutBlock,
+  currentStep, completeSet, undoSet, updateSet, stepSet, setItemMemo, setWorkoutMemo, addSet, removeSet, skipItem, swapItem, swapSplitsGroup, appendExercise, moveWorkoutBlock,
   adjustTimer, clearTimer, timerRemaining, progress, restAfter, completeRound, roundSteps, isGroup, roundOf,
 } from '../../core/session';
 import { isAutoWarmup, WARMUP_RULE } from '../../core/warmupGuess';
@@ -46,6 +46,9 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const [open, setOpen] = useState<number | null>(null);
   const [picker, setPicker] = useState<{ mode: 'swap'; b: number; i: number } | { mode: 'add' } | null>(null);
   const [ended, setEnded] = useState(false);
+  /** 교체 뒤 한 줄 알림 (묶음 다음에 따로 해요), 6초 뒤 사라짐 */
+  const [swapNote, setSwapNote] = useState<string | null>(null);
+  useEffect(() => { if (!swapNote) return; const t = setTimeout(() => setSwapNote(null), 6000); return () => clearTimeout(t); }, [swapNote]);
   const [plate, setPlate] = useState<number | null>(null);
   /** 펼친 세트 줄 (번호를 누르면 RIR·메모). 키 = "블록-운동-세트" */
   const [detail, setDetailKey] = useState<string | null>(null);
@@ -245,6 +248,10 @@ export function WorkoutScreen({ s }: { s: AppState }) {
   const menuBtn = (bi: number, ii: number) => (
     <button class="icon-btn round wk-more" aria-label={`${nameOf(w.blocks[bi]!.items[ii]!.exerciseId)} 메뉴`} aria-haspopup="dialog" onClick={() => setMenu({ b: bi, i: ii })}><Icon name="more" /></button>
   );
+  /** D-080: ⋯ 메뉴를 거치지 않는 바로 교체 */
+  const swapBtn = (bi: number, ii: number) => (
+    <button class="icon-btn round wk-swap" aria-label={`${nameOf(w.blocks[bi]!.items[ii]!.exerciseId)} 바로 교체`} onClick={() => setPicker({ mode: 'swap', b: bi, i: ii })}><Icon name="swap" size={20} /></button>
+  );
   const infoLink = (exId: string) => {
     const ex = byId.get(exId);
     return hasDbInfo(ex)
@@ -290,6 +297,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
                 {g && <GradeBadge g={g} prefix />}
                 {it.skipped && <span class="pill">건너뜀</span>}
                 {infoLink(it.exerciseId)}
+                {swapBtn(bi, ii)}
                 {menuBtn(bi, ii)}
               </div>
               {it.skipped && <button class="tonal" onClick={() => upd((cw) => skipItem(cw, bi, ii, false))}>되살리기</button>}
@@ -381,6 +389,7 @@ export function WorkoutScreen({ s }: { s: AppState }) {
                 </div>
                 <Icon name="chevron" size={18} class={`wk-chev${isOpen ? ' open' : ''}`} />
               </div>
+              {single && swapBtn(bi, 0)}
               {single && menuBtn(bi, 0)}
             </div>
             {isOpen && !single && groupBody(bi)}
@@ -424,6 +433,12 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       {/* 아래 도크 하나 (D-055 2단계): 휴식 중 = [고리·남은 시간·다음] [−15] [+15] [건너뛰기] [✓ 현재 세트 완료], 아닐 때 = 넓은 완료 버튼 한 줄 */}
       <div class={`timer dock${w.timer && rem === 0 ? ' end flash' : ''}`} role="timer" aria-live="polite">
         {finishErr && <div class="finish-err row between" style={{ alignItems: 'flex-start' }}><p role="alert" class="err-line"><Icon name="alert" size={18} />{finishErr}</p><button class="ghost icon-btn" aria-label="알림 닫기" onClick={() => setFinishError(null)}><Icon name="close" size={18} /></button></div>}
+        {swapNote && (
+          <div class="rest-hint" role="status">
+            <Icon name="info" size={18} /><span class="grow">{swapNote}</span>
+            <button class="ghost icon-btn" aria-label="알림 닫기" onClick={() => setSwapNote(null)}><Icon name="close" size={18} /></button>
+          </div>
+        )}
         {timerOn && w.timer && hintFor === w.timer.startedAt && (
           <div class="rest-hint" role="note" aria-label="휴식 알림 안내">
             <Icon name="info" size={18} /><span class="grow">{restHintText(hapticOn(), hapticMethod())}</span>
@@ -466,11 +481,19 @@ export function WorkoutScreen({ s }: { s: AppState }) {
       {menu && menuItem && <MenuSheet title={nameOf(menuItem.exerciseId)} items={itemMenu(menu.b, menu.i)} onClose={() => setMenu(null)} />}
       {picker && (
         <ExercisePicker s={s} all={all} title={picker.mode === 'swap' ? '운동 교체' : '운동 추가'}
+          from={picker.mode === 'swap' ? w.blocks[picker.b]!.items[picker.i]!.exerciseId : undefined}
           part={picker.mode === 'swap' ? byId.get(w.blocks[picker.b]!.items[picker.i]!.exerciseId)?.part : undefined}
           exclude={w.blocks.flatMap((b) => b.items.map((it) => it.exerciseId))} /* 같은 운동 두 번 불가: 동기화·늦은 기록이 운동 이름으로 짝지음 (D-037) */
           onClose={() => setPicker(null)}
           onPick={(e) => {
-            if (picker.mode === 'swap') upd((cw) => replaceItem(cw, picker.b, picker.i, e.id, history));
+            if (picker.mode === 'swap') {
+              // 완료 세트는 남기고 안 한 세트만 새 운동으로 (묶음이면 묶음 다음에 따로). 새 카드를 열어 보여 줌
+              const { b, i } = picker;
+              const hadDone = w.blocks[b]!.items[i]!.sets.some((x) => x.done);
+              if (swapSplitsGroup(w, b, i)) setSwapNote('묶음 다음에 따로 해요');
+              if (hadDone) setOpen(b + 1);
+              void upd((cw) => swapItem(cw, b, i, e.id, history));
+            }
             else upd((cw) => appendExercise(cw, e.id, 3, e.measure === 'time' ? 0 : targetReps(e), e.mechanics === 'compound' ? s.settings.rest.compound : s.settings.rest.isolation, history, e.measure === 'time' ? e.default_seconds ?? 30 : undefined));
             setPicker(null);
           }} />

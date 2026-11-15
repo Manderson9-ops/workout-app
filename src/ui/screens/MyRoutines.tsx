@@ -25,6 +25,7 @@ import { fullText, dateText } from '../../core/dateText';
 import { duplicateNames } from '../../core/routineFit';
 import { paceLabelOf, setFitOnOpen } from '../pace';
 import { PaceLine } from './FitSheet';
+import { RoutinePreview } from './RoutinePreview';
 
 const SORT_KEY = 'routines.sort';
 const SORT_LABEL: Record<RoutineSort, string> = { recent: '최근 한 순', name: '이름 순', short: '짧은 시간 순' };
@@ -84,6 +85,8 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
   };
 
   const [menu, setMenu] = useState<Routine | null>(null);
+  /** D-080: 내용 보기 창을 연 루틴 */
+  const [preview, setPreview] = useState<string | null>(null);
   const edit = (r: Routine) => { setEditReturn(mode === 'pick' ? '#/workout' : '#/'); go(`#/routine/${encodeURIComponent(r.id)}`); };
   /** 카드의 [맞추기]: 편집 화면을 열며 맞추기 창을 바로 (D-067) */
   const fitFrom = (r: Routine) => { setFitOnOpen(r.id); edit(r); };
@@ -110,9 +113,10 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
     return (
       <div class={`card routine-card${isHidden ? ' is-hidden' : ''}`} key={r.id} role="group" aria-label={`루틴 ${r.name}`}>
         <div class="row between" style={{ alignItems: 'flex-start' }}>
-          <div class="grow">
+          <div class="grow card-open-wrap">
             <h3 class="routine-name">{r.name}</h3>{r.id === nextId && <span class="status-pill acc next-tag">다음 운동</span>}
             <div class="row wrap routine-parts">{parts.map((p) => <span key={p} class="tag">{p}</span>)}</div>
+            {!isHidden && <button class="card-open" aria-label={`${r.name} 내용 보기`} aria-haspopup="dialog" onClick={() => setPreview(r.id)} />}
           </div>
           <div class="routine-when sub small" role="note" aria-label={u ? `마지막으로 한 날 ${when}, 총 ${u.count}회` : '아직 안 한 루틴'}
             title={u?.lastAt ? fullText(u.lastAt) : undefined}>
@@ -122,7 +126,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
         {/* D-067 남은 일: 내 속도 예상이 있으면 앱 기본 예상(약 N분)은 빼고 내 예상만. 홈에서는 "다음 운동" 카드에 이미 나온 루틴은 줄을 다시 안 보임 (한 루틴에 한 번) */}
         <div class="sub small" style={{ marginTop: '4px' }}>{items.length ? `운동 ${items.length}개${r.estimatedSec && !pl ? ` · 약 ${minutes(r.estimatedSec)}` : ''}` : '아직 운동이 없어요'}</div>
         {pl && !(mode === 'home' && r.id === nextId) && <PaceLine pl={pl} name={r.name} onFit={() => fitFrom(r)} />}
-        {items.length > 0 && <div class="pill routine-preview">{items.slice(0, 4).map((i) => nameOf(i.exerciseId)).join(', ')}{items.length > 4 ? ` 외 ${items.length - 4}개` : ''}</div>}
+        {items.length > 0 && <div class={`pill routine-preview${isHidden ? "" : " tap"}`} onClick={isHidden ? undefined : () => setPreview(r.id)}>{items.slice(0, 4).map((i) => nameOf(i.exerciseId)).join(', ')}{items.length > 4 ? ` 외 ${items.length - 4}개` : ''}</div>}
         <div class="row" style={{ marginTop: '10px' }}>
           {isHidden ? <>
             <button class="grow" onClick={async () => { await setRoutineHidden(r.id, false); setToast({ text: `「${r.name}」 루틴을 다시 보이게 했어요` }); }} aria-label={`${r.name} 다시 보이기`}>다시 보이기</button>
@@ -201,6 +205,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
           </div>
         </Sheet>
       )}
+      {preview && <RoutinePreview s={s} rid={preview} onClose={() => setPreview(null)} onStart={(r) => void startRoutine(s, r)} onEdit={edit} />}
       {menu && <MenuSheet title={menu.name} onClose={() => setMenu(null)} items={[
         { label: '편집', aria: `${menu.name} 편집`, run: () => edit(menu) },
         { label: '지우기…', aria: `${menu.name} 지우기`, danger: true, run: () => void remove(menu) },

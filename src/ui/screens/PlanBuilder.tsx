@@ -670,7 +670,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
       )}
 
       {picker && plan && (
-        <ExercisePicker s={s} all={all} part={plan.blocks[picker.b]!.items[picker.i]!.part} title="운동 교체"
+        <ExercisePicker s={s} all={all} part={plan.blocks[picker.b]!.items[picker.i]!.part} from={plan.blocks[picker.b]!.items[picker.i]!.exerciseId} title="운동 교체"
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setPicker(null)}
           onAddCustom={() => setAddCustomOpen(true)}

@@ -1,12 +1,13 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'preact/hooks';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'preact/hooks';
 import { Icon } from './icons';
-import { registerPending, flushKey, flushValue } from './store';
+import { registerPending, flushKey, flushValue, historyOf } from './store';
 import type { ComponentChildren } from 'preact';
 import type { BuiltExercise, Part } from '../core/types';
 import { PARTS, EQUIPMENT_LABEL } from '../core/types';
 import type { ResolvedGrade } from '../core/exercises';
 import { resolveGrade, eligibleParts, equipmentAvailable } from '../core/exercises';
 import { matchesQuery } from '../core/search';
+import { lastRecordMap, lastLineText, similarExercises } from '../core/similar';
 import { GRADES } from '../core/version';
 import type { AppState } from './store';
 import { lsGet, lsSet, lsRemove } from './appName';
@@ -211,8 +212,10 @@ export function Empty({ title, text = '아직 기록 없음', hint, children, la
 }
 
 /** 운동 고르기 (교체·추가). part가 있으면 그 부위 후보를 등급 순으로 먼저 */
-export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctxIn, onPick, onClose, title, onAddCustom }: {
+export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctxIn, onPick, onClose, title, onAddCustom, from }: {
   s: AppState; all: BuiltExercise[]; part?: Part; exclude?: string[];
+  /** D-080: 바꿀 운동 id. 있고 검색어가 비면 목록 위에 "비슷한 운동" (최대 5개) */
+  from?: string;
   /** D-052: 추가 모드에서 이 부위로 시작 (기억된 부위는 건드리지 않음. 칩을 누르면 평소처럼 기억) */
   startPart?: Part;
   /** 지금 들어 있는 부위 (플랜은 항목의 실제 부위를 넘김). 없으면 빼기 목록 운동의 기본 부위 */
@@ -248,6 +251,20 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
     .map((e) => ({ e, g: resolveGrade(e, widened ? e.part : (p ?? e.part), level, undefined, s.meta.get(e.id)?.userGrade) }))
     .sort((a, b) => GRADES.indexOf(a.g.value) - GRADES.indexOf(b.g.value) || (a.g.estimated ? 1 : 0) - (b.g.estimated ? 1 : 0) || a.e.name_ko.localeCompare(b.e.name_ko))
     .slice(0, 60);
+  // D-080: 비슷한 운동(검색 중에는 숨김)은 아래 전체 목록에서 빼서 같은 운동이 두 줄로 나오지 않게 함
+  const last = useMemo(() => lastRecordMap(historyOf(s)), [s.workouts]);
+  const similar = from && !q.trim()
+    ? similarExercises(from, all, { exclude, excluded: (id) => !!s.meta.get(id)?.excluded, available: (e) => equipmentAvailable(e, s.settings.equipment), last, gradeRank: (e) => GRADES.indexOf(resolveGrade(e, e.part, level, undefined, s.meta.get(e.id)?.userGrade).value) })
+    : [];
+  const simIds = new Set(similar.map((e) => e.id));
+  const rest = list.filter(({ e }) => !simIds.has(e.id));
+  const nowMs = Date.now();
+  const row = (e: BuiltExercise, g: Pick<ResolvedGrade, 'value' | 'source' | 'estimated'>) => (
+    <div class="list-item" key={e.id} onClick={() => onPick(e)} role="button" aria-label={e.name_ko}>
+      <GradeBadge g={g} />
+      <div class="grow"><div>{e.name_ko}</div><div class="pill">{e.part} · {e.equipment.map((q2) => EQUIPMENT_LABEL[q2]).join(', ')}</div><div class="pill last-line">{lastLineText(last.get(e.id), nowMs)}</div></div>
+    </div>
+  );
   return (
     <Sheet onClose={onClose} title={title}>
       <input placeholder="검색 (초성 가능: ㄹㅍㄷ)" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} aria-label="운동 검색" />
@@ -265,13 +282,14 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
         {PARTS.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} aria-pressed={p === x} onClick={() => setP(x)}>{x}</button>)}
       </div>
       {widened && <p class="sub small" role="status">{p}에는 "{q.trim()}" 운동이 없어 모든 부위에서 찾았어요</p>}
-      {list.map(({ e, g }) => (
-        <div class="list-item" key={e.id} onClick={() => onPick(e)} role="button" aria-label={e.name_ko}>
-          <GradeBadge g={g} />
-          <div class="grow"><div>{e.name_ko}</div><div class="pill">{e.part} · {e.equipment.map((q2) => EQUIPMENT_LABEL[q2]).join(', ')}</div></div>
+      {similar.length > 0 && (
+        <div role="group" aria-label="비슷한 운동" class="similar-grp">
+          <div class="sub small similar-cap" aria-hidden="true">비슷한 운동</div>
+          {similar.map((e) => row(e, resolveGrade(e, e.part, level, undefined, s.meta.get(e.id)?.userGrade)))}
         </div>
-      ))}
-      {!list.length && <div class="empty">조건에 맞는 운동이 없어요</div>}
+      )}
+      {rest.map(({ e, g }) => row(e, g))}
+      {!list.length && !similar.length && <div class="empty">조건에 맞는 운동이 없어요</div>}
     </Sheet>
   );
 }

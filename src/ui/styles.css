@@ -868,3 +868,23 @@ button.danger:active { background: var(--bad-soft); border-color: transparent; }
 .tip-conflict { margin: 2px 0; }
 /* 보러 가기: 좁은 폰(480px 이하)에서는 제목 줄 옆에 띄우면 날짜·'지금' 칩과 겹침(320px 실측) → 글 아래 흐름 안에 둠 */
 @media (max-width: 480px) { .cl-item[open] > .wn-go { position: static; margin: 8px 16px 12px; } }
+/* D-080: 비슷한 운동 구역·지난 기록 줄, 루틴 미리보기 줄, 카드 누르기 영역 */
+.similar-grp { margin: 4px 0 8px; padding: 2px 0 2px 8px; border-left: 3px solid var(--acc); }
+.similar-cap { font-weight: 700; padding: 2px 0 0; }
+.list-item .last-line { color: var(--acc-text); }
+.pv-lines { display: flex; flex-direction: column; gap: 10px; }
+.pv-block { padding: 8px 0 6px; border-bottom: 1px solid var(--line); }
+.pv-block:last-child { border-bottom: 0; }
+.pv-row { display: flex; align-items: center; gap: 8px; min-height: 56px; }
+.pv-name { font-weight: 600; overflow-wrap: anywhere; }
+.pv-swap { flex: none; }
+.pv-rest { margin-top: 2px; }
+.pv-toast { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; background: var(--card3); border-radius: var(--r-btn); padding: 6px 8px 6px 16px; }
+.pv-toast .ghost { color: var(--acc-text); font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+/* 루틴 카드: 이름·부위 영역 전체를 누르는 버튼 (제목 글자는 그대로 두고 그 위에 투명하게 덮음) */
+.card-open-wrap { position: relative; min-height: 44px; }
+button.card-open { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 44px; padding: 0; border: 0; background: transparent; border-radius: var(--r-btn); }
+button.card-open:active { background: var(--card2); opacity: .5; }
+.routine-preview.tap { cursor: pointer; }
+.wk-swap { flex: none; }
+.rt-swap { flex: none; }
