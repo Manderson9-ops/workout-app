@@ -16,6 +16,8 @@ export interface SwapWindow<T> {
   text: string;
   /** 화면 읽기 알림 문장 (운동 이름 포함) */
   say: string;
+  /** 처음 모습으로 돌아옴(0칸): 저장은 snap 을 그대로 다시 저장 */
+  restore: boolean;
 }
 
 /** 처음 모습(snap)과 지금(cur)을 같은 자리끼리 견줘 운동이 다른 칸들 */
@@ -37,10 +39,10 @@ export function nextSwapWindow<T extends RoutineLike>(prev: SwapWindow<T> | null
   const pair = (r: { from: string; to: string }) => `${nameOf(r.from)} → ${nameOf(r.to)}`;
   const first = rows[0];
   const firstName = first ? nameOf(first.from) : same ? prev.firstName : '';
-  if (count === 0) return { rid, snap, count, firstName, text: '원래대로예요', say: '원래대로예요' };
-  if (count === 1) { const t = `${pair(first!)}: 바꿨어요`; return { rid, snap, count, firstName, text: t, say: t }; }
+  if (count === 0) return { rid, snap, count, firstName, text: '원래대로예요', say: '원래대로예요', restore: true };
+  if (count === 1) { const t = `${pair(first!)}: 바꿨어요`; return { rid, snap, count, firstName, text: t, say: t, restore: false }; }
   const shown = rows.slice(0, 3).map(pair).join(', ');
-  return { rid, snap, count, firstName, text: `${count}개 바꿨어요`, say: `${count}개 바꿨어요: ${shown}${count > 3 ? ` 외 ${count - 3}개` : ''}` };
+  return { rid, snap, count, firstName, text: `${count}개 바꿨어요`, say: `${count}개 바꿨어요: ${shown}${count > 3 ? ` 외 ${count - 3}개` : ''}`, restore: false };
 }
 
 /** 알림 타이머를 멈추는 이유: 키보드 초점이 알림 안에 있음 / 포인터가 알림 위에 있거나 누르는 중 (WCAG 2.2.1) */

@@ -41,6 +41,16 @@ describe('D-080 6차: 되돌리기 창 (처음 모습과 견줘 바뀐 칸 수)'
     expect(w2).toMatchObject({ rid: 'x', count: 1, firstName: 'B', text: 'B → D: 바꿨어요' });
     expect(w2.snap.at).toBe('u0');
   });
+  it('7차: 돌아오면 restore 표시 (A → B → A, 다른 측정 단위여도 id 만 견줌), A → B 는 1칸이고 restore 아님', () => {
+    const w1 = nextSwapWindow<R>(null, 'r', rt('t0', 'plank', 'b'), rt('t1', 'x', 'b'), nm);
+    expect(w1).toMatchObject({ count: 1, restore: false });
+    const w2 = nextSwapWindow(w1, 'r', rt('t1', 'x', 'b'), rt('t2', 'plank', 'b'), nm);
+    expect(w2).toMatchObject({ count: 0, restore: true, text: '원래대로예요' });
+    expect(w2.snap.at).toBe('t0');
+    const s1 = nextSwapWindow<R>(null, 'r', rt('t0', 'a', 'b'), rt('t1', 'c', 'b'), nm);
+    expect(nextSwapWindow(s1, 'r', rt('t1', 'c', 'b'), rt('t2', 'a', 'b'), nm).restore).toBe(true);
+    expect(nextSwapWindow(s1, 'r', rt('t1', 'c', 'b'), rt('t2', 'd', 'b'), nm).restore).toBe(false);
+  });
   it('changedRows: 자리가 없어진 칸은 건너뜀', () => {
     expect(changedRows(rt('a', 'a', 'b'), rt('b', 'a'))).toEqual([]);
   });

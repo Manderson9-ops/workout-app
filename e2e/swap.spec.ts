@@ -46,6 +46,8 @@ const idbAll = (page: Page, store: string) => page.evaluate(async (s) => {
 type R = { id: string; name: string; updatedAt: string; blocks: { kind: string; items: { exerciseId: string; sets: number }[] }[] };
 type W = { id: string; endedAt?: string; blocks: { kind: string; restSec: number; items: { exerciseId: string; target: { sets: number }; sets: { done: boolean }[] }[] }[] };
 const routines = async (page: Page) => (await idbAll(page, 'routines')) as unknown as R[];
+/** 저장소가 쓸 때마다 붙이는 동기화 표(_s)를 뺀 루틴 (내용 견주기용) */
+const content = (r: unknown) => { const { _s: _drop, ...rest } = (r ?? {}) as Record<string, unknown>; return rest; };
 const activeWorkout = async (page: Page) => ((await idbAll(page, 'workouts')) as unknown as W[]).find((w) => !w.endedAt)!;
 
 const one = (exerciseId: string, sets: number) => ({ kind: 'single', items: [{ exerciseId, sets, reps: 10 }], restSec: 90, roundRestSec: 120, transitionSec: 10 });
@@ -595,12 +597,36 @@ test('D-080 6차: 같은 줄을 A → B → A 로 되돌려 놓으면 "원래대
   await page.reload();
   await page.getByRole('group', { name: '루틴 원래대로' }).getByRole('button', { name: '원래대로 내용 보기' }).click();
   const pv = page.getByRole('dialog', { name: '원래대로 내용' });
+  const before16 = (await routines(page)).find((r) => r.id === 'r16');
   await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
   await pickByName(page, '덤벨 벤치프레스');
   await pv.getByRole('button', { name: '덤벨 벤치프레스 바로 교체', exact: true }).click();
   await pickByName(page, '바벨 벤치프레스');
   await page.mouse.move(1, 1);
   await expect(pv.locator('.pv-toast')).toContainText('원래대로예요');
+  // 7차: 저장된 루틴도 바꾸기 전과 똑같음 (수정 시각 포함)
+  await expect.poll(async () => content((await routines(page)).find((r) => r.id === 'r16'))).toEqual(content(before16));
   await expect(pv.locator('.pv-toast').getByRole('button', { name: '되돌리기' })).toHaveCount(0);
   await expect(pv.getByRole('status')).toHaveText('원래대로예요');
+});
+
+test('D-080 7차: 시간 운동(플랭크 60초) → 횟수 운동 → 플랭크로 돌아오면 저장된 루틴이 처음과 똑같음 (60초·수정 시각)', async ({ page }) => {
+  await idbPut(page, 'routines', [routine('r17', '시간 원래대로', [one('bench_press', 3), { kind: 'single', items: [{ exerciseId: 'plank', sets: 3, reps: 0, seconds: 60 }], restSec: 90, roundRestSec: 120, transitionSec: 10 }])]);
+  await page.goto('./#/routines');
+  await page.reload();
+  const before = (await routines(page)).find((r) => r.id === 'r17');
+  await page.getByRole('group', { name: '루틴 시간 원래대로' }).getByRole('button', { name: '시간 원래대로 내용 보기' }).click();
+  const pv = page.getByRole('dialog', { name: '시간 원래대로 내용' });
+  await pv.getByRole('button', { name: '플랭크 바로 교체', exact: true }).click();
+  await pickByName(page, '데드버그');
+  await expect(pv.locator('.pv-toast')).toContainText('플랭크 → 데드버그');
+  const mid = (await routines(page)).find((r) => r.id === 'r17')!;
+  expect(mid.blocks[1]!.items[0], '횟수 운동으로 바뀐 중간 모습').not.toHaveProperty('seconds');
+  await pv.getByRole('button', { name: '데드버그 바로 교체', exact: true }).click();
+  await pickByName(page, '플랭크');
+  await page.mouse.move(1, 1);
+  await expect(pv.locator('.pv-toast')).toContainText('원래대로예요');
+  await expect(pv.locator('.pv-toast').getByRole('button', { name: '되돌리기' })).toHaveCount(0);
+  await expect.poll(async () => content((await routines(page)).find((r) => r.id === 'r17'))).toEqual(content(before));
+  expect((await routines(page)).find((r) => r.id === 'r17')!.blocks[1]!.items[0]).toMatchObject({ exerciseId: 'plank', seconds: 60 });
 });

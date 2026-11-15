@@ -72,7 +72,10 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
   // fallback = 새 줄이 그려지기 전까지 먼저 초점을 둘 줄 (교체를 시작한 줄). 저장이 실패하면 그 줄에 그대로 남음
   const [focus, setFocus] = useState<{ rid: string; name: string; scroll: boolean; fallback?: string } | null>(null);
   // 화면 읽기 알림 문장 (알림칸이 다시 그려져도 같은 문장이 남도록 알림 창 상태와 따로 쥠)
-  const [say, setSay] = useState('');
+  // n = 알릴 때마다 1씩 늘어, 앞과 같은 문장도 다시 읽히게 함
+  const [sayState, setSayState] = useState({ t: '', n: 0 });
+  const say = sayState.t;
+  const setSay = (t: string) => setSayState((p) => ({ t, n: p.n + 1 }));
   useEffect(() => {
     if (!focus || pick) return;
     const host = [...document.querySelectorAll<HTMLElement>('[data-rid][data-ctx]')].find((x) => x.dataset.rid === focus.rid && x.dataset.ctx === ctx && (ctx === 'home' || x.closest('.sheet')));
@@ -89,7 +92,7 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
   }, [focus, pick, s.routines]);
   // 줄을 못 찾으면 3초 뒤 포기
   useEffect(() => { if (!focus) return; const t = setTimeout(() => setFocus(null), 3000); return () => clearTimeout(t); }, [focus]);
-  useEffect(() => { if (!say) return; const t = setTimeout(() => setSay(''), 5000); return () => clearTimeout(t); }, [say]);
+  useEffect(() => { if (!sayState.t) return; const t = setTimeout(() => setSayState((p) => ({ t: '', n: p.n })), 5000); return () => clearTimeout(t); }, [sayState]);
   const all = catalog(s.custom);
   const byId = new Map(all.map((e) => [e.id, e]));
   const r = pick ? s.routines.find((x) => x.id === pick.rid) : undefined;
@@ -107,8 +110,9 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
         setFocus({ rid: r.id, name: e.name_ko, scroll: true, fallback: byId.get(oldId)?.name_ko ?? oldId });
         setPending(true);
         const next: Routine = { ...swapped, updatedAt: new Date().toISOString(), estimatedSec: routineEstimate(swapped, byId, s.settings.rest.between) + (r.warmupSec ?? 0) };
-        void mutate((d) => d.routines.put(next)).then(() => {
-          const w = nextSwapWindow(winRef.current, r.id, r, next, (id) => byId.get(id)?.name_ko ?? id);
+        const w = nextSwapWindow(winRef.current, r.id, r, next, (id) => byId.get(id)?.name_ko ?? id);
+        // 처음 모습으로 돌아왔으면 처음 루틴 객체를 그대로 저장 (횟수·시간·수정 시각까지 원래대로)
+        void mutate((d) => d.routines.put(w.restore ? w.snap : next)).then(() => {
           setWin(w);
           setSay(w.say);
         }).finally(() => setPending(false));
@@ -135,7 +139,7 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
     return inline ? box : <ToastPortal aboveBanner={!!activeOf(s)}>{box}</ToastPortal>;
   };
   /** 화면 읽기 알림칸 (MyRoutines 와 같은 방식). 미리보기 창은 고르기 동안 내려갔다 다시 떠서 알림칸이 새로 만들어지므로 조금 늦게 채움 */
-  const live = <LiveRegion text={say} delay={ctx === 'preview'} />;
+  const live = <LiveRegion text={say} seq={sayState.n} delay={ctx === 'preview'} />;
   return { ask: (rid: string, b: number, i: number) => setPick({ rid, b, i }), picker, busy: !!picker, hasToast: !!win || pending, toast: toastNode, live };
 }
 
@@ -143,15 +147,15 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
  * 화면 읽기 알림칸. delay = 새로 그려진 칸에 글자를 바로 넣으면 읽히지 않으므로 빈 칸으로 먼저 그리고 0.4초 뒤에 채움
  * (타이머는 하나, 글자가 바뀌거나 사라지면 정리)
  */
-function LiveRegion({ text, delay }: { text: string; delay: boolean }) {
+function LiveRegion({ text, seq, delay }: { text: string; seq: number; delay: boolean }) {
   const [shown, setShown] = useState(delay ? '' : text);
+  // 같은 문장이 다시 와도 seq 가 바뀌면 비웠다가 채워 다시 읽게 함
   useEffect(() => {
-    if (!delay) { setShown(text); return; }
     setShown('');
     if (!text) return;
-    const t = setTimeout(() => setShown(text), 400);
+    const t = setTimeout(() => setShown(text), delay ? 400 : 50);
     return () => clearTimeout(t);
-  }, [text, delay]);
+  }, [text, seq, delay]);
   return <span class="sr-only" role="status" aria-live="polite">{shown}</span>;
 }
 

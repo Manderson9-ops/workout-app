@@ -167,6 +167,18 @@ describe('D-080 검토 F1: 갈라 교체한 운동을 끝낼 때 교체로 접�
     expect(both(w)).toEqual([4, 4]);
   });
 
+  it('7차: 갈라 뒤 남긴 완료 세트를 지우면 그만큼 뺌 (4 → 3), 1 아래로는 안 내려감', () => {
+    const w0 = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n', [], REPS); // x 2 완료(splitWork 2) + n 2
+    const trim = (w: Workout, keep: number) => { const x = w.blocks[0]!.items[0]!; return { ...w, blocks: w.blocks.map((b, i) => (i === 0 ? { ...b, items: [{ ...x, sets: x.sets.slice(0, keep) }] } : b)) }; };
+    expect(both(trim(w0, 1))).toEqual([3, 3]);
+    expect(both(trim(w0, 0))).toEqual([3, 3]); // 칸이 비어도 원래 운동 몫은 1
+    expect(both(w0)).toEqual([4, 4]);
+    // 옛 기록(splitWork 없음)은 그대로
+    const { splitWork: _s, ...old } = trim(w0, 1).blocks[0]!.items[0]!;
+    const wo = { ...w0, blocks: w0.blocks.map((b, i) => (i === 0 ? { ...b, items: [old] } : b)) };
+    expect(both(wo)).toEqual([4, 4]);
+  });
+
   it('6차: 연쇄에서 가운데 운동에 더한 세트도 셈', () => {
     let w = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n1', [], REPS); // x 2 + n1 2
     w = swapItem(doneN(w, 1, 0, 1), 1, 0, 'n2', [], REPS); // n1 1 완료 + n2 1
