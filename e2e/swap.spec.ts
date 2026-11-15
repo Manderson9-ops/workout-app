@@ -351,7 +351,7 @@ test('D-080 검토 3차: 플랜 [운동 추가] → 새 운동 직접 추가 →
   await page.getByRole('button', { name: '운동 추가하기', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(plan.getByText('끝에 붙일 케이블 로우', { exact: true })).toHaveCount(1);
-  expect(await names()).toBeGreaterThanOrEqual(before);
+  expect(await names()).toBe(before + 1);
   const cards = plan.locator('.card');
   await expect(cards.last()).toContainText('끝에 붙일 케이블 로우');
   await expect(page.locator('[data-opener="add"]').filter({ visible: true }).first()).toBeFocused();
@@ -415,4 +415,19 @@ test('D-080 검토 3차: 홈 ⇄ → 고르기 → [되돌리기] 로 원래 운
   await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: '닫기' }).click();
   await expect(last).toBeFocused();
   expect(await page.evaluate(() => window.scrollY)).toBe(y0);
+});
+
+test('D-080 검토 4차: 미리보기에서 한 번 교체한 뒤 닫으면 초점은 그 루틴 카드의 내용 보기 버튼', async ({ page }) => {
+  await idbPut(page, 'routines', [routine('r9', '초점 루틴', [one('bench_press', 3), one('plank', 3)])]);
+  await page.goto('./#/routines');
+  await page.reload();
+  const open = page.getByRole('group', { name: '루틴 초점 루틴' }).getByRole('button', { name: '초점 루틴 내용 보기' });
+  await open.click();
+  const pv = page.getByRole('dialog', { name: '초점 루틴 내용' });
+  await pv.getByRole('button', { name: '바벨 벤치프레스 바로 교체', exact: true }).click();
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('group', { name: '비슷한 운동' }).getByRole('button', { name: /^덤벨 벤치프레스 · / }).click();
+  await expect(pv.locator('.pv-toast')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(pv).toHaveCount(0);
+  await expect(open).toBeFocused();
 });

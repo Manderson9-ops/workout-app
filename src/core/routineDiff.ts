@@ -4,6 +4,7 @@
  * 순서는 블록·운동 자리로 비교 (완료 시각 아님). 무게·횟수·세트 수만 바뀐 것은 묻지 않음 (Hevy 방식)
  */
 import type { Routine, RoutineBlock, RoutineItem, Workout, WorkoutBlock, WorkoutItem } from './session';
+import { isPreMarkedWarmup } from './session';
 
 export interface RoutineDiff {
   added: string[];
@@ -22,28 +23,33 @@ export interface FoldBlock { src: WorkoutBlock; items: FoldItem[] }
 
 /**
  * D-080 검토: 운동 중 ⇄ 로 갈라 둔 교체(새 운동 N.swappedFrom = 원래 운동 X)를 비교·반영용으로만 접는다 (운동 기록은 안 바꿈).
- * X 의 칸 K 가 운동에 남아 있으면 N 이 K 의 자리(블록·위치)를 차지하고 N 의 블록은 뺀다. 연쇄(X→N1→N2)는 더 접힐 게 없을 때까지 반복.
+ * N 이 X 의 자리(블록·위치)를 차지하고 N 의 블록은 뺀다. 연쇄(X→N1→N2)는 마지막 운동이 맨 앞 자리를 차지한다.
  * X 를 못 찾으면 N 은 그대로 둔다
  */
 export function foldSwaps(w: Workout): FoldBlock[] {
   const fb: FoldBlock[] = w.blocks.map((b) => ({ src: b, items: b.items.filter(present).map((it) => ({ it, sets: setCount(it), from: it.swappedFrom })) }));
-  for (let guard = 0; guard < 1000; guard++) {
-    let hit = false;
-    outer: for (const nb of fb) for (const n of nb.items) {
-      if (!n.from) continue;
-      for (const kb of fb) {
-        const k = kb.items.find((x) => x !== n && x.it.exerciseId === n.from);
-        if (!k) continue;
-        // 합친 가상 칸 = 남긴 세트(K) + 새 운동 세트(N): 안 접힌 칸과 같은 setCount 로 세어 미리 표시한 웜업(D-070) 보정이 그대로 적용됨
-        const merged: WorkoutItem = { ...n.it, sets: [...k.it.sets, ...n.it.sets], target: { ...n.it.target, sets: k.it.sets.length + n.it.target.sets } };
-        kb.items[kb.items.indexOf(k)] = { it: merged, sets: setCount(merged), root: k.root ?? k.it.exerciseId, from: k.from };
-        nb.items.splice(nb.items.indexOf(n), 1);
-        hit = true;
-        break outer;
-      }
-    }
-    if (!hit) break;
+  const all = fb.flatMap((b) => b.items);
+  const byId = new Map<string, FoldItem>();
+  for (const f of all) byId.set(f.it.exerciseId, f);
+  const succ = new Map<FoldItem, FoldItem>(), hasPred = new Set<FoldItem>();
+  for (const n of all) {
+    const k = n.from ? byId.get(n.from) : undefined;
+    if (!k || k === n || succ.has(k)) continue;
+    succ.set(k, n);
+    hasPred.add(n);
   }
+  // 사슬(X→N1→N2…)마다 맨 앞 칸 자리에 마지막 운동 하나: 세트 수 = 뒤가 있는 칸들의 목표 세트 수 합 + 마지막 칸의 setCount (순서 무관)
+  const drop = new Set<FoldItem>();
+  const folded = new Map<FoldItem, FoldItem>();
+  for (const root of all) {
+    if (hasPred.has(root) || !succ.has(root)) continue;
+    let sets = 0, cur = root;
+    const chain = new Set<FoldItem>([root]);
+    for (let nx = succ.get(cur); nx && !chain.has(nx); nx = succ.get(cur)) { sets += cur.it.target.sets; chain.add(nx); cur = nx; }
+    for (const c of chain) if (c !== root) drop.add(c);
+    folded.set(root, { it: cur.it, sets: sets + setCount(cur.it), root: root.it.exerciseId, from: root.from });
+  }
+  for (const b of fb) b.items = b.items.filter((f) => !drop.has(f)).map((f) => folded.get(f) ?? f);
   return fb.filter((b) => b.items.length);
 }
 
@@ -101,8 +107,7 @@ export function diffText(d: RoutineDiff, nameOf: (id: string) => string): string
  */
 export function setCount(it: WorkoutItem): number {
   const work = it.sets.filter((s) => !s.warmup).length;
-  const preMarked = it.sets.length === it.target.sets && !!it.sets[0]?.warmup && work === it.target.sets - 1;
-  return Math.max(1, preMarked ? it.target.sets : work);
+  return Math.max(1, isPreMarkedWarmup(it) ? it.target.sets : work);
 }
 
 /**

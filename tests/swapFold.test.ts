@@ -111,6 +111,52 @@ describe('D-080 검토 F1: 갈라 교체한 운동을 끝낼 때 교체로 접�
     expect(routineFromPastWorkout(w, 'new', '다시', iso(T0 + 1)).blocks[0]!.items[0]!.sets).toBe(5);
   });
 
+  const both = (w: Workout) => [routineFromWorkout(r, w, iso(T0 + 1)).blocks[0]!.items[0]!.sets, routineFromPastWorkout(w, 'new', '다시', iso(T0 + 1)).blocks[0]!.items[0]!.sets];
+  const addSet = (w: Workout, b: number, warmup: boolean): Workout => {
+    const x = w.blocks[b]!.items[0]!;
+    const extra = { ...x.sets[0]!, done: false, warmup };
+    return { ...w, blocks: w.blocks.map((bl, i) => (i === b ? { ...bl, items: [{ ...x, sets: warmup ? [extra, ...x.sets] : [...x.sets, extra] }] } : bl)) };
+  };
+
+  it('d. 미리 표시한 웜업을 안 하고 작업 2세트만 한 뒤 교체(1세트 남음): 4 (예전 3)', () => {
+    const w0 = preMarked();
+    const it0 = w0.blocks[0]!.items[0]!;
+    const w1 = { ...w0, blocks: w0.blocks.map((b, i) => (i === 0 ? { ...b, items: [{ ...it0, sets: it0.sets.map((s, k) => (k === 1 || k === 2 ? { ...s, done: true } : s)) }] } : b)) };
+    const w = swapItem(w1, 0, 0, 'n', [], REPS);
+    expect(w.blocks[0]!.items[0]!.sets).toHaveLength(2);
+    expect(w.blocks[1]!.items[0]!.sets).toHaveLength(1);
+    expect(both(w)).toEqual([4, 4]);
+  });
+
+  it('e. 루틴 4세트 + 앞에 [+ 웜업] 직접 추가, 웜업 + 작업 2세트 완료 후 교체(2 남음): 4 (예전 5)', () => {
+    const w1 = doneN(addSet(start(), 0, true), 0, 0, 3);
+    const w = swapItem(w1, 0, 0, 'n', [], REPS);
+    expect(w.blocks[1]!.items[0]!.sets).toHaveLength(2);
+    expect(both(w)).toEqual([4, 4]);
+  });
+
+  it('g. 웜업 없이 2+2 교체 뒤 새 운동 앞에 웜업을 더해도 4', () => {
+    const w0 = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n', [], REPS);
+    expect(both(addSet(w0, 1, true))).toEqual([4, 4]);
+  });
+
+  it('h. 연쇄 X → N1 → N2 (웜업 없음): 4, 미리 표시한 웜업에서 시작해도 4', () => {
+    let w = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n1', [], REPS); // x 2 + n1 2
+    w = swapItem(doneN(w, 1, 0, 1), 1, 0, 'n2', [], REPS); // n1 1 + n2 1
+    expect(both(w)).toEqual([4, 4]);
+    let p = swapItem(doneN(preMarked(), 0, 0, 2), 0, 0, 'n1', [], REPS); // x 웜업+1 (목표 2) + n1 2
+    p = swapItem(doneN(p, 1, 0, 1), 1, 0, 'n2', [], REPS);
+    expect(both(p)).toEqual([4, 4]);
+  });
+
+  it('foldSwaps 는 블록 순서와 상관없이 같은 세트 수 (N2 가 X 보다 앞에 있어도)', () => {
+    let w = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n1', [], REPS);
+    w = swapItem(doneN(w, 1, 0, 1), 1, 0, 'n2', [], REPS);
+    const rev = { ...w, blocks: [w.blocks[2]!, w.blocks[1]!, w.blocks[0]!, w.blocks[3]!] };
+    const f = foldSwaps(rev);
+    expect(f.map((b) => b.items.map((i) => [i.it.exerciseId, i.sets]))).toEqual([[['n2', 4]], [['z', 3]]]);
+  });
+
   it('연쇄 + 미리 표시한 웜업: 접어서 누적한 칸도 같은 세트 수 (X 웜업+1 → N1 → N2)', () => {
     let w = swapItem(doneN(preMarked(), 0, 0, 2), 0, 0, 'n1', [], REPS); // x: 웜업+1, n1: 2 남음
     w = swapItem(doneN(w, 1, 0, 1), 1, 0, 'n2', [], REPS); // n1: 1 완료, n2: 1 남음

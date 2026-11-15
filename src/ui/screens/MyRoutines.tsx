@@ -111,7 +111,7 @@ export function RoutineList({ s, mode, nextId }: { s: AppState; mode: 'home' | '
     const when = sinceText(u?.lastAt, now);
     const pl = !isHidden && items.length > 0 ? paceLabelOf(s, r) : undefined;
     return (
-      <div class={`card routine-card${isHidden ? ' is-hidden' : ''}`} key={r.id} role="group" aria-label={`루틴 ${r.name}`}>
+      <div class={`card routine-card${isHidden ? ' is-hidden' : ''}`} key={r.id} data-rid={r.id} role="group" aria-label={`루틴 ${r.name}`}>
         <div class="row between" style={{ alignItems: 'flex-start' }}>
           <div class="grow card-open-wrap">
             <h3 class="routine-name">{r.name}{!isHidden && <Icon name="chevron" size={16} class="routine-chev" />}</h3>{r.id === nextId && <span class="status-pill acc next-tag">다음 운동</span>}

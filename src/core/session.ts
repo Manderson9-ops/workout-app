@@ -271,6 +271,11 @@ export function replaceItem(w: Workout, block: number, item: number, exerciseId:
     };
   });
 }
+/** 시작 때 루틴 세트의 첫 세트를 웜업으로 미리 표시(D-070)했고 세트 수를 그대로 둔 운동 칸인가 */
+export function isPreMarkedWarmup(it: WorkoutItem): boolean {
+  const work = it.sets.filter((s) => !s.warmup).length;
+  return it.sets.length === it.target.sets && !!it.sets[0]?.warmup && work === it.target.sets - 1;
+}
 /**
  * D-080 운동 중 바로 교체. 완료한 작업 세트가 없으면 replaceItem 과 같다(웜업만 끝낸 것 포함). 있으면 원래 운동은 완료 세트만 남기고
  * (target.sets = 완료한 작업 세트 수, skipped 해제), 안 한 작업 세트 수만큼 새 운동을 같은 휴식의 단일 블록으로 바로 다음에 넣는다
@@ -288,6 +293,7 @@ export function swapItem(w: Workout, block: number, item: number, exerciseId: st
   const t: Target = e ? swapTarget(it.target, e) : it.target;
   // 남은 작업 세트가 없어도 새 운동은 1세트 (빈 운동 칸을 만들지 않음)
   const left = Math.max(1, it.sets.filter((s) => !s.done && !s.warmup).length);
+  const pre = isPreMarkedWarmup(it);
   const fresh: WorkoutItem = {
     exerciseId, target: { sets: left, reps: t.reps, ...(t.seconds !== undefined ? { seconds: t.seconds } : {}) }, swappedFrom: it.exerciseId,
     // 운동 중간이라 이미 몸이 풀렸음: 웜업을 미리 표시하지 않음
@@ -296,7 +302,7 @@ export function swapItem(w: Workout, block: number, item: number, exerciseId: st
       return { warmup: false, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(t.seconds !== undefined ? { seconds: t.seconds } : { reps: p?.reps ?? t.reps }) };
     }),
   };
-  const kept: WorkoutItem = { ...it, skipped: false, target: { ...it.target, sets: doneWork }, sets: done };
+  const kept: WorkoutItem = { ...it, skipped: false, target: { ...it.target, sets: pre ? it.target.sets - left : doneWork }, sets: done };
   const blocks = w.blocks.map((x, bi) => (bi === block ? { ...x, items: x.items.map((y, ii) => (ii === item ? kept : y)) } : x));
   blocks.splice(block + 1, 0, { kind: 'single', items: [fresh], restSec: b.restSec, roundRestSec: b.roundRestSec, transitionSec: b.transitionSec });
   return { ...w, blocks };

@@ -136,7 +136,7 @@ export function RoutinePreview({ s, rid, onClose, onStart, onEdit }: { s: AppSta
   return (
     <>
       {!sw.busy && (
-        <Sheet title={`${r.name} 내용`} onClose={onClose} trap cls={sw.hasToast ? 'has-toast' : undefined}>
+        <Sheet title={`${r.name} 내용`} onClose={onClose} trap returnFocus={() => document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] .card-open`) ?? document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] button`)} cls={sw.hasToast ? 'has-toast' : undefined}>
           <RoutineLines s={s} r={r} ctx="preview" onSwap={(b, i) => sw.ask(r.id, b, i)} />
           {sw.toast(true)}
           {sw.live}
