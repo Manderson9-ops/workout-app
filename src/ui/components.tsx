@@ -273,6 +273,12 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
           <Icon name="plus" size={14} /> 새 운동 직접 추가 (최고 등급 S)
         </button>
       )}
+      {similar.length > 0 && (
+        <div role="group" aria-label="비슷한 운동" class="similar-grp">
+          <div class="sub small similar-cap" aria-hidden="true">비슷한 운동</div>
+          {similar.map((e) => row(e, resolveGrade(e, e.part, level, undefined, s.meta.get(e.id)?.userGrade)))}
+        </div>
+      )}
       {ctxParts.length > 0 && <div class="row wrap" role="group" aria-label="지금 들어 있는 부위" style={{ margin: '8px 0 0' }}>
         <span class="sub small">지금 들어 있는 부위</span>
         {ctxParts.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} aria-pressed={p === x} onClick={() => setP(x)}>{x}</button>)}
@@ -282,12 +288,7 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
         {PARTS.map((x) => <button key={x} class={`chip ${p === x ? 'on' : ''}`} aria-pressed={p === x} onClick={() => setP(x)}>{x}</button>)}
       </div>
       {widened && <p class="sub small" role="status">{p}에는 "{q.trim()}" 운동이 없어 모든 부위에서 찾았어요</p>}
-      {similar.length > 0 && (
-        <div role="group" aria-label="비슷한 운동" class="similar-grp">
-          <div class="sub small similar-cap" aria-hidden="true">비슷한 운동</div>
-          {similar.map((e) => row(e, resolveGrade(e, e.part, level, undefined, s.meta.get(e.id)?.userGrade)))}
-        </div>
-      )}
+
       {rest.map(({ e, g }) => row(e, g))}
       {!list.length && !similar.length && <div class="empty">조건에 맞는 운동이 없어요</div>}
     </Sheet>

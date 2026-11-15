@@ -869,9 +869,9 @@ button.danger:active { background: var(--bad-soft); border-color: transparent; }
 /* 보러 가기: 좁은 폰(480px 이하)에서는 제목 줄 옆에 띄우면 날짜·'지금' 칩과 겹침(320px 실측) → 글 아래 흐름 안에 둠 */
 @media (max-width: 480px) { .cl-item[open] > .wn-go { position: static; margin: 8px 16px 12px; } }
 /* D-080: 비슷한 운동 구역·지난 기록 줄, 루틴 미리보기 줄, 카드 누르기 영역 */
-.similar-grp { margin: 4px 0 8px; padding: 2px 0 2px 8px; border-left: 3px solid var(--acc); }
+.similar-grp { margin: 4px 0 8px; padding: 2px 0 2px 8px; border-left: 3px solid var(--card3); }
 .similar-cap { font-weight: 700; padding: 2px 0 0; }
-.list-item .last-line { color: var(--acc-text); }
+.list-item .last-line { color: var(--sub); }
 .pv-lines { display: flex; flex-direction: column; gap: 10px; }
 .pv-block { padding: 8px 0 6px; border-bottom: 1px solid var(--line); }
 .pv-block:last-child { border-bottom: 0; }
