@@ -79,7 +79,7 @@ function workoutOk(w: unknown): boolean {
   if (w.timer !== null && w.timer !== undefined && !(isObj(w.timer) && num(w.timer.startedAt) && num(w.timer.endsAt) && TIMER_KINDS.includes(w.timer.kind as string))) return false;
   return w.blocks.every((b) => isObj(b) && KINDS.includes(b.kind as string) && restOk(b) && Array.isArray(b.items)
     && b.items.every((i) => isObj(i) && str(i.exerciseId) && isObj(i.target) && num(i.target.sets) && num(i.target.reps) && optNum(i.target.seconds)
-      && Array.isArray(i.sets) && i.sets.every(setOk) && optBool(i.skipped) && optStr(i.memo) && optStr(i.swappedFrom)));
+      && Array.isArray(i.sets) && i.sets.every(setOk) && optBool(i.skipped) && optStr(i.memo) && optStr(i.swappedFrom) && optNum(i.splitWork)));
 }
 function routineOk(r: unknown): boolean {
   return isObj(r) && str(r.id) && typeof r.name === 'string' && isoDate(r.createdAt) && isoDate(r.updatedAt) && optNum(r.estimatedSec) && optNum(r.warmupSec) && optStr(r.note)

@@ -21,7 +21,9 @@ export interface SetLog {
 }
 export interface WorkoutItem { exerciseId: string; target: { sets: number; reps: number; seconds?: number }; sets: SetLog[]; skipped?: boolean; memo?: string;
   /** D-080 검토: 묶음 밖으로 갈라 교체한 새 운동이 바꾼 원래 운동 id. 끝낼 때 루틴 비교에서 "교체"로 접어 봄 (운동 기록은 그대로) */
-  swappedFrom?: string }
+  swappedFrom?: string;
+  /** D-080 6차: 갈라 교체 때 원래 운동이 남긴 완료 작업 세트 수. 그 뒤 원래 운동에 세트를 더하면 접을 때 더한 만큼 셈 */
+  splitWork?: number }
 export interface WorkoutBlock { kind: RoutineBlock['kind']; items: WorkoutItem[]; restSec: number; roundRestSec: number; transitionSec: number }
 export interface Timer { startedAt: number; endsAt: number; label: string; kind: 'set' | 'transition' | 'round' | 'between' | 'warmup' }
 export interface Workout {
@@ -302,7 +304,7 @@ export function swapItem(w: Workout, block: number, item: number, exerciseId: st
       return { warmup: false, done: false, ...(p?.weight !== undefined ? { weight: p.weight, auto: true } : {}), ...(t.seconds !== undefined ? { seconds: t.seconds } : { reps: p?.reps ?? t.reps }) };
     }),
   };
-  const kept: WorkoutItem = { ...it, skipped: false, target: { ...it.target, sets: pre ? it.target.sets - left : doneWork }, sets: done };
+  const kept: WorkoutItem = { ...it, splitWork: doneWork, skipped: false, target: { ...it.target, sets: pre ? it.target.sets - left : doneWork }, sets: done };
   const blocks = w.blocks.map((x, bi) => (bi === block ? { ...x, items: x.items.map((y, ii) => (ii === item ? kept : y)) } : x));
   blocks.splice(block + 1, 0, { kind: 'single', items: [fresh], restSec: b.restSec, roundRestSec: b.roundRestSec, transitionSec: b.transitionSec });
   return { ...w, blocks };

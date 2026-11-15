@@ -65,18 +65,24 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
   const setWin = (w: SwapWindow<Routine> | null) => { winRef.current = w; setWinState(w); };
   // 고른 직후 저장이 끝나기 전에도 창 아래 여백(.has-toast)을 미리 잡아 둠 (저장 뒤 스크롤이 알림에 가리지 않게)
   const [pending, setPending] = useState(false);
-  const holdProps = useToastHold(!!win, win, () => setWin(null));
+  // 알림 위로 교체 창이 열려 있거나 고른 것이 저장되는 동안은 5초를 멈추고, 풀리면 새 5초 (느리게 골라도 같은 되돌리기 창에 이어짐)
+  const holdProps = useToastHold(!!win, win, () => setWin(null), 5000, !!pick || pending);
   // 초점: 줄이 새 이름으로 그려지면(저장 뒤) 그 줄의 ⇄ 로 옮기고 화면 가운데로 스크롤 (창이 다시 열리며 맨 위로 올라간 뒤에)
   // scroll = 고르기·되돌리기 뒤에는 바뀐 줄을 화면 가운데로, 그냥 닫았을 때는 스크롤 없이 초점만
-  const [focus, setFocus] = useState<{ rid: string; name: string; scroll: boolean } | null>(null);
+  // fallback = 새 줄이 그려지기 전까지 먼저 초점을 둘 줄 (교체를 시작한 줄). 저장이 실패하면 그 줄에 그대로 남음
+  const [focus, setFocus] = useState<{ rid: string; name: string; scroll: boolean; fallback?: string } | null>(null);
   // 화면 읽기 알림 문장 (알림칸이 다시 그려져도 같은 문장이 남도록 알림 창 상태와 따로 쥠)
   const [say, setSay] = useState('');
   useEffect(() => {
     if (!focus || pick) return;
     const host = [...document.querySelectorAll<HTMLElement>('[data-rid][data-ctx]')].find((x) => x.dataset.rid === focus.rid && x.dataset.ctx === ctx && (ctx === 'home' || x.closest('.sheet')));
-    const label = `${focus.name} 바로 교체`;
-    const el = host && [...host.querySelectorAll<HTMLElement>('button.pv-swap')].find((x) => x.getAttribute('aria-label') === label);
-    if (!el) return;
+    const rowBtn = (name: string) => host && [...host.querySelectorAll<HTMLElement>('button.pv-swap')].find((x) => x.getAttribute('aria-label') === `${name} 바로 교체`);
+    const el = rowBtn(focus.name);
+    if (!el) {
+      const fb = focus.fallback !== undefined ? rowBtn(focus.fallback) : undefined;
+      if (fb && document.activeElement !== fb) fb.focus({ preventScroll: true });
+      return;
+    }
     el.focus({ preventScroll: true });
     if (focus.scroll) el.scrollIntoView({ block: 'center' });
     setFocus(null);
@@ -98,14 +104,13 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
         const swapped = swapRoutineItem(r, p.b, p.i, e);
         // 바뀐 게 없으면 새 이름 줄을 기다리지 않고 연 ⇄ 로 바로 돌아감
         if (swapped === r) { setFocus({ rid: r.id, name: byId.get(oldId)?.name_ko ?? oldId, scroll: false }); return; }
-        setFocus({ rid: r.id, name: e.name_ko, scroll: true });
+        setFocus({ rid: r.id, name: e.name_ko, scroll: true, fallback: byId.get(oldId)?.name_ko ?? oldId });
         setPending(true);
         const next: Routine = { ...swapped, updatedAt: new Date().toISOString(), estimatedSec: routineEstimate(swapped, byId, s.settings.rest.between) + (r.warmupSec ?? 0) };
-        const oldName = byId.get(oldId)?.name_ko ?? oldId;
         void mutate((d) => d.routines.put(next)).then(() => {
-          const w = nextSwapWindow(winRef.current, r.id, r, oldName, e.name_ko);
+          const w = nextSwapWindow(winRef.current, r.id, r, next, (id) => byId.get(id)?.name_ko ?? id);
           setWin(w);
-          setSay(w.text);
+          setSay(w.say);
         }).finally(() => setPending(false));
       }} />
   ) : null;
@@ -123,7 +128,7 @@ export function useRoutineSwap(s: AppState, ctx: SwapCtx) {
     const box = (
       <div class={inline ? 'pv-toast' : `toast${activeOf(s) ? ' above-banner' : ''}`} {...holdProps}>
         <span aria-hidden="true">{win.text}</span>
-        <button class="ghost" onClick={undo}>되돌리기</button>
+        {win.count > 0 && <button class="ghost" onClick={undo}>되돌리기</button>}
       </div>
     );
     // 홈: 다른 알림(루틴 숨기기)과 겹치지 않게 한 자리에 세로로 쌓음
@@ -156,13 +161,16 @@ export function RoutinePreview({ s, rid, onClose, onStart, onEdit }: { s: AppSta
   // 고르기 창이 닫혀 이 창이 다시 뜰 때는 [시작]에 초점을 주지 않음 (초점은 바뀐 줄의 ⇄ 로 곧장 감). 처음 열 때만 [시작]
   const shown = useRef(false);
   const again = shown.current;
+  // 교체 창이 열려 이 창이 잠시 내려가는 중이면 초점을 배경 카드로 보내지 않음 (교체 창이 자기 초점을 잡음)
+  const busyRef = useRef(false);
+  busyRef.current = sw.busy;
   useEffect(() => { if (!sw.busy) shown.current = true; });
   const r = s.routines.find((x) => x.id === rid);
   if (!r) return null;
   return (
     <>
       {!sw.busy && (
-        <Sheet title={`${r.name} 내용`} onClose={onClose} trap returnFocus={() => document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] .card-open`) ?? document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] button`)} cls={sw.hasToast ? 'has-toast' : undefined} noAutofocus={again}>
+        <Sheet title={`${r.name} 내용`} onClose={onClose} trap returnFocus={() => busyRef.current ? null : document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] .card-open`) ?? document.querySelector<HTMLElement>(`.routine-card[data-rid="${CSS.escape(r.id)}"] button`)} cls={sw.hasToast ? 'has-toast' : undefined} noAutofocus={again}>
           <RoutineLines s={s} r={r} ctx="preview" onSwap={(b, i) => sw.ask(r.id, b, i)} />
           {sw.toast(true)}
           {sw.live}

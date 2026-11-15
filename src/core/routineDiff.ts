@@ -45,13 +45,19 @@ export function foldSwaps(w: Workout): FoldBlock[] {
     if (hasPred.has(root) || !succ.has(root)) continue;
     let sets = 0, cur = root;
     const chain = new Set<FoldItem>([root]);
-    for (let nx = succ.get(cur); nx && !chain.has(nx); nx = succ.get(cur)) { sets += cur.it.target.sets; chain.add(nx); cur = nx; }
+    for (let nx = succ.get(cur); nx && !chain.has(nx); nx = succ.get(cur)) { sets += cur.it.target.sets + extraSets(cur.it); chain.add(nx); cur = nx; }
     for (const c of chain) if (c !== root) drop.add(c);
     folded.set(root, { it: cur.it, sets: sets + setCount(cur.it), root: root.it.exerciseId, from: root.from });
   }
   for (const b of fb) b.items = b.items.filter((f) => !drop.has(f)).map((f) => folded.get(f) ?? f);
   return fb.filter((b) => b.items.length);
 }
+
+/** 갈라 교체 뒤 원래 운동에 더한 작업 세트 수 (splitWork 없는 옛 기록은 0) */
+const extraSets = (it: WorkoutItem): number => {
+  const work = it.sets.filter((s) => !s.warmup).length;
+  return Math.max(0, work - (it.splitWork ?? work));
+};
 
 export function routineDiff(r: Routine, w: Workout): RoutineDiff {
   const rb = r.blocks.map((b) => b.items.map((i) => i.exerciseId)).filter((b) => b.length);

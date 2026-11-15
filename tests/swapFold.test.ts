@@ -149,6 +149,32 @@ describe('D-080 검토 F1: 갈라 교체한 운동을 끝낼 때 교체로 접�
     expect(both(p)).toEqual([4, 4]);
   });
 
+  it('6차: 갈라 교체 뒤 원래 운동에 세트를 더하고 끝내면 루틴 5세트 (더하지 않으면 4)', () => {
+    const w0 = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n', [], REPS); // x 2 완료(splitWork 2) + n 2 남음
+    expect(w0.blocks[0]!.items[0]!.splitWork).toBe(2);
+    const x = w0.blocks[0]!.items[0]!;
+    const w = { ...w0, blocks: w0.blocks.map((b, i) => (i === 0 ? { ...b, items: [{ ...x, sets: [...x.sets, { ...x.sets[0]!, done: true }] }] } : b)) };
+    expect(both(w)).toEqual([5, 5]);
+    expect(both(w0)).toEqual([4, 4]);
+    // 웜업을 더한 것은 세지 않음
+    expect(both(addSet(w0, 0, true))).toEqual([4, 4]);
+  });
+
+  it('6차: splitWork 가 없는 옛 기록은 예전 그대로 (원래 운동에 세트가 더해져도 목표 세트 수만)', () => {
+    const w0 = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n', [], REPS);
+    const { splitWork: _s, ...old } = w0.blocks[0]!.items[0]!;
+    const w = { ...w0, blocks: w0.blocks.map((b, i) => (i === 0 ? { ...b, items: [{ ...old, sets: [...old.sets, { ...old.sets[0]! }] }] } : b)) };
+    expect(both(w)).toEqual([4, 4]);
+  });
+
+  it('6차: 연쇄에서 가운데 운동에 더한 세트도 셈', () => {
+    let w = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n1', [], REPS); // x 2 + n1 2
+    w = swapItem(doneN(w, 1, 0, 1), 1, 0, 'n2', [], REPS); // n1 1 완료 + n2 1
+    const m = w.blocks[1]!.items[0]!;
+    const w2 = { ...w, blocks: w.blocks.map((b, i) => (i === 1 ? { ...b, items: [{ ...m, sets: [...m.sets, { ...m.sets[0]! }] }] } : b)) };
+    expect(both(w2)).toEqual([5, 5]);
+  });
+
   it('foldSwaps 는 블록 순서와 상관없이 같은 세트 수 (N2 가 X 보다 앞에 있어도)', () => {
     let w = swapItem(doneN(start(), 0, 0, 2), 0, 0, 'n1', [], REPS);
     w = swapItem(doneN(w, 1, 0, 1), 1, 0, 'n2', [], REPS);

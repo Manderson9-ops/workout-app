@@ -131,6 +131,13 @@ describe('깊은 검사: 깨진 백업이 기존 데이터를 지우지 않게 (
     f.data.workouts[0].blocks[0].items[0].swappedFrom = 5;
     expect(parseBackup(JSON.stringify(f))).toMatchObject({ ok: false, error: expect.stringContaining('운동 기록') });
   });
+  it('splitWork 숫자는 통과, 문자열은 거절 (D-080 6차)', () => {
+    const f = JSON.parse(JSON.stringify(good()));
+    f.data.workouts[0].blocks[0].items[0].splitWork = 2; f.counts = undefined;
+    expect(parseBackup(JSON.stringify(f)).ok).toBe(true);
+    f.data.workouts[0].blocks[0].items[0].splitWork = '2';
+    expect(parseBackup(JSON.stringify(f))).toMatchObject({ ok: false, error: expect.stringContaining('운동 기록') });
+  });
   it('개수가 파일에 적힌 것과 다르면 잘린 파일로 보고 거절', () => {
     const f = good(); f.counts.workouts = 5;
     expect(parseBackup(JSON.stringify(f))).toMatchObject({ ok: false, error: expect.stringContaining('잘렸') });
