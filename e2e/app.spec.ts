@@ -2224,16 +2224,20 @@ test('D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·
   await expect(page.getByTestId('home-week')).toHaveAttribute('href', '#/stats?tab=summary'); // 마지막으로 본 탭이 아니라 요약 탭으로 (M2)
   // 다음 운동 (앱 판단): 하나뿐인 루틴을 오늘 했으면 그대로 보이고 이유 줄 "오늘 이미 했어요"
   await expect(next).toContainText('오늘 이미 했어요');
-  // 390×844 첫 화면: 백업 알림은 다음 운동 아래, [▶ 시작]은 탭 바 위에 다 보임 (검토 A3)
+  // 390×844 첫 화면: 백업 알림은 다음 운동 아래 (검토 A3)
   // 재기 전에 초점·스크롤이 가라앉게 (Chromium 모바일 흉내에서 한 번 탭 바 위치가 흔들린 적 있음)
   await page.evaluate(() => { (document.activeElement as HTMLElement | null)?.blur(); window.scrollTo(0, 0); });
   await page.waitForTimeout(300);
   const backup = page.getByRole('note', { name: '백업 알림' });
   await expect(backup).toBeVisible();
-  const startBox = (await next.getByRole('button', { name: /^다음 운동으로 시작/ }).boundingBox())!;
-  const navBox = (await page.locator('nav.nav').boundingBox())!;
-  expect(startBox.y + startBox.height, '[▶ 시작] 아래 끝 < 탭 바 위 끝').toBeLessThan(navBox.y);
+  const startBtn = next.getByRole('button', { name: /^다음 운동으로 시작/ });
+  const startBox = (await startBtn.boundingBox())!;
+  // D-080: 홈 다음 운동은 운동 줄을 펼친 뒤 시작 — D-055 '첫 화면 시작' 대체, 사용자 선택 2026-11-16
+  const lastRowBox = (await next.locator('.pv-row').last().boundingBox())!;
+  expect(startBox.y, '[▶ 시작]은 운동 줄 다음').toBeGreaterThanOrEqual(lastRowBox.y + lastRowBox.height);
   expect((await backup.boundingBox())!.y).toBeGreaterThan(startBox.y);
+  await startBtn.scrollIntoViewIfNeeded();
+  await expect(startBtn).toBeInViewport();
   await expect(backup.getByRole('button', { name: '지금 백업' })).not.toHaveClass(/primary/);
   await expect(page.locator('.routine-card').first().locator('.next-tag')).toHaveText('다음 운동');
   // 최근 운동 = 기록 탭 카드(button.wcard) + ⋯
