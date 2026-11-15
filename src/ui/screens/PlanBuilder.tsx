@@ -76,6 +76,20 @@ export function PlanBuilder({ s }: { s: AppState }) {
   const [picker, setPicker] = useState<{ b: number; i: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [groupAdd, setGroupAdd] = useState<number | null>(null); // 묶음에 운동 추가 중인 블록 번호 (D-051)
+  // 고르기 창을 연 버튼 (교체·운동 추가·묶음에 추가). 창이 직접 추가 창 때문에 잠시 내려갔다 올라오거나 추가로 끝나도 닫힐 때 초점을 여기로
+  const openerRef = useRef<{ el: HTMLElement | null; key: string }>({ el: null, key: '' });
+  const rememberOpener = (key: string, e: Event) => { openerRef.current = { el: e.currentTarget as HTMLElement, key }; };
+  const opener = (): HTMLElement | null => {
+    const o = openerRef.current;
+    if (o.el?.isConnected) return o.el;
+    return [...document.querySelectorAll<HTMLElement>('[data-opener]')].find((x) => x.dataset.opener === o.key && x.offsetParent !== null) ?? null;
+  };
+  const customOpenRef = useRef(false);
+  customOpenRef.current = addCustomOpen;
+  // 직접 추가 창이 열려 고르기 창이 내려가는 순간에는 초점을 옮기지 않음 (null = 그대로)
+  const pickerReturn = () => (customOpenRef.current ? null : opener());
+  const [pq, setPq] = useState(''); // 고르기 창 검색어: 직접 추가 창을 다녀와도 유지
+  const refocus = useRef(false);
   const [moved, setMoved] = useState<{ key: string; d: -1 | 1; msg: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [groupMsg, setGroupMsg] = useState('');
@@ -203,6 +217,13 @@ export function PlanBuilder({ s }: { s: AppState }) {
     const base: Plan = plan.blocks.length ? plan : { ...plan, status: 'ok', warmup: warmupFor(plan.targetSec !== undefined ? plan.targetSec / 60 : undefined, e.part === '하체', { exercise: e, sets: 1, reps: item.reps, ...(item.seconds !== undefined ? { seconds: item.seconds } : {}) }) };
     setPlan(recompute(addBlock(base, item), withExtra(e)));
   };
+  useEffect(() => { if (!picker && !adding && groupAdd === null) setPq(''); }, [picker, adding, groupAdd]);
+  // 직접 추가로 고르기 흐름이 끝나면 카드가 다시 만들어져도 초점은 연 버튼으로
+  useEffect(() => {
+    if (!refocus.current || addCustomOpen || picker || adding || groupAdd !== null) return;
+    refocus.current = false;
+    opener()?.focus();
+  }, [plan, picker, adding, groupAdd, addCustomOpen]);
   // 묶음에 운동을 추가하면 카드가 다시 만들어져 초점이 풀림: 새 운동의 '세트 늘리기'로 옮김
   useEffect(() => {
     const want = pendingFocus.current;
@@ -498,7 +519,8 @@ export function PlanBuilder({ s }: { s: AppState }) {
                           </button>
                           <button
                             style={{ minWidth: '44px', minHeight: '44px', padding: '0 12px' }}
-                            onClick={() => setPicker({ b: bi, i: ii })}
+                            data-opener={`swap-${bi}-${ii}`}
+                            onClick={(e) => { rememberOpener(`swap-${bi}-${ii}`, e); setPicker({ b: bi, i: ii }); }}
                           >
                             교체
                           </button>
@@ -518,7 +540,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
               ))}
 
               <div class="row gap4" style={{ margin: '8px 0' }}>
-                <button class="grow" onClick={() => setAdding(true)}>+ 운동 추가</button>
+                <button class="grow" data-opener="add" onClick={(e) => { rememberOpener('add', e); setAdding(true); }}>+ 운동 추가</button>
                 <button class="grow" onClick={() => generate(false)}>🔄 다른 추천 조합</button>
               </div>
 
@@ -606,7 +628,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
                   </div>
                   <div class="row wrap plan-actions">
                     <button class={locks.has(it.exerciseId) ? 'chip on' : 'chip'} aria-pressed={locks.has(it.exerciseId)} onClick={() => { const n = new Set(locks); if (n.has(it.exerciseId)) n.delete(it.exerciseId); else n.add(it.exerciseId); setLocks(n); }}>{locks.has(it.exerciseId) ? <><Icon name="lock" size={16} />잠금됨</> : '잠금'}</button>
-                    <button onClick={() => setPicker({ b: bi, i: ii })}>교체</button>
+                    <button data-opener={`swap-${bi}-${ii}`} onClick={(e) => { rememberOpener(`swap-${bi}-${ii}`, e); setPicker({ b: bi, i: ii }); }}>교체</button>
                     <button class="danger" aria-label={`${it.name} 삭제`} onClick={() => editItem(bi, ii, () => null)}>삭제</button>
                   </div>
                 </div>
@@ -634,7 +656,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
                       </div>
                     </details>
                     <div class="row wrap plan-actions">
-                      <button aria-label={`+ 묶음에 운동 추가: ${nm}`} disabled={full} onClick={() => setGroupAdd(bi)}>+ 묶음에 운동 추가</button>
+                      <button aria-label={`+ 묶음에 운동 추가: ${nm}`} disabled={full} data-opener={`group-${bi}`} onClick={(e) => { rememberOpener(`group-${bi}`, e); setGroupAdd(bi); }}>+ 묶음에 운동 추가</button>
                       {full && <span class="sub small">묶음은 {GROUP_MAX}개까지</span>}
                     </div>
                   </div>
@@ -659,7 +681,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
               })()}
             </div>
           ))}
-          <button class="big plan-add" onClick={() => setAdding(true)}>+ 운동 추가</button>
+          <button class="big plan-add" data-opener="add" onClick={(e) => { rememberOpener('add', e); setAdding(true); }}>+ 운동 추가</button>
           <button class="ghost" onClick={() => setShowReasons(!showReasons)}><Icon name="chevron" size={16} class={`rot${showReasons ? ' open' : ''}`} />이렇게 짠 이유</button>
           {showReasons && <ul class="reasons">{plan.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
           <div class="row plan-save">
@@ -674,6 +696,7 @@ export function PlanBuilder({ s }: { s: AppState }) {
       {/* 새 운동 직접 추가 창이 떠 있는 동안은 고르기 창을 내림 (초점·Esc 가 한 창에서만). 상태(picker 등)는 그대로라 추가가 끝나면 이어서 반영하고, 추가 없이 닫으면 다시 보임 */}
       {picker && plan && !addCustomOpen && (
         <ExercisePicker s={s} all={all} part={plan.blocks[picker.b]!.items[picker.i]!.part} from={plan.blocks[picker.b]!.items[picker.i]!.exerciseId} title="운동 교체"
+          query={pq} onQuery={setPq} returnFocus={pickerReturn}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setPicker(null)}
           onAddCustom={() => setAddCustomOpen(true)}
@@ -687,14 +710,14 @@ export function PlanBuilder({ s }: { s: AppState }) {
           }} />
       )}
       {adding && plan && !addCustomOpen && (
-        <ExercisePicker s={s} all={all} title="운동 추가" ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
+        <ExercisePicker s={s} all={all} title="운동 추가" query={pq} onQuery={setPq} returnFocus={pickerReturn} ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setAdding(false)}
           onAddCustom={() => setAddCustomOpen(true)}
           onPick={(e) => { addExercise(e); setAdding(false); }} />
       )}
       {groupAdd !== null && plan && plan.blocks[groupAdd] && !addCustomOpen && (
-        <ExercisePicker s={s} all={all} title="묶음에 운동 추가" ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
+        <ExercisePicker s={s} all={all} title="묶음에 운동 추가" query={pq} onQuery={setPq} returnFocus={pickerReturn} ctxParts={plan.blocks.flatMap((b) => b.items.map((i) => i.part))}
           exclude={plan.blocks.flatMap((b) => b.items.map((i) => i.exerciseId))}
           onClose={() => setGroupAdd(null)}
           onAddCustom={() => setAddCustomOpen(true)}
@@ -727,9 +750,11 @@ export function PlanBuilder({ s }: { s: AppState }) {
               nl.add(newEx.id);
               setLocks(nl);
               setPicker(null);
+              refocus.current = true;
             } else if (adding && plan) {
               addExercise(newEx);
               setAdding(false);
+              refocus.current = true;
             } else if (groupAdd !== null && plan) {
               addToGroupExercise(groupAdd, newEx);
               setGroupAdd(null);

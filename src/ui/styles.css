@@ -881,6 +881,8 @@ button.danger:active { background: var(--bad-soft); border-color: transparent; }
 .pv-swap { flex: none; }
 .pv-rest { margin-top: 2px; }
 .pv-toast { position: sticky; bottom: 0; z-index: 1; box-shadow: 0 0 0 6px var(--card); display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; background: var(--card3); border-radius: var(--r-btn); padding: 6px 8px 6px 16px; }
+/* 고정 알림이 보이는 동안 초점·스크롤로 올라온 줄이 알림 밑에 가리지 않게 (알림 높이 + 여유) */
+.sheet.has-toast { scroll-padding-bottom: 72px; }
 .pv-toast .ghost { color: var(--acc-text); font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 /* 루틴 카드: 이름·부위 영역 전체를 누르는 버튼 (제목 글자는 그대로 두고 그 위에 투명하게 덮음) */
 .card-open-wrap { position: relative; min-height: 44px; }

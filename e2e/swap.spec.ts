@@ -328,3 +328,91 @@ test('D-080 검토 2차: 고르기 창 줄의 읽는 이름에 지난 기록, Ta
   await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r9')!.blocks[0]!.items[0]!.exerciseId).not.toBe('bench_press');
   await expect(pv.locator('.pv-row').first()).toContainText(name);
 });
+
+/** 플랜 만들기 화면에서 플랜 하나 만들기 (등 선택 안 함) */
+async function makePlan(page: Page) {
+  await page.getByRole('link', { name: '플랜' }).click();
+  await page.getByRole('button', { name: '등 선택 안 함' }).click();
+  await page.getByRole('dialog', { name: '등 우선순위' }).getByRole('button', { name: '완료' }).click();
+  await page.getByRole('button', { name: '플랜 만들기', exact: true }).click();
+  const plan = page.getByRole('region', { name: '생성된 플랜' });
+  await expect(plan).toBeVisible();
+  return plan;
+}
+
+test('D-080 검토 3차: 플랜 [운동 추가] → 새 운동 직접 추가 → 추가하면 맨 뒤에 붙고 초점은 [운동 추가] 로', async ({ page }) => {
+  const plan = await makePlan(page);
+  const names = async () => (await plan.locator('.card').count());
+  const before = await names();
+  const open = plan.getByRole('button', { name: '+ 운동 추가' }).last();
+  await open.click();
+  await page.getByRole('dialog', { name: '운동 추가' }).getByRole('button', { name: /새 운동 직접 추가/ }).click();
+  await page.getByLabel('운동 이름').fill('끝에 붙일 케이블 로우');
+  await page.getByRole('button', { name: '운동 추가하기', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(plan.getByText('끝에 붙일 케이블 로우', { exact: true })).toHaveCount(1);
+  expect(await names()).toBeGreaterThanOrEqual(before);
+  const cards = plan.locator('.card');
+  await expect(cards.last()).toContainText('끝에 붙일 케이블 로우');
+  await expect(page.locator('[data-opener="add"]').filter({ visible: true }).first()).toBeFocused();
+});
+
+test('D-080 검토 3차: 플랜 [묶음에 운동 추가] → 새 운동 직접 추가 → 추가하면 그 묶음 안에 들어감', async ({ page }) => {
+  const plan = await makePlan(page);
+  await page.getByRole('button', { name: /구체적인 플랜 만들기/ }).click();
+  const first = plan.locator('.card').first();
+  await first.getByRole('button', { name: /^다음과 묶기 · / }).click();
+  await expect(plan.locator('.card').first().locator('.badge.kind')).toBeVisible();
+  await plan.locator('.card').first().getByRole('button', { name: /^\+ 묶음에 운동 추가/ }).click();
+  await page.getByRole('dialog', { name: '묶음에 운동 추가' }).getByRole('button', { name: /새 운동 직접 추가/ }).click();
+  await page.getByLabel('운동 이름').fill('묶음용 케이블 컬');
+  await page.getByRole('button', { name: '운동 추가하기', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(plan.locator('.card').first()).toContainText('묶음용 케이블 컬');
+  await expect(plan.getByText('묶음용 케이블 컬', { exact: true })).toHaveCount(1);
+});
+
+test('D-080 검토 3차: 플랜 교체 → 검색어 입력 → 새 운동 직접 추가 → 닫으면 같은 검색어, 고르기 창을 닫으면 초점은 [교체] 로', async ({ page }) => {
+  const plan = await makePlan(page);
+  const opener = plan.getByRole('button', { name: '교체' }).first();
+  await opener.click();
+  const pick = page.getByRole('dialog', { name: '운동 교체' });
+  await pick.getByLabel('운동 검색').fill('로우');
+  await pick.getByRole('button', { name: /새 운동 직접 추가/ }).click();
+  const custom = page.getByRole('dialog', { name: '운동 직접 추가' });
+  await expect(custom).toBeVisible();
+  await custom.getByRole('button', { name: '닫기' }).click();
+  await expect(pick).toBeVisible();
+  await expect(pick.getByLabel('운동 검색')).toHaveValue('로우');
+  await pick.getByRole('button', { name: '닫기' }).click();
+  await expect(pick).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  // 다시 열면 검색어는 비어 있음
+  await opener.click();
+  await expect(page.getByRole('dialog', { name: '운동 교체' }).getByLabel('운동 검색')).toHaveValue('');
+});
+
+test('D-080 검토 3차: 홈 ⇄ → 고르기 → [되돌리기] 로 원래 운동, 초점은 그 ⇄; 고르지 않고 닫으면 ⇄ 초점·스크롤 그대로', async ({ page }) => {
+  const ids = ['pull_up', 'chin_up', 'plank', 'incline_db_press', 'deadlift', 'lat_pulldown', 'bench_press', 'leg_press'];
+  await idbPut(page, 'routines', [routine('r10', '홈 3차', ids.map((x) => one(x, 3)))]);
+  await page.reload();
+  const next = page.getByTestId('home-next');
+  const swap = next.getByRole('button', { name: '플랭크 바로 교체', exact: true });
+  await swap.click();
+  const pick = page.getByRole('dialog', { name: '운동 교체' });
+  await pick.getByLabel('운동 검색').fill('데드버그');
+  await pick.getByRole('button', { name: /^데드버그/ }).first().click();
+  await expect(page.locator('.toast').filter({ hasText: '플랭크 → 데드버그: 바꿨어요' })).toBeVisible();
+  await expect(next.getByRole('button', { name: '데드버그 바로 교체', exact: true })).toBeFocused();
+  await page.locator('.toast').getByRole('button', { name: '되돌리기' }).click();
+  const back = next.getByRole('button', { name: '플랭크 바로 교체', exact: true });
+  await expect(back).toBeFocused();
+  await expect.poll(async () => (await routines(page)).find((r) => r.id === 'r10')!.blocks[2]!.items[0]!.exerciseId).toBe('plank');
+  // 고르지 않고 닫기: 초점은 그 ⇄, 화면은 그대로
+  const last = next.getByRole('button', { name: '레그 프레스 바로 교체', exact: true });
+  await last.click();
+  const y0 = await page.evaluate(() => window.scrollY);
+  await page.getByRole('dialog', { name: '운동 교체' }).getByRole('button', { name: '닫기' }).click();
+  await expect(last).toBeFocused();
+  expect(await page.evaluate(() => window.scrollY)).toBe(y0);
+});

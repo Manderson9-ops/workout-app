@@ -95,9 +95,9 @@ export function NumInput({ value, onChange, label, suffix, integer, pendingKey }
  * (확인 창 ConfirmHost는 modal + 자기 키 처리를 씁)
  * focusClose = 처음 초점을 닫기 버튼에 (검색칸에 주면 아이폰 키보드가 목록을 덮음)
  */
-export function Sheet({ onClose, title, children, modal, trap, cls, focusClose }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean; cls?: string; focusClose?: boolean }) {
+export function Sheet({ onClose, title, children, modal, trap, cls, focusClose, returnFocus }: { onClose: () => void; title: string; children: ComponentChildren; modal?: boolean; trap?: boolean; cls?: string; focusClose?: boolean; returnFocus?: () => HTMLElement | null }) {
   const panel = useRef<HTMLDivElement>(null);
-  useDialogKeys(trap ? panel : null, onClose);
+  useDialogKeys(trap ? panel : null, onClose, returnFocus);
   return (
     <>
       <div class="sheet-bg" onClick={onClose} />
@@ -109,10 +109,15 @@ export function Sheet({ onClose, title, children, modal, trap, cls, focusClose }
   );
 }
 
-/** 대화상자 키: 열릴 때 [data-autofocus](없으면 첫 버튼)에 초점, Tab은 안에서만 돌고, Esc = 닫기, 닫히면 연 곳으로 초점 */
-export function useDialogKeys(ref: { current: HTMLElement | null } | null, onClose: () => void) {
+/**
+ * 대화상자 키: 열릴 때 [data-autofocus](없으면 첫 버튼)에 초점, Tab은 안에서만 돌고, Esc = 닫기, 닫히면 연 곳으로 초점
+ * returnFocus = 닫힐 때 초점을 줄 곳을 직접 정함 (창이 잠시 내려갔다 다시 뜨는 흐름용: 열 때 초점을 잡아 둔 곳이 이미 사라졌을 수 있음). null 이면 초점을 옮기지 않음
+ */
+export function useDialogKeys(ref: { current: HTMLElement | null } | null, onClose: () => void, returnFocus?: () => HTMLElement | null) {
   const close = useRef(onClose);
   close.current = onClose;
+  const ret = useRef(returnFocus);
+  ret.current = returnFocus;
   useLayoutEffect(() => {
     if (!ref) return;
     const back = document.activeElement as HTMLElement | null;
@@ -130,7 +135,11 @@ export function useDialogKeys(ref: { current: HTMLElement | null } | null, onClo
       e.preventDefault(); els[n]!.focus();
     };
     window.addEventListener('keydown', k);
-    return () => { window.removeEventListener('keydown', k); if (back?.isConnected) back.focus(); };
+    return () => {
+      window.removeEventListener('keydown', k);
+      const to = ret.current ? ret.current() : back;
+      if (to?.isConnected) to.focus();
+    };
   }, []);
 }
 
@@ -213,7 +222,7 @@ export function Empty({ title, text = '아직 기록 없음', hint, children, la
 }
 
 /** 운동 고르기 (교체·추가). part가 있으면 그 부위 후보를 등급 순으로 먼저 */
-export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctxIn, onPick, onClose, title, onAddCustom, from }: {
+export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctxIn, onPick, onClose, title, onAddCustom, from, query, onQuery, returnFocus }: {
   s: AppState; all: BuiltExercise[]; part?: Part; exclude?: string[];
   /** D-080: 바꿀 운동 id. 있고 검색어가 비면 목록 위에 "비슷한 운동" (최대 5개) */
   from?: string;
@@ -223,8 +232,14 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
   ctxParts?: Part[];
   onPick: (e: BuiltExercise) => void; onClose: () => void; title: string;
   onAddCustom?: () => void;
+  /** 검색어를 부모가 쥐는 경우 (창이 잠시 내려갔다 다시 떠도 글자 유지). 없으면 안에서 관리 */
+  query?: string; onQuery?: (q: string) => void;
+  /** 닫힐 때 초점을 돌려줄 곳 (Sheet 로 전달) */
+  returnFocus?: () => HTMLElement | null;
 }) {
-  const [q, setQ] = useState('');
+  const [q0, setQ0] = useState('');
+  const q = query ?? q0;
+  const setQ = (v: string) => { setQ0(v); onQuery?.(v); };
   // D-044: 교체는 그 운동의 부위로 시작하고 기억에 손대지 않음. 추가는 마지막으로 고른 부위로 시작
   const swap = part !== undefined;
   const [p, setPRaw] = useState<Part | undefined>(() => {
@@ -268,7 +283,7 @@ export function ExercisePicker({ s, all, part, startPart, exclude, ctxParts: ctx
     </div>
   );
   return (
-    <Sheet onClose={onClose} title={title} trap focusClose>
+    <Sheet onClose={onClose} title={title} trap focusClose returnFocus={returnFocus}>
       <input placeholder="검색 (초성 가능: ㄹㅍㄷ)" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} aria-label="운동 검색" />
       {onAddCustom && (
         <button class="btn sub-btn" style={{ margin: '8px 0 0', width: '100%', justifyContent: 'center' }} onClick={onAddCustom}>

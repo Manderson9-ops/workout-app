@@ -34,7 +34,9 @@ export function foldSwaps(w: Workout): FoldBlock[] {
       for (const kb of fb) {
         const k = kb.items.find((x) => x !== n && x.it.exerciseId === n.from);
         if (!k) continue;
-        kb.items[kb.items.indexOf(k)] = { it: n.it, sets: k.sets + n.sets, root: k.root ?? k.it.exerciseId, from: k.from };
+        // 합친 가상 칸 = 남긴 세트(K) + 새 운동 세트(N): 안 접힌 칸과 같은 setCount 로 세어 미리 표시한 웜업(D-070) 보정이 그대로 적용됨
+        const merged: WorkoutItem = { ...n.it, sets: [...k.it.sets, ...n.it.sets], target: { ...n.it.target, sets: k.it.sets.length + n.it.target.sets } };
+        kb.items[kb.items.indexOf(k)] = { it: merged, sets: setCount(merged), root: k.root ?? k.it.exerciseId, from: k.from };
         nb.items.splice(nb.items.indexOf(n), 1);
         hit = true;
         break outer;
