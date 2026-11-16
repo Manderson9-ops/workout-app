@@ -24,14 +24,14 @@ const round1 = (v: number) => (Number.isInteger(v) ? v : Math.round(v * 10) / 10
 export function valueText(m: PeriodMetric, v: number, ton = false): string {
   if (m === 'count') return `${round1(v).toLocaleString()}회`;
   if (m === 'sets') return `${round1(v).toLocaleString()}세트`;
-  if (m === 'volume') return ton ? `${tonNum(v)}톤` : `${Math.round(v).toLocaleString()}kg`;
+  if (m === 'volume') return ton ? (v > 0 && v < 50 ? '0.1톤 미만' : `${tonNum(v)}톤`) : `${Math.round(v).toLocaleString()}kg`;
   return durText(v);
 }
 /** 카드 큰 숫자·작은 단위 쌍: 천 단위 쉼표, 시간은 10시간 이상이면 시간만 (반올림) */
 export function bigParts(m: PeriodMetric, v: number, ton = false): [string | number, string][] {
   if (m === 'count') return [[v.toLocaleString(), '회']];
   if (m === 'sets') return [[v.toLocaleString(), '세트']];
-  if (m === 'volume') return ton ? [[tonNum(v), '톤']] : [[v.toLocaleString(), 'kg']];
+  if (m === 'volume') return ton ? (v > 0 && v < 50 ? [['0.1', '톤 미만']] : [[tonNum(v), '톤']]) : [[v.toLocaleString(), 'kg']];
   return v >= 36000 ? [[Math.round(v / 3600).toLocaleString(), '시간']] : durParts(v);
 }
 /** 볼륨이 100만 kg 이상이면 카드의 큰 숫자·이전 값 줄을 톤으로 (390px 에서 일곱 자리 숫자가 안 들어감) */
@@ -76,23 +76,28 @@ export function rangeText(r: PeriodRange, today: string): string {
 /** 이동줄 밑 비교 대상 (짧게: 정확한 기준은 한 문장·아래 글에) */
 export const compareLine = (kind: PeriodKind, current: boolean): string => `vs. ${prevName(kind, current, true)}`;
 
-const NB = ' ';
-/** 한 줄 요약 (고른 지표 기준). 운동이 있었는지는 운동 수(curCount·prevCount)로 가림: 지표 값이 0이어도 운동은 있을 수 있음(맨몸 운동의 볼륨).
- * 라벨·값 안의 띄어쓰기는 줄바꿈 안 되는 공백(NBSP)이라 "이번 주"·"1시간 12분"이 반으로 갈리지 않음 */
-export function headline(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; curCount: number; prevCount: number; label: string }): string {
-  const { kind, current, metric, cur, prev, curCount, prevCount } = o;
-  const label = o.label.replace(/ /g, NB);
+/** 한 줄 요약 조각: nw 는 줄바꿈 없이 붙여 보일 부분(라벨·값). 화면 읽기·복사에는 일반 띄어쓰기 그대로 */
+export interface HeadlinePart { text: string; nw?: boolean }
+export const headlineText = (parts: HeadlinePart[]): string => parts.map((p) => p.text).join('');
+const T = (text: string): HeadlinePart => ({ text });
+const N = (text: string): HeadlinePart => ({ text, nw: true });
+/** 단어 + 조사 (단어는 nw) */
+const J = (word: string, withBatchim: string, without: string): HeadlinePart[] => [N(word), T(hasBatchim(word) ? withBatchim : without)];
+
+/** 한 줄 요약 (고른 지표 기준). 운동이 있었는지는 운동 수(curCount·prevCount)로 가림: 지표 값이 0이어도 운동은 있을 수 있음(맨몸 운동의 볼륨) */
+export function headline(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; curCount: number; prevCount: number; label: string }): HeadlinePart[] {
+  const { kind, current, metric, cur, prev, curCount, prevCount, label } = o;
   const name = METRIC_NAME[metric];
+  const none = (): HeadlinePart[] => (current ? [...J(label, '은', '는'), T(' 아직 운동 기록이 없어요')] : [T('이 기간에는 운동 기록이 없어요')]);
+  if (curCount === 0 && prevCount === 0) return none();
   const ton = metric === 'volume' && tonMode(cur, prev);
-  const val = (v: number) => valueText(metric, v, ton).replace(/ /g, NB).replace(/,/g, ',⁠'); // 쉼표 뒤에서도 줄이 안 바뀜(WORD JOINER)
-  if (curCount === 0 && prevCount === 0) return current ? `${josa(label, '은', '는')} 아직 운동 기록이 없어요` : '이 기간에는 운동 기록이 없어요';
-  const pn = prevName(kind, current).replace(/ /g, NB);
-  if (prevCount === 0) return `${josa(pn, '은', '는')} 운동이 없었어요 · ${label} ${val(cur)}`;
-  if (metric === 'volume' && cur === 0 && prev === 0) return '무게를 적은 세트가 없어 볼륨은 0kg이에요';
-  if (cur === prev) return `${josa(pn, '과', '와')} ${josa(name, '이', '가')} 같아요`;
-  const more = cur > prev;
-  const adj = metric === 'time' ? (more ? '길어요' : '짧아요') : (more ? '많아요' : '적어요');
-  return `${pn}보다 ${josa(name, '이', '가')} ${val(Math.abs(cur - prev))} ${adj}`;
+  const val = (v: number) => N(valueText(metric, v, ton));
+  const pn = prevName(kind, current);
+  if (prevCount === 0) return [...J(pn, '은', '는'), T(' 운동이 없었어요 · '), N(label), T(' '), val(cur)];
+  if (metric === 'volume' && cur === 0 && prev === 0) return curCount === 0 ? none() : [T('무게를 적은 세트가 없어 볼륨은 0kg이에요')];
+  if (cur === prev) return [...J(pn, '과', '와'), T(` ${josa(name, '이', '가')} 같아요`)];
+  const adj = metric === 'time' ? (cur > prev ? '길어요' : '짧아요') : (cur > prev ? '많아요' : '적어요');
+  return [N(pn), T(`보다 ${josa(name, '이', '가')} `), val(Math.abs(cur - prev)), T(` ${adj}`)];
 }
 
 /** 카드 aria-label: "운동 1회, 지난주 같은 요일까지 0회보다 1회 많음" */

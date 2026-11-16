@@ -244,3 +244,15 @@ test('볼륨 100만 kg 이상이면 카드가 톤으로, 한 줄에 들어감', 
   for (const h of hs) expect(h, '큰 숫자 한 줄').toBeLessThan(40);
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
 });
+
+test('좁은 화면(320px)에서도 한 문장 안의 값·라벨이 줄 중간에서 갈리지 않는다', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await card(page).getByTestId('pm-volume').click();
+  const head = card(page).getByTestId('period-headline');
+  await expect(head).toContainText('볼륨이');
+  await expect(head).not.toContainText('⁠');
+  const hs = await head.locator('.nw').evaluateAll((els) => els.map((e) => ({ t: e.textContent, h: e.getBoundingClientRect().height })));
+  expect(hs.some((x) => /kg/.test(x.t ?? ''))).toBe(true);
+  for (const x of hs) expect(x.h, `${x.t} 한 줄`).toBeLessThan(26);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
+});

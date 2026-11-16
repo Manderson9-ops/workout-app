@@ -1,5 +1,5 @@
 /** D-081 기간 요약 카드: 주·월·년 전환, 이전 기간과 비교 한 문장, 지표 카드 4개, 막대 그래프 (Apple 피트니스 요약 모양) */
-import { useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import type { Workout } from '../../core/session';
 import type { Exercise } from '../../core/types';
@@ -30,6 +30,8 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
   const [sel, setSel] = useState<number | null>(null);
   const setKind = (k: PeriodKind) => { if (k === kind) return; setPref({ kind: k, metric }); writePref(k, metric); setOff(0); setSel(null); };
   const setMetric = (m: PeriodMetric) => { setPref({ kind, metric: m }); writePref(kind, m); };
+  const day0 = useRef(today);
+  useEffect(() => { if (day0.current !== today) { day0.current = today; setSel(null); } }, [today]); // 자정을 넘기면 고른 칸을 비움 (처음 그릴 때는 건드리지 않음)
   const go = (n: number) => { setOff(n); setSel(null); };
 
   const current = off === 0;
@@ -54,6 +56,8 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
     if (kind === 'month') return [1, 8, 15, 22, 29].includes(d) ? String(d) : '';
     return String(i + 1);
   });
+  const lastOk = state.reduce((m, s, i) => (s !== 'future' ? i : m), 0);
+  const selv = sel !== null && sel <= lastOk ? sel : null; // 날이 바뀌어 미래가 된 칸은 고른 것으로 안 침
   const avgV = activeAverage(vals, cur.active);
   const activeN = cur.active.filter(Boolean).length;
   const empty = activeN === 0;
@@ -63,7 +67,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
     /** 한 칸 문구: "11월 16일 (월) · 작업 세트 9세트 · 운동 1회" (일·월 보기에서 지표가 운동 수가 아니면 운동한 칸에 횟수를 덧붙임) */
   const bucketLine = (i: number) => !cur.active[i] ? `${bucketText(kind, buckets[i]!.start)} · 운동 안 함` : `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!, ton)}${kind !== 'year' && metric !== 'count' ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
   const total = `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}`;
-  const caption = empty ? '' : sel === null ? `막대를 누르거나 옆으로 밀면 ${kind === 'year' ? '달별' : '날짜별'} 값이 보여요` : bucketLine(sel);
+  const caption = empty ? '' : selv === null ? `막대를 누르거나 옆으로 밀면 ${kind === 'year' ? '달별' : '날짜별'} 값이 보여요` : bucketLine(selv!);
   const todayWd = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8))).getDay();
   const atEnd = range.start <= earliest;
 
@@ -74,16 +78,16 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
       </div>
       <div class="ps-nav">
         <button aria-label={`이전 ${names}`} disabled={atEnd} onClick={() => go(off + 1)}>‹</button>
-        <div class="ps-mid" aria-live="polite">
+        <div class="ps-mid">
           <strong data-testid="period-label">{label}</strong>
           <span class="sub small" data-testid="period-range">{off <= 1 && <><span class="nw">{rangeText(range, today)}</span>{' '}</>}<span class="nw">{compareLine(kind, current)}</span></span>
         </div>
         <button aria-label={`다음 ${names}`} disabled={current} onClick={() => go(off - 1)}>›</button>
       </div>
-      <p class="ps-headline" data-testid="period-headline" aria-live="polite">{headline({ kind, current, metric, cur: metricValue(metric, t), prev: metricValue(metric, p), curCount: t.count, prevCount: p.count, label })}</p>
+      <p class="ps-headline" data-testid="period-headline" aria-live="polite">{headline({ kind, current, metric, cur: metricValue(metric, t), prev: metricValue(metric, p), curCount: t.count, prevCount: p.count, label }).map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
       <div class="sub small ps-caption" data-testid="period-caption">{caption}</div>
       {showAvg && !empty && <div class="sub small ps-legend" data-testid="period-avg"><span class="ps-swatch" aria-hidden="true" />{avgText(kind, metric, avgV, ton)}</div>}
-      <PeriodBars values={vals} labels={xLabels} state={state} selected={sel} onSelect={setSel}
+      <PeriodBars values={vals} labels={xLabels} state={state} selected={selv} onSelect={setSel}
         dots={kind === 'year' ? undefined : cur.active} avg={showAvg ? avgV : undefined} fmt={(v) => valueText(metric, v, ton)}
         valueText={bucketLine} jump={kind === 'year' ? 3 : 7}
         labelClass={kind === 'week' ? ['sun', '', '', '', '', '', 'sat'] : undefined}

@@ -903,7 +903,7 @@ html.editing .toast-stack { bottom: calc(16px + var(--safe-b)); }
 .ps-nav .ps-mid .small { display: block; overflow-wrap: anywhere; }
 .ps-headline { margin: 12px 0 4px; font-size: 17px; font-weight: 700; line-height: 1.4; word-break: keep-all; overflow-wrap: break-word; }
 .ps-caption { margin: 8px 0 2px; min-height: 20px; overflow-wrap: anywhere; }
-.pbars { width: 100%; max-width: 720px; touch-action: pan-y; user-select: none; -webkit-user-select: none; border-radius: 8px; cursor: pointer; }
+.pbars { width: 100%; touch-action: pan-y; user-select: none; -webkit-user-select: none; border-radius: 8px; cursor: pointer; }
 .pbars svg { display: block; }
 .pb-bar { fill: var(--sub); opacity: .5; }
 .pb-bar.now { fill: var(--acc); opacity: 1; }
@@ -919,7 +919,7 @@ html.editing .toast-stack { bottom: calc(16px + var(--safe-b)); }
 .pb-avg { stroke: var(--text); stroke-opacity: .7; stroke-width: 1; stroke-dasharray: 4 3; }
 .ps-legend { display: flex; align-items: center; gap: 8px; margin: 2px 0 4px; }
 .ps-swatch { flex: none; width: 18px; height: 0; border-top: 2px dashed var(--text); opacity: .7; }
-.ps-mid .nw { white-space: nowrap; }
+.nw { white-space: nowrap; }
 .pm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 button.pm-card { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 2px; min-width: 0; text-align: left; padding: 10px 12px; border-radius: 12px; background: var(--card2); font-weight: 500; }
 button.pm-card.on { background: var(--acc-fill); border-color: var(--acc-fill); color: var(--on-acc); }

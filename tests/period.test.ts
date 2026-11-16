@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { periodOf, shiftPeriod, periodBuckets, compareThrough, periodData, earliestPeriod, activeAverage, daysInMonth } from '../src/core/period';
-import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, tonMode, headline, cardAria, bucketText, footnote } from '../src/core/periodText';
+import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, tonMode, headlineText, headline, cardAria, bucketText, footnote } from '../src/core/periodText';
 import { weekSummary } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
@@ -183,8 +183,7 @@ describe('periodText', () => {
     expect(bucketText('year', '2026-03-01')).toBe('2026년 3월');
   });
   it('한 문장', () => {
-    const sp = (s: string) => s.replace(/ /g, ' ').replace(/⁠/g, ''); // 줄바꿈 안 되는 공백은 일반 공백으로 견줌
-    const H = (o: Partial<Parameters<typeof headline>[0]>) => sp(headline({ kind: 'week', current: true, metric: 'sets', cur: 1, prev: 1, curCount: 1, prevCount: 1, label: '이번 주', ...o }));
+    const H = (o: Partial<Parameters<typeof headline>[0]>) => headlineText(headline({ kind: 'week', current: true, metric: 'sets', cur: 1, prev: 1, curCount: 1, prevCount: 1, label: '이번 주', ...o }));
     expect(H({ cur: 20, prev: 11 })).toBe('지난주 이맘때보다 작업 세트가 9세트 많아요');
     expect(H({ cur: 2, prev: 11 })).toBe('지난주 이맘때보다 작업 세트가 9세트 적어요');
     expect(H({ cur: 0, prev: 9 })).toBe('지난주 이맘때보다 작업 세트가 9세트 적어요');
@@ -209,8 +208,20 @@ describe('periodText', () => {
     expect(H({ metric: 'time', cur: 0, prev: 0 })).toBe('지난주 이맘때와 시간이 같아요');
     expect(H({ metric: 'volume', cur: 3003040, prev: 0, prevCount: 0, label: '작년', current: false, kind: 'year' })).toBe('전년은 운동이 없었어요 · 작년 3,003톤');
     expect(H({ metric: 'volume', cur: 2500000, prev: 1000000 })).toBe('지난주 이맘때보다 볼륨이 1,500톤 많아요');
-    // 라벨·값의 띄어쓰기는 줄바꿈 안 되는 공백
-    expect(headline({ kind: 'week', current: true, metric: 'time', cur: 4380, prev: 0, curCount: 1, prevCount: 0, label: '이번 주' })).toContain('이번 주 1시간 13분');
+    // M2: 맨몸 볼륨 0 이어도 이번 기간 운동이 없으면 "기록 없음" 문장
+    expect(H({ metric: 'volume', cur: 0, prev: 0, curCount: 0, prevCount: 2 })).toBe('이번 주는 아직 운동 기록이 없어요');
+    expect(H({ metric: 'volume', cur: 0, prev: 0, curCount: 0, prevCount: 2, current: false, label: '9월' })).toBe('이 기간에는 운동 기록이 없어요');
+    // 조각: 라벨·값은 nw, 합치면 일반 띄어쓰기 글
+    const parts = headline({ kind: 'week', current: true, metric: 'time', cur: 4380, prev: 0, curCount: 1, prevCount: 0, label: '이번 주' });
+    expect(parts.filter((p) => p.nw).map((p) => p.text)).toEqual(['지난주 이맘때', '이번 주', '1시간 13분']);
+    expect(headlineText(parts)).toBe('지난주 이맘때는 운동이 없었어요 · 이번 주 1시간 13분');
+    expect(headlineText(parts)).not.toMatch(/[ ⁠]/);
+    // M3: 톤 모드에서 아주 작은 값
+    expect(valueText('volume', 30, true)).toBe('0.1톤 미만');
+    expect(valueText('volume', 0, true)).toBe('0톤');
+    expect(valueText('volume', 50, true)).toBe('0.1톤');
+    expect(bigParts('volume', 30, true)).toEqual([['0.1', '톤 미만']]);
+    expect(cardAria({ kind: 'year', current: true, metric: 'volume', cur: 30, prev: 2000000, ton: true })).toBe('볼륨 0.1톤 미만, 작년 같은 날까지 2,000톤보다 2,000톤 적음');
   });
   it('카드 읽기 문구·아래 글', () => {
     const o = { kind: 'week' as const, current: true, metric: 'count' as const };

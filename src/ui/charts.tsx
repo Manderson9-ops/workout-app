@@ -210,7 +210,7 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
           return (
             <g key={i}>
               <rect x={cx - bw / 2} y={h - pad.b - bh} width={bw} height={bh} rx={Math.min(4, bw / 2)} class={cls} />
-              {dots?.[i] && <circle cx={cx} cy={h - pad.b + 7} r="2.5" class="pb-dot" />}
+              {dots?.[i] && <circle cx={cx} cy={h - pad.b + 5} r="2.5" class="pb-dot" />}
               {lines.map((t, k) => t && <text key={k} x={cx} y={h - pad.b + 20 + k * 13} class={`ch-text${selected === i ? ' pb-sel-text' : ''}${labelClass?.[i] ? ` ${labelClass[i]}` : ''}`} font-size={FS} text-anchor="middle">{t}</text>)}
             </g>
           );
