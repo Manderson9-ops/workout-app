@@ -1,6 +1,6 @@
 /** D-081 기간 요약 문구 (순수 함수). 조사(이/가·은/는·와/과)는 받침으로 고른다 */
 import { WD, weekRangeText } from './dateText';
-import { durText } from './stats';
+import { durText, durParts } from './stats';
 import type { PeriodKind, PeriodMetric, PeriodRange } from './period';
 
 /** 마지막 글자에 받침이 있나 (한글 음절, 'g'(kg = 킬로그램)는 있음, 그 밖은 없음으로 본다) */
@@ -25,7 +25,17 @@ export function valueText(m: PeriodMetric, v: number): string {
   if (m === 'volume') return `${Math.round(v).toLocaleString()}kg`;
   return durText(v);
 }
-/** 큰 숫자·작은 단위 쌍 (시간은 durParts 를 따로 씀) */
+/** 카드 큰 숫자·작은 단위 쌍: 천 단위 쉼표, 시간은 10시간 이상이면 시간만 (반올림) */
+export function bigParts(m: PeriodMetric, v: number): [string | number, string][] {
+  if (m === 'count') return [[v.toLocaleString(), '회']];
+  if (m === 'sets') return [[v.toLocaleString(), '세트']];
+  if (m === 'volume') return [[v.toLocaleString(), 'kg']];
+  return v >= 36000 ? [[Math.round(v / 3600).toLocaleString(), '시간']] : durParts(v);
+}
+/** 평균 문구: 운동한 날(년은 달) 평균, 횟수·세트·볼륨은 정수로 */
+export function avgText(kind: PeriodKind, m: PeriodMetric, v: number): string {
+  return `${kind === 'year' ? '운동한 달' : '운동한 날'} 평균 ${m === 'time' ? durText(v) : valueText(m, Math.round(v))}`;
+}
 export const metricValue = (m: PeriodMetric, totals: { count: number; sets: number; volume: number; durationSec: number }) =>
   m === 'count' ? totals.count : m === 'sets' ? totals.sets : m === 'volume' ? totals.volume : totals.durationSec;
 
@@ -59,11 +69,8 @@ export function rangeText(r: PeriodRange, today: string): string {
   }
   return `${y}년 1월~12월`;
 }
-/** 이동줄 밑 비교 대상 */
-export function compareLine(kind: PeriodKind, current: boolean): string {
-  if (!current) return `vs. ${prevName(kind, false)}`;
-  return `vs. ${prevPhrase(kind, true)}`;
-}
+/** 이동줄 밑 비교 대상 (짧게: 정확한 기준은 한 문장·아래 글에) */
+export const compareLine = (kind: PeriodKind, current: boolean): string => `vs. ${prevName(kind, current, true)}`;
 
 /** 한 줄 요약 (고른 지표 기준) */
 export function headline(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; label: string }): string {
@@ -84,7 +91,7 @@ export function cardAria(o: { kind: PeriodKind; current: boolean; metric: Period
   const pp = prevPhrase(kind, current), cv = valueText(metric, cur), pv = valueText(metric, prev);
   const head = `${METRIC_NAME[metric]} ${cv}, ${pp} `;
   if (cur === prev) return `${head}${josa(pv, '과', '와')} 같음`;
-  return `${head}${pv}보다 ${valueText(metric, Math.abs(cur - prev))} ${cur > prev ? '많음' : '적음'}`;
+  return `${head}${pv}보다 ${valueText(metric, Math.abs(cur - prev))} ${metric === 'time' ? (cur > prev ? '김' : '짧음') : (cur > prev ? '많음' : '적음')}`;
 }
 
 /** 칸 날짜 문구: week·month "11월 16일 (월)", year "2026년 3월" */
@@ -100,5 +107,5 @@ export function footnote(kind: PeriodKind, current: boolean, through: string, st
   const [, m, d] = through.split('-').map(Number);
   if (kind === 'week') return `▲▼ = 지난주 같은 요일(일${todayWd > 0 ? `~${WD[todayWd]}` : ''})까지와 비교 · 연속 ${streak}주 · 일요일~토요일 기준`;
   if (kind === 'month') return `▲▼ = 지난달 같은 날(${d === 1 ? '1일' : `1~${d}일`})까지와 비교`;
-  return `▲▼ = 작년 같은 날(1월 1일~${m}월 ${d}일)까지와 비교`;
+  return `▲▼ = 작년 같은 날(${m === 1 && d === 1 ? '1월 1일' : `1월 1일~${m}월 ${d}일`})까지와 비교`;
 }

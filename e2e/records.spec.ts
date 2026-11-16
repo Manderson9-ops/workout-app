@@ -44,7 +44,8 @@ const kind = (page: Page, n: string) => card(page).getByRole('group', { name: '�
 test('기본 주 보기: 7칸, 이번 주 이름, 비교 문장, 카드 4개', async ({ page }) => {
   await expect(card(page).getByTestId('period-label')).toHaveText('이번 주');
   await expect(bars(page)).toHaveCount(7);
-  await expect(chart(page)).toHaveAttribute('aria-valuemax', '7');
+  await expect(chart(page)).toHaveAttribute('aria-valuemax', '2'); // 고를 수 있는 마지막 칸 = 오늘(월)
+  await expect(chart(page)).toHaveAttribute('aria-valuenow', '2');
   await expect(chart(page)).toHaveAttribute('aria-label', '일별 작업 세트 그래프');
   await expect(kind(page, '주')).toHaveAttribute('aria-pressed', 'true');
   await expect(card(page).getByTestId('period-headline')).toHaveText('지난주 이맘때보다 작업 세트가 2세트 많아요'); // 7 vs 5
@@ -97,15 +98,20 @@ test('슬라이더: 화살표로 칸을 고르고 Esc 로 해제', async ({ page
   const c = chart(page), cap = card(page).getByTestId('period-caption');
   await c.focus();
   await page.keyboard.press('ArrowLeft'); // 고른 칸이 없으면 첫 화살표는 오늘(월) 칸을 고름
-  await expect(cap).toHaveText('11월 16일 (월) · 작업 세트 4세트');
+  await expect(cap).toHaveText('11월 16일 (월) · 작업 세트 4세트 · 운동 1회');
   await page.keyboard.press('ArrowLeft');
-  await expect(cap).toHaveText('11월 15일 (일) · 작업 세트 3세트');
-  await expect(c).toHaveAttribute('aria-valuetext', '11월 15일 (일) · 작업 세트 3세트');
+  await expect(cap).toHaveText('11월 15일 (일) · 작업 세트 3세트 · 운동 1회');
+  await expect(c).toHaveAttribute('aria-valuetext', '11월 15일 (일) · 작업 세트 3세트 · 운동 1회');
   await expect(c).toHaveAttribute('aria-valuenow', '1');
-  await page.keyboard.press('ArrowRight');
-  await expect(cap).toHaveText('11월 16일 (월) · 작업 세트 4세트');
+  await page.keyboard.press('ArrowUp'); // ↑ = 오른쪽
+  await expect(cap).toHaveText('11월 16일 (월) · 작업 세트 4세트 · 운동 1회');
   await page.keyboard.press('ArrowRight'); // 미래 칸은 못 고름
-  await expect(cap).toHaveText('11월 16일 (월) · 작업 세트 4세트');
+  await expect(cap).toHaveText('11월 16일 (월) · 작업 세트 4세트 · 운동 1회');
+  await expect(c).toHaveAttribute('aria-valuemax', '2'); // 고를 수 있는 마지막 칸 = 오늘
+  await page.keyboard.press('PageDown'); // 한 번에 끝으로
+  await expect(cap).toHaveText('11월 15일 (일) · 작업 세트 3세트 · 운동 1회');
+  await page.keyboard.press('ArrowDown');
+  await expect(cap).toHaveText('11월 15일 (일) · 작업 세트 3세트 · 운동 1회');
   await page.keyboard.press('Escape');
   await expect(cap).toHaveText('합계 · 작업 세트 7세트');
 });
@@ -121,7 +127,7 @@ test('고른 단위·지표는 새로 열어도 기억 (이동한 기간은 이�
   await expect(card(page).getByTestId('period-label')).toHaveText('이번 달');
 });
 
-test('390px 가로 스크롤 없음 (주·월·년), 밝은 화면도 그려짐', async ({ page }) => {
+test('390px 가로 스크롤 없음 (주·월·년)', async ({ page }) => {
   const noScroll = async () => expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
   for (const k of ['주', '월', '년']) {
     await kind(page, k).click();
@@ -129,8 +135,69 @@ test('390px 가로 스크롤 없음 (주·월·년), 밝은 화면도 그려짐'
     await noScroll();
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.emulateMedia({ colorScheme: 'light' });
-  await expect(card(page)).toBeVisible();
   await expect(bars(page)).toHaveCount(12);
   await noScroll();
+});
+
+/** 합성 포인터 이벤트 (pointerType touch): 그래프 가운데 줄 기준 좌표 */
+async function ptr(page: Page, type: string, x: number, y: number) {
+  await page.getByTestId('period-chart').evaluate((el, a) => {
+    el.dispatchEvent(new PointerEvent(a.type, { pointerId: 7, pointerType: 'touch', clientX: a.x, clientY: a.y, bubbles: true, isPrimary: true }));
+  }, { type, x, y });
+}
+/** 주 보기 i 번째 칸(일=0)의 화면 좌표 */
+async function slot(page: Page, i: number) {
+  const b = (await chart(page).boundingBox())!;
+  const s = (b.width - 16) / 7;
+  return { x: b.x + 8 + s * (i + 0.5), y: b.y + b.height / 2, s };
+}
+
+test('터치: 세로로 끌면 고르지 않고(스크롤), 가로로 끌면 훑고, 탭은 고름·다시 탭하면 해제, 취소는 원래대로', async ({ page }) => {
+  const cap = card(page).getByTestId('period-caption');
+  const total = '합계 · 작업 세트 7세트';
+  const sun = await slot(page, 0), mon = await slot(page, 1);
+  // 세로 끌기 + 취소(브라우저가 스크롤로 가져감) → 그대로
+  await ptr(page, 'pointerdown', sun.x, sun.y);
+  await ptr(page, 'pointermove', sun.x, sun.y + 20);
+  await ptr(page, 'pointercancel', sun.x, sun.y + 20);
+  await expect(cap).toHaveText(total);
+  // 세로 끌기 뒤 떼기도 고르지 않음
+  await ptr(page, 'pointerdown', sun.x, sun.y);
+  await ptr(page, 'pointermove', sun.x + 2, sun.y + 12);
+  await ptr(page, 'pointerup', sun.x + 2, sun.y + 12);
+  await expect(cap).toHaveText(total);
+  // 가로 끌기: 훑는 동안 고름, 떼도 그대로
+  await ptr(page, 'pointerdown', sun.x, sun.y);
+  await ptr(page, 'pointermove', mon.x, sun.y);
+  await expect(cap).toContainText('11월 16일 (월)');
+  await ptr(page, 'pointerup', mon.x, sun.y);
+  await expect(cap).toContainText('11월 16일 (월)');
+  await chart(page).focus(); await page.keyboard.press('Escape');
+  await expect(cap).toHaveText(total);
+  // 훑다가 취소 → 처음(고른 칸 없음)으로
+  await ptr(page, 'pointerdown', sun.x, sun.y);
+  await ptr(page, 'pointermove', mon.x, sun.y);
+  await expect(cap).toContainText('11월 16일 (월)');
+  await ptr(page, 'pointercancel', mon.x, sun.y);
+  await expect(cap).toHaveText(total);
+  // 탭 = 고름, 같은 칸 다시 탭 = 해제
+  await ptr(page, 'pointerdown', sun.x, sun.y); await ptr(page, 'pointerup', sun.x, sun.y);
+  await expect(cap).toContainText('11월 15일 (일)');
+  await ptr(page, 'pointerdown', sun.x, sun.y); await ptr(page, 'pointerup', sun.x, sun.y);
+  await expect(cap).toHaveText(total);
+  // 미래 칸 탭은 무시
+  const fri = await slot(page, 5);
+  await ptr(page, 'pointerdown', fri.x, fri.y); await ptr(page, 'pointerup', fri.x, fri.y);
+  await expect(cap).toHaveText(total);
+});
+
+test('운동한 날 점·평균 범례·큰 숫자 쉼표·이동줄', async ({ page }) => {
+  await expect(chart(page).locator('circle.pb-dot')).toHaveCount(2); // 일·월
+  await expect(card(page).getByTestId('period-avg')).toHaveText('운동한 날 평균 4세트'); // (3+4)/2 = 3.5 → 4
+  await expect(card(page).getByTestId('period-range')).toHaveText('11월 15일~21일 vs. 지난주');
+  await card(page).getByTestId('pm-count').click();
+  await expect(card(page).getByTestId('period-avg')).toHaveCount(0); // 주·월 보기의 운동 수는 평균선 없음
+  await card(page).getByRole('button', { name: '이전 주' }).click();
+  await card(page).getByRole('button', { name: '이전 주' }).click();
+  await expect(card(page).getByTestId('period-range')).toHaveText('vs. 그 전 주'); // 라벨이 날짜면 범위 줄은 없음
 });

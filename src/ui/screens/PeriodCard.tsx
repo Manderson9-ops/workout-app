@@ -3,10 +3,10 @@ import { useMemo, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import type { Workout } from '../../core/session';
 import type { Exercise } from '../../core/types';
-import { weekStreak, durParts } from '../../core/stats';
+import { weekStreak } from '../../core/stats';
 import { periodOf, shiftPeriod, periodBuckets, compareThrough, periodData, earliestPeriod, activeAverage } from '../../core/period';
 import type { PeriodKind, PeriodMetric } from '../../core/period';
-import { METRICS, METRIC_NAME, KIND_LABEL, valueText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
+import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, avgText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
 import { WD } from '../../core/dateText';
 import { PeriodBars } from '../charts';
 import type { BucketState } from '../charts';
@@ -55,9 +55,9 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
   });
   const avgV = activeAverage(vals, cur.active);
   const showAvg = avgV > 0 && !(metric === 'count' && kind !== 'year');
-  const avgLabel = `${kind === 'year' ? '운동한 달' : '운동한 날'} 평균 ${valueText(metric, avgV)}`;
-  const caption = sel === null ? `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0))}`
-    : `${bucketText(kind, buckets[sel]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[sel]!)}`;
+    /** 한 칸 문구: "11월 16일 (월) · 작업 세트 9세트 · 운동 1회" (일·월 보기에서 지표가 운동 수가 아니면 운동한 칸에 횟수를 덧붙임) */
+  const bucketLine = (i: number) => `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!)}${kind !== 'year' && metric !== 'count' && cur.active[i] ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
+  const caption = sel === null ? `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0))}` : bucketLine(sel);
   const t = cur.totals, p = prev.totals;
   const todayWd = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8))).getDay();
   const atEnd = range.start <= earliest;
@@ -71,20 +71,21 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
         <button aria-label={`이전 ${names}`} disabled={atEnd} onClick={() => go(off + 1)}>‹</button>
         <div class="ps-mid" aria-live="polite">
           <strong data-testid="period-label">{label}</strong>
-          <span class="sub small" data-testid="period-range">{rangeText(range, today)} · {compareLine(kind, current)}</span>
+          <span class="sub small" data-testid="period-range">{off <= 1 && <><span class="nw">{rangeText(range, today)}</span>{' '}</>}<span class="nw">{compareLine(kind, current)}</span></span>
         </div>
         <button aria-label={`다음 ${names}`} disabled={current} onClick={() => go(off - 1)}>›</button>
       </div>
-      <p class="ps-headline" data-testid="period-headline">{headline({ kind, current, metric, cur: metricValue(metric, t), prev: metricValue(metric, p), label })}</p>
+      <p class="ps-headline" data-testid="period-headline" aria-live="polite">{headline({ kind, current, metric, cur: metricValue(metric, t), prev: metricValue(metric, p), label })}</p>
       <div class="sub small ps-caption" data-testid="period-caption">{caption}</div>
+      {showAvg && <div class="sub small ps-legend" data-testid="period-avg"><span class="ps-swatch" aria-hidden="true" />{avgText(kind, metric, avgV)}</div>}
       <PeriodBars values={vals} labels={xLabels} state={state} selected={sel} onSelect={setSel}
-        avg={showAvg ? { value: avgV, label: avgLabel } : undefined}
-        valueText={(i) => `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!)}`}
+        dots={kind === 'year' ? undefined : cur.active} avg={showAvg ? avgV : undefined} fmt={(v) => valueText(metric, v)}
+        valueText={bucketLine} jump={kind === 'year' ? 3 : 7}
         summary={caption} label={`${kind === 'year' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />
       <div class="pm-grid">
         {METRICS.map((m) => {
           const c = metricValue(m, t), pv = metricValue(m, p);
-          const parts: [string | number, string][] = m === 'count' ? [[c, '회']] : m === 'sets' ? [[c, '세트']] : m === 'volume' ? [[c.toLocaleString(), 'kg']] : durParts(c);
+          const parts = bigParts(m, c);
           const dir = c > pv ? 'up' : c < pv ? 'down' : 'same';
           return (
             <button key={m} class={`pm-card${metric === m ? ' on' : ''}`} aria-pressed={metric === m} data-testid={`pm-${m}`}

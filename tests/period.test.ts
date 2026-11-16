@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { periodOf, shiftPeriod, periodBuckets, compareThrough, periodData, earliestPeriod, activeAverage, daysInMonth } from '../src/core/period';
-import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../src/core/periodText';
+import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, headline, cardAria, bucketText, footnote } from '../src/core/periodText';
 import { weekSummary } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
@@ -132,6 +132,17 @@ describe('periodText', () => {
     expect(valueText('sets', 9)).toBe('9세트');
     expect(valueText('volume', 12345.4)).toBe('12,345kg');
     expect(valueText('time', 720)).toBe('12분');
+    expect(bigParts('count', 1894)).toEqual([['1,894', '회']]);
+    expect(bigParts('sets', 1894)).toEqual([['1,894', '세트']]);
+    expect(bigParts('volume', 12345)).toEqual([['12,345', 'kg']]);
+    expect(bigParts('time', 4380)).toEqual([[1, '시간'], [13, '분']]);
+    expect(bigParts('time', 35000)).toEqual([[9, '시간'], [43, '분']]);
+    expect(bigParts('time', 36000)).toEqual([['10', '시간']]);
+    expect(bigParts('time', 168 * 3600 + 1700)).toEqual([['168', '시간']]);
+    expect(avgText('week', 'sets', 8.6)).toBe('운동한 날 평균 9세트');
+    expect(avgText('year', 'count', 3.4)).toBe('운동한 달 평균 3회');
+    expect(avgText('month', 'volume', 1234.5)).toBe('운동한 날 평균 1,235kg');
+    expect(avgText('week', 'time', 2900)).toBe('운동한 날 평균 48분');
     const t = { count: 1, sets: 2, volume: 3, durationSec: 4 };
     expect([metricValue('count', t), metricValue('sets', t), metricValue('volume', t), metricValue('time', t)]).toEqual([1, 2, 3, 4]);
     expect(prevName('week', true)).toBe('지난주 이맘때');
@@ -140,7 +151,9 @@ describe('periodText', () => {
     expect(prevPhrase('week', true)).toBe('지난주 같은 요일까지');
     expect(prevPhrase('month', true)).toBe('지난달 같은 날까지');
     expect(prevPhrase('year', false)).toBe('그 전 해');
-    expect(compareLine('week', true)).toBe('vs. 지난주 같은 요일까지');
+    expect(compareLine('week', true)).toBe('vs. 지난주');
+    expect(compareLine('month', true)).toBe('vs. 지난달');
+    expect(compareLine('year', true)).toBe('vs. 작년');
     expect(compareLine('year', false)).toBe('vs. 그 전 해');
     const today = '2026-11-16';
     expect(periodLabel(periodOf('week', today), 0, today)).toBe('이번 주');
@@ -188,6 +201,9 @@ describe('periodText', () => {
     expect(footnote('month', true, '2026-10-16', 0, 1)).toBe('▲▼ = 지난달 같은 날(1~16일)까지와 비교');
     expect(footnote('month', true, '2026-10-01', 0, 1)).toBe('▲▼ = 지난달 같은 날(1일)까지와 비교');
     expect(footnote('year', true, '2025-11-16', 0, 1)).toBe('▲▼ = 작년 같은 날(1월 1일~11월 16일)까지와 비교');
+    expect(footnote('year', true, '2025-01-01', 0, 1)).toBe('▲▼ = 작년 같은 날(1월 1일)까지와 비교');
+    expect(cardAria({ ...o, metric: 'time', cur: 3600, prev: 2880 })).toBe('시간 1시간, 지난주 같은 요일까지 48분보다 12분 김');
+    expect(cardAria({ ...o, metric: 'time', cur: 2880, prev: 3600 })).toBe('시간 48분, 지난주 같은 요일까지 1시간보다 12분 짧음');
     expect(footnote('year', false, '', 0, 0)).toBe('▲▼ = 그 전 해 전체와 비교');
   });
 });

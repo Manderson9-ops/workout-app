@@ -909,9 +909,15 @@ html.editing .toast-stack { bottom: calc(16px + var(--safe-b)); }
 .pb-bar.now { fill: var(--acc); opacity: 1; }
 .pb-bar.future { fill: var(--sub); opacity: .18; }
 .pb-bar.sel { fill: var(--acc); opacity: 1; stroke: var(--text); stroke-width: 1.5; }
+.pb-bar.dim { fill: var(--sub); opacity: .5; }
+.pb-bar.now.dim { fill: var(--sub); opacity: .5; stroke: var(--acc); stroke-width: 1.5; }
+.pb-dot { fill: var(--sub); }
+.pb-top { stroke-opacity: .5; stroke-dasharray: 2 3; }
 .pb-sel-text { fill: var(--text); font-weight: 700; }
 .pb-avg { stroke: var(--text); stroke-opacity: .7; stroke-width: 1; stroke-dasharray: 4 3; }
-.pb-avg-text { fill: var(--text); paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+.ps-legend { display: flex; align-items: center; gap: 8px; margin: 2px 0 4px; }
+.ps-swatch { flex: none; width: 18px; height: 0; border-top: 2px dashed var(--text); opacity: .7; }
+.ps-mid .nw { white-space: nowrap; }
 .pm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 button.pm-card { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 2px; min-width: 0; text-align: left; padding: 10px 12px; border-radius: 12px; background: var(--card2); font-weight: 500; }
 button.pm-card.on { background: var(--acc-fill); border-color: var(--acc-fill); color: var(--on-acc); }
