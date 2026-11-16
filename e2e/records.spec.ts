@@ -51,7 +51,8 @@ test('기본 주 보기: 7칸, 이번 주 이름, 비교 문장, 카드 4개', a
   await expect(card(page).getByTestId('period-headline')).toHaveText('지난주 이맘때보다 작업 세트가 2세트 많아요'); // 7 vs 5
   await expect(card(page).getByRole('button', { name: '운동 2회, 지난주 같은 요일까지 1회보다 1회 많음' })).toBeVisible();
   await expect(card(page)).toContainText('지난주 같은 요일(일~월)까지와 비교');
-  await expect(card(page).getByTestId('period-caption')).toHaveText('합계 · 작업 세트 7세트');
+  await expect(card(page).getByTestId('period-caption')).toHaveText('막대를 누르거나 옆으로 밀면 날짜별 값이 보여요');
+  await expect(chart(page)).toHaveAttribute('aria-valuetext', '합계 · 작업 세트 7세트');
 });
 
 test('월·년으로 바꾸면 칸 수와 이름이 바뀐다', async ({ page }) => {
@@ -80,7 +81,7 @@ test('이전·다음 이동과 끝 비활성', async ({ page }) => {
   await expect(card(page).getByTestId('period-label')).toHaveText('작년');
   await expect(py).toBeDisabled(); // 가장 오래된 기록이 2025년
   await expect(card(page).getByRole('button', { name: '다음 해' })).toBeEnabled();
-  await expect(card(page).getByTestId('period-headline')).toContainText('그 전 해는 기록이 없었어요');
+  await expect(card(page).getByTestId('period-headline')).toContainText('전년은 운동이 없었어요');
 });
 
 test('볼륨 카드를 누르면 그래프 지표가 바뀐다', async ({ page }) => {
@@ -90,7 +91,7 @@ test('볼륨 카드를 누르면 그래프 지표가 바뀐다', async ({ page }
   await expect(vol).toHaveAttribute('aria-pressed', 'true');
   await expect(card(page).getByTestId('pm-sets')).toHaveAttribute('aria-pressed', 'false');
   await expect(chart(page)).toHaveAttribute('aria-label', '일별 볼륨 그래프');
-  await expect(card(page).getByTestId('period-caption')).toHaveText('합계 · 볼륨 3,500kg'); // 7세트 × 500
+  await expect(chart(page)).toHaveAttribute('aria-valuetext', '합계 · 볼륨 3,500kg'); // 7세트 × 500
   await expect(card(page).getByTestId('period-headline')).toContainText('볼륨이');
 });
 
@@ -113,7 +114,7 @@ test('슬라이더: 화살표로 칸을 고르고 Esc 로 해제', async ({ page
   await page.keyboard.press('ArrowDown');
   await expect(cap).toHaveText('11월 15일 (일) · 작업 세트 3세트 · 운동 1회');
   await page.keyboard.press('Escape');
-  await expect(cap).toHaveText('합계 · 작업 세트 7세트');
+  await expect(cap).toHaveText('막대를 누르거나 옆으로 밀면 날짜별 값이 보여요');
 });
 
 test('고른 단위·지표는 새로 열어도 기억 (이동한 기간은 이번으로)', async ({ page }) => {
@@ -154,7 +155,7 @@ async function slot(page: Page, i: number) {
 
 test('터치: 세로로 끌면 고르지 않고(스크롤), 가로로 끌면 훑고, 탭은 고름·다시 탭하면 해제, 취소는 원래대로', async ({ page }) => {
   const cap = card(page).getByTestId('period-caption');
-  const total = '합계 · 작업 세트 7세트';
+  const total = '막대를 누르거나 옆으로 밀면 날짜별 값이 보여요';
   const sun = await slot(page, 0), mon = await slot(page, 1);
   // 세로 끌기 + 취소(브라우저가 스크롤로 가져감) → 그대로
   await ptr(page, 'pointerdown', sun.x, sun.y);
@@ -200,4 +201,46 @@ test('운동한 날 점·평균 범례·큰 숫자 쉼표·이동줄', async ({ 
   await card(page).getByRole('button', { name: '이전 주' }).click();
   await card(page).getByRole('button', { name: '이전 주' }).click();
   await expect(card(page).getByTestId('period-range')).toHaveText('vs. 그 전 주'); // 라벨이 날짜면 범위 줄은 없음
+});
+
+test('지난 주 운동 안 한 날을 고르면 "운동 안 함", 일요일 라벨은 빨강·토요일은 파랑', async ({ page }) => {
+  await card(page).getByRole('button', { name: '이전 주' }).click();
+  await chart(page).focus();
+  await page.keyboard.press('Home');
+  await expect(card(page).getByTestId('period-caption')).toHaveText('11월 8일 (일) · 운동 안 함');
+  await page.keyboard.press('ArrowRight');
+  await expect(card(page).getByTestId('period-caption')).toHaveText('11월 9일 (월) · 작업 세트 5세트 · 운동 1회');
+  const colors = await chart(page).locator('text.ch-text').evaluateAll((els) => els.map((e) => getComputedStyle(e).fill));
+  expect(colors[0], '일요일 라벨').not.toBe(colors[1]);
+  expect(colors[6], '토요일 라벨').not.toBe(colors[1]);
+});
+
+test('운동한 칸이 하나뿐이면 평균 범례 없음, 기록 없는 기간은 한 줄 안내', async ({ page }) => {
+  await kind(page, '월').click();
+  await card(page).getByRole('button', { name: '이전 달' }).click();
+  await card(page).getByRole('button', { name: '이전 달' }).click(); // 9월: 운동한 날 하루
+  await expect(card(page).getByTestId('period-label')).toHaveText('9월');
+  await expect(card(page).getByTestId('period-avg')).toHaveCount(0);
+  await card(page).getByRole('button', { name: '이전 달' }).click(); // 8월: 기록 없음
+  await expect(page.getByTestId('period-chart-empty')).toHaveText('이 기간에는 운동 기록이 없어요');
+  await expect(page.getByTestId('period-chart')).toHaveCount(0);
+});
+
+test('볼륨 100만 kg 이상이면 카드가 톤으로, 한 줄에 들어감', async ({ page }) => {
+  await idbPut(page, 'workouts', [done('big', 2025, 6, 8, 5, 40000)]); // 5세트 × 40,000kg × 10회 = 2,000,000kg
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await kind(page, '년').click();
+  const vol = card(page).getByTestId('pm-volume');
+  await expect(vol).toContainText('톤');
+  await expect(vol).toContainText('작년 2,00');
+  await vol.click();
+  await expect(card(page).getByTestId('period-avg')).toContainText('톤'); // 평균 범례·맨 위 눈금·읽기 문구도 같은 단위
+  await expect(card(page).getByTestId('period-avg')).not.toContainText('kg');
+  await expect(chart(page)).toHaveAttribute('aria-valuetext', /톤/);
+  await expect(chart(page).locator('text.ch-text').first()).toContainText('톤');
+  await expect(vol.locator('.num').first()).toBeVisible();
+  const hs = await vol.locator('.num').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+  for (const h of hs) expect(h, '큰 숫자 한 줄').toBeLessThan(40);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
 });

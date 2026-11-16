@@ -6,7 +6,7 @@ import type { Exercise } from '../../core/types';
 import { weekStreak } from '../../core/stats';
 import { periodOf, shiftPeriod, periodBuckets, compareThrough, periodData, earliestPeriod, activeAverage } from '../../core/period';
 import type { PeriodKind, PeriodMetric } from '../../core/period';
-import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, avgText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
+import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, avgText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
 import { WD } from '../../core/dateText';
 import { PeriodBars } from '../charts';
 import type { BucketState } from '../charts';
@@ -43,6 +43,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
   }), [done, byId, range, bw, current, through]);
   const streak = useMemo(() => weekStreak(done, today), [done, today]);
 
+  const t = cur.totals, p = prev.totals;
   const label = periodLabel(range, off, today);
   const names = UNIT_WORD[kind];
   const vals = cur.series[metric];
@@ -54,11 +55,15 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
     return String(i + 1);
   });
   const avgV = activeAverage(vals, cur.active);
-  const showAvg = avgV > 0 && !(metric === 'count' && kind !== 'year');
+  const activeN = cur.active.filter(Boolean).length;
+  const empty = activeN === 0;
+  // 평균선·범례: 운동한 칸이 둘 이상이고 평균이 최댓값과 같지 않을 때만 (한 칸뿐이면 같은 값이 되풀이됨)
+  const showAvg = avgV > 0 && activeN >= 2 && avgV < Math.max(...vals) && !(metric === 'count' && kind !== 'year');
+  const ton = tonMode(t.volume, p.volume);
     /** 한 칸 문구: "11월 16일 (월) · 작업 세트 9세트 · 운동 1회" (일·월 보기에서 지표가 운동 수가 아니면 운동한 칸에 횟수를 덧붙임) */
-  const bucketLine = (i: number) => `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!)}${kind !== 'year' && metric !== 'count' && cur.active[i] ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
-  const caption = sel === null ? `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0))}` : bucketLine(sel);
-  const t = cur.totals, p = prev.totals;
+  const bucketLine = (i: number) => !cur.active[i] ? `${bucketText(kind, buckets[i]!.start)} · 운동 안 함` : `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!, ton)}${kind !== 'year' && metric !== 'count' ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
+  const total = `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}`;
+  const caption = empty ? '' : sel === null ? `막대를 누르거나 옆으로 밀면 ${kind === 'year' ? '달별' : '날짜별'} 값이 보여요` : bucketLine(sel);
   const todayWd = new Date(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8))).getDay();
   const atEnd = range.start <= earliest;
 
@@ -75,24 +80,27 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
         </div>
         <button aria-label={`다음 ${names}`} disabled={current} onClick={() => go(off - 1)}>›</button>
       </div>
-      <p class="ps-headline" data-testid="period-headline" aria-live="polite">{headline({ kind, current, metric, cur: metricValue(metric, t), prev: metricValue(metric, p), label })}</p>
+      <p class="ps-headline" data-testid="period-headline" aria-live="polite">{headline({ kind, current, metric, cur: metricValue(metric, t), prev: metricValue(metric, p), curCount: t.count, prevCount: p.count, label })}</p>
       <div class="sub small ps-caption" data-testid="period-caption">{caption}</div>
-      {showAvg && <div class="sub small ps-legend" data-testid="period-avg"><span class="ps-swatch" aria-hidden="true" />{avgText(kind, metric, avgV)}</div>}
+      {showAvg && !empty && <div class="sub small ps-legend" data-testid="period-avg"><span class="ps-swatch" aria-hidden="true" />{avgText(kind, metric, avgV, ton)}</div>}
       <PeriodBars values={vals} labels={xLabels} state={state} selected={sel} onSelect={setSel}
-        dots={kind === 'year' ? undefined : cur.active} avg={showAvg ? avgV : undefined} fmt={(v) => valueText(metric, v)}
+        dots={kind === 'year' ? undefined : cur.active} avg={showAvg ? avgV : undefined} fmt={(v) => valueText(metric, v, ton)}
         valueText={bucketLine} jump={kind === 'year' ? 3 : 7}
-        summary={caption} label={`${kind === 'year' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />
+        labelClass={kind === 'week' ? ['sun', '', '', '', '', '', 'sat'] : undefined}
+        empty={empty ? (current ? '운동을 끝내면 여기에 막대가 생겨요' : '이 기간에는 운동 기록이 없어요') : undefined}
+        summary={total} label={`${kind === 'year' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />
       <div class="pm-grid">
         {METRICS.map((m) => {
           const c = metricValue(m, t), pv = metricValue(m, p);
-          const parts = bigParts(m, c);
+          const tn = m === 'volume' && ton;
+          const parts = bigParts(m, c, tn);
           const dir = c > pv ? 'up' : c < pv ? 'down' : 'same';
           return (
             <button key={m} class={`pm-card${metric === m ? ' on' : ''}`} aria-pressed={metric === m} data-testid={`pm-${m}`}
-              aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv })} onClick={() => setMetric(m)}>
+              aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn })} onClick={() => setMetric(m)}>
               <span class="pm-top"><span class={`pm-badge ${dir}`} aria-hidden="true">{dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='}</span><span class="m-label" aria-hidden="true">{METRIC_NAME[m]}</span></span>
               <span class="m-val" aria-hidden="true">{parts.map(([n, u], i) => <span key={i} class="m-pair"><span class="num">{n}</span>{u && <span class="unit">{u}</span>}</span>)}</span>
-              <span class="pm-prev" aria-hidden="true">{prevName(kind, current, true)} {valueText(m, pv)}</span>
+              <span class="pm-prev" aria-hidden="true">{prevName(kind, current, true)} {valueText(m, pv, tn)}</span>
             </button>
           );
         })}

@@ -127,8 +127,12 @@ export type BucketState = 'past' | 'now' | 'future';
  * 손가락: 세로로 끌면 화면 스크롤(고르지 않음), 가로로 8px 넘게 끌면 훑기, 거의 안 움직이고 떼면 탭(고름/다시 탭하면 해제).
  * 미래 칸은 못 고름. x 라벨의 줄바꿈('\n')은 두 줄. 맨 위 줄은 최댓값 눈금, 평균선은 점선(글씨는 그래프 밖 범례)
  */
-export function PeriodBars({ values, labels, state, dots, avg, selected, onSelect, valueText, fmt, label, summary, jump = 7, height = 150 }: {
+export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg, selected, onSelect, valueText, fmt, label, summary, jump = 7, height = 150 }: {
   values: number[]; labels: string[]; state: BucketState[];
+  /** x 라벨별 글자색 클래스 ('sun' · 'sat', D-054 일요일 빨강·토요일 파랑) */
+  labelClass?: string[];
+  /** 기록이 없을 때 그래프 대신 보여 줄 한 줄 (슬라이더 없음) */
+  empty?: string;
   /** 운동한 칸 표시 (기준선 아래 작은 점) */
   dots?: boolean[];
   /** 평균선 값 (글씨 없음) */
@@ -167,6 +171,7 @@ export function PeriodBars({ values, labels, state, dots, avg, selected, onSelec
   };
   const y = (v: number) => pad.t + inner - inner * (v / max);
   const hasData = values.some((v) => v > 0);
+  if (empty) return <div class="pb-empty" ref={ref} data-testid="period-chart-empty">{empty}</div>;
   return (
     <div class="pbars" ref={ref} role="slider" tabIndex={0} aria-label={label} aria-valuemin={1} aria-valuemax={lastOk + 1}
       aria-valuenow={(selected ?? lastOk) + 1} aria-valuetext={selected === null ? summary : valueText(selected)} data-testid="period-chart"
@@ -206,7 +211,7 @@ export function PeriodBars({ values, labels, state, dots, avg, selected, onSelec
             <g key={i}>
               <rect x={cx - bw / 2} y={h - pad.b - bh} width={bw} height={bh} rx={Math.min(4, bw / 2)} class={cls} />
               {dots?.[i] && <circle cx={cx} cy={h - pad.b + 7} r="2.5" class="pb-dot" />}
-              {lines.map((t, k) => t && <text key={k} x={cx} y={h - pad.b + 20 + k * 13} class={`ch-text${selected === i ? ' pb-sel-text' : ''}`} font-size={FS} text-anchor="middle">{t}</text>)}
+              {lines.map((t, k) => t && <text key={k} x={cx} y={h - pad.b + 20 + k * 13} class={`ch-text${selected === i ? ' pb-sel-text' : ''}${labelClass?.[i] ? ` ${labelClass[i]}` : ''}`} font-size={FS} text-anchor="middle">{t}</text>)}
             </g>
           );
         })}

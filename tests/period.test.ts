@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { periodOf, shiftPeriod, periodBuckets, compareThrough, periodData, earliestPeriod, activeAverage, daysInMonth } from '../src/core/period';
-import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, headline, cardAria, bucketText, footnote } from '../src/core/periodText';
+import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, tonMode, headline, cardAria, bucketText, footnote } from '../src/core/periodText';
 import { weekSummary } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
@@ -143,6 +143,15 @@ describe('periodText', () => {
     expect(avgText('year', 'count', 3.4)).toBe('운동한 달 평균 3회');
     expect(avgText('month', 'volume', 1234.5)).toBe('운동한 날 평균 1,235kg');
     expect(avgText('week', 'time', 2900)).toBe('운동한 날 평균 48분');
+    expect(valueText('volume', 1234567, true)).toBe('1,235톤');
+    expect(bigParts('volume', 1234567, true)).toEqual([['1,235', '톤']]);
+    expect(valueText('volume', 300, true)).toBe('0.3톤');
+    expect(valueText('volume', 9940, true)).toBe('9.9톤');
+    expect(valueText('volume', 9960, true)).toBe('10톤');
+    expect(bigParts('volume', 250253, true)).toEqual([['250', '톤']]);
+    expect(avgText('year', 'volume', 250253.4, true)).toBe('운동한 달 평균 250톤');
+    expect(tonMode(999999, 10)).toBe(false);
+    expect(tonMode(10, 1_000_000)).toBe(true);
     const t = { count: 1, sets: 2, volume: 3, durationSec: 4 };
     expect([metricValue('count', t), metricValue('sets', t), metricValue('volume', t), metricValue('time', t)]).toEqual([1, 2, 3, 4]);
     expect(prevName('week', true)).toBe('지난주 이맘때');
@@ -150,11 +159,11 @@ describe('periodText', () => {
     expect(prevName('month', false)).toBe('그 전 달');
     expect(prevPhrase('week', true)).toBe('지난주 같은 요일까지');
     expect(prevPhrase('month', true)).toBe('지난달 같은 날까지');
-    expect(prevPhrase('year', false)).toBe('그 전 해');
+    expect(prevPhrase('year', false)).toBe('전년');
     expect(compareLine('week', true)).toBe('vs. 지난주');
     expect(compareLine('month', true)).toBe('vs. 지난달');
     expect(compareLine('year', true)).toBe('vs. 작년');
-    expect(compareLine('year', false)).toBe('vs. 그 전 해');
+    expect(compareLine('year', false)).toBe('vs. 전년');
     const today = '2026-11-16';
     expect(periodLabel(periodOf('week', today), 0, today)).toBe('이번 주');
     expect(periodLabel(periodOf('week', '2026-11-01'), 2, today)).toBe('11월 1일~7일');
@@ -174,27 +183,41 @@ describe('periodText', () => {
     expect(bucketText('year', '2026-03-01')).toBe('2026년 3월');
   });
   it('한 문장', () => {
-    const o = { kind: 'week' as const, current: true, metric: 'sets' as const, label: '이번 주' };
-    expect(headline({ ...o, cur: 20, prev: 11 })).toBe('지난주 이맘때보다 작업 세트가 9세트 많아요');
-    expect(headline({ ...o, cur: 2, prev: 11 })).toBe('지난주 이맘때보다 작업 세트가 9세트 적어요');
-    expect(headline({ ...o, cur: 0, prev: 9 })).toBe('지난주 이맘때보다 작업 세트가 9세트 적어요');
-    expect(headline({ ...o, cur: 5, prev: 5 })).toBe('지난주 이맘때와 작업 세트가 같아요');
-    expect(headline({ ...o, cur: 9, prev: 0 })).toBe('지난주 이맘때는 기록이 없었어요 · 이번 주 9세트');
-    expect(headline({ ...o, cur: 0, prev: 0 })).toBe('이번 주는 아직 운동 기록이 없어요');
-    expect(headline({ ...o, kind: 'month', cur: 0, prev: 0, label: '이번 달' })).toBe('이번 달은 아직 운동 기록이 없어요');
-    expect(headline({ ...o, kind: 'year', cur: 0, prev: 0, label: '올해' })).toBe('올해는 아직 운동 기록이 없어요');
-    expect(headline({ ...o, current: false, cur: 0, prev: 0, label: '지난주' })).toBe('이 기간에는 운동 기록이 없어요');
-    expect(headline({ ...o, current: false, kind: 'month', metric: 'volume', cur: 1000, prev: 400, label: '9월' })).toBe('그 전 달보다 볼륨이 600kg 많아요');
-    expect(headline({ ...o, current: false, kind: 'month', cur: 5, prev: 5, label: '9월' })).toBe('그 전 달과 작업 세트가 같아요');
-    expect(headline({ ...o, current: false, kind: 'month', cur: 5, prev: 0, label: '9월' })).toBe('그 전 달은 기록이 없었어요 · 9월 5세트');
-    expect(headline({ ...o, metric: 'time', cur: 3600, prev: 2880 })).toBe('지난주 이맘때보다 시간이 12분 길어요');
-    expect(headline({ ...o, metric: 'time', cur: 2880, prev: 3600 })).toBe('지난주 이맘때보다 시간이 12분 짧아요');
+    const sp = (s: string) => s.replace(/ /g, ' ').replace(/⁠/g, ''); // 줄바꿈 안 되는 공백은 일반 공백으로 견줌
+    const H = (o: Partial<Parameters<typeof headline>[0]>) => sp(headline({ kind: 'week', current: true, metric: 'sets', cur: 1, prev: 1, curCount: 1, prevCount: 1, label: '이번 주', ...o }));
+    expect(H({ cur: 20, prev: 11 })).toBe('지난주 이맘때보다 작업 세트가 9세트 많아요');
+    expect(H({ cur: 2, prev: 11 })).toBe('지난주 이맘때보다 작업 세트가 9세트 적어요');
+    expect(H({ cur: 0, prev: 9 })).toBe('지난주 이맘때보다 작업 세트가 9세트 적어요');
+    expect(H({ cur: 5, prev: 5 })).toBe('지난주 이맘때와 작업 세트가 같아요');
+    expect(H({ cur: 9, prev: 0, prevCount: 0 })).toBe('지난주 이맘때는 운동이 없었어요 · 이번 주 9세트');
+    expect(H({ cur: 0, prev: 0, curCount: 0, prevCount: 0 })).toBe('이번 주는 아직 운동 기록이 없어요');
+    expect(H({ kind: 'month', cur: 0, prev: 0, curCount: 0, prevCount: 0, label: '이번 달' })).toBe('이번 달은 아직 운동 기록이 없어요');
+    expect(H({ kind: 'year', cur: 0, prev: 0, curCount: 0, prevCount: 0, label: '올해' })).toBe('올해는 아직 운동 기록이 없어요');
+    expect(H({ current: false, cur: 0, prev: 0, curCount: 0, prevCount: 0, label: '지난주' })).toBe('이 기간에는 운동 기록이 없어요');
+    expect(H({ current: false, kind: 'month', metric: 'volume', cur: 1000, prev: 400, label: '9월' })).toBe('그 전 달보다 볼륨이 600kg 많아요');
+    expect(H({ current: false, kind: 'month', cur: 5, prev: 5, label: '9월' })).toBe('그 전 달과 작업 세트가 같아요');
+    expect(H({ current: false, kind: 'month', cur: 5, prev: 0, prevCount: 0, label: '9월' })).toBe('그 전 달은 운동이 없었어요 · 9월 5세트');
+    expect(H({ current: false, kind: 'year', cur: 5, prev: 0, prevCount: 0, label: '2025년' })).toBe('전년은 운동이 없었어요 · 2025년 5세트');
+    expect(H({ current: false, kind: 'year', cur: 5, prev: 3, label: '2025년' })).toBe('전년보다 작업 세트가 2세트 많아요');
+    expect(H({ current: false, kind: 'year', metric: 'count', cur: 2, prev: 2, label: '2025년' })).toBe('전년과 운동이 같아요');
+    expect(H({ metric: 'time', cur: 3600, prev: 2880 })).toBe('지난주 이맘때보다 시간이 12분 길어요');
+    expect(H({ metric: 'time', cur: 2880, prev: 3600 })).toBe('지난주 이맘때보다 시간이 12분 짧아요');
+    // 맨몸 운동만 한 주: 볼륨 0 이지만 운동은 있었음
+    expect(H({ metric: 'volume', cur: 0, prev: 800 })).toBe('지난주 이맘때보다 볼륨이 800kg 적어요');
+    expect(H({ metric: 'volume', cur: 800, prev: 0 })).toBe('지난주 이맘때보다 볼륨이 800kg 많아요');
+    expect(H({ metric: 'volume', cur: 0, prev: 0 })).toBe('무게를 적은 세트가 없어 볼륨은 0kg이에요');
+    expect(H({ metric: 'time', cur: 0, prev: 0 })).toBe('지난주 이맘때와 시간이 같아요');
+    expect(H({ metric: 'volume', cur: 3003040, prev: 0, prevCount: 0, label: '작년', current: false, kind: 'year' })).toBe('전년은 운동이 없었어요 · 작년 3,003톤');
+    expect(H({ metric: 'volume', cur: 2500000, prev: 1000000 })).toBe('지난주 이맘때보다 볼륨이 1,500톤 많아요');
+    // 라벨·값의 띄어쓰기는 줄바꿈 안 되는 공백
+    expect(headline({ kind: 'week', current: true, metric: 'time', cur: 4380, prev: 0, curCount: 1, prevCount: 0, label: '이번 주' })).toContain('이번 주 1시간 13분');
   });
   it('카드 읽기 문구·아래 글', () => {
     const o = { kind: 'week' as const, current: true, metric: 'count' as const };
     expect(cardAria({ ...o, cur: 1, prev: 0 })).toBe('운동 1회, 지난주 같은 요일까지 0회보다 1회 많음');
     expect(cardAria({ ...o, cur: 0, prev: 2 })).toBe('운동 0회, 지난주 같은 요일까지 2회보다 2회 적음');
     expect(cardAria({ ...o, current: false, cur: 2, prev: 2 })).toBe('운동 2회, 그 전 주 2회와 같음');
+    expect(cardAria({ kind: 'year', current: true, metric: 'volume', cur: 1500000, prev: 900000, ton: true })).toBe('볼륨 1,500톤, 작년 같은 날까지 900톤보다 600톤 많음');
     expect(footnote('week', true, '2026-11-09', 3, 1)).toBe('▲▼ = 지난주 같은 요일(일~월)까지와 비교 · 연속 3주 · 일요일~토요일 기준');
     expect(footnote('week', true, '2026-11-08', 3, 0)).toContain('(일)까지');
     expect(footnote('week', false, '', 0, 0)).toBe('▲▼ = 그 전 주 전체와 비교');
@@ -204,6 +227,6 @@ describe('periodText', () => {
     expect(footnote('year', true, '2025-01-01', 0, 1)).toBe('▲▼ = 작년 같은 날(1월 1일)까지와 비교');
     expect(cardAria({ ...o, metric: 'time', cur: 3600, prev: 2880 })).toBe('시간 1시간, 지난주 같은 요일까지 48분보다 12분 김');
     expect(cardAria({ ...o, metric: 'time', cur: 2880, prev: 3600 })).toBe('시간 48분, 지난주 같은 요일까지 1시간보다 12분 짧음');
-    expect(footnote('year', false, '', 0, 0)).toBe('▲▼ = 그 전 해 전체와 비교');
+    expect(footnote('year', false, '', 0, 0)).toBe('▲▼ = 전년 전체와 비교');
   });
 });

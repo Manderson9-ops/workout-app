@@ -901,7 +901,7 @@ html.editing .toast-stack { bottom: calc(16px + var(--safe-b)); }
 .ps-nav .ps-mid { flex: 1; min-width: 0; text-align: center; }
 .ps-nav .ps-mid strong { font-size: 17px; }
 .ps-nav .ps-mid .small { display: block; overflow-wrap: anywhere; }
-.ps-headline { margin: 12px 0 4px; font-size: 17px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.ps-headline { margin: 12px 0 4px; font-size: 17px; font-weight: 700; line-height: 1.4; word-break: keep-all; overflow-wrap: break-word; }
 .ps-caption { margin: 8px 0 2px; min-height: 20px; overflow-wrap: anywhere; }
 .pbars { width: 100%; max-width: 720px; touch-action: pan-y; user-select: none; -webkit-user-select: none; border-radius: 8px; cursor: pointer; }
 .pbars svg { display: block; }
@@ -914,6 +914,8 @@ html.editing .toast-stack { bottom: calc(16px + var(--safe-b)); }
 .pb-dot { fill: var(--sub); }
 .pb-top { stroke-opacity: .5; stroke-dasharray: 2 3; }
 .pb-sel-text { fill: var(--text); font-weight: 700; }
+.ch-text.sun { fill: var(--sun); } .ch-text.sat { fill: var(--sat); }
+.pb-empty { display: flex; align-items: center; justify-content: center; height: 80px; text-align: center; color: var(--sub); font-size: 14px; border-radius: 8px; background: var(--card2); }
 .pb-avg { stroke: var(--text); stroke-opacity: .7; stroke-width: 1; stroke-dasharray: 4 3; }
 .ps-legend { display: flex; align-items: center; gap: 8px; margin: 2px 0 4px; }
 .ps-swatch { flex: none; width: 18px; height: 0; border-top: 2px dashed var(--text); opacity: .7; }
@@ -927,6 +929,7 @@ button.pm-card.on { background: var(--acc-fill); border-color: var(--acc-fill); 
 .pm-badge.up { background: var(--ok); color: var(--on-ok); }
 .pm-badge.down { background: var(--sub); color: var(--bg); }
 button.pm-card .m-val { flex-wrap: wrap; }
-button.pm-card .num { font-size: 26px; }
+button.pm-card .num { font-size: 26px; white-space: nowrap; }
+button.pm-card .m-pair, button.pm-card .unit { white-space: nowrap; }
 button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opacity: .85; }
 .pm-prev { color: var(--sub); font-size: 12px; overflow-wrap: anywhere; }
