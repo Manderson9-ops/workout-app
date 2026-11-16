@@ -1,0 +1,104 @@
+/**
+ * D-081 기간 요약 (주·월·년): 한 기간의 합계와 칸(일·월)별 계열, 같은 상대 위치의 이전 기간 끝 날짜.
+ * 센 규칙은 weekSummary 와 같다 (끝났고 완료한 작업 세트가 있는 운동, 현지 날짜, 한 운동은 한 번만 summarize).
+ * 모두 'YYYY-MM-DD' 문자열 날짜. 주는 일요일 시작 (D-054)
+ */
+import type { Workout } from './session';
+import type { Exercise } from './types';
+import { addDays, isCountedWorkout, localDate, summarize, weekStart } from './stats';
+import type { BodyweightEntry } from './stats';
+
+export type PeriodKind = 'week' | 'month' | 'year';
+export type PeriodMetric = 'count' | 'sets' | 'volume' | 'time';
+/** start 포함, end 미포함 */
+export interface PeriodRange { kind: PeriodKind; start: string; end: string }
+export interface Bucket { start: string; end: string }
+export interface PeriodTotals { count: number; sets: number; volume: number; durationSec: number }
+export interface PeriodData { totals: PeriodTotals; series: Record<PeriodMetric, number[]>; active: boolean[] }
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const ymdOf = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
+const parts = (date: string): [number, number, number] => { const [y, m, d] = date.split('-').map(Number); return [y!, m!, d!]; };
+/** 그 달의 날수 (month 1~12) */
+export function daysInMonth(y: number, m: number): number { return new Date(y, m, 0).getDate(); }
+
+export function periodOf(kind: PeriodKind, date: string): PeriodRange {
+  const [y, m] = parts(date);
+  if (kind === 'week') { const start = weekStart(date); return { kind, start, end: addDays(start, 7) }; }
+  if (kind === 'month') return { kind, start: ymdOf(y, m, 1), end: m === 12 ? ymdOf(y + 1, 1, 1) : ymdOf(y, m + 1, 1) };
+  return { kind, start: ymdOf(y, 1, 1), end: ymdOf(y + 1, 1, 1) };
+}
+
+/** n 기간 뒤 (음수 = 앞) */
+export function shiftPeriod(r: PeriodRange, n: number): PeriodRange {
+  if (r.kind === 'week') return periodOf('week', addDays(r.start, 7 * n));
+  const [y, m] = parts(r.start);
+  if (r.kind === 'month') { const t = y * 12 + (m - 1) + n; return periodOf('month', ymdOf(Math.floor(t / 12), (t % 12 + 12) % 12 + 1, 1)); }
+  return periodOf('year', ymdOf(y + n, 1, 1));
+}
+
+/** 칸 목록: 주 = 7일, 월 = 그 달의 날들, 년 = 12개월 */
+export function periodBuckets(r: PeriodRange): Bucket[] {
+  if (r.kind === 'week' || r.kind === 'month') {
+    const n = r.kind === 'week' ? 7 : monthLen(r.start);
+    return Array.from({ length: n }, (_, i) => { const start = addDays(r.start, i); return { start, end: addDays(start, 1) }; });
+  }
+  const [y] = parts(r.start);
+  return Array.from({ length: 12 }, (_, i) => ({ start: ymdOf(y, i + 1, 1), end: i === 11 ? ymdOf(y + 1, 1, 1) : ymdOf(y, i + 2, 1) }));
+}
+
+/** 오늘이 든 기간(cur)과 견줄 이전 기간의 같은 상대 위치 날짜 (포함). 월·년은 없는 날이면 그 달 말일로 */
+export function compareThrough(cur: PeriodRange, today: string): string {
+  if (cur.kind === 'week') return addDays(today, -7);
+  const prev = shiftPeriod(cur, -1);
+  const [, tm, td] = parts(today);
+  const [py, pm] = parts(prev.start);
+  if (cur.kind === 'month') return ymdOf(py, pm, Math.min(td, daysInMonth(py, pm)));
+  return ymdOf(py, tm, Math.min(td, daysInMonth(py, tm)));
+}
+
+/** 그 날짜가 든 달의 날수 */
+const monthLen = (date: string) => { const [y, m] = parts(date); return daysInMonth(y, m); };
+
+/** 칸 번호: 주·월 = 날짜 차이, 년 = 달 */
+function bucketIndex(r: PeriodRange, date: string): number {
+  if (r.kind === 'year') return Number(date.slice(5, 7)) - 1;
+  if (r.kind === 'month') return Number(date.slice(8)) - 1;
+  const [y1, m1, d1] = parts(r.start), [y2, m2, d2] = parts(date);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
+}
+
+export function periodData(workouts: Workout[], byId: Map<string, Exercise>, r: PeriodRange, bw: BodyweightEntry[] = [], through?: string): PeriodData {
+  const n = r.kind === 'week' ? 7 : r.kind === 'month' ? monthLen(r.start) : 12;
+  const series: Record<PeriodMetric, number[]> = { count: Array(n).fill(0), sets: Array(n).fill(0), volume: Array(n).fill(0), time: Array(n).fill(0) };
+  const totals: PeriodTotals = { count: 0, sets: 0, volume: 0, durationSec: 0 };
+  const active: boolean[] = Array(n).fill(false);
+  for (const w of workouts) {
+    if (!isCountedWorkout(w)) continue;
+    const date = localDate(w.startedAt);
+    if (date < r.start || date >= r.end || (through !== undefined && date > through)) continue;
+    const s = summarize(w, byId, bw);
+    const i = bucketIndex(r, date);
+    series.count[i]!++; series.sets[i]! += s.workSets; series.volume[i]! += s.volume; series.time[i]! += s.durationSec; active[i] = true;
+    totals.count++; totals.sets += s.workSets; totals.volume += s.volume; totals.durationSec += s.durationSec;
+  }
+  return { totals, series, active };
+}
+
+/** 가장 오래된 센 운동이 든 기간의 시작 (없으면 오늘이 든 기간의 시작) */
+export function earliestPeriod(workouts: Workout[], kind: PeriodKind, today: string): string {
+  let min = today;
+  for (const w of workouts) {
+    if (!isCountedWorkout(w)) continue;
+    const d = localDate(w.startedAt);
+    if (d < min) min = d;
+  }
+  return periodOf(kind, min).start;
+}
+
+/** 운동한 칸만의 평균 (없으면 0) */
+export function activeAverage(values: number[], active: boolean[]): number {
+  let sum = 0, k = 0;
+  values.forEach((v, i) => { if (active[i]) { sum += v; k++; } });
+  return k ? sum / k : 0;
+}

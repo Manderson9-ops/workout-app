@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, flushPending } from '../store';
 import { catalog } from '../catalog';
-import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, localDate, weekStart, addDays, weekSummary, durText, durParts, partWeekDetail, plannedVsActualRows } from '../../core/stats';
+import { summarize, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, localDate, weekStart, addDays, durText, partWeekDetail, plannedVsActualRows } from '../../core/stats';
 import type { PartWeekRow } from '../../core/stats';
 import type { WorkoutSummary } from '../../core/stats';
 import { BW_MIN, BW_MAX } from '../../core/backup';
@@ -12,10 +12,11 @@ import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
 import { recoveryByPart } from '../../core/recovery';
 import { RecoveryCard } from './RecoveryCard';
+import { PeriodCard } from './PeriodCard';
 import { RecordFixCard } from './RecordFix';
 import { lastNight, watchReason, watchReasonLines, WATCH_PENDING, WATCH_GATE } from '../../core/health';
 import { LineChart, BarChart, PairBarChart } from '../charts';
-import { NumInput, Empty, Metric, Delta, Sheet } from '../components';
+import { NumInput, Empty, Sheet } from '../components';
 import { ScreenHeader } from '../header';
 import { WorkoutCard, shortPart } from './WorkoutCard';
 import { startRoutine, setHomeHidden } from '../actions';
@@ -29,55 +30,12 @@ import { Icon } from '../icons';
 import { axisText, weekRangeText, dateText, dateTimeText, timeRangeText, fullText, fullDateText } from '../../core/dateText';
 
 const WD = ['일', '월', '화', '수', '목', '금', '토']; // 주는 일요일 시작 (D-054)
-const ymd = (d: string) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y!, m! - 1, dd!); };
 const md = axisText; // 그래프 축 전용 "10/4" (D-060)
 const wdClass = (i: number) => (i === 0 ? 'sun' : i === 6 ? 'sat' : '');
 const weekRange = (ws: string) => weekRangeText(ws, Date.now()); // "10월 4일~10일", "9월 27일~10월 3일"
 const MAX_WEEKS_BACK = 11; // 이번 주 포함 12주
 const MARK = 10; // 연구 참고 범위 아래 끝 (부위당 주 10세트, Schoenfeld 외 2017)
 const BAND_HI = 20; // 연구 참고 범위 위 끝 (Baz-Valle 외 2022: 훈련된 남성 12~20세트 제안, 20 넘는 양은 근거가 적음)
-
-function ThisWeek({ done, byId, today, bw }: { done: Workout[]; byId: Map<string, Exercise>; today: string; bw: AppState['bodyweight'] }) {
-  const ws = weekStart(today);
-  const [cur, prev] = useMemo(() => [weekSummary(done, byId, ws, bw),
-    weekSummary(done, byId, addDays(ws, -7), bw, addDays(today, -7))], [done, byId, ws, bw, today]); // 지난주 일요일 ~ 오늘과 같은 요일까지
-  const streak = useMemo(() => weekStreak(done, today), [done, today]);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
-  // D-055: 홈과 같은 Metric (큰 숫자 + 작은 단위, 아래 증감)
-  const tiles: { k: string; parts: [string | number, string][]; d: preact.JSX.Element }[] = [
-    { k: '운동', parts: [[cur.count, '회']], d: <Delta cur={cur.count} prev={prev.count} /> },
-    { k: '작업 세트', parts: [[cur.sets, '세트']], d: <Delta cur={cur.sets} prev={prev.sets} /> },
-    { k: '볼륨', parts: [[cur.volume.toLocaleString(), 'kg']], d: <Delta cur={cur.volume} prev={prev.volume} unit="kg" /> },
-    { k: '시간', parts: durParts(cur.durationSec), d: <Delta cur={cur.durationSec} prev={prev.durationSec} fmt={durText} /> },
-  ];
-  return (
-    <>
-      <section class="card" data-testid="this-week">
-        <div class="card-head"><span class="card-title">이번 주</span><span class="sub small">{weekRange(ws)}</span></div>
-        <div class="daystrip" role="list" aria-label="이번 주 운동한 날">
-          {days.map((d, i) => {
-            const did = cur.days.has(d);
-            const cls = `daydot ${did ? 'did' : ''} ${d === today ? 'is-today' : ''} ${d > today ? 'future' : ''}`;
-            return (
-              <div key={d} role="listitem" class={cls} aria-label={`${WD[i]}요일 ${Number(d.slice(8))}일${did ? ' 운동함' : ''}${d === today ? ' 오늘' : ''}`}>
-                <span class={`wd ${wdClass(i)}`} aria-hidden="true">{WD[i]}</span>
-                <span class="dn" aria-hidden="true">{Number(d.slice(8))}</span>
-              </div>
-            );
-          })}
-        </div>
-        <div class="tiles">
-          {tiles.map((t) => (
-            <div class="tile" key={t.k}>
-              <Metric label={t.k} parts={t.parts} statusClass="tile-delta">{t.d}</Metric>
-            </div>
-          ))}
-        </div>
-        <p class="sub small" style={{ margin: '8px 0 0' }}>▲▼ = 지난주 같은 요일({WD[0]}{ymd(today).getDay() > 0 ? `~${WD[ymd(today).getDay()]}` : ''})까지와 비교 · 연속 {streak}주 · 일요일~토요일 기준</p>
-      </section>
-    </>
-  );
-}
 
 function PartSets({ done, byId, today }: { done: Workout[]; byId: Map<string, Exercise>; today: string }) {
   const [off, setOff] = useState(0);
@@ -265,7 +223,7 @@ export function Stats({ s }: { s: AppState }) {
       {tab === 'summary' && (
         <div role="tabpanel" id="stats-panel-summary" aria-labelledby="stats-tab-summary" aria-label="요약">
           <RecordFixCard s={s} byId={byId} />
-          <ThisWeek done={done} byId={byId} today={today} bw={s.bodyweight} />
+          <PeriodCard done={done} byId={byId} today={today} bw={s.bodyweight} />
           <RecoveryCard m={rec} night={night} />
           <div class="row between" style={{ alignItems: 'center', margin: '20px 0 10px' }}>
             <h2 style={{ margin: 0 }}>최근 운동</h2>

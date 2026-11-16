@@ -926,13 +926,14 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   // 기록 탭: 이번 주 1회, 오늘 달력 표시 → 상세
   await page.getByRole('link', { name: '기록' }).click();
   await expect(page.getByTestId('this-week')).toContainText('1회');
-  // D-054: 일요일 시작 달력, 이번 주 요일 띠(7칸, 운동한 날 표시), 월 회수
-  const dayStrip = page.getByRole('list', { name: '이번 주 운동한 날' }).getByRole('listitem');
-  await expect(dayStrip).toHaveCount(7);
-  await expect(dayStrip.first()).toContainText('일');
-  await expect(dayStrip.last()).toContainText('토');
-  await expect(page.locator('.daydot.did')).toHaveCount(1);
-  await expect(page.locator('.daydot.did')).toHaveAttribute('aria-label', /운동함/);
+  // D-054·D-081: 이번 주 7칸 그래프(일요일 시작), 오늘 칸 하나, 운동 1회가 오늘 칸 값으로 보임
+  const chart = page.getByTestId('period-chart');
+  await expect(chart.locator('rect.pb-bar')).toHaveCount(7);
+  await expect(chart.locator('rect.pb-bar.now')).toHaveCount(1);
+  await expect(page.getByTestId('this-week').getByRole('button', { name: /^운동 1회/ })).toBeVisible();
+  await chart.focus();
+  await page.keyboard.press('ArrowRight'); // 고른 칸이 없으면 오늘 칸부터
+  await expect(chart).toHaveAttribute('aria-valuetext', / · 작업 세트 1세트/);
   await page.getByRole('tab', { name: '운동 기록' }).click();
   await expect(page.locator('.cal-wd').first()).toHaveText('일');
   await expect(page.locator('.cal-wd').nth(6)).toHaveText('토');
@@ -2000,10 +2001,10 @@ test('기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안
   await expect(page.getByTestId('part-row')).toHaveCount(0);
   await page.getByRole('tab', { name: '요약' }).click();
   await expect(page.getByTestId('this-week')).toContainText('지난주 같은 요일');
-  // 타일 증감은 한 줄 (390px)
-  const hs = await page.locator('.tile-delta').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+  // 카드 비교 줄(지난주 값)은 한 줄 (390px)
+  const hs = await page.locator('.pm-prev').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
   expect(hs).toHaveLength(4);
-  for (const h of hs) expect(h, '타일 증감 줄 높이(한 줄)').toBeLessThan(24);
+  for (const h of hs) expect(h, '카드 비교 줄 높이(한 줄)').toBeLessThan(24);
   await checkScreen(page, '10b-stats-empty-week');
   await page.getByRole('tab', { name: '분석' }).click();
   await page.getByRole('button', { name: '운동 시작' }).click();

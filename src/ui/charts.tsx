@@ -119,3 +119,86 @@ export function PairBarChart({ points, unit, label, height = 150 }: { points: Pa
     </Frame>
   );
 }
+
+export type BucketState = 'past' | 'now' | 'future';
+
+/**
+ * D-081 기간 막대 그래프 (주·월·년). 그래프 전체가 슬라이더 하나: 화살표·Home·End·Esc, 손가락·마우스로 훑어 고름.
+ * 미래 칸은 못 고름. x 라벨의 줄바꿈('\n')은 두 줄. 평균선은 점선 + 오른쪽 위 작은 글씨
+ */
+export function PeriodBars({ values, labels, state, avg, selected, onSelect, valueText, label, summary, height = 150 }: {
+  values: number[]; labels: string[]; state: BucketState[];
+  avg?: { value: number; label: string };
+  selected: number | null; onSelect: (i: number | null) => void;
+  /** 고른 칸 문구 (aria-valuetext) */
+  valueText: (i: number) => string;
+  label: string;
+  /** 고른 칸이 없을 때 aria-valuetext */
+  summary: string;
+  height?: number;
+}) {
+  const [ref, w] = useWidth();
+  const n = values.length;
+  const twoLine = labels.some((l) => l.includes('\n'));
+  const h = height, pad = { l: 8, r: 8, t: 12, b: twoLine ? 36 : 22 };
+  const inner = h - pad.t - pad.b;
+  const max = Math.max(1, ...values, avg?.value ?? 0);
+  const slot = (w - pad.l - pad.r) / n;
+  const bw = Math.min(34, slot * 0.64);
+  const lastOk = (() => { for (let i = n - 1; i >= 0; i--) if (state[i] !== 'future') return i; return 0; })();
+  const down = useRef<{ idx: number; was: boolean; moved: boolean } | null>(null);
+  const at = (e: PointerEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return Math.max(0, Math.min(lastOk, Math.floor((e.clientX - r.left - pad.l) / slot)));
+  };
+  const key = (e: KeyboardEvent) => {
+    const cur = selected ?? lastOk;
+    const first = selected === null; // 고른 칸이 없으면 첫 화살표는 오늘(현재) 칸을 고름
+    const to = e.key === 'ArrowLeft' ? (first ? cur : cur - 1) : e.key === 'ArrowRight' ? (first ? cur : cur + 1) : e.key === 'Home' ? 0 : e.key === 'End' ? lastOk : null;
+    if (e.key === 'Escape' && selected !== null) { e.preventDefault(); onSelect(null); return; }
+    if (to === null) return;
+    e.preventDefault();
+    onSelect(Math.max(0, Math.min(lastOk, to)));
+  };
+  const y = (v: number) => pad.t + inner - inner * (v / max);
+  return (
+    <div class="pbars" ref={ref} role="slider" tabIndex={0} aria-label={label} aria-valuemin={1} aria-valuemax={n}
+      aria-valuenow={(selected ?? 0) + 1} aria-valuetext={selected === null ? summary : valueText(selected)} data-testid="period-chart"
+      onKeyDown={key}
+      onPointerDown={(e) => {
+        const i = at(e);
+        down.current = { idx: i, was: selected === i, moved: false };
+        (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+        onSelect(i);
+      }}
+      onPointerMove={(e) => {
+        const d = down.current; if (!d) return;
+        const i = at(e);
+        if (i !== d.idx) { d.moved = true; onSelect(i); }
+      }}
+      onPointerUp={() => { const d = down.current; down.current = null; if (d && d.was && !d.moved) onSelect(null); }}
+      onPointerCancel={() => { down.current = null; }}>
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" focusable="false">
+        <line x1={pad.l} x2={w - pad.r} y1={h - pad.b} y2={h - pad.b} class="ch-grid" />
+        {values.map((v, i) => {
+          const cx = pad.l + i * slot + slot / 2;
+          const bh = v > 0 ? Math.max(2, inner * (v / max)) : 2;
+          const cls = `pb-bar ${state[i]}${selected === i ? ' sel' : ''}`;
+          const lines = (labels[i] ?? '').split('\n');
+          return (
+            <g key={i}>
+              <rect x={cx - bw / 2} y={h - pad.b - bh} width={bw} height={bh} rx={Math.min(4, bw / 2)} class={cls} />
+              {lines.map((t, k) => t && <text key={k} x={cx} y={h - pad.b + 14 + k * 13} class={`ch-text${selected === i ? ' pb-sel-text' : ''}`} font-size={FS} text-anchor="middle">{t}</text>)}
+            </g>
+          );
+        })}
+        {avg && (
+          <g>
+            <line x1={pad.l} x2={w - pad.r} y1={y(avg.value)} y2={y(avg.value)} class="pb-avg" />
+            <text x={w - pad.r} y={y(avg.value) - 4} class="pb-avg-text" font-size={FS} text-anchor="end">{avg.label}</text>
+          </g>
+        )}
+      </svg>
+    </div>
+  );
+}

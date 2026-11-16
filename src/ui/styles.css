@@ -262,13 +262,6 @@ button.back { margin-bottom: 4px; }
 
 /* D-054: 기록 탭 (이번 주·부위별 세트·운동 기록 카드·달력). 일요일 빨강, 토요일 파랑 */
 .sun { color: var(--sun); } .sat { color: var(--sat); }
-.daystrip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; justify-items: center; }
-.daydot { width: 44px; height: 44px; max-width: 100%; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid transparent; background: var(--card2); line-height: 1.1; }
-.daydot .wd { font-size: 11px; color: var(--sub); } .daydot .wd.sun { color: var(--sun); } .daydot .wd.sat { color: var(--sat); }
-.daydot .dn { font-size: 15px; font-weight: 700; }
-.daydot.did { background: var(--acc-fill); } .daydot.did .wd, .daydot.did .dn { color: var(--on-acc); }
-.daydot.is-today { border-color: var(--text); }
-.daydot.future { opacity: .4; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .tile { background: var(--card2); border-radius: 12px; padding: 10px 12px; min-width: 0; }
 .tile .tv { font-size: 22px; font-weight: 800; margin: 2px 0; overflow-wrap: anywhere; }
@@ -901,3 +894,33 @@ html.editing .toast-stack { bottom: calc(16px + var(--safe-b)); }
   html:not(.phone-view) .toast-stack { left: 200px; right: 24px; bottom: 16px; }
   html:not(.phone-view) .toast-stack.above-banner { bottom: 76px; }
 }
+
+/* D-081 기간 요약 카드 (주·월·년) */
+.ps-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.ps-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.ps-nav .ps-mid { flex: 1; min-width: 0; text-align: center; }
+.ps-nav .ps-mid strong { font-size: 17px; }
+.ps-nav .ps-mid .small { display: block; overflow-wrap: anywhere; }
+.ps-headline { margin: 12px 0 4px; font-size: 17px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+.ps-caption { margin: 8px 0 2px; min-height: 20px; overflow-wrap: anywhere; }
+.pbars { width: 100%; max-width: 720px; touch-action: pan-y; user-select: none; -webkit-user-select: none; border-radius: 8px; cursor: pointer; }
+.pbars svg { display: block; }
+.pb-bar { fill: var(--sub); opacity: .5; }
+.pb-bar.now { fill: var(--acc); opacity: 1; }
+.pb-bar.future { fill: var(--sub); opacity: .18; }
+.pb-bar.sel { fill: var(--acc); opacity: 1; stroke: var(--text); stroke-width: 1.5; }
+.pb-sel-text { fill: var(--text); font-weight: 700; }
+.pb-avg { stroke: var(--text); stroke-opacity: .7; stroke-width: 1; stroke-dasharray: 4 3; }
+.pb-avg-text { fill: var(--text); paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+.pm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+button.pm-card { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 2px; min-width: 0; text-align: left; padding: 10px 12px; border-radius: 12px; background: var(--card2); font-weight: 500; }
+button.pm-card.on { background: var(--acc-fill); border-color: var(--acc-fill); color: var(--on-acc); }
+.pm-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pm-top .m-label { color: inherit; opacity: .85; }
+.pm-badge { flex: none; width: 20px; height: 20px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; background: var(--card3); color: var(--sub); }
+.pm-badge.up { background: var(--ok); color: var(--on-ok); }
+.pm-badge.down { background: var(--sub); color: var(--bg); }
+button.pm-card .m-val { flex-wrap: wrap; }
+button.pm-card .num { font-size: 26px; }
+button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opacity: .85; }
+.pm-prev { color: var(--sub); font-size: 12px; overflow-wrap: anywhere; }
