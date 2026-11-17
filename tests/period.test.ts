@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { compareThroughFor, hasWorkoutOn, periodOf, shiftPeriod, periodBuckets, compareThrough, waitingForToday, averageOver, offsetOf, periodData, earliestPeriod, activeAverage, daysInMonth } from '../src/core/period';
-import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, avgParts, footnoteParts, tonMode, cmpValues, WAITING_LINE, prevNote, headline, wholePrevMonth, cardAria, bucketText, footnote } from '../src/core/periodText';
+import { compareThroughFor, hasWorkoutOn, periodOf, shiftPeriod, periodBuckets, compareThrough, waitingForToday, averageOver, offsetOf, daysInYear, periodData, earliestPeriod, activeAverage, daysInMonth } from '../src/core/period';
+import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgParts, footnoteParts, timeDiffText, tonMode, cmpValues, WAITING_LINE, prevNote, headline, wholePrevMonth, cardAria, bucketText } from '../src/core/periodText';
 import { weekSummary } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
@@ -14,6 +14,8 @@ const wk = (id: string, start: string, sets: SetLog[], endedMin: number | null =
   blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: 'bench', target: { sets: 3, reps: 8 }, sets }] }],
 });
 
+const avgText = (...a: Parameters<typeof avgParts>): string => { const r = avgParts(...a); return `${r.label} ${r.value}`; };
+const footnote = (kind: Parameters<typeof footnoteParts>[0], current: boolean, o: Parameters<typeof footnoteParts>[2]): string => footnoteParts(kind, current, o).map((p) => p.text).join('');
 const headlineText = (parts: { text: string }[]): string => parts.map((p) => p.text).join('');
 
 describe('periodOf / shiftPeriod / periodBuckets', () => {
@@ -156,9 +158,10 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
   });
   it('averageOver: 년 보기는 진행 중인 이번 달을 뺌', () => {
     const v = [4, 6, 0, 2], act = [true, true, false, true], st = ['past', 'past', 'past', 'now'];
-    expect(averageOver('year', v, act, st)).toEqual({ value: 5, n: 2 });
-    expect(averageOver('month', v, act, st)).toEqual({ value: 4, n: 3 });
-    expect(averageOver('year', [3], [true], ['now'])).toEqual({ value: 0, n: 0 });
+    expect(averageOver('year', v, act, st)).toEqual({ value: 5, n: 2, excluded: true });
+    expect(averageOver('month', v, act, st)).toEqual({ value: 4, n: 3, excluded: false });
+    expect(averageOver('year', [3], [true], ['now'])).toEqual({ value: 0, n: 0, excluded: true });
+    expect(averageOver('year', [3, 0], [true, false], ['past', 'now'])).toEqual({ value: 3, n: 1, excluded: false }); // 이번 달에 운동이 없으면 뺀 게 없음
   });
   it('footnote: 끝이 같으면 오늘 운동하면 문구 없음, 이번 달이 더 길면 지난달 전체', () => {
     // 3/30 운동 전: 어제(3/29)도 2/28 로 눌려 오늘 운동 뒤와 같은 끝
@@ -166,7 +169,7 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
     expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: false, streak: 0, today: '2026-03-29' })).toBe('▲▼ = 지난달 같은 날(1~28일)까지와 비교');
     expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: true, streak: 0, today: '2026-03-29' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 더 길어요');
     expect(footnote('month', true, { through: '2026-10-15', base: '2026-10-16', done: false, streak: 0, today: '2026-11-16' })).toBe('▲▼ = 지난달 같은 날(1~15일)까지와 비교 · 오늘 운동하면 16일까지');
-    expect(footnote('year', true, { through: '2027-02-28', base: '2027-02-28', done: false, streak: 0, today: '2026-11-16' })).toBe('▲▼ = 작년 같은 날(1월 1일~2월 28일)까지와 비교');
+    expect(footnote('year', true, { through: '2027-02-28', base: '2027-02-28', done: false, streak: 0, today: '2028-02-29' })).toBe('▲▼ = 작년 같은 날(1월 1일~2월 28일)까지와 비교');
   });
   it('월말(이번 달이 더 긺): 각주·한 문장·작은 글씨·읽기 문구가 같은 말 (2026-03-30)', () => {
     // 3/30: 지난달 2월은 28일까지. 운동 전(기준 3/29)도 운동 뒤(기준 3/30)도 지난달 전체
@@ -211,6 +214,38 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
     expect(footnote('month', false, ex)).toBe('▲▼ = 그 전 달 전체와 비교');
     expect(footnote('week', false, { ...ex, lens: [31, 28] })).toBe('▲▼ = 그 전 주 전체와 비교');
     expect(avgParts('year', 'sets', 15.5, false, true)).toEqual({ label: '운동한 달 평균(이번 달 제외)', value: '15.5세트' });
+  });
+  it('시간 차이 문구: 보이는 값끼리, 초가 남으면 함께', () => {
+    expect(timeDiffText(30)).toBe('30초');
+    expect(timeDiffText(90)).toBe('1분 30초');
+    expect(timeDiffText(-75)).toBe('1분 15초');
+    expect(timeDiffText(900)).toBe('15분');
+    expect(timeDiffText(3900)).toBe('1시간 5분');
+    expect(timeDiffText(3930)).toBe('1시간 5분 30초');
+    const H = (cur: number, prev: number) => headlineText(headline({ kind: 'week', current: true, metric: 'time', cur, prev, curCount: 1, prevCount: 1, label: '이번 주' }));
+    expect(H(30, 120)).toBe('지난주 이맘때보다 시간이 1분 30초 짧아요');
+    expect(H(45, 120)).toBe('지난주 이맘때보다 시간이 1분 15초 짧아요');
+    expect(H(10, 120)).toBe('지난주 이맘때보다 시간이 1분 50초 짧아요');
+    expect(H(2100, 1200)).toBe('지난주 이맘때보다 시간이 15분 길어요');
+    expect(cardAria({ kind: 'week', current: true, metric: 'time', cur: 30, prev: 120 })).toBe('시간 30초, 지난주 같은 요일까지 2분보다 1분 30초 짧음');
+  });
+  it('윤년 공시: 하루 더 길거나 짧음', () => {
+    const ex = (o: object) => ({ through: '', base: '', done: true, streak: 0, today: '2026-11-16', ...o });
+    // 2028-03-01 (운동 후): 이번 해 61일 vs 작년 2027-03-01 까지 60일
+    expect(footnote('year', true, ex({ through: '2027-03-01', base: '2027-03-01', today: '2028-03-01' }))).toBe('▲▼ = 작년 같은 날(1월 1일~3월 1일)까지와 비교 · 이 해가 하루 더 길어요');
+    // 2028-03-01 운동 전: 이번 해 2/29 까지 60일 vs 2027-02-28 까지 59일, 오늘 운동하면 3/1 까지
+    expect(footnote('year', true, ex({ through: '2027-02-28', base: '2027-03-01', done: false, today: '2028-03-01' }))).toBe('▲▼ = 작년 같은 날(1월 1일~2월 28일)까지와 비교 · 오늘 운동하면 3월 1일까지 · 이 해가 하루 더 길어요');
+    // 2029-03-01 (운동 후): 60일 vs 2028-03-01 까지 61일
+    expect(footnote('year', true, ex({ through: '2028-03-01', base: '2028-03-01', today: '2029-03-01' }))).toContain('이 해가 하루 더 짧아요');
+    // 같은 길이면 없음, 2028-02-29 운동 전(어제 2/28 까지 59 vs 2027-02-28 까지 59)
+    expect(footnote('year', true, ex({ through: '2027-02-28', base: '2027-02-28', done: false, today: '2028-02-29' }))).not.toContain('이 해가');
+    expect(footnote('year', true, ex({ through: '2025-11-16', base: '2025-11-16', today: '2026-11-16' }))).not.toContain('이 해가');
+    // 지난 해: 366 vs 365, 365 vs 366, 같음
+    expect(footnote('year', false, ex({ lens: [366, 365] }))).toBe('▲▼ = 전년 전체와 비교 · 이 해가 하루 더 길어요');
+    expect(footnote('year', false, ex({ lens: [365, 366] }))).toBe('▲▼ = 전년 전체와 비교 · 이 해가 하루 더 짧아요');
+    expect(footnote('year', false, ex({ lens: [365, 365] }))).toBe('▲▼ = 전년 전체와 비교');
+    expect(daysInYear(2028)).toBe(366);
+    expect(daysInYear(2027)).toBe(365);
   });
   it('offsetOf: 보던 기간이 오늘 기준 몇 기간 전인지', () => {
     expect(offsetOf('week', '2026-11-08', '2026-11-16')).toBe(1);
@@ -403,7 +438,7 @@ describe('periodText', () => {
     expect(footnote('month', true, { through: '2026-10-01', base: '2026-10-01', done: true, streak: 0, today: '2026-11-01' })).toBe('▲▼ = 지난달 같은 날(1일)까지와 비교');
     expect(footnote('year', true, { through: '2025-11-16', base: '2025-11-16', done: true, streak: 0, today: '2026-11-16' })).toBe('▲▼ = 작년 같은 날(1월 1일~11월 16일)까지와 비교');
     expect(footnote('year', true, { through: '2025-11-15', base: '2025-11-16', done: false, streak: 0, today: '2026-11-16' })).toBe('▲▼ = 작년 같은 날(1월 1일~11월 15일)까지와 비교 · 오늘 운동하면 11월 16일까지');
-    expect(footnote('year', true, { through: '2025-01-01', base: '2025-01-01', done: true, streak: 0, today: '2026-11-16' })).toBe('▲▼ = 작년 같은 날(1월 1일)까지와 비교');
+    expect(footnote('year', true, { through: '2025-01-01', base: '2025-01-01', done: true, streak: 0, today: '2026-01-01' })).toBe('▲▼ = 작년 같은 날(1월 1일)까지와 비교');
     expect(cardAria({ ...o, metric: 'time', cur: 3600, prev: 2880 })).toBe('시간 1시간, 지난주 같은 요일까지 48분보다 12분 김');
     expect(cardAria({ ...o, metric: 'time', cur: 2880, prev: 3600 })).toBe('시간 48분, 지난주 같은 요일까지 1시간보다 12분 짧음');
     expect(footnote('year', false, { through: '', base: '', done: true, streak: 0, today: '2026-11-16' })).toBe('▲▼ = 전년 전체와 비교');

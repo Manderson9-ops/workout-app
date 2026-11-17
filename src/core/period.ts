@@ -88,10 +88,14 @@ export function offsetOf(kind: PeriodKind, start: string, today: string): number
 }
 
 /** 평균에 쓸 칸 평균과 칸 수: 년 보기는 아직 진행 중인 이번 달('now')을 뺌 (덜 찬 달이 평균을 끌어내리지 않게) */
-export function averageOver(kind: PeriodKind, values: number[], active: boolean[], state: string[]): { value: number; n: number } {
-  const mask = active.map((a, i) => a && !(kind === 'year' && state[i] === 'now'));
-  return { value: activeAverage(values, mask), n: mask.filter(Boolean).length };
+export function averageOver(kind: PeriodKind, values: number[], active: boolean[], state: string[]): { value: number; n: number; excluded: boolean } {
+  const skip = (i: number) => kind === 'year' && state[i] === 'now';
+  const mask = active.map((a, i) => a && !skip(i));
+  return { value: activeAverage(values, mask), n: mask.filter(Boolean).length, excluded: active.some((a, i) => a && skip(i)) }; // excluded = 진행 중인 달에 운동이 있어 실제로 뺌
 }
+
+/** 그 해의 날수 (365·366) */
+export const daysInYear = (y: number): number => Math.round((Date.UTC(y + 1, 0, 1) - Date.UTC(y, 0, 1)) / 86400000);
 
 /** 칸 번호: 주·월 = 날짜 차이, 년 = 달 */
 function bucketIndex(r: PeriodRange, date: string): number {

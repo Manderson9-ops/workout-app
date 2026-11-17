@@ -936,6 +936,7 @@ button.pm-card .m-pair, button.pm-card .unit { white-space: nowrap; }
   button.pm-card .unit { font-size: 12px; }
   button.pm-card .m-val { flex-wrap: nowrap; gap: 2px; }
   button.pm-card .m-pair { margin-right: 3px; gap: 2px; }
+  button.pm-card .m-pair:last-child { margin-right: 0; }
   button.pm-card .pm-prev { font-size: 11px; white-space: nowrap; }
 }
 button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opacity: .85; }

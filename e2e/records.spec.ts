@@ -53,7 +53,7 @@ test('기본 주 보기: 7칸, 이번 주 이름, 비교 문장, 카드 4개', a
   await expect(card(page).getByRole('button', { name: '운동 2회, 지난주 같은 요일까지 1회보다 1회 많음' })).toBeVisible();
   await expect(card(page)).toContainText('지난주 같은 요일(일~월)까지와 비교');
   await expect(card(page).getByTestId('period-caption')).toHaveText('막대를 누르거나 옆으로 밀면 날짜별 값이 보여요');
-  await expect(chart(page)).toHaveAttribute('aria-valuetext', '합계 · 작업 세트 7세트');
+  await expect(chart(page)).toHaveAttribute('aria-valuetext', '합계 · 작업 세트 7세트 · 방향키로 칸을 고르면 날짜별 값');
 });
 
 test('월·년으로 바꾸면 칸 수와 이름이 바뀐다', async ({ page }) => {
@@ -92,7 +92,7 @@ test('볼륨 카드를 누르면 그래프 지표가 바뀐다', async ({ page }
   await expect(vol).toHaveAttribute('aria-pressed', 'true');
   await expect(card(page).getByTestId('pm-sets')).toHaveAttribute('aria-pressed', 'false');
   await expect(chart(page)).toHaveAttribute('aria-label', '일별 볼륨 그래프');
-  await expect(chart(page)).toHaveAttribute('aria-valuetext', '합계 · 볼륨 3,500kg'); // 7세트 × 500
+  await expect(chart(page)).toHaveAttribute('aria-valuetext', '합계 · 볼륨 3,500kg · 방향키로 칸을 고르면 날짜별 값'); // 7세트 × 500
   await expect(card(page).getByTestId('period-headline')).toContainText('볼륨이');
 });
 

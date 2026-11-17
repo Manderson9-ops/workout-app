@@ -4,7 +4,7 @@ import type { AppState } from '../store';
 import type { Workout } from '../../core/session';
 import type { Exercise } from '../../core/types';
 import { weekStreak } from '../../core/stats';
-import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, waitingForToday, averageOver, offsetOf, daysInMonth, periodData, earliestPeriod } from '../../core/period';
+import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, waitingForToday, averageOver, offsetOf, daysInMonth, daysInYear, periodData, earliestPeriod } from '../../core/period';
 import type { PeriodKind, PeriodMetric } from '../../core/period';
 import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, wholePrevMonth, WAITING_LINE, prevNote, avgParts, metricValue, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnoteParts } from '../../core/periodText';
 import { WD } from '../../core/dateText';
@@ -62,7 +62,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
   });
   const lastOk = state.reduce((m, s, i) => (s !== 'future' ? i : m), 0);
   const selv = sel !== null && sel <= lastOk ? sel : null; // 날이 바뀌어 미래가 된 칸은 고른 것으로 안 침
-  const { value: avgV, n: avgN } = averageOver(kind, vals, cur.active, state); // 년 보기는 진행 중인 이번 달을 평균에서 뺌
+  const { value: avgV, n: avgN, excluded: avgExcl } = averageOver(kind, vals, cur.active, state); // 년 보기는 진행 중인 이번 달을 평균에서 뺌
   const whole = wholePrevMonth(kind, current, { through, today, done: todayDone }); // 이번 달이 더 길어 지난달 전체와 견줌
   const wholeDays = whole ? Number(through.slice(8)) : 0;
   const empty = !cur.active.some(Boolean);
@@ -70,7 +70,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
   // 평균선·범례: 운동한 칸이 둘 이상이고 평균이 최댓값과 같지 않을 때만 (한 칸뿐이면 같은 값이 되풀이됨)
   const showAvg = avgV > 0 && avgN >= 2 && avgV < Math.max(...vals) && !(metric === 'count' && kind !== 'year');
   const ton = tonMode(t.volume, p.volume);
-  const avgLeg = avgParts(kind, metric, avgV, ton, kind === 'year' && state.includes('now'));
+  const avgLeg = avgParts(kind, metric, avgV, ton, avgExcl);
     /** 한 칸 문구: "11월 16일 (월) · 작업 세트 9세트 · 운동 1회" (일·월 보기에서 지표가 운동 수가 아니면 운동한 칸에 횟수를 덧붙임) */
   const bucketLine = (i: number) => !cur.active[i] ? `${bucketText(kind, buckets[i]!.start)} · 운동 안 함` : `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!, ton)}${kind !== 'year' && metric !== 'count' ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
   const total = `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}`;
@@ -99,7 +99,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
         valueText={bucketLine} jump={kind === 'year' ? 3 : 7}
         labelClass={kind === 'week' ? ['sun', '', '', '', '', '', 'sat'] : undefined}
         empty={empty ? (current ? '운동을 끝내면 여기에 막대가 생겨요' : '이 기간에는 운동 기록이 없어요') : undefined}
-        summary={total} label={`${kind === 'year' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />
+        summary={`${total} · 방향키로 칸을 고르면 날짜별 값`} label={`${kind === 'year' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />
       {!waiting && <p class="sub small pm-note" data-testid="pm-note">{prevNote(kind, current, whole)}</p>}
       <div class="pm-grid">
         {METRICS.map((m) => {
@@ -118,7 +118,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
           );
         })}
       </div>
-      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnoteParts(kind, current, { through, base: baseThrough, done: todayDone, streak, today, waiting, lens: kind === 'month' ? [buckets.length, daysInMonth(Number(range.start.slice(0, 4)) - (range.start.slice(5, 7) === '01' ? 1 : 0), range.start.slice(5, 7) === '01' ? 12 : Number(range.start.slice(5, 7)) - 1)] : undefined }).map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
+      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnoteParts(kind, current, { through, base: baseThrough, done: todayDone, streak, today, waiting, lens: kind === 'year' ? [daysInYear(Number(range.start.slice(0, 4))), daysInYear(Number(range.start.slice(0, 4)) - 1)] : kind === 'month' ? [buckets.length, daysInMonth(Number(range.start.slice(0, 4)) - (range.start.slice(5, 7) === '01' ? 1 : 0), range.start.slice(5, 7) === '01' ? 12 : Number(range.start.slice(5, 7)) - 1)] : undefined }).map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
     </section>
   );
 }

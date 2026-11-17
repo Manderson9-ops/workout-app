@@ -51,13 +51,19 @@ export function cmpValues(m: PeriodMetric, cur: number, prev: number, ton = fals
   const step = (v: number) => (v <= 0 ? 0 : v < 50 ? 25 : v / 1000 < 9.95 ? Math.round(v / 100) * 100 : Math.round(v / 1000) * 1000);
   return [step(cur), step(prev)];
 }
+/** 시간 차이 문구 (보이는 값끼리의 차, 초 단위): 1분 미만 "30초", 분 단위 "15분"·"1시간 5분", 초가 남으면 "1분 30초" */
+export function timeDiffText(sec: number): string {
+  const d = Math.abs(Math.round(sec));
+  if (d < 60) return `${d}초`;
+  return d % 60 ? `${durText(d - (d % 60))} ${d % 60}초` : durText(d);
+}
+/** 보이는 값 c, p 의 차이 문구 (한 문장·읽기 문구가 같이 씀) */
+function diffValue(m: PeriodMetric, c: number, p: number, ton: boolean): string {
+  return m === 'time' ? timeDiffText(c - p) : valueText(m, Math.abs(c - p), ton);
+}
 /** 평균 문구: 운동한 날(년은 달) 평균. 횟수·세트는 소수 한 자리까지, 볼륨은 정수(톤은 보이는 단계), 시간은 시간·분 */
 export function avgParts(kind: PeriodKind, m: PeriodMetric, v: number, ton = false, exclNow = false): { label: string; value: string } {
   return { label: `${kind === 'year' ? '운동한 달' : '운동한 날'} 평균${exclNow ? '(이번 달 제외)' : ''}`, value: m === 'time' ? durText(v) : m === 'volume' ? valueText(m, Math.round(v), ton) : valueText(m, v) };
-}
-export function avgText(kind: PeriodKind, m: PeriodMetric, v: number, ton = false, exclNow = false): string {
-  const a = avgParts(kind, m, v, ton, exclNow);
-  return `${a.label} ${a.value}`;
 }
 export const metricValue = (m: PeriodMetric, totals: { count: number; sets: number; volume: number; durationSec: number }) =>
   m === 'count' ? totals.count : m === 'sets' ? totals.sets : m === 'volume' ? totals.volume : totals.durationSec;
@@ -130,7 +136,7 @@ export function headline(o: { kind: PeriodKind; current: boolean; metric: Period
   const [c, p] = cmpValues(metric, cur, prev, ton);
   if (c === p) return [...J(pn, '과', '와'), T(` ${josa(name, '이', '가')} 같아요`)];
   const adj = metric === 'time' ? (c > p ? '길어요' : '짧아요') : (c > p ? '많아요' : '적어요');
-  return [N(pn), T(`보다 ${josa(name, '이', '가')} `), val(Math.abs(c - p)), T(` ${adj}`)];
+  return [N(pn), T(`보다 ${josa(name, '이', '가')} `), N(diffValue(metric, c, p, ton)), T(` ${adj}`)];
 }
 
 /** 오늘 운동 전에 실제로 견주는 끝을 날짜로: "지난주 월요일까지" · "지난달 16일까지" · "작년 2월 28일까지" */
@@ -147,7 +153,7 @@ export function cardAria(o: { kind: PeriodKind; current: boolean; metric: Period
   const head = `${METRIC_NAME[metric]} ${cv}, ${pp} `;
   const [c, p] = cmpValues(metric, cur, prev, ton);
   if (c === p) return `${head}${josa(pv, '과', '와')} 같음`;
-  return `${head}${pv}보다 ${valueText(metric, Math.abs(c - p), ton)} ${metric === 'time' ? (c > p ? '김' : '짧음') : (c > p ? '많음' : '적음')}`;
+  return `${head}${pv}보다 ${diffValue(metric, c, p, !!ton)} ${metric === 'time' ? (c > p ? '김' : '짧음') : (c > p ? '많음' : '적음')}`;
 }
 
 /** 칸 날짜 문구: week·month "11월 16일 (월)", year "2026년 3월" */
@@ -167,6 +173,7 @@ export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: 
   const later = !done && through !== base; // 오늘 운동하면 견줄 끝이 달라질 때만 알림
   if (!current) {
     if (kind === 'month' && lens && lens[0] !== lens[1]) return [T('▲▼ = 그 전 달 전체'), N(`(${lens[1]}일)`), T('와 비교 · 이 달이 '), N(`${Math.abs(lens[0] - lens[1])}일`), T(lens[0] > lens[1] ? ' 더 길어요' : ' 더 짧아요')];
+    if (kind === 'year' && lens && lens[0] !== lens[1]) return [T(`▲▼ = 전년 전체와 비교 · 이 해가 하루 ${lens[0] > lens[1] ? '더 길어요' : '더 짧아요'}`)];
     return [T(`▲▼ = ${prevName(kind, false)} 전체와 비교`)];
   }
   if (waiting) return kind === 'week' ? [T('▲▼ = 오늘 운동하면 지난주 같은 요일'), N('(일)'), T('까지와 비교')] : kind === 'month' ? [T('▲▼ = 오늘 운동하면 지난달 같은 날'), N('(1일)'), T('까지와 비교')] : [T('▲▼ = 오늘 운동하면 작년 같은 날'), N('(1월 1일)'), T('까지와 비교')];
@@ -178,6 +185,8 @@ export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: 
     if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(`(1~${d}일)`), T('와 비교 · 이번 달이 더 길어요')];
     return [T('▲▼ = 지난달 같은 날'), N(d === 1 ? '(1일)' : `(1~${d}일)`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${bd}일까지`)] : [])];
   }
-  return [T('▲▼ = 작년 같은 날'), N(m === 1 && d === 1 ? '(1월 1일)' : `(1월 1일~${m}월 ${d}일)`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${bm}월 ${bd}일까지`)] : [])];
+  // 윤년이 끼면 두 구간 날수가 하루 다름 (오늘 운동 전이면 이번 해 구간도 어제까지)
+  const dayNo = (s: string): number => Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10))) / 86400000;
+  const curLen = dayNo(today) - (done ? 0 : 1) - dayNo(`${today.slice(0, 4)}-01-01`) + 1, prevLen = dayNo(through) - dayNo(`${through.slice(0, 4)}-01-01`) + 1;
+  return [T('▲▼ = 작년 같은 날'), N(m === 1 && d === 1 ? '(1월 1일)' : `(1월 1일~${m}월 ${d}일)`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${bm}월 ${bd}일까지`)] : []), ...(curLen !== prevLen ? [T(` · 이 해가 하루 ${curLen > prevLen ? '더 길어요' : '더 짧아요'}`)] : [])];
 }
-export const footnote = (kind: PeriodKind, current: boolean, o: Parameters<typeof footnoteParts>[2]): string => footnoteParts(kind, current, o).map((p) => p.text).join('');
