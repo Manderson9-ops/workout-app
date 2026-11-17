@@ -184,6 +184,7 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
       }}
       onPointerMove={(e) => {
         if (!e.isPrimary) return;
+        if (e.pointerType === 'mouse' && e.buttons === 0) { gest.current = null; return; } // 버튼을 이미 뗀 마우스: 제스처 끝 (고름 그대로)
         const g = gest.current; if (!g || g.mode === 'dead') return;
         if (g.mode === 'wait') {
           const adx = Math.abs(e.clientX - g.x), ady = Math.abs(e.clientY - g.y);
@@ -201,6 +202,7 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
         if (i < 0 || i > lastOk) return; // 미래 칸·바깥은 못 고름
         onSelect(selected === i ? null : i);
       }}
+      onLostPointerCapture={() => { gest.current = null; }}
       onPointerCancel={() => { const g = gest.current; gest.current = null; if (g && g.mode === 'scrub') onSelect(g.before); }}>
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" focusable="false">
         {hasData && <line x1={pad.l} x2={w - pad.r} y1={pad.t} y2={pad.t} class="ch-grid pb-top" />}

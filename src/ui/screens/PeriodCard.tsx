@@ -99,7 +99,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
         valueText={bucketLine} jump={kind === 'year' ? 3 : 7}
         labelClass={kind === 'week' ? ['sun', '', '', '', '', '', 'sat'] : undefined}
         empty={empty ? (current ? '운동을 끝내면 여기에 막대가 생겨요' : '이 기간에는 운동 기록이 없어요') : undefined}
-        summary={`${total} · 방향키로 칸을 고르면 날짜별 값`} label={`${kind === 'year' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />
+        summary={`${total} · 방향키로 칸을 고르면 ${kind === 'year' ? '달별' : '날짜별'} 값`} label={`${kind === 'year' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />
       {!waiting && <p class="sub small pm-note" data-testid="pm-note">{prevNote(kind, current, whole)}</p>}
       <div class="pm-grid">
         {METRICS.map((m) => {
@@ -112,7 +112,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
             <button key={m} class={`pm-card${metric === m ? ' on' : ''}`} aria-pressed={metric === m} data-testid={`pm-${m}`}
               aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn, waiting, partialThrough: current && !todayDone ? through : undefined, wholeDays })} onClick={() => setMetric(m)}>
               <span class="pm-top">{!waiting && <span class={`pm-badge ${dir}`} aria-hidden="true">{dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='}</span>}<span class="m-label" aria-hidden="true">{METRIC_NAME[m]}</span></span>
-              <span class={`m-val${m === 'time' && c >= 360000 ? ' long' : ''}`} aria-hidden="true">{parts.map(([n, u], i) => <span key={i} class="m-pair"><span class="num">{n}</span>{u && <span class="unit">{u}</span>}</span>)}</span>
+              <span class={`m-val${m === 'time' && c >= 3600000 ? ' xlong' : m === 'time' && c >= 360000 ? ' long' : ''}`} aria-hidden="true">{parts.map(([n, u], i) => <span key={i} class="m-pair"><span class="num">{n}</span>{u && <span class="unit">{u}</span>}</span>)}</span>
               <span class="pm-prev" aria-hidden="true">{waiting ? WAITING_LINE : `이전 ${valueText(m, pv, tn)}`}</span>
             </button>
           );
