@@ -11,7 +11,7 @@ import { homeRecent } from '../../core/session';
 import type { Workout } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { weekSummary, weekStart, addDays, localDate, summarize } from '../../core/stats';
-import { periodOf, compareThroughFor, hasWorkoutOn } from '../../core/period';
+import { periodOf, compareThroughFor, hasWorkoutOn, waitingForToday } from '../../core/period';
 import { routineUse, routineParts, pickNextRoutine, sinceText } from '../../core/routineList';
 import type { NextPick } from '../../core/routineList';
 import type { Part } from '../../core/types';
@@ -61,10 +61,10 @@ function ThisWeekCard({ s }: { s: AppState }) {
   const today = localDate(Date.now());
   const ws = weekStart(today);
   // 0.9.3 성능 관문 (기록 1,000회): 앱이 1초마다 다시 그려도 기록·날짜가 바뀔 때만 다시 셈
-  const { done, cur, prev } = useMemo(() => {
+  const { done, cur, prev, waiting } = useMemo(() => {
     const byId = new Map(all.map((e) => [e.id, e]));
     const done = historyOf(s);
-    return { done, cur: weekSummary(done, byId, ws, s.bodyweight), prev: weekSummary(done, byId, addDays(ws, -7), s.bodyweight, compareThroughFor(periodOf('week', today), today, hasWorkoutOn(done, today))) }; // 기록 탭과 같은 비교 구간 (오늘 운동 전이면 어제 같은 요일까지)
+    return { done, waiting: waitingForToday(periodOf('week', today), today, hasWorkoutOn(done, today)), cur: weekSummary(done, byId, ws, s.bodyweight, today), prev: weekSummary(done, byId, addDays(ws, -7), s.bodyweight, compareThroughFor(periodOf('week', today), today, hasWorkoutOn(done, today))) }; // 기록 탭과 같은 비교 구간 (오늘 운동 전이면 어제 같은 요일까지)
   }, [all, s.workouts, s.bodyweight, ws, today]);
   const never = done.length === 0;
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
@@ -74,8 +74,8 @@ function ThisWeekCard({ s }: { s: AppState }) {
     <Card title="이번 주" href="#/stats?tab=summary" label={label} testid="home-week">
       <div class="metrics2">
         {/* 증감은 기록 탭 타일과 같은 Delta (D-055 검토 R3) */}
-        <Metric label="운동" value={never ? undefined : cur.count} unit="회" status={never ? '아직 기록 없음' : undefined} statusClass="tile-delta">{never ? undefined : <Delta cur={cur.count} prev={prev.count} />}</Metric>
-        <Metric label="작업 세트" value={never ? undefined : cur.sets} unit="세트" status={never ? '첫 운동을 해 보세요' : undefined} statusClass="tile-delta">{never ? undefined : <Delta cur={cur.sets} prev={prev.sets} />}</Metric>
+        <Metric label="운동" value={never ? undefined : cur.count} unit="회" status={never ? '아직 기록 없음' : undefined} statusClass="tile-delta">{never || waiting ? undefined : <Delta cur={cur.count} prev={prev.count} />}</Metric>
+        <Metric label="작업 세트" value={never ? undefined : cur.sets} unit="세트" status={never ? '첫 운동을 해 보세요' : undefined} statusClass="tile-delta">{never || waiting ? undefined : <Delta cur={cur.sets} prev={prev.sets} />}</Metric>
       </div>
       <div class="weekdots" aria-hidden="true">
         {days.map((d, i) => (

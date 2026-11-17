@@ -159,7 +159,7 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
   const bw = Math.min(34, slot * 0.64);
   const lastOk = (() => { for (let i = n - 1; i >= 0; i--) if (state[i] !== 'future') return i; return 0; })();
   const gest = useRef<{ x: number; y: number; before: number | null; mode: 'wait' | 'scrub' | 'dead' } | null>(null);
-  const raw = (e: PointerEvent) => Math.floor((e.clientX - (e.currentTarget as HTMLElement).getBoundingClientRect().left - pad.l) / slot);
+  const raw = (e: PointerEvent) => slot > 0 ? Math.floor((e.clientX - (e.currentTarget as HTMLElement).getBoundingClientRect().left - pad.l) / slot) : -1;
   const clamp = (i: number) => Math.max(0, Math.min(lastOk, i));
   const key = (e: KeyboardEvent) => {
     if (e.key === 'Escape' && selected !== null) { e.preventDefault(); onSelect(null); return; }
@@ -177,7 +177,7 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
       aria-valuenow={(selected ?? lastOk) + 1} aria-valuetext={selected === null ? summary : valueText(selected)} data-testid="period-chart"
       onKeyDown={key}
       onPointerDown={(e) => {
-        if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return; // 둘째 손가락·오른쪽 버튼은 무시
+        if (slot <= 0 || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return; // 폭 0·둘째 손가락·오른쪽 버튼은 무시
         gest.current = { x: e.clientX, y: e.clientY, before: selected, mode: 'wait' };
         try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* 합성 이벤트 등 */ }
       }}

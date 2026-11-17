@@ -14,9 +14,9 @@ const idbPut = (page: Page, store: string, rows: Row[]) => page.evaluate(async (
   db.close();
 }, [store, rows] as const);
 /** 끝낸 운동: 한 종목, 같은 세트 n 개 (로컬 시각 y-m-d 10시, 40분) */
-const done = (id: string, y: number, m: number, d: number, sets: number, weight = 50, reps = 10) => {
+const done = (id: string, y: number, m: number, d: number, sets: number, weight = 50, reps = 10, mins = 40) => {
   const start = new Date(y, m - 1, d, 10).getTime();
-  return { id, name: '기록 테스트', startedAt: new Date(start).toISOString(), endedAt: new Date(start + 40 * MIN).toISOString(), timer: null,
+  return { id, name: '기록 테스트', startedAt: new Date(start).toISOString(), endedAt: new Date(start + mins * MIN).toISOString(), timer: null,
     blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: 'bench_press', target: { sets, reps }, sets: Array.from({ length: sets }, () => ({ warmup: false, done: true, weight, reps, doneAt: new Date(start + 5 * MIN).toISOString() })) }] }] };
 };
 
@@ -227,7 +227,7 @@ test('운동한 칸이 하나뿐이면 평균 범례 없음, 기록 없는 기�
 });
 
 test('볼륨 100만 kg 이상이면 카드가 톤으로, 한 줄에 들어감', async ({ page }) => {
-  await idbPut(page, 'workouts', [done('big', 2025, 6, 8, 5, 40000)]); // 5세트 × 40,000kg × 10회 = 2,000,000kg
+  await idbPut(page, 'workouts', [done('big', 2025, 6, 8, 5, 40000), done('mar', 2025, 3, 3, 4, 50)]); // 5세트 × 40,000kg × 10회 = 2,000,000kg
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await kind(page, '년').click();
@@ -235,6 +235,7 @@ test('볼륨 100만 kg 이상이면 카드가 톤으로, 한 줄에 들어감', 
   await expect(vol).toContainText('톤');
   await expect(vol).toContainText('작년 2,00');
   await vol.click();
+  await card(page).getByRole('button', { name: '이전 해' }).click(); // 지난 해는 진행 중인 달이 없어 평균을 보임 (올해 보기는 이번 달을 평균에서 뺌)
   await expect(card(page).getByTestId('period-avg')).toContainText('톤'); // 평균 범례·맨 위 눈금·읽기 문구도 같은 단위
   await expect(card(page).getByTestId('period-avg')).not.toContainText('kg');
   await expect(chart(page)).toHaveAttribute('aria-valuetext', /톤/);
@@ -292,13 +293,44 @@ test('오늘 운동 전이면 지난주는 어제 같은 요일까지만 견준�
   await expect(prev).toHaveText('지난주 9세트');
 });
 
-test('320px: 시간 큰 숫자와 단위는 짝으로 붙어 있고 가로 스크롤이 없다 (P11)', async ({ page }) => {
+test('320px: 네 카드의 큰 숫자 줄과 작은 줄이 모두 한 줄이고 가로 스크롤이 없다 (Q4·Q7)', async ({ page }) => {
+  await idbPut(page, 'workouts', [done('long', 2026, 11, 15, 4, 1250, 10, 133)]); // 이번 주 시간 3시간 33분·볼륨 5자리
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
   await page.setViewportSize({ width: 320, height: 700 });
-  await card(page).getByTestId('pm-time').click();
-  const ok = await card(page).getByTestId('pm-time').locator('.m-pair').evaluateAll((els) => els.every((e) => e.getBoundingClientRect().height < 40));
-  expect(ok).toBe(true);
+  for (const id of ['count', 'sets', 'volume', 'time']) {
+    const c = card(page).getByTestId(`pm-${id}`);
+    const mv = await c.locator('.m-val').evaluate((e) => e.getBoundingClientRect().height);
+    const pv = await c.locator('.pm-prev').evaluate((e) => e.getBoundingClientRect().height);
+    expect(mv, `${id} 큰 숫자 한 줄`).toBeLessThan(34);
+    expect(pv, `${id} 작은 줄 한 줄`).toBeLessThan(20);
+    const b = (await c.boundingBox())!, v = (await c.locator('.m-val').boundingBox())!;
+    expect(v.x + v.width, `${id} 숫자 줄이 카드 안`).toBeLessThanOrEqual(b.x + b.width + 0.5);
+  }
+  await expect(card(page).getByTestId('pm-time')).toContainText('3시간');
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
-  const card0 = (await card(page).getByTestId('pm-time').boundingBox())!;
-  const num = (await card(page).getByTestId('pm-time').locator('.m-val').boundingBox())!;
-  expect(num.x + num.width, '숫자 줄이 카드 밖으로 안 나감').toBeLessThanOrEqual(card0.x + card0.width + 0.5);
+});
+
+test('기간 첫날 운동 전(일요일 아침): 배지·증감 없이 "운동하면 비교해요", 홈도 증감 없음 (Q2)', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-22T09:00:00')); // 일요일, 지난주(11/15~21)에 운동 있음
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(card(page).locator('.pm-badge')).toHaveCount(0);
+  for (const id of ['count', 'sets', 'volume', 'time']) await expect(card(page).getByTestId(`pm-${id}`).locator('.pm-prev')).toHaveText('운동하면 비교해요');
+  await expect(card(page).getByTestId('pm-sets')).toHaveAttribute('aria-label', '작업 세트 0세트, 오늘 운동하면 지난주 같은 요일까지와 비교해요');
+  await expect(card(page)).toContainText('오늘 운동하면 지난주 같은 요일(일)까지와 비교');
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+  const home = page.getByTestId('home-week');
+  await expect(home).toBeVisible();
+  await expect(home).not.toContainText('지난주');
+});
+
+test('오늘 뒤 날짜로 적힌 기록은 기록 탭·홈 어디서도 이번 주에 안 센다 (Q3·P6)', async ({ page }) => {
+  await idbPut(page, 'workouts', [done('fut', 2026, 11, 18, 9)]); // 11/16 기준 수요일(미래)
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(card(page).getByTestId('pm-sets')).toHaveAttribute('aria-label', /^작업 세트 7세트/);
+  await expect(card(page).getByTestId('pm-count')).toHaveAttribute('aria-label', /^운동 2회/);
+  await page.getByRole('link', { name: '홈', exact: true }).click();
+  await expect(page.getByTestId('home-week')).toHaveAttribute('aria-label', /2회, 작업 세트 7개/);
 });

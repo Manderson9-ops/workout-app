@@ -4,9 +4,9 @@ import type { AppState } from '../store';
 import type { Workout } from '../../core/session';
 import type { Exercise } from '../../core/types';
 import { weekStreak } from '../../core/stats';
-import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, periodData, earliestPeriod, activeAverage } from '../../core/period';
+import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, waitingForToday, averageOver, periodData, earliestPeriod } from '../../core/period';
 import type { PeriodKind, PeriodMetric } from '../../core/period';
-import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, avgText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
+import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, WAITING_LINE, prevNote, avgText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
 import { WD } from '../../core/dateText';
 import { PeriodBars } from '../charts';
 import type { BucketState } from '../charts';
@@ -61,11 +61,11 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
   });
   const lastOk = state.reduce((m, s, i) => (s !== 'future' ? i : m), 0);
   const selv = sel !== null && sel <= lastOk ? sel : null; // 날이 바뀌어 미래가 된 칸은 고른 것으로 안 침
-  const avgV = activeAverage(vals, cur.active);
-  const activeN = cur.active.filter(Boolean).length;
-  const empty = activeN === 0;
+  const { value: avgV, n: avgN } = averageOver(kind, vals, cur.active, state); // 년 보기는 진행 중인 이번 달을 평균에서 뺌
+  const empty = !cur.active.some(Boolean);
+  const waiting = current && waitingForToday(periodOf(kind, today), today, todayDone); // 첫날·운동 전: 견줄 구간이 비어 있음
   // 평균선·범례: 운동한 칸이 둘 이상이고 평균이 최댓값과 같지 않을 때만 (한 칸뿐이면 같은 값이 되풀이됨)
-  const showAvg = avgV > 0 && activeN >= 2 && avgV < Math.max(...vals) && !(metric === 'count' && kind !== 'year');
+  const showAvg = avgV > 0 && avgN >= 2 && avgV < Math.max(...vals) && !(metric === 'count' && kind !== 'year');
   const ton = tonMode(t.volume, p.volume);
     /** 한 칸 문구: "11월 16일 (월) · 작업 세트 9세트 · 운동 1회" (일·월 보기에서 지표가 운동 수가 아니면 운동한 칸에 횟수를 덧붙임) */
   const bucketLine = (i: number) => !cur.active[i] ? `${bucketText(kind, buckets[i]!.start)} · 운동 안 함` : `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!, ton)}${kind !== 'year' && metric !== 'count' ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
@@ -96,24 +96,25 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
         labelClass={kind === 'week' ? ['sun', '', '', '', '', '', 'sat'] : undefined}
         empty={empty ? (current ? '운동을 끝내면 여기에 막대가 생겨요' : '이 기간에는 운동 기록이 없어요') : undefined}
         summary={total} label={`${kind === 'year' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />
+      {current && !waiting && <p class="sub small pm-note">{prevNote(kind)}</p>}
       <div class="pm-grid">
         {METRICS.map((m) => {
           const c = metricValue(m, t), pv = metricValue(m, p);
           const tn = m === 'volume' && ton;
           const parts = bigParts(m, c, tn);
-          const [cc, cp] = cmpValues(m, c, pv, tn);
+          const [cc, cp] = cmpValues(m, c, pv, tn, true);
           const dir = cc > cp ? 'up' : cc < cp ? 'down' : 'same';
           return (
             <button key={m} class={`pm-card${metric === m ? ' on' : ''}`} aria-pressed={metric === m} data-testid={`pm-${m}`}
-              aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn })} onClick={() => setMetric(m)}>
-              <span class="pm-top"><span class={`pm-badge ${dir}`} aria-hidden="true">{dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='}</span><span class="m-label" aria-hidden="true">{METRIC_NAME[m]}</span></span>
+              aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn, waiting })} onClick={() => setMetric(m)}>
+              <span class="pm-top">{!waiting && <span class={`pm-badge ${dir}`} aria-hidden="true">{dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='}</span>}<span class="m-label" aria-hidden="true">{METRIC_NAME[m]}</span></span>
               <span class="m-val" aria-hidden="true">{parts.map(([n, u], i) => <span key={i} class="m-pair"><span class="num">{n}</span>{u && <span class="unit">{u}</span>}</span>)}</span>
-              <span class="pm-prev" aria-hidden="true">{prevName(kind, current, true)} {valueText(m, pv, tn)}</span>
+              <span class="pm-prev" aria-hidden="true">{waiting ? WAITING_LINE : `${prevName(kind, current, true)} ${valueText(m, pv, tn)}`}</span>
             </button>
           );
         })}
       </div>
-      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnote(kind, current, baseThrough, streak, todayWd)}</p>
+      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnote(kind, current, baseThrough, streak, todayWd, waiting)}</p>
     </section>
   );
 }

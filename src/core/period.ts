@@ -66,13 +66,23 @@ export function hasWorkoutOn(workouts: Workout[], date: string): boolean {
 }
 
 /**
- * 비교할 이전 기간의 끝 날짜 (포함). compareThrough 와 같되, 오늘 운동을 아직 안 했으면 하루 덜 (어제 같은 위치까지):
+ * 비교할 이전 기간의 끝 날짜 (포함). 오늘 운동을 했으면 compareThrough 그대로, 아직이면 어제 기준(같은 위치의 어제까지):
  * 운동 전의 오늘(0)을 지난주 같은 요일의 완성된 하루와 견주면 늘 "적어요"로 나오는 편향을 막음.
- * 기간의 첫날이면 이전 기간 시작보다 앞이라 비교 구간이 빔
+ * 월·년은 어제 날짜로 다시 맞춰서 짧은 달 끝(3/31 → 2/28)도 이전 기간의 마지막 날을 놓치지 않음.
+ * 기간의 첫날이면 어제가 이전 기간 밖이라 비교 구간이 빔 (이전 기간 시작보다 하루 앞 날짜를 돌려줌, waitingForToday 로 구분)
  */
 export function compareThroughFor(cur: PeriodRange, today: string, todayDone: boolean): string {
-  const base = compareThrough(cur, today);
-  return todayDone ? base : addDays(base, -1);
+  if (todayDone) return compareThrough(cur, today);
+  if (today === cur.start) return addDays(shiftPeriod(cur, -1).start, -1);
+  return compareThrough(cur, addDays(today, -1));
+}
+/** 기간 첫날이고 오늘 운동 전: 견줄 구간이 비어 있음 (▲▼ 를 보여 주지 않음) */
+export const waitingForToday = (cur: PeriodRange, today: string, todayDone: boolean): boolean => !todayDone && today === cur.start;
+
+/** 평균에 쓸 칸 평균과 칸 수: 년 보기는 아직 진행 중인 이번 달('now')을 뺌 (덜 찬 달이 평균을 끌어내리지 않게) */
+export function averageOver(kind: PeriodKind, values: number[], active: boolean[], state: string[]): { value: number; n: number } {
+  const mask = active.map((a, i) => a && !(kind === 'year' && state[i] === 'now'));
+  return { value: activeAverage(values, mask), n: mask.filter(Boolean).length };
 }
 
 /** 칸 번호: 주·월 = 날짜 차이, 년 = 달 */

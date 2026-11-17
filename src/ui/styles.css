@@ -927,6 +927,14 @@ button.pm-card.on { background: var(--acc-fill); border-color: var(--acc-fill); 
 button.pm-card .m-val { flex-wrap: wrap; }
 button.pm-card .num { font-size: 26px; white-space: nowrap; }
 button.pm-card .m-pair, button.pm-card .unit { white-space: nowrap; }
-@media (max-width: 340px) { button.pm-card .num { font-size: 22px; } }
+.pm-note { margin: 10px 0 -4px; }
+@media (max-width: 340px) {
+  button.pm-card { padding: 8px; }
+  button.pm-card .num { font-size: 20px; }
+  button.pm-card .unit { font-size: 12px; }
+  button.pm-card .m-val { flex-wrap: nowrap; gap: 2px; }
+  button.pm-card .m-pair { margin-right: 3px; gap: 2px; }
+  .pm-prev { font-size: 11px; white-space: nowrap; }
+}
 button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opacity: .85; }
 .pm-prev { color: var(--sub); font-size: 12px; overflow-wrap: anywhere; }

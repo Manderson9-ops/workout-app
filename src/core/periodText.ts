@@ -31,19 +31,20 @@ export function valueText(m: PeriodMetric, v: number, ton = false): string {
 export function bigParts(m: PeriodMetric, v: number, ton = false): [string | number, string][] {
   if (m === 'count') return [[v.toLocaleString('ko-KR'), '회']];
   if (m === 'sets') return [[v.toLocaleString('ko-KR'), '세트']];
-  if (m === 'volume') return ton ? (v > 0 && v < 50 ? [['0.1', '톤 미만']] : [[tonNum(v), '톤']]) : [[v.toLocaleString('ko-KR'), 'kg']];
+  if (m === 'volume') return ton ? (v > 0 && v < 50 ? [['0.1', '톤 미만']] : [[tonNum(v), '톤']]) : [[Math.round(v).toLocaleString('ko-KR'), 'kg']];
   return v >= 36000 ? [[Math.round(v / 3600).toLocaleString('ko-KR'), '시간']] : durParts(v);
 }
 /** 볼륨이 100만 kg 이상이면 카드의 큰 숫자·이전 값 줄을 톤으로 (390px 에서 일곱 자리 숫자가 안 들어감) */
 export const tonMode = (cur: number, prev: number): boolean => Math.max(cur, prev) >= 1_000_000;
 /**
  * 견줄 때 쓰는 값: 사용자에게 보이는 정밀도로 맞춘 같은 단위(시간 초, 볼륨 kg) 값 둘.
- * 시간 = 분 단위(둘 다 1분 미만이면 초), 볼륨 kg = 정수, 톤 = 보이는 단계(10톤 미만 0.1톤, 이상 1톤, 0 초과 50kg 미만은 따로 한 단계).
+ * 시간 = 분 단위(어느 한쪽이 1분 미만이면 초; badge 이고 큰 숫자가 10시간 이상이면 시간 단위), 볼륨 kg = 정수, 톤 = 보이는 단계(10톤 미만 0.1톤, 이상 1톤, 0 초과 50kg 미만은 따로 한 단계).
  * 같으면 ▲▼ 대신 "=" 와 "같아요"
  */
-export function cmpValues(m: PeriodMetric, cur: number, prev: number, ton = false): [number, number] {
+export function cmpValues(m: PeriodMetric, cur: number, prev: number, ton = false, badge = false): [number, number] {
   if (m === 'time') {
-    if (cur < 60 && prev < 60) return [Math.round(cur), Math.round(prev)];
+    if (cur < 60 || prev < 60) return [Math.round(cur), Math.round(prev)];
+    if (badge && cur >= 36000) return [Math.round(cur / 3600) * 3600, Math.round(prev / 3600) * 3600]; // 큰 숫자가 시간만 보일 때 배지도 시간 단위
     return [Math.round(cur / 60) * 60, Math.round(prev / 60) * 60];
   }
   if (m !== 'volume') return [cur, prev];
@@ -69,6 +70,11 @@ export function prevPhrase(kind: PeriodKind, current: boolean): string {
   if (!current) return prevName(kind, false);
   return `${prevName(kind, true, true)} ${kind === 'week' ? '같은 요일까지' : '같은 날까지'}`;
 }
+
+/** 카드 작은 줄: 현재 기간이면 "지난주 12세트" (무엇과 견주는지는 카드 위 한 줄 안내), 첫날 운동 전이면 안내 */
+export const WAITING_LINE = '운동하면 비교해요';
+/** 카드 격자 위 안내: 현재 기간의 작은 글씨가 이전 기간 어느 시점 값인지 */
+export const prevNote = (kind: PeriodKind): string => `작은 글씨 = ${prevName(kind, true)} 값`;
 
 /** 이동줄 이름: offset 0 이번 주/달·올해, 1 지난주·지난달·작년, 그 밖은 날짜 이름 */
 export function periodLabel(r: PeriodRange, offset: number, today: string): string {
@@ -117,8 +123,9 @@ export function headline(o: { kind: PeriodKind; current: boolean; metric: Period
 }
 
 /** 카드 aria-label: "운동 1회, 지난주 같은 요일까지 0회보다 1회 많음" */
-export function cardAria(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; ton?: boolean }): string {
-  const { kind, current, metric, cur, prev, ton } = o;
+export function cardAria(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; ton?: boolean; waiting?: boolean }): string {
+  const { kind, current, metric, cur, prev, ton, waiting } = o;
+  if (waiting) return `${METRIC_NAME[metric]} ${valueText(metric, cur, ton)}, 오늘 운동하면 ${prevPhrase(kind, current)}와 비교해요`;
   const pp = prevPhrase(kind, current), cv = valueText(metric, cur, ton), pv = valueText(metric, prev, ton);
   const head = `${METRIC_NAME[metric]} ${cv}, ${pp} `;
   const [c, p] = cmpValues(metric, cur, prev, ton);
@@ -134,9 +141,10 @@ export function bucketText(kind: PeriodKind, start: string): string {
 }
 
 /** 아래 작은 글씨 (현재 기간이면 through = 이전 기간의 비교 끝 날짜) */
-export function footnote(kind: PeriodKind, current: boolean, through: string, streak: number, todayWd: number): string {
+export function footnote(kind: PeriodKind, current: boolean, through: string, streak: number, todayWd: number, waiting = false): string {
   if (!current) return `▲▼ = ${prevName(kind, false)} 전체와 비교`;
   const [, m, d] = through.split('-').map(Number);
+  if (waiting) return kind === 'week' ? '▲▼ = 오늘 운동하면 지난주 같은 요일(일)까지와 비교' : kind === 'month' ? '▲▼ = 오늘 운동하면 지난달 같은 날(1일)까지와 비교' : '▲▼ = 오늘 운동하면 작년 같은 날(1월 1일)까지와 비교';
   if (kind === 'week') return `▲▼ = 지난주 같은 요일(일${todayWd > 0 ? `~${WD[todayWd]}` : ''})까지와 비교 · 오늘 운동 전이면 어제까지 · 연속 ${streak}주 · 일요일~토요일 기준`;
   if (kind === 'month') return `▲▼ = 지난달 같은 날(${d === 1 ? '1일' : `1~${d}일`})까지와 비교 · 오늘 운동 전이면 어제까지`;
   return `▲▼ = 작년 같은 날(${m === 1 && d === 1 ? '1월 1일' : `1월 1일~${m}월 ${d}일`})까지와 비교 · 오늘 운동 전이면 어제까지`;
