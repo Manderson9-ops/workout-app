@@ -79,6 +79,14 @@ export function compareThroughFor(cur: PeriodRange, today: string, todayDone: bo
 /** 기간 첫날이고 오늘 운동 전: 견줄 구간이 비어 있음 (▲▼ 를 보여 주지 않음) */
 export const waitingForToday = (cur: PeriodRange, today: string, todayDone: boolean): boolean => !todayDone && today === cur.start;
 
+/** start(기간 시작)가 today 가 든 기간에서 몇 기간 전인지 (0 = 이번 기간, 미래면 0) */
+export function offsetOf(kind: PeriodKind, start: string, today: string): number {
+  const cur = periodOf(kind, today).start;
+  const [cy, cm] = parts(cur), [sy, sm] = parts(start);
+  const n = kind === 'year' ? cy - sy : kind === 'month' ? (cy * 12 + cm) - (sy * 12 + sm) : Math.round((Date.UTC(cy, cm - 1, parts(cur)[2]) - Date.UTC(sy, sm - 1, parts(start)[2])) / (7 * 86400000));
+  return Math.max(0, n);
+}
+
 /** 평균에 쓸 칸 평균과 칸 수: 년 보기는 아직 진행 중인 이번 달('now')을 뺌 (덜 찬 달이 평균을 끌어내리지 않게) */
 export function averageOver(kind: PeriodKind, values: number[], active: boolean[], state: string[]): { value: number; n: number } {
   const mask = active.map((a, i) => a && !(kind === 'year' && state[i] === 'now'));

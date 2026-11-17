@@ -64,7 +64,8 @@ function ThisWeekCard({ s }: { s: AppState }) {
   const { done, cur, prev, waiting } = useMemo(() => {
     const byId = new Map(all.map((e) => [e.id, e]));
     const done = historyOf(s);
-    return { done, waiting: waitingForToday(periodOf('week', today), today, hasWorkoutOn(done, today)), cur: weekSummary(done, byId, ws, s.bodyweight, today), prev: weekSummary(done, byId, addDays(ws, -7), s.bodyweight, compareThroughFor(periodOf('week', today), today, hasWorkoutOn(done, today))) }; // 기록 탭과 같은 비교 구간 (오늘 운동 전이면 어제 같은 요일까지)
+    const thisWeek = periodOf('week', today), todayDone = hasWorkoutOn(done, today); // 기록 탭과 같은 비교 구간
+    return { done, waiting: waitingForToday(thisWeek, today, todayDone), cur: weekSummary(done, byId, ws, s.bodyweight, today), prev: weekSummary(done, byId, addDays(ws, -7), s.bodyweight, compareThroughFor(thisWeek, today, todayDone)) }; // 기록 탭과 같은 비교 구간 (오늘 운동 전이면 어제 같은 요일까지)
   }, [all, s.workouts, s.bodyweight, ws, today]);
   const never = done.length === 0;
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));

@@ -926,11 +926,13 @@ button.pm-card.on { background: var(--acc-fill); border-color: var(--acc-fill); 
 .pm-badge.down { background: var(--sub); color: var(--bg); }
 button.pm-card .m-val { flex-wrap: wrap; }
 button.pm-card .num { font-size: 26px; white-space: nowrap; }
+button.pm-card .m-val.long .num { font-size: 20px; } /* 100시간 이상: 세 자리 시간 + 분이 한 줄에 */
 button.pm-card .m-pair, button.pm-card .unit { white-space: nowrap; }
 .pm-note { margin: 10px 0 -4px; }
 @media (max-width: 340px) {
   button.pm-card { padding: 8px; }
   button.pm-card .num { font-size: 20px; }
+  button.pm-card .m-val.long .num { font-size: 16px; }
   button.pm-card .unit { font-size: 12px; }
   button.pm-card .m-val { flex-wrap: nowrap; gap: 2px; }
   button.pm-card .m-pair { margin-right: 3px; gap: 2px; }
