@@ -1,0 +1,73 @@
+
+> workout-app@0.9.17-preview test
+> vitest run --coverage && vitest run tests/planner.test.ts
+
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - import "./dateText" without a file extension (src/core/changelog.ts:1:26). Add the file extension
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v5.0.2 C:/dev/workout-app
+      Coverage enabled with v8
+
+
+ Test Files  49 passed (49)
+      Tests  756 passed (756)
+   Start at  15:56:41
+   Duration  21.01s (tests 70%, transform 14%, import 12%, worker 4%)
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|------------------------------------------------------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                
+-------------------|---------|----------|---------|---------|------------------------------------------------------------------
+All files          |   97.79 |    91.64 |   98.88 |   99.63 |                                                                  
+ autoSendConfig.ts |     100 |     87.5 |     100 |     100 | 9                                                                
+ backup.ts         |   98.46 |    97.51 |   97.77 |   98.75 | 98                                                               
+ changelog.ts      |   95.91 |    84.76 |     100 |   98.33 | 127                                                              
+ dateText.ts       |     100 |    98.38 |     100 |     100 | 126                                                              
+ diag.ts           |   90.82 |       80 |      90 |    97.1 | 128-129                                                          
+ feedback.ts       |   94.44 |     87.8 |      80 |   95.83 | 36                                                               
+ finishTime.ts     |   94.89 |    91.04 |     100 |     100 | 36,104-115,133-138                                               
+ health.ts         |   97.61 |    82.46 |   94.59 |   98.38 | 138,234                                                          
+ healthIngest.ts   |   95.65 |    89.44 |   97.46 |   99.75 | 280                                                              
+ hlc.ts            |   94.59 |       70 |     100 |     100 | 14-18,34                                                         
+ notify.ts         |   88.88 |     91.3 |     100 |   85.71 | 38,40                                                            
+ planEdit.ts       |   98.71 |    94.73 |     100 |     100 | 67-69,97,150,156                                                 
+ planner.ts        |   99.51 |    96.49 |   99.37 |     100 | 115,128-131,172,258,322,352,433,445,467-469,496,557-559,571,587  
+ recovery.ts       |   97.36 |    92.59 |     100 |     100 | 58,69,84,130                                                     
+ recoveryData.ts   |     100 |    88.88 |     100 |     100 | 21,41                                                            
+ routineDiff.ts    |   97.36 |    89.87 |     100 |     100 | 90,105-106,125,138,142-146                                       
+ routineFit.ts     |   97.97 |     85.6 |     100 |   99.15 | 248                                                              
+ routineList.ts    |   98.38 |    66.17 |   96.15 |     100 | 26,28,30,32,60,64,67                                             
+ session.ts        |    98.9 |    95.47 |   99.13 |     100 | 55,66,155,208-214,271,289,370,403,444,450                        
+ similar.ts        |   97.77 |    85.91 |     100 |     100 | 12-18,24,34-35,51,80                                             
+ stats.ts          |     100 |    93.93 |     100 |     100 | 52,90,179-183,193,233-236                                        
+ syncMerge.ts      |   97.32 |    88.19 |     100 |     100 | 44,61,99,117-122,138,153,157,171,178,182,187-190,206-207,242,248 
+ syncStamp.ts      |    98.3 |    93.87 |     100 |     100 | 30,65                                                            
+ time.ts           |     100 |    95.74 |     100 |     100 | 71,79                                                            
+ undoWindow.ts     |     100 |       96 |     100 |     100 | 41                                                               
+ validatePlan.ts   |    97.8 |    94.97 |     100 |     100 | 36,40,52,82,92,110,122,125,128                                   
+ volume.ts         |   97.72 |    96.96 |     100 |     100 | 44                                                               
+ warmupGuess.ts    |   93.47 |    91.22 |     100 |     100 | 11,41-46,49                                                      
+ wkImport.ts       |   98.24 |    92.63 |   96.29 |     100 | 118-123,150,155,160,163,189                                      
+ workoutEdit.ts    |   96.32 |    86.48 |     100 |     100 | 43,54,69-73,86-93,101,115-117,121,130                            
+ workoutHistory.ts |   95.29 |       80 |     100 |     100 | 14,18-27,35,37,57-58,88,90,97                                    
+-------------------|---------|----------|---------|---------|------------------------------------------------------------------
+
+=============================== Coverage summary ===============================
+Statements   : 97.79% ( 4828/4937 )
+Branches     : 91.64% ( 3994/4358 )
+Functions    : 98.88% ( 1237/1251 )
+Lines        : 99.63% ( 3003/3014 )
+================================================================================
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - import "./dateText" without a file extension (src/core/changelog.ts:1:26). Add the file extension
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+ RUN  v5.0.2 C:/dev/workout-app
+
+
+ Test Files  1 passed (1)
+      Tests  72 passed (72)
+   Start at  15:57:03
+   Duration  9.23s (tests 97%, transform 2%, import 1%)
+

@@ -2,15 +2,15 @@
 
 | 관문 | 결과 |
 |---|---|
-| typecheck | 오류 0 (`npm run typecheck`, 최종 b2d2136) |
+| typecheck | 오류 0 (`npm run typecheck`, 최종 7f64aee) |
 | decisions:check | M 결정 33개 불일치 0 |
-| npm test | 단위 756 + 플랜 72 전부 통과, `src/core` 줄 커버리지 99.63%, period.ts·periodText.ts 줄·분기 100% |
-| E2E | 최종 b2d2136 전체(--workers=1, iPhone 13 WebKit·Chromium + PC, 로그 reports/e2e-0.9.17-b2d2136.txt, HEAD 머리글): **268/268 통과**. 흔들리던 시험 2개는 원인(시험이 저장 끝나기 전에 새로고침)을 고쳐 반복 P4 12/12·설정 묶음 8/8 |
-| UX/UI 감사 게이트 | b2d2136 e2e 직후 `node tools/uxui_audit.ts --gate` exit 0 — PASS 22 · INFO 4 · JUDGED 11 · N/A 12 (reports/uxui-audit-0.9.17-b2d2136.txt) |
+| npm test | 단위 756 + 플랜 72 전부 통과(reports/unit-0.9.17-7f64aee.txt), period.ts·periodText.ts 줄·분기 100% |
+| E2E | b2d2136 전체 **268/268**(로그 reports/e2e-0.9.17-b2d2136.txt). 최종 7f64aee(CSS 한 블록 + 폭 5개 시험 추가): 전체 실행에서 WebKit 139/139 통과, Chromium 은 PC 메모리 부족으로 기동 실패(시험 조건 실패 0, 로그 reports/e2e-0.9.17-7f64aee.txt); 같은 내용 records+uxui 80/80(두 브라우저, 구현 에이전트). 흔들리던 시험 2개는 시험 쪽 저장 대기로 해결 |
+| UX/UI 감사 게이트 | 7f64aee `node tools/uxui_audit.ts --gate` exit 0 — PASS 22 · INFO 4 · JUDGED 11 · N/A 12 (reports/uxui-audit-0.9.17-7f64aee.txt) |
 | 동기화 서버 | syncMerge·syncStamp·hlc·tools/gas 변경 없음 → Apps Script 재배포 불필요 |
 | 저장 구조 | DB·백업 변경 없음 (기기 설정 localStorage `stats.period.v1` 만 추가) |
 | 독립 검토 (Opus, 매회 새 검토자) | 11회: 9.15 → 9.30 → 9.60 → 9.68 → 9.45 → 9.45 → 9.55 → 9.65 → 9.70 → 9.65 → **9.65 PASS** (11차 = 0227acb; 그 뒤 b2d2136 은 시험 파일 2개 + 화면 변화 없는 클래스 1줄). 채점표 Drive WORK_OUT_APP/docs/reviews/v0.9.17.md |
-| /ogf 패널 (role-stacking, 평균 ≥9.25) | 9회, 최고 9.00 — 미달(nit 만 남은 채 수렴하지 않아 중단) |
+| /ogf 패널 (role-stacking, 평균 ≥9.25) | 10회, 최종 9.05(구현 9.0·통계 9.4·재현 8.8) — 미달, 7회 이후 nit 만 남은 채 9.0~9.05 에서 멈춰 종료 |
 | 사용자 확인 | 본판은 "메인 배포" 승인 후 |
 
 ## 주요 반영 (D-081)
@@ -19,3 +19,4 @@
 - 막대 그래프(이번 칸 강조·평균 범례·최댓값 눈금·운동한 날 점), 탭·가로 훑기·방향키로 칸 값 보기, 세로로 끌면 스크롤만
 - 비교 = 지난 기간 같은 시점까지(오늘 운동 전이면 어제까지, 첫날 운동 전이면 "운동하면 비교해요", 월말엔 "지난달 전체"), 홈 "지난주보다"도 같은 구간
 - 100만 kg 이상 톤, 시간은 시간+분, 보이는 값끼리 비교
+- 1,000시간 이상 시간 카드: 341~375px 에서 두 줄이던 것(실측 38.6~39.0px)을 한 줄(13.2px)로, 폭 320·341·360·375·390 e2e
