@@ -894,158 +894,161 @@ test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 �
   expect(sec).toBeLessThanOrEqual(75);
 });
 
-test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원판·1RM, 백업 → 초기화 → 복원 100% 일치', async ({ page }) => {
-  // D-081: 기록 요약 카드가 요일에 따라 달라지지 않게 시각을 수요일 낮으로 고정 (시간은 그대로 흐름)
-  await page.clock.install({ time: new Date('2026-11-18T12:00:00') });
-  await page.reload();
-  // 공유 시트 대신 다운로드 경로로 고정 (테스트 브라우저에는 공유 시트가 없음)
-  await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
-  // 운동 하나 끝내기: 바벨 컬 1세트 30kg × 10 (기본 목표 횟수)
-  await page.getByRole('button', { name: '+ 직접' }).click();
-  await page.getByLabel('루틴 이름').fill('팔 테스트');
-  await page.getByRole('button', { name: '+ 운동 추가' }).click();
-  await page.getByLabel('운동 검색').fill('바벨 컬');
-  await page.getByRole('dialog').getByRole('button').filter({ hasText: '바벨 컬' }).first().click();
-  for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '바벨 컬 세트 줄이기', exact: true }).click();
-  await page.getByRole('button', { name: '저장하고 시작' }).click();
-  await page.getByLabel('바벨 컬 1세트 무게', { exact: true }).fill('30');
-  // 현재 세트 펼침은 2줄 (① kg·회 −/+ · 원판, ② RIR · 메모) → 세트 줄 포함 3줄 이하 (iPhone 13 폭)
-  const det = page.locator('.set-detail').filter({ has: page.getByRole('button', { name: '바벨 컬 1세트 원판 계산' }) });
-  const tops = await det.getByRole('button').evaluateAll((els) => [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().top)))]);
-  expect(tops.length).toBeLessThanOrEqual(2);
-  for (const bb of await det.getByRole('button').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height))) expect(bb).toBeGreaterThanOrEqual(44);
-  // 운동 중 원판 계산 시트 (바벨·스미스 운동에만 버튼)
-  await page.getByRole('button', { name: '바벨 컬 1세트 원판 계산' }).click();
-  await expect(page.getByRole('dialog', { name: '원판 계산기' })).toBeVisible();
-  await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 5');
-  await touchTargets(page);
-  await page.getByRole('button', { name: '닫기' }).click();
-  await page.getByRole('button', { name: '현재 세트 완료' }).click();
-  await endWorkout(page);
-  await expect(page.getByText('최근 운동')).toBeVisible();
-  // 홈 백업 알림 (백업한 적 없음)
-  await expect(page.getByRole('note', { name: '백업 알림' })).toContainText('아직 백업한 적이 없어요');
+test.describe('D-081 시각 고정 (한국 시간)', () => {
+  test.use({ timezoneId: 'Asia/Seoul', locale: 'ko-KR' });
+  test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원판·1RM, 백업 → 초기화 → 복원 100% 일치', async ({ page }) => {
+    // D-081: 기록 요약 카드가 요일에 따라 달라지지 않게 시각을 수요일 낮으로 고정 (시간은 그대로 흐름)
+    await page.clock.install({ time: new Date('2026-11-18T12:00:00+09:00') });
+    await page.reload();
+    // 공유 시트 대신 다운로드 경로로 고정 (테스트 브라우저에는 공유 시트가 없음)
+    await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
+    // 운동 하나 끝내기: 바벨 컬 1세트 30kg × 10 (기본 목표 횟수)
+    await page.getByRole('button', { name: '+ 직접' }).click();
+    await page.getByLabel('루틴 이름').fill('팔 테스트');
+    await page.getByRole('button', { name: '+ 운동 추가' }).click();
+    await page.getByLabel('운동 검색').fill('바벨 컬');
+    await page.getByRole('dialog').getByRole('button').filter({ hasText: '바벨 컬' }).first().click();
+    for (let i = 0; i < 2; i++) await page.getByRole('button', { name: '바벨 컬 세트 줄이기', exact: true }).click();
+    await page.getByRole('button', { name: '저장하고 시작' }).click();
+    await page.getByLabel('바벨 컬 1세트 무게', { exact: true }).fill('30');
+    // 현재 세트 펼침은 2줄 (① kg·회 −/+ · 원판, ② RIR · 메모) → 세트 줄 포함 3줄 이하 (iPhone 13 폭)
+    const det = page.locator('.set-detail').filter({ has: page.getByRole('button', { name: '바벨 컬 1세트 원판 계산' }) });
+    const tops = await det.getByRole('button').evaluateAll((els) => [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().top)))]);
+    expect(tops.length).toBeLessThanOrEqual(2);
+    for (const bb of await det.getByRole('button').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height))) expect(bb).toBeGreaterThanOrEqual(44);
+    // 운동 중 원판 계산 시트 (바벨·스미스 운동에만 버튼)
+    await page.getByRole('button', { name: '바벨 컬 1세트 원판 계산' }).click();
+    await expect(page.getByRole('dialog', { name: '원판 계산기' })).toBeVisible();
+    await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 5');
+    await touchTargets(page);
+    await page.getByRole('button', { name: '닫기' }).click();
+    await page.getByRole('button', { name: '현재 세트 완료' }).click();
+    await endWorkout(page);
+    await expect(page.getByText('최근 운동')).toBeVisible();
+    // 홈 백업 알림 (백업한 적 없음)
+    await expect(page.getByRole('note', { name: '백업 알림' })).toContainText('아직 백업한 적이 없어요');
 
-  // 기록 탭: 이번 주 1회, 오늘 달력 표시 → 상세
-  await page.getByRole('link', { name: '기록' }).click();
-  await expect(page.getByTestId('this-week')).toContainText('1회');
-  // D-054·D-081: 이번 주 7칸 그래프(일요일 시작), 오늘 칸 하나, 운동 1회가 오늘 칸 값으로 보임
-  const chart = page.getByTestId('period-chart');
-  await expect(chart.locator('rect.pb-bar')).toHaveCount(7);
-  await expect(chart.locator('rect.pb-bar.now')).toHaveCount(1);
-  await expect(page.getByTestId('this-week').getByRole('button', { name: /^운동 1회/ })).toBeVisible();
-  await chart.focus();
-  await page.keyboard.press('ArrowRight'); // 고른 칸이 없으면 오늘 칸부터
-  await expect(chart).toHaveAttribute('aria-valuetext', / · 작업 세트 1세트/);
-  await page.getByRole('tab', { name: '운동 기록' }).click();
-  await expect(page.locator('.cal-wd').first()).toHaveText('일');
-  await expect(page.locator('.cal-wd').nth(6)).toHaveText('토');
-  await expect(page.getByText(/이번 달 1회/)).toBeVisible();
-  const d = new Date(await page.evaluate(() => Date.now())); // 고정한 시각 (이 시험 PC의 오늘이 아님)
-  const todayBtn = page.getByRole('button', { name: `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일, 운동 1회` }); // 검토 E5 전체 형태
-  await expect(todayBtn).toBeEnabled();
-  await todayBtn.click();
-  await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
-  await page.getByRole('tab', { name: '분석' }).click();
-  // 부위별 세트: 이두 줄에 1세트, 열 지도, 운동 기록 카드에 종목 줄(최고)
-  await expect(page.getByTestId('part-row').filter({ hasText: '이두' })).toContainText('1세트');
-  await expect(page.getByTestId('bodyheat')).toBeVisible();
-  await expect(page.getByTestId('bodyheat').locator('svg')).toHaveCount(2); // 앞·뒤 나란히
-  await expect(page.getByRole('group', { name: /부위별 세트 열 지도: .*이두 1세트/ })).toBeVisible();
-  // 빈 주: 이전 주로 가면 안내 문구, 다시 이번 주로
-  await page.getByRole('button', { name: '이전 주' }).click();
-  await expect(page.getByText('이 주에는 운동 기록이 없어요')).toBeVisible();
-  await expect(page.getByTestId('part-row')).toHaveCount(0);
-  await page.getByRole('button', { name: '다음 주' }).click();
-  await expect(page.getByTestId('part-row').first()).toBeVisible();
-  await expect(page.getByRole('table', { name: '최근 4주 부위별 작업 세트' })).toContainText('이두');
-  await expect(page.getByRole('img', { name: /최근 8주 주간 볼륨: .*300kg/ })).toBeVisible();
-  // 체중: 범위 밖은 거절, 정상 값 기록
-  await page.getByLabel('체중', { exact: true }).fill('700');
-  await page.getByRole('button', { name: '기록', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('20~300kg');
-  await page.getByLabel('체중', { exact: true }).fill('72.5');
-  await page.getByRole('button', { name: '기록', exact: true }).click();
-  await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: '고치기' })).toBeVisible();
-  await checkScreen(page, '10-stats');
-  await page.getByRole('tab', { name: '요약' }).click();
-  await expect(page.getByRole('button', { name: /^팔 테스트,.*세트 1,.*바벨 컬 1세트 최고 30kg × 10회/ }).first()).toBeVisible(); // 카드 요약 이름
-  await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toContainText('바벨 컬 · 1세트 · 최고 30kg × 10회');
-  await page.getByRole('button', { name: /팔 테스트/ }).first().click();
-  await expect(page.getByRole('heading', { name: '팔 테스트' })).toBeVisible();
-  await expect(page.getByText(/30kg × 10회/)).toBeVisible();
-  await expect(page.getByRole('button', { name: '이 운동 다시 하기' })).toBeVisible();
-  await checkScreen(page, '11-workout-detail');
+    // 기록 탭: 이번 주 1회, 오늘 달력 표시 → 상세
+    await page.getByRole('link', { name: '기록' }).click();
+    await expect(page.getByTestId('this-week')).toContainText('1회');
+    // D-054·D-081: 이번 주 7칸 그래프(일요일 시작), 오늘 칸 하나, 운동 1회가 오늘 칸 값으로 보임
+    const chart = page.getByTestId('period-chart');
+    await expect(chart.locator('rect.pb-bar')).toHaveCount(7);
+    await expect(chart.locator('rect.pb-bar.now')).toHaveCount(1);
+    await expect(page.getByTestId('this-week').getByRole('button', { name: /^운동 1회/ })).toBeVisible();
+    await chart.focus();
+    await page.keyboard.press('ArrowRight'); // 고른 칸이 없으면 오늘 칸부터
+    await expect(chart).toHaveAttribute('aria-valuetext', / · 작업 세트 1세트/);
+    await page.getByRole('tab', { name: '운동 기록' }).click();
+    await expect(page.locator('.cal-wd').first()).toHaveText('일');
+    await expect(page.locator('.cal-wd').nth(6)).toHaveText('토');
+    await expect(page.getByText(/이번 달 1회/)).toBeVisible();
+    const [yy, mo, dd, wd] = await page.evaluate(() => { const d = new Date(); return [d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getDay()] as const; }); // 고정한 시각 (이 시험 PC의 오늘·시간대가 아님)
+    const todayBtn = page.getByRole('button', { name: `${yy}년 ${mo}월 ${dd}일 ${'일월화수목금토'[wd]}요일, 운동 1회` }); // 검토 E5 전체 형태
+    await expect(todayBtn).toBeEnabled();
+    await todayBtn.click();
+    await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+    await page.getByRole('tab', { name: '분석' }).click();
+    // 부위별 세트: 이두 줄에 1세트, 열 지도, 운동 기록 카드에 종목 줄(최고)
+    await expect(page.getByTestId('part-row').filter({ hasText: '이두' })).toContainText('1세트');
+    await expect(page.getByTestId('bodyheat')).toBeVisible();
+    await expect(page.getByTestId('bodyheat').locator('svg')).toHaveCount(2); // 앞·뒤 나란히
+    await expect(page.getByRole('group', { name: /부위별 세트 열 지도: .*이두 1세트/ })).toBeVisible();
+    // 빈 주: 이전 주로 가면 안내 문구, 다시 이번 주로
+    await page.getByRole('button', { name: '이전 주' }).click();
+    await expect(page.getByText('이 주에는 운동 기록이 없어요')).toBeVisible();
+    await expect(page.getByTestId('part-row')).toHaveCount(0);
+    await page.getByRole('button', { name: '다음 주' }).click();
+    await expect(page.getByTestId('part-row').first()).toBeVisible();
+    await expect(page.getByRole('table', { name: '최근 4주 부위별 작업 세트' })).toContainText('이두');
+    await expect(page.getByRole('img', { name: /최근 8주 주간 볼륨: .*300kg/ })).toBeVisible();
+    // 체중: 범위 밖은 거절, 정상 값 기록
+    await page.getByLabel('체중', { exact: true }).fill('700');
+    await page.getByRole('button', { name: '기록', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('20~300kg');
+    await page.getByLabel('체중', { exact: true }).fill('72.5');
+    await page.getByRole('button', { name: '기록', exact: true }).click();
+    await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: '고치기' })).toBeVisible();
+    await checkScreen(page, '10-stats');
+    await page.getByRole('tab', { name: '요약' }).click();
+    await expect(page.getByRole('button', { name: /^팔 테스트,.*세트 1,.*바벨 컬 1세트 최고 30kg × 10회/ }).first()).toBeVisible(); // 카드 요약 이름
+    await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toContainText('바벨 컬 · 1세트 · 최고 30kg × 10회');
+    await page.getByRole('button', { name: /팔 테스트/ }).first().click();
+    await expect(page.getByRole('heading', { name: '팔 테스트' })).toBeVisible();
+    await expect(page.getByText(/30kg × 10회/)).toBeVisible();
+    await expect(page.getByRole('button', { name: '이 운동 다시 하기' })).toBeVisible();
+    await checkScreen(page, '11-workout-detail');
 
-  // 종목 상세: 내 기록 그래프
-  await page.getByRole('link', { name: '종목' }).click();
-  await page.getByLabel('운동 검색').fill('바벨 컬');
-  await page.getByRole('button', { name: '바벨 컬', exact: true }).click();
-  await expect(page.getByRole('img', { name: /추정 1RM 추이/ })).toBeVisible();
-  await expect(page.getByRole('img', { name: /볼륨 추이: .*300kg/ })).toBeVisible();
-  await checkScreen(page, '14-exercise-history');
+    // 종목 상세: 내 기록 그래프
+    await page.getByRole('link', { name: '종목' }).click();
+    await page.getByLabel('운동 검색').fill('바벨 컬');
+    await page.getByRole('button', { name: '바벨 컬', exact: true }).click();
+    await expect(page.getByRole('img', { name: /추정 1RM 추이/ })).toBeVisible();
+    await expect(page.getByRole('img', { name: /볼륨 추이: .*300kg/ })).toBeVisible();
+    await checkScreen(page, '14-exercise-history');
 
-  // 도구: 원판 100kg (20kg 바) → 25 + 15, 원판 [15,10]만 → 60kg = 10 + 10, 1RM 100×5 → 116.7
-  await page.getByRole('link', { name: '설정' }).click();
-  await openSet(page, '앱 정보·도구');
-  await page.getByRole('button', { name: '원판 계산기 · 1RM 계산기' }).click();
-  await page.getByLabel('원판 계산 목표 무게', { exact: true }).fill('100');
-  await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 25 + 15');
-  await page.getByLabel('1RM 계산 무게', { exact: true }).fill('100');
-  await page.getByLabel('1RM 계산 횟수', { exact: true }).fill('5');
-  await expect(page.getByLabel('1RM 계산 결과')).toContainText('추정 1RM 116.7kg');
-  await checkScreen(page, '12-tools');
-  await page.getByLabel('1RM 계산 횟수', { exact: true }).fill('20');
-  await expect(page.getByLabel('1RM 계산 결과')).toContainText('12회보다 많으면');
-  for (const p of ['25', '20', '5', '2.5', '1.25']) await page.getByRole('button', { name: p, exact: true }).click();
-  await page.getByLabel('원판 계산 목표 무게', { exact: true }).fill('60');
-  await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 10 + 10');
-  for (const p of ['25', '20', '5', '2.5', '1.25']) await page.getByRole('button', { name: p, exact: true }).click(); // 되돌림 (localStorage)
+    // 도구: 원판 100kg (20kg 바) → 25 + 15, 원판 [15,10]만 → 60kg = 10 + 10, 1RM 100×5 → 116.7
+    await page.getByRole('link', { name: '설정' }).click();
+    await openSet(page, '앱 정보·도구');
+    await page.getByRole('button', { name: '원판 계산기 · 1RM 계산기' }).click();
+    await page.getByLabel('원판 계산 목표 무게', { exact: true }).fill('100');
+    await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 25 + 15');
+    await page.getByLabel('1RM 계산 무게', { exact: true }).fill('100');
+    await page.getByLabel('1RM 계산 횟수', { exact: true }).fill('5');
+    await expect(page.getByLabel('1RM 계산 결과')).toContainText('추정 1RM 116.7kg');
+    await checkScreen(page, '12-tools');
+    await page.getByLabel('1RM 계산 횟수', { exact: true }).fill('20');
+    await expect(page.getByLabel('1RM 계산 결과')).toContainText('12회보다 많으면');
+    for (const p of ['25', '20', '5', '2.5', '1.25']) await page.getByRole('button', { name: p, exact: true }).click();
+    await page.getByLabel('원판 계산 목표 무게', { exact: true }).fill('60');
+    await expect(page.getByLabel('원판 계산 결과')).toContainText('한쪽에: 10 + 10');
+    for (const p of ['25', '20', '5', '2.5', '1.25']) await page.getByRole('button', { name: p, exact: true }).click(); // 되돌림 (localStorage)
 
-  // 백업 저장 → 모든 데이터 지우기 → 불러오기 → 다시 백업: 내용 100% 일치 (7.1)
-  await page.getByRole('link', { name: '설정' }).click();
-  await openSet(page, '동기화·백업');
-  await expect(page.getByText('마지막 백업: 없음')).toBeVisible();
-  const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
-  expect(dl.suggestedFilename()).toMatch(/^workout-backup-\d{8}-\d{4}\.json$/);
-  const file = await dl.path();
-  await expect(page.getByText(/백업 파일을 내려받았어요/)).toBeVisible();
-  await expect(page.getByText('마지막 백업: 없음')).toHaveCount(0);
-  await checkScreen(page, '13-settings-backup');
-  await openSet(page, '데이터'); // 초기화는 '데이터' 묶음에 있음 (D-079 2차 검토 L4)
-  await page.getByText('모든 데이터 지우기 (초기화)').click();
-  await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
-  await answer(page, '지우기');
-  await answer(page, '계속 지우기');
-  await expect(page.getByText('모든 데이터를 지웠어요')).toBeVisible();
-  await page.getByRole('link', { name: '기록' }).click();
-  await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
-  await page.getByRole('link', { name: '설정' }).click();
-  await openSet(page, '동기화·백업');
-  await page.getByLabel('백업 파일 고르기').setInputFiles(file);
-  await answer(page, '바꾸기');
-  await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
-  await expect(page.getByText('마지막 백업: 없음')).toHaveCount(0); // 복원해도 백업 시각 유지
-  const [dl2] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
-  const strip = (t: string) => { const j = JSON.parse(t); for (const s of j.data.settings) delete s.lastBackupAt; return j.data; };
-  expect(strip(readFileSync(await dl2.path(), 'utf8'))).toEqual(strip(readFileSync(file, 'utf8')));
-  await page.getByRole('link', { name: '기록' }).click();
-  await page.getByRole('tab', { name: '요약' }).click();
-  await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
-  await page.getByRole('tab', { name: '분석' }).click();
-  await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
-  // 다른 앱 파일·깨진 파일은 거절, 기존 데이터 유지
-  await page.getByRole('link', { name: '설정' }).click();
-  await openSet(page, '동기화·백업');
-  await page.getByLabel('백업 파일 고르기').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"app":"other"}') });
-  await expect(page.getByText(/불러오지 못했어요: 이 앱의 백업 파일이 아니에요/)).toBeVisible();
-  const broken = JSON.parse(readFileSync(file, 'utf8')); broken.data.workouts[0].blocks = [{}]; delete broken.counts;
-  await page.getByLabel('백업 파일 고르기').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(broken)) });
-  await expect(page.getByText(/불러오지 못했어요: 운동 기록 중 형식이 맞지 않는/)).toBeVisible();
-  await page.getByRole('link', { name: '기록' }).click();
-  await page.getByRole('tab', { name: '요약' }).click();
-  await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+    // 백업 저장 → 모든 데이터 지우기 → 불러오기 → 다시 백업: 내용 100% 일치 (7.1)
+    await page.getByRole('link', { name: '설정' }).click();
+    await openSet(page, '동기화·백업');
+    await expect(page.getByText('마지막 백업: 없음')).toBeVisible();
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
+    expect(dl.suggestedFilename()).toMatch(/^workout-backup-\d{8}-\d{4}\.json$/);
+    const file = await dl.path();
+    await expect(page.getByText(/백업 파일을 내려받았어요/)).toBeVisible();
+    await expect(page.getByText('마지막 백업: 없음')).toHaveCount(0);
+    await checkScreen(page, '13-settings-backup');
+    await openSet(page, '데이터'); // 초기화는 '데이터' 묶음에 있음 (D-079 2차 검토 L4)
+    await page.getByText('모든 데이터 지우기 (초기화)').click();
+    await page.getByRole('button', { name: '모든 데이터 지우기', exact: true }).click();
+    await answer(page, '지우기');
+    await answer(page, '계속 지우기');
+    await expect(page.getByText('모든 데이터를 지웠어요')).toBeVisible();
+    await page.getByRole('link', { name: '기록' }).click();
+    await expect(page.getByText('아직 끝낸 운동이 없어요')).toBeVisible();
+    await page.getByRole('link', { name: '설정' }).click();
+    await openSet(page, '동기화·백업');
+    await page.getByLabel('백업 파일 고르기').setInputFiles(file);
+    await answer(page, '바꾸기');
+    await expect(page.getByText('백업을 불러왔어요')).toBeVisible();
+    await expect(page.getByText('마지막 백업: 없음')).toHaveCount(0); // 복원해도 백업 시각 유지
+    const [dl2] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
+    const strip = (t: string) => { const j = JSON.parse(t); for (const s of j.data.settings) delete s.lastBackupAt; return j.data; };
+    expect(strip(readFileSync(await dl2.path(), 'utf8'))).toEqual(strip(readFileSync(file, 'utf8')));
+    await page.getByRole('link', { name: '기록' }).click();
+    await page.getByRole('tab', { name: '요약' }).click();
+    await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+    await page.getByRole('tab', { name: '분석' }).click();
+    await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
+    // 다른 앱 파일·깨진 파일은 거절, 기존 데이터 유지
+    await page.getByRole('link', { name: '설정' }).click();
+    await openSet(page, '동기화·백업');
+    await page.getByLabel('백업 파일 고르기').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"app":"other"}') });
+    await expect(page.getByText(/불러오지 못했어요: 이 앱의 백업 파일이 아니에요/)).toBeVisible();
+    const broken = JSON.parse(readFileSync(file, 'utf8')); broken.data.workouts[0].blocks = [{}]; delete broken.counts;
+    await page.getByLabel('백업 파일 고르기').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(broken)) });
+    await expect(page.getByText(/불러오지 못했어요: 운동 기록 중 형식이 맞지 않는/)).toBeVisible();
+    await page.getByRole('link', { name: '기록' }).click();
+    await page.getByRole('tab', { name: '요약' }).click();
+    await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toBeVisible();
+  });
 });
 test('P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, 끄기', async ({ page }) => {
   await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
@@ -1988,32 +1991,35 @@ test('끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으�
   await ctx.close();
 });
 
-test('기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안내·지난주 요약·"운동 시작" → 운동 화면, 타일 증감 한 줄', async ({ page }) => {
-  // D-081: 시각을 수요일 낮으로 고정 (요일에 따라 비교 구간이 달라지지 않게)
-  await page.clock.install({ time: new Date('2026-11-18T12:00:00') });
-  // 지난주 일요일 10시에 끝난 운동 하나를 저장소에 직접 넣음 (이번 주 일~토와 겹치지 않음)
-  await page.evaluate(async () => {
-    const d = new Date(); const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay() - 7, 10, 0);
-    const w = { id: 'w-lastweek', name: '지난주 팔', startedAt: start.toISOString(), endedAt: new Date(start.getTime() + 30 * 60000).toISOString(), timer: null,
-      blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: 'barbell_curl', target: { sets: 1, reps: 10 }, sets: [{ weight: 30, reps: 10, warmup: false, done: true }] }] }] };
-    await new Promise<void>((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => { const db = r.result; const tx = db.transaction('workouts', 'readwrite'); tx.objectStore('workouts').put(w); tx.oncomplete = () => { db.close(); res(); }; tx.onerror = () => rej(tx.error); }; r.onerror = () => rej(r.error); });
+test.describe('D-081 시각 고정 (한국 시간)', () => {
+  test.use({ timezoneId: 'Asia/Seoul', locale: 'ko-KR' });
+  test('기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안내·지난주 요약·"운동 시작" → 운동 화면, 타일 증감 한 줄', async ({ page }) => {
+    // D-081: 시각을 수요일 낮으로 고정 (요일에 따라 비교 구간이 달라지지 않게)
+    await page.clock.install({ time: new Date('2026-11-18T12:00:00+09:00') });
+    // 지난주 일요일 10시에 끝난 운동 하나를 저장소에 직접 넣음 (이번 주 일~토와 겹치지 않음)
+    await page.evaluate(async () => {
+      const d = new Date(); const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay() - 7, 10, 0);
+      const w = { id: 'w-lastweek', name: '지난주 팔', startedAt: start.toISOString(), endedAt: new Date(start.getTime() + 30 * 60000).toISOString(), timer: null,
+        blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: 'barbell_curl', target: { sets: 1, reps: 10 }, sets: [{ weight: 30, reps: 10, warmup: false, done: true }] }] }] };
+      await new Promise<void>((res, rej) => { const r = indexedDB.open('workout-app'); r.onsuccess = () => { const db = r.result; const tx = db.transaction('workouts', 'readwrite'); tx.objectStore('workouts').put(w); tx.oncomplete = () => { db.close(); res(); }; tx.onerror = () => rej(tx.error); }; r.onerror = () => rej(r.error); });
+    });
+    await page.reload();
+    await page.getByRole('link', { name: '기록' }).click();
+    await page.getByRole('tab', { name: '분석' }).click();
+    await expect(page.getByText('이번 주는 아직 운동이 없어요')).toBeVisible();
+    await expect(page.getByText('지난주: 이두 1세트')).toBeVisible();
+    await expect(page.getByTestId('part-row')).toHaveCount(0);
+    await page.getByRole('tab', { name: '요약' }).click();
+    await expect(page.getByTestId('this-week')).toContainText('지난주 같은 요일');
+    // 카드 비교 줄(지난주 값)은 한 줄 (390px)
+    const hs = await page.locator('.pm-prev').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+    expect(hs).toHaveLength(4);
+    for (const h of hs) expect(h, '카드 비교 줄 높이(한 줄)').toBeLessThan(24);
+    await checkScreen(page, '10b-stats-empty-week');
+    await page.getByRole('tab', { name: '분석' }).click();
+    await page.getByRole('button', { name: '운동 시작' }).click();
+    await expect(page).toHaveURL(/#\/workout/);
   });
-  await page.reload();
-  await page.getByRole('link', { name: '기록' }).click();
-  await page.getByRole('tab', { name: '분석' }).click();
-  await expect(page.getByText('이번 주는 아직 운동이 없어요')).toBeVisible();
-  await expect(page.getByText('지난주: 이두 1세트')).toBeVisible();
-  await expect(page.getByTestId('part-row')).toHaveCount(0);
-  await page.getByRole('tab', { name: '요약' }).click();
-  await expect(page.getByTestId('this-week')).toContainText('지난주 같은 요일');
-  // 카드 비교 줄(지난주 값)은 한 줄 (390px)
-  const hs = await page.locator('.pm-prev').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
-  expect(hs).toHaveLength(4);
-  for (const h of hs) expect(h, '카드 비교 줄 높이(한 줄)').toBeLessThan(24);
-  await checkScreen(page, '10b-stats-empty-week');
-  await page.getByRole('tab', { name: '분석' }).click();
-  await page.getByRole('button', { name: '운동 시작' }).click();
-  await expect(page).toHaveURL(/#\/workout/);
 });
 
 // ===== D-055 디자인 1단계: 업데이트 안내·틀 =====
