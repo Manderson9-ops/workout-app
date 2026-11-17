@@ -1009,6 +1009,8 @@ test.describe('D-081 시각 고정 (한국 시간)', () => {
     await page.getByRole('link', { name: '설정' }).click();
     await openSet(page, '동기화·백업');
     await expect(page.getByText('마지막 백업: 없음')).toBeVisible();
+    // 첫 백업 전에 설정 저장소의 기본 행이 쓰여 있어야 함 (아직 안 쓰였으면 첫 파일의 settings 가 비어 복원 뒤 비교가 어긋남)
+    await expect.poll(() => page.evaluate(() => new Promise<number>((res) => { const q = indexedDB.open('workout-app'); q.onsuccess = () => { const g = q.result.transaction('settings').objectStore('settings').count(); g.onsuccess = () => { q.result.close(); res(g.result); }; }; }))).toBeGreaterThan(0);
     const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
     expect(dl.suggestedFilename()).toMatch(/^workout-backup-\d{8}-\d{4}\.json$/);
     const file = await dl.path();

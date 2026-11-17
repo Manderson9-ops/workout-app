@@ -474,6 +474,7 @@ test('M2·M3·L3 바로 가기·설정 묶음 기억·멈춤 경고·기록 탭 
   await page.reload();
   await expect(grp('workout')).toHaveJSProperty('open', true);
   await grp('workout').locator(':scope > summary').click();
+  await expect.poll(async () => (await stored()).workout).toBe(false); // 닫힘이 저장된 뒤에 새로 고침 (저장은 toggle 처리기가 비동기로 함)
   await page.reload();
   await expect(grp('workout')).toHaveJSProperty('open', false);
   expect((await stored()).workout).toBe(false);

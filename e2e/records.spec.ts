@@ -391,18 +391,18 @@ test('월말: 이번 달이 더 길면 지난달 전체와 견주고 모든 문�
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await kind(page, '월').click();
-  const check = async (tag: string, gap: string) => {
+  const check = async (tag: string, days: number, gap: string) => {
     await expect(card(page).getByTestId('period-headline'), `${tag} 한 문장`).toContainText('지난달 전체');
     await expect(card(page).getByTestId('pm-note'), `${tag} 안내`).toHaveText('작은 글씨 = 지난달 전체 값');
     await expect(card(page).getByTestId('pm-sets'), `${tag} 카드 읽기`).toHaveAttribute('aria-label', /지난달 전체\(1~28일\)/);
-    await expect(card(page), `${tag} 각주`).toContainText(`지난달 전체(1~28일)와 비교 · 이번 달 구간이 ${gap} 더 길어요`);
+    await expect(card(page), `${tag} 각주`).toContainText(`지난달 전체(1~28일)와 비교 · 이번 달 구간(1~${days}일)이 ${gap} 더 길어요`);
     await expect(card(page).getByTestId('period-range'), `${tag} 이동줄`).toContainText('vs. 지난달 전체');
   };
-  await check('운동 전', '하루'); // 기준일 3/29 → 28일과 1일 차이
+  await check('운동 전', 29, '하루'); // 기준일 3/29 → 28일과 1일 차이
   await idbPut(page, 'workouts', [done('today', 2027, 3, 30, 2)]);
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
-  await check('운동 후', '2일'); // 기준일 3/30
+  await check('운동 후', 30, '2일'); // 기준일 3/30
 });
 
 test('320px 년 보기: 평균 안내의 값과 각주 날짜가 줄 중간에서 갈리지 않는다 (U1·U2)', async ({ page }) => {
@@ -430,8 +430,14 @@ test('320px: 1,000시간이 넘는 시간 카드도 카드 안에 한 줄 (W7)',
   await idbPut(page, 'workouts', [done('huge', 2026, 11, 14, 1, 50, 10, 60500), done('huge25', 2025, 6, 8, 1, 50, 10, 60500)]); // 올해·작년 모두 1,008시간 20분 안팎
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
-  await page.setViewportSize({ width: 320, height: 700 });
   await kind(page, '년').click();
+  { // 390px (기본 화면)에서도 1,000시간 큰 숫자가 카드 안에 한 줄
+    const c0 = card(page).getByTestId('pm-time');
+    const b0 = (await c0.boundingBox())!, v0 = (await c0.locator('.m-val').boundingBox())!;
+    expect(v0.height, '390px 큰 숫자 한 줄').toBeLessThan(34);
+    expect(v0.x + v0.width, '390px 카드 안').toBeLessThanOrEqual(b0.x + b0.width + 0.5);
+  }
+  await page.setViewportSize({ width: 320, height: 700 });
   const c = card(page).getByTestId('pm-time');
   await expect(c.locator('.num').first()).toHaveText(/^1,0[0-9]{2}$/);
   const b = (await c.boundingBox())!, v = (await c.locator('.m-val').boundingBox())!;
@@ -446,4 +452,36 @@ test('320px: 1,000시간이 넘는 시간 카드도 카드 안에 한 줄 (W7)',
   expect(pb.x + pb.width, '이전 값이 카드 안').toBeLessThanOrEqual(b.x + b.width + 0.5);
   expect(await pv.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), '이전 값이 넘치지 않음').toBe(true);
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
+});
+
+test('년 보기 슬라이더 안내는 달별, 고른 칸이 있어도 미래 칸은 흐림 그대로 (W1·X2)', async ({ page }) => {
+  await kind(page, '년').click();
+  await expect(chart(page)).toHaveAttribute('aria-valuetext', /달별 값/);
+  await kind(page, '주').click();
+  await expect(chart(page)).toHaveAttribute('aria-valuetext', /날짜별 값/);
+  await chart(page).focus();
+  await page.keyboard.press('ArrowLeft'); // 오늘 칸을 고름
+  const ops = await chart(page).locator('rect.pb-bar.future').evaluateAll((els) => els.map((e) => Number(getComputedStyle(e).opacity)));
+  expect(ops.length).toBeGreaterThan(0);
+  for (const o of ops) expect(o, '미래 칸 투명도').toBeLessThanOrEqual(0.2);
+});
+
+test('마우스: 버튼을 이미 뗀 채 움직이면 제스처가 끝나 선택이 바뀌지 않는다 (W6)', async ({ page }) => {
+  const cap = card(page).getByTestId('period-caption');
+  const hint = '막대를 누르거나 옆으로 밀면 날짜별 값이 보여요';
+  const b = (await chart(page).boundingBox())!;
+  const s = (b.width - 16) / 7;
+  const x0 = b.x + 8 + s * 0.5, x1 = b.x + 8 + s * 1.5, y = b.y + b.height / 2;
+  const mouse = (type: string, x: number, buttons: number) => chart(page).evaluate((el, a) => {
+    el.dispatchEvent(new PointerEvent(a.type, { pointerId: 9, pointerType: 'mouse', clientX: a.x, clientY: a.y, button: 0, buttons: a.buttons, bubbles: true, isPrimary: true }));
+  }, { type, x, y, buttons });
+  await mouse('pointerdown', x0, 1);
+  await mouse('pointermove', x1, 0); // 창 밖에서 버튼을 뗀 뒤 돌아온 움직임: 제스처 끝
+  await mouse('pointermove', x1 + 40, 1); // 이후 움직임은 훑기가 아님
+  await expect(cap).toHaveText(hint);
+  // 비교: 버튼을 누른 채 움직이면 훑음
+  await mouse('pointerdown', x0, 1);
+  await mouse('pointermove', x1, 1);
+  await expect(cap).toContainText('11월 16일 (월)');
+  await mouse('pointerup', x1, 0);
 });

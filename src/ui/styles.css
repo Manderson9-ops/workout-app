@@ -927,8 +927,8 @@ button.pm-card.on { background: var(--acc-fill); border-color: var(--acc-fill); 
 .pm-badge.down { background: var(--sub); color: var(--bg); }
 button.pm-card .m-val { flex-wrap: wrap; }
 button.pm-card .num { font-size: 26px; white-space: nowrap; }
-button.pm-card .m-val.long .num { font-size: 20px; }
-button.pm-card .m-val.xlong .num { font-size: 15px; } /* 1,000시간 이상: 쉼표까지 네 자리 + 분 */ /* 100시간 이상: 세 자리 시간 + 분이 한 줄에 */
+button.pm-card .m-val.long .num { font-size: 20px; } /* 100시간 이상: 세 자리 시간 + 분이 한 줄에 */
+button.pm-card .m-val.xlong .num { font-size: 16px; } /* 1,000시간 이상: 390px 에서도 한 줄 (측정: 20px 이면 47px 두 줄) */
 button.pm-card .m-pair, button.pm-card .unit { white-space: nowrap; }
 .pm-note { margin: 10px 0 -4px; }
 @media (max-width: 340px) {

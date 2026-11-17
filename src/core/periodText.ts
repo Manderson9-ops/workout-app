@@ -163,6 +163,8 @@ export function bucketText(kind: PeriodKind, start: string): string {
   return `${m}월 ${d}일 (${WD[new Date(y!, m! - 1, d!).getDay()]})`;
 }
 
+/** 연속 주 문구 (0주면 없음) */
+const streakText = (n: number): string => (n > 0 ? ` · 연속 ${n}주` : '');
 /** 날수 차이 문구: 1일이면 "하루" */
 const dayGap = (n: number): string => (n === 1 ? '하루' : `${n}일`);
 const wdOf = (date: string): number => { const [y, m, d] = date.split('-').map(Number); return new Date(y!, m! - 1, d!).getDay(); };
@@ -178,13 +180,13 @@ export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: 
     if (kind === 'year' && lens && lens[0] !== lens[1]) return [T(`▲▼ = 전년 전체와 비교 · 이 해가 하루 ${lens[0] > lens[1] ? '더 길어요' : '더 짧아요'}`)];
     return [T(`▲▼ = ${prevName(kind, false)} 전체와 비교`)];
   }
-  if (waiting) return kind === 'week' ? [T('▲▼ = 오늘 운동하면 지난주 같은 요일'), N('(일)'), T(`까지와 비교 · 연속 ${streak}주 · 일요일~토요일 기준`)] : kind === 'month' ? [T('▲▼ = 오늘 운동하면 지난달 같은 날'), N('(1일)'), T('까지와 비교')] : [T('▲▼ = 오늘 운동하면 작년 같은 날'), N('(1월 1일)'), T('까지와 비교')];
+  if (waiting) return kind === 'week' ? [T('▲▼ = 오늘 운동하면 지난주 같은 요일'), N('(일)'), T(`까지와 비교${streakText(streak)} · 일요일~토요일 기준`)] : kind === 'month' ? [T('▲▼ = 오늘 운동하면 지난달 같은 날'), N('(1일)'), T('까지와 비교')] : [T('▲▼ = 오늘 운동하면 작년 같은 날'), N('(1월 1일)'), T('까지와 비교')];
   const [, m, d] = through.split('-').map(Number);
   const [, bm, bd] = base.split('-').map(Number);
-  if (kind === 'week') { const w = wdOf(through); return [T('▲▼ = 지난주 같은 요일'), N(`(일${w > 0 ? `~${WD[w]}` : ''})`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${WD[wdOf(base)]}요일까지`)] : []), T(` · 연속 ${streak}주 · 일요일~토요일 기준`)]; }
+  if (kind === 'week') { const w = wdOf(through); return [T('▲▼ = 지난주 같은 요일'), N(`(일${w > 0 ? `~${WD[w]}` : ''})`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${WD[wdOf(base)]}요일까지`)] : []), T(`${streakText(streak)} · 일요일~토요일 기준`)]; }
   if (kind === 'month') {
     // 이번 달이 더 길어 기준일이 지난달 말일을 넘으면 지난달 전체와 견줌
-    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(`(1~${d}일)`), T('와 비교 · 이번 달 구간이 '), N(dayGap(Number(today.slice(8)) - (done ? 0 : 1) - d!)), T(' 더 길어요')];
+    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(`(1~${d}일)`), T('와 비교 · 이번 달 구간'), N(`(1~${Number(today.slice(8)) - (done ? 0 : 1)}일)`), T('이 '), N(dayGap(Number(today.slice(8)) - (done ? 0 : 1) - d!)), T(' 더 길어요')];
     return [T('▲▼ = 지난달 같은 날'), N(d === 1 ? '(1일)' : `(1~${d}일)`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${bd}일까지`)] : [])];
   }
   // 윤년이 끼면 두 구간 날수가 하루 다름 (오늘 운동 전이면 이번 해 구간도 어제까지)
