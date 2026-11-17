@@ -946,3 +946,11 @@ button.pm-card .m-pair, button.pm-card .unit { white-space: nowrap; }
 }
 button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opacity: .85; }
 .pm-prev { color: var(--sub); font-size: 12px; overflow-wrap: anywhere; }
+/* 1,000시간 이상 큰 숫자: 341~375px 에서도 한 줄 (측정: 16px 이면 341~375px 에서 두 줄, 13px 이어도 341px 에서 두 줄) */
+@media (max-width: 375px) {
+  button.pm-card .m-val.xlong { flex-wrap: nowrap; gap: 1px; }
+  button.pm-card .m-val.xlong .m-pair { margin-right: 2px; gap: 1px; }
+  button.pm-card .m-val.xlong .m-pair:last-child { margin-right: 0; }
+  button.pm-card .m-val.xlong .num { font-size: 12px; }
+  button.pm-card .m-val.xlong .unit { font-size: 10px; }
+}

@@ -439,7 +439,7 @@ test('320px: 1,000시간이 넘는 시간 카드도 카드 안에 한 줄 (W7)',
   }
   await page.setViewportSize({ width: 320, height: 700 });
   const c = card(page).getByTestId('pm-time');
-  await expect(c.locator('.num').first()).toHaveText(/^1,0[0-9]{2}$/);
+  await expect(c.locator('.num').first()).toHaveText(/^1,[0-9]{3}$/);
   const b = (await c.boundingBox())!, v = (await c.locator('.m-val').boundingBox())!;
   expect(v.height, '큰 숫자 한 줄').toBeLessThan(34);
   expect(v.x + v.width, '카드 안').toBeLessThanOrEqual(b.x + b.width + 0.5);
@@ -485,3 +485,32 @@ test('마우스: 버튼을 이미 뗀 채 움직이면 제스처가 끝나 선�
   await expect(cap).toContainText('11월 16일 (월)');
   await mouse('pointerup', x1, 0);
 });
+
+for (const w of [320, 341, 360, 375, 390]) {
+  test(`${w}px: 시간 카드 큰 숫자(세 자리 시간·1,000시간 이상)와 이전 값이 한 줄이고 카드 안 (폭 ${w})`, async ({ page }) => {
+    await idbPut(page, 'workouts', [
+      done('mega', 2026, 11, 15, 1, 50, 10, 10000), // 이번 주 세 자리 시간 (long)
+      done('huge', 2026, 11, 14, 1, 50, 10, 60500), done('huge25', 2025, 6, 8, 1, 50, 10, 60500), // 올해·작년 1,000시간 이상 (xlong)
+    ]);
+    await page.reload();
+    await page.getByRole('link', { name: '기록', exact: true }).click();
+    await page.setViewportSize({ width: w, height: 700 });
+    const measure = async (tag: string) => {
+      const c = card(page).getByTestId('pm-time');
+      const mv = await c.locator('.m-val').evaluate((e) => e.getBoundingClientRect().height);
+      const pv = await c.locator('.pm-prev').evaluate((e) => e.getBoundingClientRect().height);
+      const b = (await c.boundingBox())!, v = (await c.locator('.m-val').boundingBox())!, p = (await c.locator('.pm-prev').boundingBox())!;
+      console.log(`MEASURE w=${w} ${tag} m-val=${mv.toFixed(1)} pm-prev=${pv.toFixed(1)} valRight=${(v.x + v.width).toFixed(1)} prevRight=${(p.x + p.width).toFixed(1)} cardRight=${(b.x + b.width).toFixed(1)}`);
+      expect(mv, `${tag} 큰 숫자 한 줄`).toBeLessThan(26);
+      expect(pv, `${tag} 이전 값 한 줄`).toBeLessThan(20);
+      expect(v.x + v.width, `${tag} 큰 숫자가 카드 안`).toBeLessThanOrEqual(b.x + b.width + 0.5);
+      expect(p.x + p.width, `${tag} 이전 값이 카드 안`).toBeLessThanOrEqual(b.x + b.width + 0.5);
+      expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth), `${tag} 가로 스크롤 없음`).toBe(true);
+    };
+    await expect(card(page).getByTestId('pm-time').locator('.num').first()).toHaveText(/^[0-9]{3}$/); // 이번 주 세 자리 시간
+    await measure('이번 주(세 자리)');
+    await kind(page, '년').click();
+    await expect(card(page).getByTestId('pm-time').locator('.num').first()).toHaveText(/^1,[0-9]{3}$/);
+    await measure('올해(1,000시간+)');
+  });
+}
