@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compareThroughFor, hasWorkoutOn, periodOf, shiftPeriod, periodBuckets, compareThrough, waitingForToday, averageOver, offsetOf, periodData, earliestPeriod, activeAverage, daysInMonth } from '../src/core/period';
-import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, tonMode, cmpValues, WAITING_LINE, prevNote, headline, wholePrevMonth, cardAria, bucketText, footnote } from '../src/core/periodText';
+import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, avgParts, footnoteParts, tonMode, cmpValues, WAITING_LINE, prevNote, headline, wholePrevMonth, cardAria, bucketText, footnote } from '../src/core/periodText';
 import { weekSummary } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
@@ -179,7 +179,7 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
     expect(headlineText(headline({ kind: 'month', current: true, metric: 'sets', cur: 20, prev: 15, curCount: 4, prevCount: 4, label: '이번 달', whole: true }))).toBe('지난달 전체보다 작업 세트가 5세트 많아요');
     expect(headlineText(headline({ kind: 'month', current: true, metric: 'sets', cur: 5, prev: 5, curCount: 4, prevCount: 4, label: '이번 달', whole: true }))).toBe('지난달 전체와 작업 세트가 같아요');
     expect(cardAria({ kind: 'month', current: true, metric: 'sets', cur: 20, prev: 15, wholeDays: 28 })).toBe('작업 세트 20세트, 지난달 전체(1~28일) 15세트보다 5세트 많음');
-    expect(cardAria({ kind: 'month', current: true, metric: 'sets', cur: 20, prev: 15, wholeDays: 28, partial: true })).toBe('작업 세트 20세트, 지난달 전체(1~28일) 15세트보다 5세트 많음');
+    expect(cardAria({ kind: 'month', current: true, metric: 'sets', cur: 20, prev: 15, wholeDays: 28, partialThrough: '2027-02-28' })).toBe('작업 세트 20세트, 지난달 전체(1~28일) 15세트보다 5세트 많음');
     // 아닌 경우
     expect(wholePrevMonth('month', true, { through: '2026-02-28', today: '2026-03-29', done: false })).toBe(false); // 기준 3/28
     expect(wholePrevMonth('month', true, { through: '2026-10-16', today: '2026-11-16', done: true })).toBe(false);
@@ -187,10 +187,30 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
     expect(wholePrevMonth('month', false, { through: '2026-02-28', today: '2026-03-30', done: true })).toBe(false);
     expect(wholePrevMonth('month', true, { through: '2026-09-30', today: '2026-11-01', done: false })).toBe(false); // 첫날 운동 전
   });
-  it('cardAria: 오늘 운동 전이면 전날까지', () => {
-    expect(cardAria({ kind: 'week', current: true, metric: 'sets', cur: 4, prev: 3, partial: true })).toBe('작업 세트 4세트, 지난주 같은 요일 전날까지 3세트보다 1세트 많음');
-    expect(cardAria({ kind: 'month', current: true, metric: 'count', cur: 1, prev: 1, partial: true })).toBe('운동 1회, 지난달 같은 날 전날까지 1회와 같음');
+  it('cardAria: 오늘 운동 전이면 실제 끝 날짜', () => {
+    expect(cardAria({ kind: 'week', current: true, metric: 'sets', cur: 4, prev: 3, partialThrough: '2026-11-09' })).toBe('작업 세트 4세트, 지난주 월요일까지 3세트보다 1세트 많음');
+    expect(cardAria({ kind: 'week', current: true, metric: 'sets', cur: 4, prev: 3, partialThrough: '2026-11-08' })).toBe('작업 세트 4세트, 지난주 일요일까지 3세트보다 1세트 많음');
+    expect(cardAria({ kind: 'year', current: true, metric: 'sets', cur: 4, prev: 3, partialThrough: '2027-02-28' })).toBe('작업 세트 4세트, 작년 2월 28일까지 3세트보다 1세트 많음');
+    expect(cardAria({ kind: 'month', current: true, metric: 'count', cur: 1, prev: 1, partialThrough: '2026-10-15' })).toBe('운동 1회, 지난달 15일까지 1회와 같음');
     expect(cardAria({ kind: 'week', current: true, metric: 'sets', cur: 4, prev: 3 })).toBe('작업 세트 4세트, 지난주 같은 요일까지 3세트보다 1세트 많음');
+  });
+  it('년·월 문구 조각: 값은 nw, 지난 달 길이가 다르면 알림, 월말 전체 비교 이름', () => {
+    expect(compareLine('month', true, true)).toBe('vs. 지난달 전체');
+    expect(compareLine('month', true)).toBe('vs. 지난달');
+    const ps = footnoteParts('month', true, { through: '2026-10-16', base: '2026-10-16', done: true, streak: 0, today: '2026-11-16' });
+    expect(ps.filter((p) => p.nw).map((p) => p.text)).toEqual(['(1~16일)']);
+    const yr = footnoteParts('year', true, { through: '2025-11-15', base: '2025-11-16', done: false, streak: 0, today: '2026-11-16' });
+    expect(yr.filter((p) => p.nw).map((p) => p.text)).toEqual(['(1월 1일~11월 15일)', '11월 16일까지']);
+    const wk = footnoteParts('week', true, { through: '2026-11-08', base: '2026-11-09', done: false, streak: 3, today: '2026-11-16' });
+    expect(wk.filter((p) => p.nw).map((p) => p.text)).toEqual(['(일)', '월요일까지']);
+    // 지난 달을 볼 때 날수가 다르면
+    const ex = { through: '', base: '', done: true, streak: 0, today: '2026-11-16' };
+    expect(footnote('month', false, { ...ex, lens: [31, 28] })).toBe('▲▼ = 그 전 달 전체(28일)와 비교 · 이 달이 3일 더 길어요');
+    expect(footnote('month', false, { ...ex, lens: [28, 31] })).toBe('▲▼ = 그 전 달 전체(31일)와 비교 · 이 달이 3일 더 짧아요');
+    expect(footnote('month', false, { ...ex, lens: [30, 30] })).toBe('▲▼ = 그 전 달 전체와 비교');
+    expect(footnote('month', false, ex)).toBe('▲▼ = 그 전 달 전체와 비교');
+    expect(footnote('week', false, { ...ex, lens: [31, 28] })).toBe('▲▼ = 그 전 주 전체와 비교');
+    expect(avgParts('year', 'sets', 15.5, false, true)).toEqual({ label: '운동한 달 평균(이번 달 제외)', value: '15.5세트' });
   });
   it('offsetOf: 보던 기간이 오늘 기준 몇 기간 전인지', () => {
     expect(offsetOf('week', '2026-11-08', '2026-11-16')).toBe(1);
@@ -215,8 +235,13 @@ describe('cmpValues (보이는 정밀도로 견줌)', () => {
     expect(cmpValues('time', 2700, 2720)).toEqual([2700, 2700]);
     expect(cmpValues('time', 2700, 2790)).toEqual([2700, 2820]);
     expect(cmpValues('time', 40, 50)).toEqual([40, 50]);
-    expect(cmpValues('time', 40, 100)).toEqual([40, 100]); // 한쪽이 1분 미만이면 초
-    expect(cmpValues('time', 50, 70)).toEqual([50, 70]);
+    // 보이는 값끼리: 1분 미만은 초, 그 이상은 분으로 반올림한 값
+    expect(cmpValues('time', 40, 100)).toEqual([40, 120]);
+    expect(cmpValues('time', 30, 89)).toEqual([30, 60]);
+    expect(cmpValues('time', 59, 61)).toEqual([59, 60]);
+    expect(headlineText(headline({ kind: 'week', current: true, metric: 'time', cur: 30, prev: 89, curCount: 1, prevCount: 1, label: '이번 주' }))).toBe('지난주 이맘때보다 시간이 30초 짧아요');
+    expect(headlineText(headline({ kind: 'week', current: true, metric: 'time', cur: 61, prev: 59, curCount: 1, prevCount: 1, label: '이번 주' }))).toBe('지난주 이맘때보다 시간이 1초 길어요');
+    expect(cardAria({ kind: 'week', current: true, metric: 'time', cur: 30, prev: 89 })).toBe('시간 30초, 지난주 같은 요일까지 1분보다 30초 짧음');
     // 큰 숫자가 시간만 보이면(10시간 이상) 배지는 시간 단위, 한 문장은 분 단위
     // 배지(셈)와 한 문장은 같은 정밀도(분): 방향이 늘 같음
     expect(cmpValues('time', 92400, 93000)).toEqual([92400, 93000]);

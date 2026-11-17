@@ -162,6 +162,7 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
   const raw = (e: PointerEvent) => slot > 0 ? Math.floor((e.clientX - (e.currentTarget as HTMLElement).getBoundingClientRect().left - pad.l) / slot) : -1;
   const clamp = (i: number) => Math.max(0, Math.min(lastOk, i));
   const key = (e: KeyboardEvent) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return; // 브라우저 뒤로 가기 등 단축키는 막지 않음
     if (e.key === 'Escape' && selected !== null) { e.preventDefault(); onSelect(null); return; }
     const d = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : e.key === 'PageUp' ? jump : e.key === 'PageDown' ? -jump : 0;
     const to = d ? (selected === null ? lastOk : selected + d) : e.key === 'Home' ? 0 : e.key === 'End' ? lastOk : null; // 고른 칸이 없으면 첫 키는 오늘(현재) 칸을 고름

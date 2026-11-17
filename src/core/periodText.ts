@@ -38,13 +38,13 @@ export function bigParts(m: PeriodMetric, v: number, ton = false): [string | num
 export const tonMode = (cur: number, prev: number): boolean => Math.max(cur, prev) >= 1_000_000;
 /**
  * 견줄 때 쓰는 값: 사용자에게 보이는 정밀도로 맞춘 같은 단위(시간 초, 볼륨 kg) 값 둘.
- * 시간 = 분 단위(어느 한쪽이 1분 미만이면 초), 볼륨 kg = 정수, 톤 = 보이는 단계(10톤 미만 0.1톤, 이상 1톤, 0 초과 50kg 미만은 따로 한 단계).
+ * 시간 = 보이는 값(1분 미만은 초, 그 이상은 분 단위로 반올림) 끼리의 차이, 볼륨 kg = 정수, 톤 = 보이는 단계(10톤 미만 0.1톤, 이상 1톤, 0 초과 50kg 미만은 따로 한 단계).
  * 같으면 ▲▼ 대신 "=" 와 "같아요"
  */
 export function cmpValues(m: PeriodMetric, cur: number, prev: number, ton = false): [number, number] {
   if (m === 'time') {
-    if (cur < 60 || prev < 60) return [Math.round(cur), Math.round(prev)];
-    return [Math.round(cur / 60) * 60, Math.round(prev / 60) * 60];
+    const shown = (v: number) => (v < 60 ? Math.round(v) : Math.round(v / 60) * 60); // 화면에 보이는 값: 1분 미만은 초, 그 이상은 분
+    return [shown(cur), shown(prev)];
   }
   if (m !== 'volume') return [cur, prev];
   if (!ton) return [Math.round(cur), Math.round(prev)];
@@ -52,8 +52,12 @@ export function cmpValues(m: PeriodMetric, cur: number, prev: number, ton = fals
   return [step(cur), step(prev)];
 }
 /** 평균 문구: 운동한 날(년은 달) 평균. 횟수·세트는 소수 한 자리까지, 볼륨은 정수(톤은 보이는 단계), 시간은 시간·분 */
+export function avgParts(kind: PeriodKind, m: PeriodMetric, v: number, ton = false, exclNow = false): { label: string; value: string } {
+  return { label: `${kind === 'year' ? '운동한 달' : '운동한 날'} 평균${exclNow ? '(이번 달 제외)' : ''}`, value: m === 'time' ? durText(v) : m === 'volume' ? valueText(m, Math.round(v), ton) : valueText(m, v) };
+}
 export function avgText(kind: PeriodKind, m: PeriodMetric, v: number, ton = false, exclNow = false): string {
-  return `${kind === 'year' ? '운동한 달' : '운동한 날'} 평균${exclNow ? '(이번 달 제외)' : ''} ${m === 'time' ? durText(v) : m === 'volume' ? valueText(m, Math.round(v), ton) : valueText(m, v)}`; // 횟수·세트는 소수 한 자리까지
+  const a = avgParts(kind, m, v, ton, exclNow);
+  return `${a.label} ${a.value}`;
 }
 export const metricValue = (m: PeriodMetric, totals: { count: number; sets: number; volume: number; durationSec: number }) =>
   m === 'count' ? totals.count : m === 'sets' ? totals.sets : m === 'volume' ? totals.volume : totals.durationSec;
@@ -103,7 +107,7 @@ export function rangeText(r: PeriodRange, today: string): string {
   return `${y}년 1월~12월`;
 }
 /** 이동줄 밑 비교 대상 (짧게: 정확한 기준은 한 문장·아래 글에) */
-export const compareLine = (kind: PeriodKind, current: boolean): string => `vs. ${prevName(kind, current, true)}`;
+export const compareLine = (kind: PeriodKind, current: boolean, whole = false): string => (whole ? 'vs. 지난달 전체' : `vs. ${prevName(kind, current, true)}`);
 
 /** 한 줄 요약 조각: nw 는 줄바꿈 없이 붙여 보일 부분(라벨·값). 화면 읽기·복사에는 일반 띄어쓰기 그대로 */
 export interface HeadlinePart { text: string; nw?: boolean }
@@ -129,11 +133,17 @@ export function headline(o: { kind: PeriodKind; current: boolean; metric: Period
   return [N(pn), T(`보다 ${josa(name, '이', '가')} `), val(Math.abs(c - p)), T(` ${adj}`)];
 }
 
+/** 오늘 운동 전에 실제로 견주는 끝을 날짜로: "지난주 월요일까지" · "지난달 16일까지" · "작년 2월 28일까지" */
+function partialPhrase(kind: PeriodKind, through: string): string {
+  const [, m, d] = through.split('-').map(Number);
+  return kind === 'week' ? `지난주 ${WD[wdOf(through)]}요일까지` : kind === 'month' ? `지난달 ${d}일까지` : `작년 ${m}월 ${d}일까지`;
+}
+
 /** 카드 aria-label: "운동 1회, 지난주 같은 요일까지 0회보다 1회 많음" */
-export function cardAria(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; ton?: boolean; waiting?: boolean; partial?: boolean; wholeDays?: number }): string {
-  const { kind, current, metric, cur, prev, ton, waiting, partial, wholeDays } = o;
+export function cardAria(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; ton?: boolean; waiting?: boolean; partialThrough?: string; wholeDays?: number }): string {
+  const { kind, current, metric, cur, prev, ton, waiting, partialThrough, wholeDays } = o;
   if (waiting) return `${METRIC_NAME[metric]} ${valueText(metric, cur, ton)}, 오늘 운동하면 ${prevPhrase(kind, current)}와 비교해요`;
-  const pp = wholeDays ? `지난달 전체(1~${wholeDays}일)` : prevPhrase(kind, current).replace('까지', partial ? ' 전날까지' : '까지'), cv = valueText(metric, cur, ton), pv = valueText(metric, prev, ton);
+  const pp = wholeDays ? `지난달 전체(1~${wholeDays}일)` : partialThrough ? partialPhrase(kind, partialThrough) : prevPhrase(kind, current), cv = valueText(metric, cur, ton), pv = valueText(metric, prev, ton);
   const head = `${METRIC_NAME[metric]} ${cv}, ${pp} `;
   const [c, p] = cmpValues(metric, cur, prev, ton);
   if (c === p) return `${head}${josa(pv, '과', '와')} 같음`;
@@ -149,21 +159,25 @@ export function bucketText(kind: PeriodKind, start: string): string {
 
 const wdOf = (date: string): number => { const [y, m, d] = date.split('-').map(Number); return new Date(y!, m! - 1, d!).getDay(); };
 /**
- * 아래 작은 글씨. 현재 기간이면 through = 실제로 견주는 이전 기간 끝 날짜(오늘 운동 전이면 어제 기준), base = 오늘 운동하면 견줄 끝 날짜.
- * 운동 전이면 "오늘 운동하면 ○까지"로 바뀌는 구간을 알려 줌
+ * 아래 작은 글씨 조각 (날짜는 nw 라 줄 중간에서 안 갈림). 현재 기간이면 through = 실제로 견주는 이전 기간 끝 날짜(오늘 운동 전이면 어제 기준), base = 오늘 운동하면 견줄 끝 날짜.
+ * 운동 전이면 "오늘 운동하면 ○까지"로 바뀌는 구간을 알려 줌. lens = 지난 달을 볼 때 [이 달 날수, 그 전 달 날수]
  */
-export function footnote(kind: PeriodKind, current: boolean, o: { through: string; base: string; done: boolean; streak: number; today: string; waiting?: boolean }): string {
-  const { through, base, done, streak, today, waiting = false } = o;
+export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: string; base: string; done: boolean; streak: number; today: string; waiting?: boolean; lens?: [number, number] }): HeadlinePart[] {
+  const { through, base, done, streak, today, waiting = false, lens } = o;
   const later = !done && through !== base; // 오늘 운동하면 견줄 끝이 달라질 때만 알림
-  if (!current) return `▲▼ = ${prevName(kind, false)} 전체와 비교`;
-  if (waiting) return kind === 'week' ? '▲▼ = 오늘 운동하면 지난주 같은 요일(일)까지와 비교' : kind === 'month' ? '▲▼ = 오늘 운동하면 지난달 같은 날(1일)까지와 비교' : '▲▼ = 오늘 운동하면 작년 같은 날(1월 1일)까지와 비교';
+  if (!current) {
+    if (kind === 'month' && lens && lens[0] !== lens[1]) return [T('▲▼ = 그 전 달 전체'), N(`(${lens[1]}일)`), T('와 비교 · 이 달이 '), N(`${Math.abs(lens[0] - lens[1])}일`), T(lens[0] > lens[1] ? ' 더 길어요' : ' 더 짧아요')];
+    return [T(`▲▼ = ${prevName(kind, false)} 전체와 비교`)];
+  }
+  if (waiting) return kind === 'week' ? [T('▲▼ = 오늘 운동하면 지난주 같은 요일'), N('(일)'), T('까지와 비교')] : kind === 'month' ? [T('▲▼ = 오늘 운동하면 지난달 같은 날'), N('(1일)'), T('까지와 비교')] : [T('▲▼ = 오늘 운동하면 작년 같은 날'), N('(1월 1일)'), T('까지와 비교')];
   const [, m, d] = through.split('-').map(Number);
   const [, bm, bd] = base.split('-').map(Number);
-  if (kind === 'week') { const w = wdOf(through); return `▲▼ = 지난주 같은 요일(일${w > 0 ? `~${WD[w]}` : ''})까지와 비교${later ? ` · 오늘 운동하면 ${WD[wdOf(base)]}요일까지` : ''} · 연속 ${streak}주 · 일요일~토요일 기준`; }
+  if (kind === 'week') { const w = wdOf(through); return [T('▲▼ = 지난주 같은 요일'), N(`(일${w > 0 ? `~${WD[w]}` : ''})`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${WD[wdOf(base)]}요일까지`)] : []), T(` · 연속 ${streak}주 · 일요일~토요일 기준`)]; }
   if (kind === 'month') {
     // 이번 달이 더 길어 기준일이 지난달 말일을 넘으면 지난달 전체와 견줌
-    if (wholePrevMonth(kind, current, { through, today, done })) return `▲▼ = 지난달 전체(1~${d}일)와 비교 · 이번 달이 더 길어요`;
-    return `▲▼ = 지난달 같은 날(${d === 1 ? '1일' : `1~${d}일`})까지와 비교${later ? ` · 오늘 운동하면 ${bd}일까지` : ''}`;
+    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(`(1~${d}일)`), T('와 비교 · 이번 달이 더 길어요')];
+    return [T('▲▼ = 지난달 같은 날'), N(d === 1 ? '(1일)' : `(1~${d}일)`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${bd}일까지`)] : [])];
   }
-  return `▲▼ = 작년 같은 날(${m === 1 && d === 1 ? '1월 1일' : `1월 1일~${m}월 ${d}일`})까지와 비교${later ? ` · 오늘 운동하면 ${bm}월 ${bd}일까지` : ''}`;
+  return [T('▲▼ = 작년 같은 날'), N(m === 1 && d === 1 ? '(1월 1일)' : `(1월 1일~${m}월 ${d}일)`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${bm}월 ${bd}일까지`)] : [])];
 }
+export const footnote = (kind: PeriodKind, current: boolean, o: Parameters<typeof footnoteParts>[2]): string => footnoteParts(kind, current, o).map((p) => p.text).join('');

@@ -4,9 +4,9 @@ import type { AppState } from '../store';
 import type { Workout } from '../../core/session';
 import type { Exercise } from '../../core/types';
 import { weekStreak } from '../../core/stats';
-import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, waitingForToday, averageOver, offsetOf, periodData, earliestPeriod } from '../../core/period';
+import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, waitingForToday, averageOver, offsetOf, daysInMonth, periodData, earliestPeriod } from '../../core/period';
 import type { PeriodKind, PeriodMetric } from '../../core/period';
-import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, wholePrevMonth, WAITING_LINE, prevNote, avgText, metricValue, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
+import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, wholePrevMonth, WAITING_LINE, prevNote, avgParts, metricValue, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnoteParts } from '../../core/periodText';
 import { WD } from '../../core/dateText';
 import { PeriodBars } from '../charts';
 import type { BucketState } from '../charts';
@@ -70,6 +70,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
   // 평균선·범례: 운동한 칸이 둘 이상이고 평균이 최댓값과 같지 않을 때만 (한 칸뿐이면 같은 값이 되풀이됨)
   const showAvg = avgV > 0 && avgN >= 2 && avgV < Math.max(...vals) && !(metric === 'count' && kind !== 'year');
   const ton = tonMode(t.volume, p.volume);
+  const avgLeg = avgParts(kind, metric, avgV, ton, kind === 'year' && state.includes('now'));
     /** 한 칸 문구: "11월 16일 (월) · 작업 세트 9세트 · 운동 1회" (일·월 보기에서 지표가 운동 수가 아니면 운동한 칸에 횟수를 덧붙임) */
   const bucketLine = (i: number) => !cur.active[i] ? `${bucketText(kind, buckets[i]!.start)} · 운동 안 함` : `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!, ton)}${kind !== 'year' && metric !== 'count' ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
   const total = `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}`;
@@ -86,13 +87,13 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
         <button aria-label={`이전 ${names}`} disabled={atEnd} onClick={() => go(off + 1)}>‹</button>
         <div class="ps-mid">
           <strong data-testid="period-label">{label}</strong>
-          <span class="sub small" data-testid="period-range">{off <= 1 && <><span class="nw">{rangeText(range, today)}</span>{' '}</>}<span class="nw">{compareLine(kind, current)}</span></span>
+          <span class="sub small" data-testid="period-range">{off <= 1 && <><span class="nw">{rangeText(range, today)}</span>{' '}</>}<span class="nw">{compareLine(kind, current, whole)}</span></span>
         </div>
         <button aria-label={`다음 ${names}`} disabled={current} onClick={() => go(off - 1)}>›</button>
       </div>
-      <p class="ps-headline" data-testid="period-headline" aria-live="polite" aria-atomic="true">{!headParts[0]!.text.startsWith(label) && <span class="sr-only">{label}: </span>}{headParts.map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
+      <p class="ps-headline" data-testid="period-headline" aria-live="polite" aria-atomic="true">{!headParts.some((h) => h.text.startsWith(label)) && <span class="sr-only">{label}: </span>}{headParts.map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
       <div class="sub small ps-caption" data-testid="period-caption">{caption}</div>
-      {showAvg && !empty && <div class="sub small ps-legend" data-testid="period-avg"><span class="ps-swatch" aria-hidden="true" />{avgText(kind, metric, avgV, ton, kind === 'year' && state.includes('now'))}</div>}
+      {showAvg && !empty && <div class="sub small ps-legend" data-testid="period-avg"><span class="ps-swatch" aria-hidden="true" />{avgLeg.label} <span class="nw" data-testid="period-avg-value">{avgLeg.value}</span></div>}
       <PeriodBars values={vals} labels={xLabels} state={state} selected={selv} onSelect={setSel}
         dots={kind === 'year' ? undefined : cur.active} avg={showAvg ? avgV : undefined} fmt={(v) => valueText(metric, v, ton)}
         valueText={bucketLine} jump={kind === 'year' ? 3 : 7}
@@ -109,7 +110,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
           const dir = cc > cp ? 'up' : cc < cp ? 'down' : 'same';
           return (
             <button key={m} class={`pm-card${metric === m ? ' on' : ''}`} aria-pressed={metric === m} data-testid={`pm-${m}`}
-              aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn, waiting, partial: current && !todayDone, wholeDays })} onClick={() => setMetric(m)}>
+              aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn, waiting, partialThrough: current && !todayDone ? through : undefined, wholeDays })} onClick={() => setMetric(m)}>
               <span class="pm-top">{!waiting && <span class={`pm-badge ${dir}`} aria-hidden="true">{dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='}</span>}<span class="m-label" aria-hidden="true">{METRIC_NAME[m]}</span></span>
               <span class={`m-val${m === 'time' && c >= 360000 ? ' long' : ''}`} aria-hidden="true">{parts.map(([n, u], i) => <span key={i} class="m-pair"><span class="num">{n}</span>{u && <span class="unit">{u}</span>}</span>)}</span>
               <span class="pm-prev" aria-hidden="true">{waiting ? WAITING_LINE : `이전 ${valueText(m, pv, tn)}`}</span>
@@ -117,7 +118,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
           );
         })}
       </div>
-      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnote(kind, current, { through, base: baseThrough, done: todayDone, streak, today, waiting })}</p>
+      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnoteParts(kind, current, { through, base: baseThrough, done: todayDone, streak, today, waiting, lens: kind === 'month' ? [buckets.length, daysInMonth(Number(range.start.slice(0, 4)) - (range.start.slice(5, 7) === '01' ? 1 : 0), range.start.slice(5, 7) === '01' ? 12 : Number(range.start.slice(5, 7)) - 1)] : undefined }).map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
     </section>
   );
 }

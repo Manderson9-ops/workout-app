@@ -384,3 +384,44 @@ test('오늘 뒤 날짜로 적힌 기록은 기록 탭·홈 어디서도 이번 
   await page.getByRole('link', { name: '홈', exact: true }).click();
   await expect(page.getByTestId('home-week')).toHaveAttribute('aria-label', /2회, 작업 세트 7개/);
 });
+
+test('월말: 이번 달이 더 길면 지난달 전체와 견주고 모든 문구가 같은 말을 한다 (3/30, 운동 전·후) (T1·U4)', async ({ page }) => {
+  await idbPut(page, 'workouts', [done('feb', 2027, 2, 10, 4), done('mar', 2027, 3, 10, 3)]);
+  await page.clock.setFixedTime(new Date('2027-03-30T10:00:00+09:00'));
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await kind(page, '월').click();
+  const check = async (tag: string) => {
+    await expect(card(page).getByTestId('period-headline'), `${tag} 한 문장`).toContainText('지난달 전체');
+    await expect(card(page).getByTestId('pm-note'), `${tag} 안내`).toHaveText('작은 글씨 = 지난달 전체 값');
+    await expect(card(page).getByTestId('pm-sets'), `${tag} 카드 읽기`).toHaveAttribute('aria-label', /지난달 전체\(1~28일\)/);
+    await expect(card(page), `${tag} 각주`).toContainText('지난달 전체(1~28일)와 비교 · 이번 달이 더 길어요');
+    await expect(card(page).getByTestId('period-range'), `${tag} 이동줄`).toContainText('vs. 지난달 전체');
+  };
+  await check('운동 전');
+  await idbPut(page, 'workouts', [done('today', 2027, 3, 30, 2)]);
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await check('운동 후');
+});
+
+test('320px 년 보기: 평균 안내의 값과 각주 날짜가 줄 중간에서 갈리지 않는다 (U1·U2)', async ({ page }) => {
+  await idbPut(page, 'workouts', [
+    done('a', 2025, 2, 3, 40, 110, 10, 954), done('b', 2025, 3, 3, 30, 90, 10, 700), done('c', 2025, 4, 3, 44, 130, 10, 480),
+  ]);
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await page.setViewportSize({ width: 320, height: 700 });
+  await kind(page, '년').click();
+  await card(page).getByRole('button', { name: '이전 해' }).click(); // 2025: 평균을 보임
+  for (const id of ['pm-sets', 'pm-volume', 'pm-time']) {
+    await card(page).getByTestId(id).click();
+    const v = card(page).getByTestId('period-avg-value');
+    await expect(v).toBeVisible();
+    expect(await v.evaluate((e) => e.getBoundingClientRect().height), `${id} 평균 값 한 줄`).toBeLessThan(20);
+  }
+  await card(page).getByRole('button', { name: '다음 해' }).click(); // 올해: 각주의 날짜 묶음
+  const dates = await card(page).locator('p.sub.small span.nw').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+  expect(dates.length).toBeGreaterThan(0);
+  for (const h of dates) expect(h, '각주 날짜 한 줄').toBeLessThan(20);
+});
