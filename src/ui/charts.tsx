@@ -177,10 +177,12 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
       aria-valuenow={(selected ?? lastOk) + 1} aria-valuetext={selected === null ? summary : valueText(selected)} data-testid="period-chart"
       onKeyDown={key}
       onPointerDown={(e) => {
+        if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return; // 둘째 손가락·오른쪽 버튼은 무시
         gest.current = { x: e.clientX, y: e.clientY, before: selected, mode: 'wait' };
         try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* 합성 이벤트 등 */ }
       }}
       onPointerMove={(e) => {
+        if (!e.isPrimary) return;
         const g = gest.current; if (!g || g.mode === 'dead') return;
         if (g.mode === 'wait') {
           const adx = Math.abs(e.clientX - g.x), ady = Math.abs(e.clientY - g.y);
@@ -191,6 +193,7 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
         onSelect(clamp(raw(e)));
       }}
       onPointerUp={(e) => {
+        if (!e.isPrimary) return;
         const g = gest.current; gest.current = null;
         if (!g || g.mode !== 'wait') return;
         const i = raw(e);

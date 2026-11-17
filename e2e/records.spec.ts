@@ -48,7 +48,7 @@ test('기본 주 보기: 7칸, 이번 주 이름, 비교 문장, 카드 4개', a
   await expect(chart(page)).toHaveAttribute('aria-valuenow', '2');
   await expect(chart(page)).toHaveAttribute('aria-label', '일별 작업 세트 그래프');
   await expect(kind(page, '주')).toHaveAttribute('aria-pressed', 'true');
-  await expect(card(page).getByTestId('period-headline')).toHaveText('지난주 이맘때보다 작업 세트가 2세트 많아요'); // 7 vs 5
+  await expect(card(page).getByTestId('period-headline')).toHaveText('이번 주: 지난주 이맘때보다 작업 세트가 2세트 많아요'); // 7 vs 5
   await expect(card(page).getByRole('button', { name: '운동 2회, 지난주 같은 요일까지 1회보다 1회 많음' })).toBeVisible();
   await expect(card(page)).toContainText('지난주 같은 요일(일~월)까지와 비교');
   await expect(card(page).getByTestId('period-caption')).toHaveText('막대를 누르거나 옆으로 밀면 날짜별 값이 보여요');
@@ -255,4 +255,50 @@ test('좁은 화면(320px)에서도 한 문장 안의 값·라벨이 줄 중간�
   expect(hs.some((x) => /kg/.test(x.t ?? ''))).toBe(true);
   for (const x of hs) expect(x.h, `${x.t} 한 줄`).toBeLessThan(26);
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
+});
+
+test('자정을 넘기면 고른 칸을 비우고 이번 기간으로 돌아온다 (N3·P7)', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-16T23:59:58'));
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  const cap = card(page).getByTestId('period-caption');
+  const hint = '막대를 누르거나 옆으로 밀면 날짜별 값이 보여요';
+  await chart(page).focus();
+  await page.keyboard.press('ArrowLeft'); // 오늘(월) 칸
+  await expect(cap).toContainText('11월 16일 (월)');
+  await card(page).getByRole('button', { name: '이전 주' }).click();
+  await expect(card(page).getByTestId('period-label')).toHaveText('지난주');
+  await chart(page).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(cap).not.toHaveText(hint);
+  await page.clock.setFixedTime(new Date('2026-11-17T00:00:03')); // 앱은 1초마다 다시 그림
+  await expect(card(page).getByTestId('period-label')).toHaveText('이번 주');
+  await expect(cap).toHaveText(hint);
+  await expect(chart(page)).toHaveAttribute('aria-valuetext', /합계/);
+});
+
+test('오늘 운동 전이면 지난주는 어제 같은 요일까지만 견준다 (P2)', async ({ page }) => {
+  // 화요일(11/17) 낮: 지난주 월(11/9) 5세트, 지난주 화(11/10) 4세트. 오늘 운동 전 = 월까지(5), 오늘 운동 뒤 = 화까지(9)
+  await idbPut(page, 'workouts', [done('lt', 2026, 11, 10, 4)]);
+  await page.clock.setFixedTime(new Date('2026-11-17T12:00:00'));
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  const prev = card(page).getByTestId('pm-sets').locator('.pm-prev');
+  await expect(prev).toHaveText('지난주 5세트');
+  await expect(card(page)).toContainText('오늘 운동 전이면 어제까지');
+  await idbPut(page, 'workouts', [done('td', 2026, 11, 17, 2)]);
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(prev).toHaveText('지난주 9세트');
+});
+
+test('320px: 시간 큰 숫자와 단위는 짝으로 붙어 있고 가로 스크롤이 없다 (P11)', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await card(page).getByTestId('pm-time').click();
+  const ok = await card(page).getByTestId('pm-time').locator('.m-pair').evaluateAll((els) => els.every((e) => e.getBoundingClientRect().height < 40));
+  expect(ok).toBe(true);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
+  const card0 = (await card(page).getByTestId('pm-time').boundingBox())!;
+  const num = (await card(page).getByTestId('pm-time').locator('.m-val').boundingBox())!;
+  expect(num.x + num.width, '숫자 줄이 카드 밖으로 안 나감').toBeLessThanOrEqual(card0.x + card0.width + 0.5);
 });

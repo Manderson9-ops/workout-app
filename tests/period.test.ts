@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { periodOf, shiftPeriod, periodBuckets, compareThrough, periodData, earliestPeriod, activeAverage, daysInMonth } from '../src/core/period';
-import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, tonMode, headlineText, headline, cardAria, bucketText, footnote } from '../src/core/periodText';
+import { compareThroughFor, hasWorkoutOn, periodOf, shiftPeriod, periodBuckets, compareThrough, periodData, earliestPeriod, activeAverage, daysInMonth } from '../src/core/period';
+import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgText, tonMode, headlineText, cmpValues, headline, cardAria, bucketText, footnote } from '../src/core/periodText';
 import { weekSummary } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
@@ -117,6 +117,55 @@ describe('periodData', () => {
   });
 });
 
+describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지)', () => {
+  const wk0 = (id: string, d: string) => wk(id, at(+d.slice(0, 4), +d.slice(5, 7), +d.slice(8), 10), [st(50, 10)]);
+  it('주·월·년: 운동했으면 그대로, 안 했으면 하루 덜', () => {
+    expect(compareThroughFor(periodOf('week', '2026-11-18'), '2026-11-18', true)).toBe('2026-11-11');
+    expect(compareThroughFor(periodOf('week', '2026-11-18'), '2026-11-18', false)).toBe('2026-11-10');
+    expect(compareThroughFor(periodOf('month', '2026-11-16'), '2026-11-16', false)).toBe('2026-10-15');
+    expect(compareThroughFor(periodOf('month', '2026-03-31'), '2026-03-31', false)).toBe('2026-02-27');
+    expect(compareThroughFor(periodOf('year', '2026-11-16'), '2026-11-16', false)).toBe('2025-11-15');
+    expect(compareThroughFor(periodOf('year', '2026-11-16'), '2026-11-16', true)).toBe('2025-11-16');
+  });
+  it('기간 첫날(1월 1일·1일·일요일)이면 비교 구간이 빔', () => {
+    const ws = [wk0('a', '2025-12-31'), wk0('b', '2025-01-01'), wk0('c', '2026-10-01')];
+    const y = periodOf('year', '2026-01-01'), m = periodOf('month', '2026-11-01'), w = periodOf('week', '2026-11-15');
+    expect(compareThroughFor(y, '2026-01-01', false)).toBe('2024-12-31');
+    expect(periodData(ws, byId, shiftPeriod(y, -1), [], compareThroughFor(y, '2026-01-01', false)).totals.count).toBe(0);
+    expect(compareThroughFor(m, '2026-11-01', false)).toBe('2026-09-30');
+    expect(periodData(ws, byId, shiftPeriod(m, -1), [], compareThroughFor(m, '2026-11-01', false)).totals.count).toBe(0);
+    expect(compareThroughFor(w, '2026-11-15', false)).toBe('2026-11-07');
+    expect(periodData(ws, byId, shiftPeriod(w, -1), [], compareThroughFor(w, '2026-11-15', false)).totals.count).toBe(0);
+  });
+  it('hasWorkoutOn: 센 운동만', () => {
+    const ws = [wk0('a', '2026-11-16'), wk('open', at(2026, 11, 17), [st(50, 10)], null)];
+    expect(hasWorkoutOn(ws, '2026-11-16')).toBe(true);
+    expect(hasWorkoutOn(ws, '2026-11-17')).toBe(false);
+    expect(hasWorkoutOn(ws, '2026-11-18')).toBe(false);
+  });
+});
+
+describe('cmpValues (보이는 정밀도로 견줌)', () => {
+  it('시간: 분 단위, 둘 다 1분 미만이면 초', () => {
+    expect(cmpValues('time', 2700, 2720)).toEqual([2700, 2700]);
+    expect(cmpValues('time', 2700, 2790)).toEqual([2700, 2820]);
+    expect(cmpValues('time', 40, 50)).toEqual([40, 50]);
+    expect(cmpValues('time', 40, 100)).toEqual([60, 120]);
+  });
+  it('볼륨 kg·톤', () => {
+    expect(cmpValues('volume', 1000.4, 999.6)).toEqual([1000, 1000]);
+    expect(cmpValues('volume', 1040300, 1039800, true)).toEqual([1040000, 1040000]);
+    expect(cmpValues('volume', 5040, 4960, true)).toEqual([5000, 5000]);
+    expect(cmpValues('volume', 5040, 4900, true)).toEqual([5000, 4900]);
+    expect(cmpValues('volume', 0, 30, true)).toEqual([0, 25]);
+    expect(cmpValues('volume', 20, 40, true)).toEqual([25, 25]);
+    expect(cmpValues('count', 3, 4)).toEqual([3, 4]);
+    expect(headlineText(headline({ kind: 'week', current: true, metric: 'time', cur: 2700, prev: 2720, curCount: 1, prevCount: 1, label: '이번 주' }))).toBe('지난주 이맘때와 시간이 같아요');
+    expect(cardAria({ kind: 'week', current: true, metric: 'time', cur: 2700, prev: 2720 })).toBe('시간 45분, 지난주 같은 요일까지 45분과 같음');
+    expect(headlineText(headline({ kind: 'year', current: true, metric: 'volume', cur: 1040300, prev: 1039800, curCount: 3, prevCount: 3, label: '올해' }))).toBe('작년 이맘때와 볼륨이 같아요');
+  });
+});
+
 describe('periodText', () => {
   it('조사', () => {
     expect(hasBatchim('볼륨')).toBe(true);
@@ -229,13 +278,13 @@ describe('periodText', () => {
     expect(cardAria({ ...o, cur: 0, prev: 2 })).toBe('운동 0회, 지난주 같은 요일까지 2회보다 2회 적음');
     expect(cardAria({ ...o, current: false, cur: 2, prev: 2 })).toBe('운동 2회, 그 전 주 2회와 같음');
     expect(cardAria({ kind: 'year', current: true, metric: 'volume', cur: 1500000, prev: 900000, ton: true })).toBe('볼륨 1,500톤, 작년 같은 날까지 900톤보다 600톤 많음');
-    expect(footnote('week', true, '2026-11-09', 3, 1)).toBe('▲▼ = 지난주 같은 요일(일~월)까지와 비교 · 연속 3주 · 일요일~토요일 기준');
+    expect(footnote('week', true, '2026-11-09', 3, 1)).toBe('▲▼ = 지난주 같은 요일(일~월)까지와 비교 · 오늘 운동 전이면 어제까지 · 연속 3주 · 일요일~토요일 기준');
     expect(footnote('week', true, '2026-11-08', 3, 0)).toContain('(일)까지');
     expect(footnote('week', false, '', 0, 0)).toBe('▲▼ = 그 전 주 전체와 비교');
-    expect(footnote('month', true, '2026-10-16', 0, 1)).toBe('▲▼ = 지난달 같은 날(1~16일)까지와 비교');
-    expect(footnote('month', true, '2026-10-01', 0, 1)).toBe('▲▼ = 지난달 같은 날(1일)까지와 비교');
-    expect(footnote('year', true, '2025-11-16', 0, 1)).toBe('▲▼ = 작년 같은 날(1월 1일~11월 16일)까지와 비교');
-    expect(footnote('year', true, '2025-01-01', 0, 1)).toBe('▲▼ = 작년 같은 날(1월 1일)까지와 비교');
+    expect(footnote('month', true, '2026-10-16', 0, 1)).toBe('▲▼ = 지난달 같은 날(1~16일)까지와 비교 · 오늘 운동 전이면 어제까지');
+    expect(footnote('month', true, '2026-10-01', 0, 1)).toBe('▲▼ = 지난달 같은 날(1일)까지와 비교 · 오늘 운동 전이면 어제까지');
+    expect(footnote('year', true, '2025-11-16', 0, 1)).toBe('▲▼ = 작년 같은 날(1월 1일~11월 16일)까지와 비교 · 오늘 운동 전이면 어제까지');
+    expect(footnote('year', true, '2025-01-01', 0, 1)).toBe('▲▼ = 작년 같은 날(1월 1일)까지와 비교 · 오늘 운동 전이면 어제까지');
     expect(cardAria({ ...o, metric: 'time', cur: 3600, prev: 2880 })).toBe('시간 1시간, 지난주 같은 요일까지 48분보다 12분 김');
     expect(cardAria({ ...o, metric: 'time', cur: 2880, prev: 3600 })).toBe('시간 48분, 지난주 같은 요일까지 1시간보다 12분 짧음');
     expect(footnote('year', false, '', 0, 0)).toBe('▲▼ = 전년 전체와 비교');

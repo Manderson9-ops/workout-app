@@ -60,6 +60,21 @@ export function compareThrough(cur: PeriodRange, today: string): string {
 /** 그 날짜가 든 달의 날수 */
 const monthLen = (date: string) => { const [y, m] = parts(date); return daysInMonth(y, m); };
 
+/** 그 날짜에 센 운동이 있나 */
+export function hasWorkoutOn(workouts: Workout[], date: string): boolean {
+  return workouts.some((w) => isCountedWorkout(w) && localDate(w.startedAt) === date);
+}
+
+/**
+ * 비교할 이전 기간의 끝 날짜 (포함). compareThrough 와 같되, 오늘 운동을 아직 안 했으면 하루 덜 (어제 같은 위치까지):
+ * 운동 전의 오늘(0)을 지난주 같은 요일의 완성된 하루와 견주면 늘 "적어요"로 나오는 편향을 막음.
+ * 기간의 첫날이면 이전 기간 시작보다 앞이라 비교 구간이 빔
+ */
+export function compareThroughFor(cur: PeriodRange, today: string, todayDone: boolean): string {
+  const base = compareThrough(cur, today);
+  return todayDone ? base : addDays(base, -1);
+}
+
 /** 칸 번호: 주·월 = 날짜 차이, 년 = 달 */
 function bucketIndex(r: PeriodRange, date: string): number {
   if (r.kind === 'year') return Number(date.slice(5, 7)) - 1;

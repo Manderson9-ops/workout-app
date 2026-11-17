@@ -262,9 +262,6 @@ button.back { margin-bottom: 4px; }
 
 /* D-054: 기록 탭 (이번 주·부위별 세트·운동 기록 카드·달력). 일요일 빨강, 토요일 파랑 */
 .sun { color: var(--sun); } .sat { color: var(--sat); }
-.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-.tile { background: var(--card2); border-radius: 12px; padding: 10px 12px; min-width: 0; }
-.tile .tv { font-size: 22px; font-weight: 800; margin: 2px 0; overflow-wrap: anywhere; }
 .delta { font-weight: 700; } .delta.up { color: var(--ok); }
 .empty-week { text-align: center; padding: 18px 8px; }
 .part-grid { display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 6px; }
@@ -310,7 +307,6 @@ button.wcard.dim { opacity: .6; }
 .cal-day.sel { border-color: var(--acc); background: var(--acc-soft); }
 .cal-day.future { opacity: .4; }
 @media (min-width: 900px) {
-  html:not(.phone-view) .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   html:not(.phone-view) .part-grid { flex-direction: row; align-items: center; gap: 24px; }
   html:not(.phone-view) .part-grid .bodyheat { flex: 0 0 340px; order: -1; }
   html:not(.phone-view) .bodyheat .bodymap-svg { width: 150px; }
@@ -931,5 +927,6 @@ button.pm-card.on { background: var(--acc-fill); border-color: var(--acc-fill); 
 button.pm-card .m-val { flex-wrap: wrap; }
 button.pm-card .num { font-size: 26px; white-space: nowrap; }
 button.pm-card .m-pair, button.pm-card .unit { white-space: nowrap; }
+@media (max-width: 340px) { button.pm-card .num { font-size: 22px; } }
 button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opacity: .85; }
 .pm-prev { color: var(--sub); font-size: 12px; overflow-wrap: anywhere; }

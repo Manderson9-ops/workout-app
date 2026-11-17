@@ -4,9 +4,9 @@ import type { AppState } from '../store';
 import type { Workout } from '../../core/session';
 import type { Exercise } from '../../core/types';
 import { weekStreak } from '../../core/stats';
-import { periodOf, shiftPeriod, periodBuckets, compareThrough, periodData, earliestPeriod, activeAverage } from '../../core/period';
+import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, periodData, earliestPeriod, activeAverage } from '../../core/period';
 import type { PeriodKind, PeriodMetric } from '../../core/period';
-import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, avgText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
+import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, avgText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
 import { WD } from '../../core/dateText';
 import { PeriodBars } from '../charts';
 import type { BucketState } from '../charts';
@@ -31,18 +31,21 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
   const setKind = (k: PeriodKind) => { if (k === kind) return; setPref({ kind: k, metric }); writePref(k, metric); setOff(0); setSel(null); };
   const setMetric = (m: PeriodMetric) => { setPref({ kind, metric: m }); writePref(kind, m); };
   const day0 = useRef(today);
-  useEffect(() => { if (day0.current !== today) { day0.current = today; setSel(null); } }, [today]); // 자정을 넘기면 고른 칸을 비움 (처음 그릴 때는 건드리지 않음)
+  // 자정을 넘기면 고른 칸을 비우고 이번 기간으로 (카드가 조용히 다른 기간으로 넘어가지 않게). 처음 그릴 때는 건드리지 않음
+  useEffect(() => { if (day0.current !== today) { day0.current = today; setSel(null); setOff(0); } }, [today]);
   const go = (n: number) => { setOff(n); setSel(null); };
 
   const current = off === 0;
   const range = useMemo(() => shiftPeriod(periodOf(kind, today), -off), [kind, today, off]);
   const earliest = useMemo(() => earliestPeriod(done, kind, today), [done, kind, today]);
-  const through = useMemo(() => compareThrough(periodOf(kind, today), today), [kind, today]);
+  const todayDone = useMemo(() => hasWorkoutOn(done, today), [done, today]);
+  const through = useMemo(() => compareThroughFor(periodOf(kind, today), today, todayDone), [kind, today, todayDone]);
+  const baseThrough = useMemo(() => compareThroughFor(periodOf(kind, today), today, true), [kind, today]);
   const { cur, prev, buckets } = useMemo(() => ({
-    cur: periodData(done, byId, range, bw),
+    cur: periodData(done, byId, range, bw, current ? today : undefined), // 오늘 뒤 날짜 기록은 이번 기간에 안 셈
     prev: periodData(done, byId, shiftPeriod(range, -1), bw, current ? through : undefined),
     buckets: periodBuckets(range),
-  }), [done, byId, range, bw, current, through]);
+  }), [done, byId, range, bw, current, through, today]);
   const streak = useMemo(() => weekStreak(done, today), [done, today]);
 
   const t = cur.totals, p = prev.totals;
@@ -84,7 +87,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
         </div>
         <button aria-label={`다음 ${names}`} disabled={current} onClick={() => go(off - 1)}>›</button>
       </div>
-      <p class="ps-headline" data-testid="period-headline" aria-live="polite">{headline({ kind, current, metric, cur: metricValue(metric, t), prev: metricValue(metric, p), curCount: t.count, prevCount: p.count, label }).map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
+      <p class="ps-headline" data-testid="period-headline" aria-live="polite" aria-atomic="true"><span class="sr-only">{label}: </span>{headline({ kind, current, metric, cur: metricValue(metric, t), prev: metricValue(metric, p), curCount: t.count, prevCount: p.count, label }).map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
       <div class="sub small ps-caption" data-testid="period-caption">{caption}</div>
       {showAvg && !empty && <div class="sub small ps-legend" data-testid="period-avg"><span class="ps-swatch" aria-hidden="true" />{avgText(kind, metric, avgV, ton)}</div>}
       <PeriodBars values={vals} labels={xLabels} state={state} selected={selv} onSelect={setSel}
@@ -98,7 +101,8 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
           const c = metricValue(m, t), pv = metricValue(m, p);
           const tn = m === 'volume' && ton;
           const parts = bigParts(m, c, tn);
-          const dir = c > pv ? 'up' : c < pv ? 'down' : 'same';
+          const [cc, cp] = cmpValues(m, c, pv, tn);
+          const dir = cc > cp ? 'up' : cc < cp ? 'down' : 'same';
           return (
             <button key={m} class={`pm-card${metric === m ? ' on' : ''}`} aria-pressed={metric === m} data-testid={`pm-${m}`}
               aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn })} onClick={() => setMetric(m)}>
@@ -109,7 +113,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
           );
         })}
       </div>
-      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnote(kind, current, through, streak, todayWd)}</p>
+      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnote(kind, current, baseThrough, streak, todayWd)}</p>
     </section>
   );
 }

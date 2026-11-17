@@ -11,6 +11,7 @@ import { homeRecent } from '../../core/session';
 import type { Workout } from '../../core/session';
 import { backupDue } from '../../core/backup';
 import { weekSummary, weekStart, addDays, localDate, summarize } from '../../core/stats';
+import { periodOf, compareThroughFor, hasWorkoutOn } from '../../core/period';
 import { routineUse, routineParts, pickNextRoutine, sinceText } from '../../core/routineList';
 import type { NextPick } from '../../core/routineList';
 import type { Part } from '../../core/types';
@@ -63,7 +64,7 @@ function ThisWeekCard({ s }: { s: AppState }) {
   const { done, cur, prev } = useMemo(() => {
     const byId = new Map(all.map((e) => [e.id, e]));
     const done = historyOf(s);
-    return { done, cur: weekSummary(done, byId, ws, s.bodyweight), prev: weekSummary(done, byId, addDays(ws, -7), s.bodyweight, addDays(today, -7)) };
+    return { done, cur: weekSummary(done, byId, ws, s.bodyweight), prev: weekSummary(done, byId, addDays(ws, -7), s.bodyweight, compareThroughFor(periodOf('week', today), today, hasWorkoutOn(done, today))) }; // 기록 탭과 같은 비교 구간 (오늘 운동 전이면 어제 같은 요일까지)
   }, [all, s.workouts, s.bodyweight, ws, today]);
   const never = done.length === 0;
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));

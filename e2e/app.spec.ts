@@ -895,6 +895,9 @@ test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 �
 });
 
 test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원판·1RM, 백업 → 초기화 → 복원 100% 일치', async ({ page }) => {
+  // D-081: 기록 요약 카드가 요일에 따라 달라지지 않게 시각을 수요일 낮으로 고정 (시간은 그대로 흐름)
+  await page.clock.install({ time: new Date('2026-11-18T12:00:00') });
+  await page.reload();
   // 공유 시트 대신 다운로드 경로로 고정 (테스트 브라우저에는 공유 시트가 없음)
   await page.evaluate(() => Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined, configurable: true }));
   // 운동 하나 끝내기: 바벨 컬 1세트 30kg × 10 (기본 목표 횟수)
@@ -938,7 +941,7 @@ test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원�
   await expect(page.locator('.cal-wd').first()).toHaveText('일');
   await expect(page.locator('.cal-wd').nth(6)).toHaveText('토');
   await expect(page.getByText(/이번 달 1회/)).toBeVisible();
-  const d = new Date();
+  const d = new Date(await page.evaluate(() => Date.now())); // 고정한 시각 (이 시험 PC의 오늘이 아님)
   const todayBtn = page.getByRole('button', { name: `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${'일월화수목금토'[d.getDay()]}요일, 운동 1회` }); // 검토 E5 전체 형태
   await expect(todayBtn).toBeEnabled();
   await todayBtn.click();
@@ -1986,6 +1989,8 @@ test('끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으�
 });
 
 test('기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안내·지난주 요약·"운동 시작" → 운동 화면, 타일 증감 한 줄', async ({ page }) => {
+  // D-081: 시각을 수요일 낮으로 고정 (요일에 따라 비교 구간이 달라지지 않게)
+  await page.clock.install({ time: new Date('2026-11-18T12:00:00') });
   // 지난주 일요일 10시에 끝난 운동 하나를 저장소에 직접 넣음 (이번 주 일~토와 겹치지 않음)
   await page.evaluate(async () => {
     const d = new Date(); const start = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay() - 7, 10, 0);
