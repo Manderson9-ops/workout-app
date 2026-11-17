@@ -1,0 +1,2 @@
+UX/UI 감사: PASS 22 · INFO 4 · JUDGED 11 · N/A 12
+audit_exit=0
