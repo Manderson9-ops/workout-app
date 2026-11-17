@@ -897,6 +897,10 @@ test('설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 �
 test.describe('D-081 시각 고정 (한국 시간)', () => {
   test.use({ timezoneId: 'Asia/Seoul', locale: 'ko-KR' });
   test('P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원판·1RM, 백업 → 초기화 → 복원 100% 일치', async ({ page }) => {
+    // beforeEach 의 [알겠어요] 가 시작한 설정 저장(storageNoticeSeen)이 끝나야 함: 바로 시계 설치·새로 고침을 하면 저장이 끊겨 설정 행이 안 생기고,
+    // 첫 백업 파일의 settings 가 비어 복원 뒤 비교가 어긋남 (11차 검토에서 찾은 흔들림 원인)
+    await expect(page.getByText('기록은 이 기기에만 저장돼요')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => new Promise<number>((res) => { const q = indexedDB.open('workout-app'); q.onsuccess = () => { const g = q.result.transaction('settings').objectStore('settings').count(); g.onsuccess = () => { q.result.close(); res(g.result); }; }; }))).toBeGreaterThan(0);
     // D-081: 기록 요약 카드가 요일에 따라 달라지지 않게 시각을 수요일 낮으로 고정 (시간은 그대로 흐름)
     await page.clock.install({ time: new Date('2026-11-18T12:00:00+09:00') });
     await page.reload();
@@ -1009,8 +1013,6 @@ test.describe('D-081 시각 고정 (한국 시간)', () => {
     await page.getByRole('link', { name: '설정' }).click();
     await openSet(page, '동기화·백업');
     await expect(page.getByText('마지막 백업: 없음')).toBeVisible();
-    // 첫 백업 전에 설정 저장소의 기본 행이 쓰여 있어야 함 (아직 안 쓰였으면 첫 파일의 settings 가 비어 복원 뒤 비교가 어긋남)
-    await expect.poll(() => page.evaluate(() => new Promise<number>((res) => { const q = indexedDB.open('workout-app'); q.onsuccess = () => { const g = q.result.transaction('settings').objectStore('settings').count(); g.onsuccess = () => { q.result.close(); res(g.result); }; }; }))).toBeGreaterThan(0);
     const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일 저장' }).click()]);
     expect(dl.suggestedFilename()).toMatch(/^workout-backup-\d{8}-\d{4}\.json$/);
     const file = await dl.path();
