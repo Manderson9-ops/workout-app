@@ -5,8 +5,8 @@
 | typecheck | 오류 0 (`npm run typecheck`, 최종 7f64aee) |
 | decisions:check | M 결정 33개 불일치 0 |
 | npm test | 단위 756 + 플랜 72 전부 통과(reports/unit-0.9.17-7f64aee.txt), period.ts·periodText.ts 줄·분기 100% |
-| E2E | b2d2136 전체 **268/268**(로그 reports/e2e-0.9.17-b2d2136.txt). 최종 7f64aee(CSS 한 블록 + 폭 5개 시험 추가): 전체 실행에서 WebKit 139/139 통과, Chromium 은 PC 메모리 부족으로 기동 실패(시험 조건 실패 0, 로그 reports/e2e-0.9.17-7f64aee.txt); 같은 내용 records+uxui 80/80(두 브라우저, 구현 에이전트). 흔들리던 시험 2개는 시험 쪽 저장 대기로 해결 |
-| UX/UI 감사 게이트 | 7f64aee `node tools/uxui_audit.ts --gate` exit 0 — PASS 22 · INFO 4 · JUDGED 11 · N/A 12 (reports/uxui-audit-0.9.17-7f64aee.txt) |
+| E2E | **최종 7f64aee 전체 278/278 통과**(두 브라우저, --workers=1, 18.4분, 로그 reports/e2e-0.9.17-7f64aee-rerun.txt — 사용자 승인 후 메모리 비운 상태에서 다시 실행). 앞선 7f64aee 실행은 메모리 부족으로 Chromium 기동 실패(WebKit 139/139). 흔들리던 시험 2개는 시험 쪽 저장 대기로 해결 |
+| UX/UI 감사 게이트 | 7f64aee 재실행 직후 `node tools/uxui_audit.ts --gate` exit 0 — PASS 22 · INFO 4 · JUDGED 11 · N/A 12 (reports/uxui-audit-0.9.17-7f64aee-rerun.txt) |
 | 동기화 서버 | syncMerge·syncStamp·hlc·tools/gas 변경 없음 → Apps Script 재배포 불필요 |
 | 저장 구조 | DB·백업 변경 없음 (기기 설정 localStorage `stats.period.v1` 만 추가) |
 | 독립 검토 (Opus, 매회 새 검토자) | 11회: 9.15 → 9.30 → 9.60 → 9.68 → 9.45 → 9.45 → 9.55 → 9.65 → 9.70 → 9.65 → **9.65 PASS** (11차 = 0227acb; 그 뒤 b2d2136 은 시험 파일 2개 + 화면 변화 없는 클래스 1줄). 채점표 Drive WORK_OUT_APP/docs/reviews/v0.9.17.md |
