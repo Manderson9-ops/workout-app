@@ -1,0 +1,312 @@
+HEAD=0384ceff024d8a326d561e54269a3af8823e1f7f
+dirty_tracked=0
+2026-11-17T13:29:37+09:00
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - import "./dateText" without a file extension (src/core/changelog.ts:1:26). Add the file extension
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - import "./dateText" without a file extension (src/core/changelog.ts:1:26). Add the file extension
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+Running 262 tests using 1 worker
+
+  ok   1 [iphone-webkit] › e2e\app.spec.ts:124:1 › 핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3개 → 종료 (탭 수 12 이하) (15.7s)
+  ok   2 [iphone-webkit] › e2e\app.spec.ts:210:1 › 운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취소하면 계속, 끝내지 못하면 이유 표시·진단 기록, 새로 시작 확인 (16.8s)
+  ok   3 [iphone-webkit] › e2e\app.spec.ts:304:1 › 운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링크, 즐겨찾기 (1.9s)
+  ok   4 [iphone-webkit] › e2e\app.spec.ts:329:1 › D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 → 짧은 이유·삼두 더해서 다시 만들기, 종목 탭 주/보조 근육·근육 필터 (5.0s)
+  ok   5 [iphone-webkit] › e2e\app.spec.ts:370:1 › 개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선순위 선택 상자(기본 높음), 세트 8 넘게, 운동 추가 부위 기억·들어 있는 부위, 음악과 같이 듣기 설정 (29.5s)
+  ok   6 [iphone-webkit] › e2e\app.spec.ts:513:1 › 플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 세트, 다른 부위 슈퍼세트, 예상 시간 줄어듦, 풀기, 저장하고 시작하면 운동 화면도 묶음 (5.5s)
+  ok   7 [iphone-webkit] › e2e\app.spec.ts:556:1 › 플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶음 휴식·전환·세트, 묶음에 운동 추가, 저장하고 시작 (7.9s)
+  ok   8 [iphone-webkit] › e2e\app.spec.ts:641:1 › 내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 부위·마지막 날짜·횟수, 목록에서만 숨기기 ↔ 다시 보이기, 완전 삭제, 운동 탭에서 바로 고르기 (25.8s)
+  ok   9 [iphone-webkit] › e2e\app.spec.ts:730:1 › 직접 추가한 운동을 플랜에서 최고 등급 S(D-074)로 반영 및 교체 쓰기, 설정의 기본 휴식 (4.1s)
+  ok  10 [iphone-webkit] › e2e\app.spec.ts:757:1 › 루틴 직접 만들기·편집: 운동 추가, 목표 횟수, 슈퍼세트로 묶기, 저장 (3.0s)
+  ok  11 [iphone-webkit] › e2e\app.spec.ts:777:1 › 루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세트·횟수 (10.0s)
+  ok  12 [iphone-webkit] › e2e\app.spec.ts:855:1 › 시간이 너무 짧으면 이유를 보여줌, 부위 없이 만들 수 없음 (3.8s)
+  ok  13 [iphone-webkit] › e2e\app.spec.ts:867:1 › 설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 −/+ (5.2s)
+  ok  14 [iphone-webkit] › e2e\app.spec.ts:899:3 › D-081 시각 고정 (한국 시간) › P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원판·1RM, 백업 → 초기화 → 복원 100% 일치 (18.2s)
+  ok  15 [iphone-webkit] › e2e\app.spec.ts:1053:1 › P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, 끄기 (7.0s)
+  ok  16 [iphone-webkit] › e2e\app.spec.ts:1092:1 › 서비스 워커 없이 (Playwright WebKit은 서비스 워커가 있으면 다른 주소 요청을 가짜 서버로 못 돌림) › P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, 실패하면 다음에 열 때 다시, 키는 어디에도 안 보임 (16.4s)
+  ok  17 [iphone-webkit] › e2e\app.spec.ts:1206:1 › S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 그대로, 지우기는 지움 표시 (2.5s)
+  ok  18 [iphone-webkit] › e2e\app.spec.ts:1259:1 › S2b 양방향 동기화 (두 브라우저 + 가짜 서버, 실제 합치기 코드) › PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용, 끝낸 운동 → PC 기록, 지움 전파 (35.3s)
+  ok  19 [iphone-webkit] › e2e\app.spec.ts:1357:1 › S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 화면으로 보기 (12.4s)
+  ok  20 [iphone-webkit] › e2e\app.spec.ts:1416:1 › S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙음 → 설정에서 상태 보기·지우기 (15.0s)
+  ok  21 [iphone-webkit] › e2e\app.spec.ts:1445:1 › 최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무게·시간·세트 → 저장 → 상세·통계 반영, 홈에서 삭제 (9.8s)
+  ok  22 [iphone-webkit] › e2e\app.spec.ts:1529:1 › 수정 화면: 입력 중 세트를 지워도 값이 옆 세트로 가지 않음, 시작을 옮겨도 운동 시간 그대로, 편집 중 메뉴 숨김 (7.5s)
+  ok  23 [iphone-webkit] › e2e\app.spec.ts:1556:1 › 수정 화면: 취소하면 기록 그대로 (6.1s)
+  ok  24 [iphone-webkit] › e2e\app.spec.ts:1574:1 › 앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동이면 그대로 / 동기화 중 초기화·불러오기 두 갈래: 닫으면 아무것도 안 바꿈, "이 기기만"은 동기화 끄고 진행 (13.6s)
+  ok  25 [iphone-webkit] › e2e\app.spec.ts:1674:1 › 기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바뀌면 묻고, 묻는 동안 또 바뀌면 다시 물음 / 지워졌으면 되살려 저장 (7.7s)
+  ok  26 [iphone-webkit] › e2e\app.spec.ts:1731:1 › 플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바꾸기, 운동 추가 → 저장하고 시작, 내 운동 DB 정보 버튼 (9.2s)
+  ok  27 [iphone-webkit] › e2e\app.spec.ts:1818:1 › 플랜 바로 고치기 (D-036): 시간 운동 초 −/+ 가 예상 시간에 반영, 잠금 다시 생성해도 바꾼 횟수·다른 부위 추가 운동 유지 (5.0s)
+  ok  28 [iphone-webkit] › e2e\app.spec.ts:1878:1 › 끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 유지, 현재 세트 따라감, 키보드) → 루틴 편집 (12.3s)
+  ok  29 [iphone-webkit] › e2e\app.spec.ts:1957:1 › 끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으로, 놓을 칸 테두리, 끄는 도중 카드가 사라져도 멈추지 않음 (4.4s)
+  ok  30 [iphone-webkit] › e2e\app.spec.ts:1996:3 › D-081 시각 고정 (한국 시간) › 기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안내·지난주 요약·"운동 시작" → 운동 화면, 타일 증감 한 줄 (2.2s)
+  ok  31 [iphone-webkit] › e2e\app.spec.ts:2026:1 › D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버전에서 올라왔을 때)·보러 가기·새 기능 점, 앱 정보, version.json (5.1s)
+  ok  32 [iphone-webkit] › e2e\app.spec.ts:2140:1 › D-055 0.8.x 에서 올라옴: 마지막 본 버전 기록이 없고 루틴이 있으면 "새로 바뀐 점"(이번 버전만)을 보여 줌 (3.5s)
+  ok  33 [iphone-webkit] › e2e\app.spec.ts:2157:3 › D-055 실제 업데이트 경로 (흉내 이벤트 없이 서버 version.json 비교) › 서버가 더 새 버전(9.9.9)이면 배너 + 앱 정보 "새 버전 9.9.9가 있어요", 적용은 한 번만 새로 고침(무한 새로 고침 없음) (3.0s)
+  ok  34 [iphone-webkit] › e2e\app.spec.ts:2189:1 › D-055 sw.js 는 빌드 이름(버전 포함)을 담음 (배포마다 바뀌어 새 서비스 워커가 설치됨) (515ms)
+  ok  35 [iphone-webkit] › e2e\app.spec.ts:2196:1 › D-055 새 버전 배너: 버전·바뀐 점 한 줄·[지금 적용][나중에], 파일을 못 읽으면 "새 버전이 있어요", 운동 중엔 작게·확인 후 적용 (4.7s)
+  ok  36 [iphone-webkit] › e2e\app.spec.ts:2226:1 › D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·지우기, Esc·초점 되돌림), 최근 운동은 기록 탭과 같은 카드 (7.4s)
+  ok  37 [iphone-webkit] › e2e\app.spec.ts:2286:1 › D-055 검토 R2: 서비스 워커를 켠 채 새 워커가 대기할 때, 서버 version.json 이 같은 버전이면 배너·새로 고침 없이 조용히 교체, 더 새로우면 배너 (배너 단계는 Chromium 만) (1.8s)
+  ok  38 [iphone-webkit] › e2e\app.spec.ts:2324:1 › D-055 2단계 운동 화면: 숫자 3개·세트 표(지난번)·완료 줄 초록·휴식 알약(고리·±15)·기록 갱신 배지·⋯ 메뉴·끝낼 때 갱신 알림 (8.0s)
+  ok  39 [iphone-webkit] › e2e\app.spec.ts:2404:1 › D-055 3단계 플랜 단계 카드(1 부위 → 2 시간·등급 → 3 결과 숫자)·종목 줄 배지·상세 숫자 (3.7s)
+  ok  40 [iphone-webkit] › e2e\app.spec.ts:2439:1 › D-055 3단계 설정 묶음 카드: 운동·소리·화면·동기화·백업·데이터·앱 정보, 컨트롤 그대로 (2.5s)
+  ok  41 [iphone-webkit] › e2e\app.spec.ts:2453:1 › D-055 3단계 기록 탭: 부위 막대·몸 그림을 누르면 그 주 그 부위 운동 창, 10~20 참고 띠 (5.8s)
+  ok  42 [iphone-webkit] › e2e\app.spec.ts:2479:1 › D-055 3단계 운동 화면: 시간 운동 지난번(초), 고친 지난 기록 기준 기록 갱신, 번호 펼침 표시·[끝내기] 보통 버튼 (9.7s)
+  ok  43 [iphone-webkit] › e2e\app.spec.ts:2524:1 › 0.9.3 성능 관문: 화면을 나눠 받아도 한 번 연 뒤에는 인터넷 없이 안 열어 본 화면(종목·기록·플랜)까지 열림 (서비스 워커가 모든 묶음을 미리 담음, 오프라인 단계는 Chromium 만) (616ms)
+  ok  44 [iphone-webkit] › e2e\app.spec.ts:2551:3 › 0.9.3 검토: 나눠 받는 화면을 못 받으면 › "새 버전이 나왔거나 인터넷이 끊겼을 수 있어요" + [다시 시도], 다시 받을 수 있게 되면 다시 시도로 열림 (다시 시도 단계는 Chromium 만) (960ms)
+  ok  45 [iphone-webkit] › e2e\app.spec.ts:2571:3 › D-056 휴식 끝 진동 › 설정: 휴식 끝 진동 켜기/끄기(이 기기만), [소리·진동 시험] 결과 글, 숨긴 스위치는 초점·스크롤에 영향 없음, 안내 카드 (3.2s)
+  ok  46 [iphone-webkit] › e2e\app.spec.ts:2615:3 › D-056 휴식 끝 진동 › 휴식: 첫 휴식에 안내 한 줄(닫기), 10초 전 짧게 1번·끝에 3번 진동(한 번만), 늦게 돌아오면 진동 안 함 (7.6s)
+  ok  47 [iphone-webkit] › e2e\app.spec.ts:2652:3 › D-056 휴식 끝 진동 › 안내 한 줄은 닫을 수 있음 (4.2s)
+  ok  48 [iphone-webkit] › e2e\app.spec.ts:2668:3 › D-056 검토: 진동 끔·소리 끔, 실험 알림 › 진동 끔이면 첫 휴식 안내는 벨소리 이야기, 소리 끔 + 진동 켬이면 10초 전 진동은 그대로 (6.7s)
+  ok  49 [iphone-webkit] › e2e\app.spec.ts:2690:3 › D-056 검토: 진동 끔·소리 끔, 실험 알림 › 실험 알림: 켜면 권한을 묻고, [알림 시험]·휴식 끝에 한 번 보냄, 늦게 돌아오면 안 보냄 (Chromium, 권한 허용) / WebKit 은 안내만 (941ms)
+  ok  50 [iphone-webkit] › e2e\app.spec.ts:2747:3 › D-057 회복 › 하체를 많이 하면 기록 탭 회복 중(남은 시간)·설명 창, 80시간 뒤 회복됨 · 홈 한 줄·다음 운동 안내 · 플랜 안내 (14.6s)
+  ok  51 [iphone-webkit] › e2e\app.spec.ts:2805:3 › D-057 회복 › 기록 없음: 회복 카드는 빈 안내, 홈 한 줄 없음 (771ms)
+  ok  52 [iphone-webkit] › e2e\app.spec.ts:2811:3 › D-057 회복 › 회복 팁: 체중이 없으면 안내, 기록하면 단백질 1.6 g/kg 계산 · 근거 논문: 인용순·최신순·주제·규칙 거르기·DOI 링크 (3.7s)
+  ok  53 [iphone-webkit] › e2e\app.spec.ts:2869:3 › D-058 애플워치 연동 › 기록이 없으면 운동 카드에 심박 줄 없음, 연동 화면은 빈 안내 (1.7s)
+  ok  54 [iphone-webkit] › e2e\app.spec.ts:2883:3 › D-058 애플워치 연동 › 받은 심박·에너지가 운동 시간과 겹치면 카드·상세에 평균·최고 심박·kcal, 회복 카드에 어젯밤 수면(짧으면 팁), 연동 화면 상태 (9.7s)
+  ok  55 [iphone-webkit] › e2e\app.spec.ts:2973:3 › D-058 애플워치 연동 › D-061 iOS 27 설명으로 만들기: 설명 복사(주소·키는 클립보드에만, 화면·DOM에 키 없음), 영어 전환, 복사 실패 안내 (3.4s)
+  ok  56 [iphone-webkit] › e2e\app.spec.ts:3014:3 › D-058 애플워치 연동 › D-064 자동 보내기: 홈 화면 앱이 아니면 기본 꺼짐, 켜기 저장, 운동 끝내기 뒤 단축어 실행 링크(NFD 이름) (9.2s)
+  ok  57 [iphone-webkit] › e2e\app.spec.ts:3057:3 › D-058 애플워치 연동 › D-059 서버가 저장한 운동별 요약(ws-운동ID)만 있고 원본 심박이 없어도(120일 정리 뒤) 카드·상세에 그대로 (6.1s)
+  ok  58 [iphone-webkit] › e2e\app.spec.ts:3106:3 › D-060 날짜·시각 표시 (고정 시각, 한국 시간) › 어제 한 운동: 홈·기록·상세·연동·앱 정보, 주가 바뀌면 날짜, 해가 바뀌면 연도 (8.5s)
+  ok  59 [iphone-webkit] › e2e\records.spec.ts:45:1 › 기본 주 보기: 7칸, 이번 주 이름, 비교 문장, 카드 4개 (1.1s)
+  ok  60 [iphone-webkit] › e2e\records.spec.ts:59:1 › 월·년으로 바꾸면 칸 수와 이름이 바뀐다 (1.5s)
+  ok  61 [iphone-webkit] › e2e\records.spec.ts:70:1 › 이전·다음 이동과 끝 비활성 (2.0s)
+  ok  62 [iphone-webkit] › e2e\records.spec.ts:88:1 › 볼륨 카드를 누르면 그래프 지표가 바뀐다 (1.2s)
+  ok  63 [iphone-webkit] › e2e\records.spec.ts:99:1 › 슬라이더: 화살표로 칸을 고르고 Esc 로 해제 (1.1s)
+  ok  64 [iphone-webkit] › e2e\records.spec.ts:121:1 › 고른 단위·지표는 새로 열어도 기억 (이동한 기간은 이번으로) (2.2s)
+  ok  65 [iphone-webkit] › e2e\records.spec.ts:132:1 › 390px 가로 스크롤 없음 (주·월·년) (2.6s)
+  ok  66 [iphone-webkit] › e2e\records.spec.ts:157:1 › 터치: 세로로 끌면 고르지 않고(스크롤), 가로로 끌면 훑고, 탭은 고름·다시 탭하면 해제, 취소는 원래대로 (1.4s)
+  ok  67 [iphone-webkit] › e2e\records.spec.ts:196:1 › 운동한 날 점·평균 범례·큰 숫자 쉼표·이동줄 (2.1s)
+  ok  68 [iphone-webkit] › e2e\records.spec.ts:207:1 › 지난 주 운동 안 한 날을 고르면 "운동 안 함", 일요일 라벨은 빨강·토요일은 파랑 (1.3s)
+  ok  69 [iphone-webkit] › e2e\records.spec.ts:219:1 › 운동한 칸이 하나뿐이면 평균 범례 없음, 기록 없는 기간은 한 줄 안내 (2.0s)
+  ok  70 [iphone-webkit] › e2e\records.spec.ts:230:1 › 볼륨 100만 kg 이상이면 카드가 톤으로, 한 줄에 들어감 (2.4s)
+  ok  71 [iphone-webkit] › e2e\records.spec.ts:250:1 › 좁은 화면(320px)에서도 한 문장 안의 값·라벨이 줄 중간에서 갈리지 않는다 (1.3s)
+  ok  72 [iphone-webkit] › e2e\records.spec.ts:262:1 › 자정을 넘기면 고른 칸만 비우고 보던 기간은 그대로 (N3·R5) (2.5s)
+  ok  73 [iphone-webkit] › e2e\records.spec.ts:282:1 › 주가 바뀌는 자정: 지난 기간을 보던 중이면 같은 날짜 범위를 계속 보여 준다 (R5) (2.8s)
+  ok  74 [iphone-webkit] › e2e\records.spec.ts:295:1 › 자정에 기간이 바뀌어도 이번 기간을 보던 중이면 새 이번 주·이번 달로 간다 (S1) (3.3s)
+  ok  75 [iphone-webkit] › e2e\records.spec.ts:312:1 › 오늘 운동 전이면 지난주는 어제 같은 요일까지만 견준다 (P2) (1.9s)
+  ok  76 [iphone-webkit] › e2e\records.spec.ts:329:1 › 320px: 네 카드의 큰 숫자 줄과 작은 줄이 모두 한 줄이고 안내 글이 보인다 (현재 주의 세 자리 시간·지난 주·지난 달의 16시간 28분) (Q4·R2) (2.8s)
+  ok  77 [iphone-webkit] › e2e\records.spec.ts:364:1 › 기간 첫날 운동 전(일요일 아침): 배지·증감 없이 "운동하면 비교해요", 홈도 증감 없음 (Q2) (1.6s)
+  ok  78 [iphone-webkit] › e2e\records.spec.ts:378:1 › 오늘 뒤 날짜로 적힌 기록은 기록 탭·홈 어디서도 이번 주에 안 센다 (Q3·P6) (1.7s)
+  ok  79 [iphone-webkit] › e2e\records.spec.ts:388:1 › 월말: 이번 달이 더 길면 지난달 전체와 견주고 모든 문구가 같은 말을 한다 (3/30, 운동 전·후) (T1·U4) (2.1s)
+  ok  80 [iphone-webkit] › e2e\records.spec.ts:408:1 › 320px 년 보기: 평균 안내의 값과 각주 날짜가 줄 중간에서 갈리지 않는다 (U1·U2) (3.5s)
+  ok  81 [iphone-webkit] › e2e\swap.spec.ts:63:1 › D-080 운동 중 ⇄: 비슷한 운동 구역 + 지난 기록 → 완료 2세트는 그대로, 남은 2세트만 새 운동 카드로 (4.7s)
+  ok  82 [iphone-webkit] › e2e\swap.spec.ts:112:1 › D-080 운동 중 ⇄ 묶음: 완료 세트가 있으면 새 운동은 묶음 다음에 따로, 알림 한 줄 (3.0s)
+  ok  83 [iphone-webkit] › e2e\swap.spec.ts:134:1 › D-080 루틴 카드 → 내용 보기 → ⇄ 바로 교체: 루틴에 저장, [되돌리기]로 복구 (7.9s)
+  ok  84 [iphone-webkit] › e2e\swap.spec.ts:187:1 › D-080 홈 다음 운동 카드: 기존 한 줄은 그대로, 아래에 운동 줄 전부 + ⇄ (1.4s)
+  ok  85 [iphone-webkit] › e2e\swap.spec.ts:206:1 › D-080 루틴 편집: 펼친 운동 이름 옆 ⇄ 로 ⋯ 메뉴 없이 교체 (세트 수 유지), 기존 ⋯ 메뉴 교체도 그대로 (2.1s)
+  ok  86 [iphone-webkit] › e2e\swap.spec.ts:223:1 › D-080 검토: 4세트 중 2세트 하고 ⇄ → 끝낼 때 "교체:" 로 묻고, [루틴 업데이트] 뒤 루틴은 제자리·세트 수 그대로 (5.2s)
+  ok  87 [iphone-webkit] › e2e\swap.spec.ts:257:1 › D-080 검토 2차: 긴 루틴 미리보기에서 7번째 ⇄ → 고른 뒤 바뀐 줄·[되돌리기]가 화면 안, 초점은 그 줄 ⇄, 되돌리면 옛 줄 ⇄ 와 수정 시각 그대로 (2.8s)
+  ok  88 [iphone-webkit] › e2e\swap.spec.ts:287:1 › D-080 검토 2차: 플랜 교체 → 새 운동 직접 추가 → 추가하면 그 자리에 반영, 추가 없이 닫으면 고르기 창이 다시 보임 (2.9s)
+  ok  89 [iphone-webkit] › e2e\swap.spec.ts:310:1 › D-080 검토 2차: 고르기 창 줄의 읽는 이름에 지난 기록, Tab 으로 비슷한 운동 줄에 닿고 Enter 로 고름 (1.2s)
+  ok  90 [iphone-webkit] › e2e\swap.spec.ts:346:1 › D-080 검토 3차: 플랜 [운동 추가] → 새 운동 직접 추가 → 추가하면 맨 뒤에 붙고 초점은 [운동 추가] 로 (2.4s)
+  ok  91 [iphone-webkit] › e2e\swap.spec.ts:363:1 › D-080 검토 3차: 플랜 [묶음에 운동 추가] → 새 운동 직접 추가 → 추가하면 그 묶음 안에 들어감 (2.9s)
+  ok  92 [iphone-webkit] › e2e\swap.spec.ts:378:1 › D-080 검토 3차: 플랜 교체 → 검색어 입력 → 새 운동 직접 추가 → 닫으면 같은 검색어, 고르기 창을 닫으면 초점은 [교체] 로 (2.7s)
+  ok  93 [iphone-webkit] › e2e\swap.spec.ts:398:1 › D-080 검토 3차: 홈 ⇄ → 고르기 → [되돌리기] 로 원래 운동, 초점은 그 ⇄; 고르지 않고 닫으면 ⇄ 초점·스크롤 그대로 (2.0s)
+  ok  94 [iphone-webkit] › e2e\swap.spec.ts:423:1 › D-080 검토 4차: 미리보기에서 한 번 교체한 뒤 닫으면 초점은 그 루틴 카드의 내용 보기 버튼 (1.3s)
+  ok  95 [iphone-webkit] › e2e\swap.spec.ts:446:1 › D-080 5차: 미리보기 ⇄ → 고르기 → 다시 뜬 창에서 [시작]은 초점을 받지 않고 바뀐 줄 ⇄ 로 곧장 (1.6s)
+  ok  96 [iphone-webkit] › e2e\swap.spec.ts:471:1 › D-080 5차: 알림 시간 안에 두 번 바꾸면 "2개 바꿨어요", [되돌리기] 한 번에 처음 모습(수정 시각까지)으로, 초점은 첫 줄 ⇄ (1.9s)
+  ok  97 [iphone-webkit] › e2e\swap.spec.ts:497:1 › D-080 5차: 알림에 초점이 있는 동안 5초 타이머는 멈추고, 벗어나면 새 5초 (WCAG 2.2.1) (12.7s)
+  ok  98 [iphone-webkit] › e2e\swap.spec.ts:517:1 › D-080 5차: 홈에서 루틴 숨기기 알림과 교체 알림이 함께 뜨면 겹치지 않고 세로로 쌓임 (2.1s)
+  ok  99 [iphone-webkit] › e2e\swap.spec.ts:541:1 › D-080 6차: 교체 창을 느리게 골라도(6초) 되돌리기 창이 이어져 "2개 바꿨어요", [되돌리기] 한 번에 둘 다 복구 (7.9s)
+  ok 100 [iphone-webkit] › e2e\swap.spec.ts:562:1 › D-080 6차: 교체 창이 떠 있는 동안 초점은 교체 창 안, 미리보기가 다시 뜨면 창 안 ⇄ (배경 카드로 가지 않음) (1.7s)
+  ok 101 [iphone-webkit] › e2e\swap.spec.ts:594:1 › D-080 6차: 같은 줄을 A → B → A 로 되돌려 놓으면 "원래대로예요", [되돌리기] 없음 (2.5s)
+  ok 102 [iphone-webkit] › e2e\swap.spec.ts:613:1 › D-080 7차: 시간 운동(플랭크 60초) → 횟수 운동 → 플랭크로 돌아오면 저장된 루틴이 처음과 똑같음 (60초·수정 시각) (1.7s)
+  ok 103 [iphone-webkit] › e2e\usage.spec.ts:52:1 › D-065 "운동 끝났나요?" 띠: 휴식 중엔 안 뜸, 30분 지나면 뜸, 아직 하는 중이면 다시 안 뜸 · 끝내기(마지막 세트 + 3분) (2.0s)
+  ok 104 [iphone-webkit] › e2e\usage.spec.ts:81:1 › D-065 끝내기: 마지막 세트 뒤 15분 넘으면 "마지막 세트 + 3분 / 지금" 고르기 (2.3s)
+  ok 105 [iphone-webkit] › e2e\usage.spec.ts:100:1 › D-065·D-070·D-072 기록 정리 카드: 목록 → 확인 → 끝난 시각·긴 기록·빈 기록·웜업 고침, 고르지 않은 것은 다시 안 물음 (3.6s)
+  ok 106 [iphone-webkit] › e2e\usage.spec.ts:158:1 › D-072 빈 운동: 새로 시작하면 "버리고 새로 시작", 끝내기는 "기록하지 않고 버리기"가 기본, 기록 남기기도 가능 (5.2s)
+  ok 107 [iphone-webkit] › e2e\usage.spec.ts:192:1 › D-070 웜업 미리 표시: 지난번 가벼운 첫 세트(50% 이하·15회 이상)는 W로, [웜업 W]로 끄고 켜기, 뒤 세트 무게는 그대로 (2.5s)
+  ok 108 [iphone-webkit] › e2e\usage.spec.ts:219:1 › D-066 묶음: 큰 ✓ 한 번에 라운드(A1+B1) 완료·라운드 휴식 한 번, 라운드 묶음 표시, 줄 ✓ 되돌리기 (4.2s)
+  ok 109 [iphone-webkit] › e2e\usage.spec.ts:255:1 › B1 묶음: 현재 줄의 ✓ 도 그 세트만 (줄마다 체크는 그대로), 라운드 한 번에는 아래 큰 ✓ 만 (1.9s)
+  ok 110 [iphone-webkit] › e2e\usage2.spec.ts:66:1 › D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 보기(목표 바꾸기) → 적용하면 75분 안 (2.2s)
+  ok 111 [iphone-webkit] › e2e\usage2.spec.ts:120:1 › 맞추기 창 PC 1280×860: 높이 제한, [취소]·[적용]이 창 아래에 붙어 보임 (2.7s)
+  ok 112 [iphone-webkit] › e2e\usage2.spec.ts:141:1 › D-067 기록이 3회보다 적으면 내 속도 줄은 안 보임 (781ms)
+  ok 113 [iphone-webkit] › e2e\usage2.spec.ts:152:1 › D-067 같은 이름 루틴: 오래된 것 [숨기기](묻지 않고 바로 숨김·[되돌리기]) · [이름 바꾸기] (1.8s)
+  ok 114 [iphone-webkit] › e2e\usage2.spec.ts:194:3 › D-068 끝낼 때 루틴 반영: 운동을 더했으면 묻기 → [루틴 업데이트] (2.8s)
+  ok 115 [iphone-webkit] › e2e\usage2.spec.ts:194:3 › D-068 끝낼 때 루틴 반영: 운동을 더했으면 묻기 → [원래대로] (2.7s)
+  ok 116 [iphone-webkit] › e2e\usage2.spec.ts:194:3 › D-068 끝낼 때 루틴 반영: 운동을 더했으면 묻기 → [새 루틴으로 저장] (2.6s)
+  ok 117 [iphone-webkit] › e2e\usage2.spec.ts:228:1 › P4 운동 중 루틴이 바뀌었으면 [루틴 업데이트] 없이 경고, 기본은 원래대로 → [새 루틴으로 저장] (2.7s)
+  ok 118 [iphone-webkit] › e2e\usage2.spec.ts:246:1 › D-068 무게·횟수만 바뀌었으면 묻지 않음 (3.1s)
+  ok 119 [iphone-webkit] › e2e\usage2.spec.ts:260:1 › 묶음 카드: 운동 글자(A·B)와 등급 배지를 구분 ("등급 S" 이름 뒤) (1.3s)
+  ok 120 [iphone-webkit] › e2e\usage2.spec.ts:279:1 › D-078 기록 탭에서 운동 기록 직접 작성 (진입, 종목 추가, 세트 입력, 저장 및 상세 확인) (2.0s)
+  ok 121 [iphone-webkit] › e2e\usage2.spec.ts:316:1 › D-078 빈 기록 상태에서 직접 작성 진입 및 취소 확인 (1.5s)
+{"code_hash":"66f96776afd55c1d","primary_per_screen":1,"touch_under_44":0,"hscroll_screens":0,"line_boxes":0,"focus_ring":true,"validation_on_blur":true,"punct_breaks":24}
+  ok 122 [iphone-webkit] › e2e\uxui.spec.ts:144:1 › D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실선 0·초점 링·blur 뒤 검증 (48.9s)
+  ok 123 [iphone-webkit] › e2e\uxui.spec.ts:301:1 › N9 기록 정리: 아무것도 안 고르고 누르면 알림 + 첫 체크 상자로 초점 (1.6s)
+  ok 124 [iphone-webkit] › e2e\uxui.spec.ts:317:1 › N9 루틴 편집: 운동 없이 [저장하고 시작] → 알림 + [+ 운동 추가]로 초점 (1.2s)
+  ok 125 [iphone-webkit] › e2e\uxui.spec.ts:327:1 › N9 루틴 이름 바꾸기: 빈 이름 → 알림 + 입력 칸으로 초점 (1.2s)
+  ok 126 [iphone-webkit] › e2e\uxui.spec.ts:342:1 › N9 개선 메모: 빈 내용으로 저장 → 알림 + 글 칸으로 초점 (1.0s)
+  ok 127 [iphone-webkit] › e2e\uxui.spec.ts:350:1 › N9 자동 보내기: 빈 설정으로 [저장하고 연결 확인] → 알림 + 입력 칸으로 초점 (1.5s)
+  ok 128 [iphone-webkit] › e2e\uxui.spec.ts:359:1 › A05 필터 결과 0건: 진짜 0건과 구분해 [필터 초기화] → 목록이 돌아옴 (1.0s)
+  ok 129 [iphone-webkit] › e2e\uxui.spec.ts:372:1 › A05 루틴 검색 0건: [검색어 지우기] → 목록이 돌아오고 초점은 검색 칸 (1.0s)
+  ok 130 [iphone-webkit] › e2e\uxui.spec.ts:392:1 › M1·L1·L2 루틴 편집: 끝에서 ↑↓ 는 꺼짐·펼침 유지 / 이동·삭제·묶기 뒤 펼친 번호 / ⋯ 메뉴 교체·삭제 / 초점 (4.9s)
+  ok 131 [iphone-webkit] › e2e\uxui.spec.ts:465:1 › M2·M3·L3 바로 가기·설정 묶음 기억·멈춤 경고·기록 탭 키보드 (4.3s)
+  x  132 [iphone-chromium] › e2e\app.spec.ts:124:1 › 핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3개 → 종료 (탭 수 12 이하) (0ms)
+  -  133 [iphone-chromium] › e2e\app.spec.ts:210:1 › 운동 끝내기 (D-038): 앱 안 확인 창(기본 확인 창 0번), 취소하면 계속, 끝내지 못하면 이유 표시·진단 기록, 새로 시작 확인
+  -  134 [iphone-chromium] › e2e\app.spec.ts:304:1 › 운동 종목: 초성 검색, 장비·등급 필터, 상세의 영상 링크, 즐겨찾기
+  -  135 [iphone-chromium] › e2e\app.spec.ts:329:1 › D-041 플랜 볼륨: 하체 75분 B- → 70분 이상, 가슴만 75분 → 짧은 이유·삼두 더해서 다시 만들기, 종목 탭 주/보조 근육·근육 필터
+  -  136 [iphone-chromium] › e2e\app.spec.ts:370:1 › 개선 메모 (D-042~D-045): 인체 그림으로 부위 고르기·우선순위 선택 상자(기본 높음), 세트 8 넘게, 운동 추가 부위 기억·들어 있는 부위, 음악과 같이 듣기 설정
+  -  137 [iphone-chromium] › e2e\app.spec.ts:513:1 › 플랜에서 다음 운동과 묶기 (D-046): 같은 부위 컴파운드 세트, 다른 부위 슈퍼세트, 예상 시간 줄어듦, 풀기, 저장하고 시작하면 운동 화면도 묶음
+  -  138 [iphone-chromium] › e2e\app.spec.ts:556:1 › 플랜 일괄·묶음 고치기 (D-051): 모든 운동 세트·횟수, 묶음 휴식·전환·세트, 묶음에 운동 추가, 저장하고 시작
+  -  139 [iphone-chromium] › e2e\app.spec.ts:641:1 › 내 루틴 (D-048): 홈은 최근 한 순 3개 + 모두 보기, 카드에 부위·마지막 날짜·횟수, 목록에서만 숨기기 ↔ 다시 보이기, 완전 삭제, 운동 탭에서 바로 고르기
+  -  140 [iphone-chromium] › e2e\app.spec.ts:730:1 › 직접 추가한 운동을 플랜에서 최고 등급 S(D-074)로 반영 및 교체 쓰기, 설정의 기본 휴식
+  -  141 [iphone-chromium] › e2e\app.spec.ts:757:1 › 루틴 직접 만들기·편집: 운동 추가, 목표 횟수, 슈퍼세트로 묶기, 저장
+  -  142 [iphone-chromium] › e2e\app.spec.ts:777:1 › 루틴 편집 (D-052): 부위 눌러 추가, 모든 운동·이 묶음 세트·횟수
+  -  143 [iphone-chromium] › e2e\app.spec.ts:855:1 › 시간이 너무 짧으면 이유를 보여줌, 부위 없이 만들 수 없음
+  -  144 [iphone-chromium] › e2e\app.spec.ts:867:1 › 설정의 기본 휴식이 루틴·운동까지 이어짐, 입력 직후 −/+
+  -  145 [iphone-chromium] › e2e\app.spec.ts:899:3 › D-081 시각 고정 (한국 시간) › P4 기록·도구·백업: 운동 후 달력·상세·추이, 체중, 원판·1RM, 백업 → 초기화 → 복원 100% 일치
+  -  146 [iphone-chromium] › e2e\app.spec.ts:1053:1 › P5a 진단 → PC로 보내기 → sync:check 왕복, 비밀 값 없음, 끄기
+  -  147 [iphone-chromium] › e2e\app.spec.ts:1092:1 › 서비스 워커 없이 (Playwright WebKit은 서비스 워커가 있으면 다른 주소 요청을 가짜 서버로 못 돌림) › P5a 자동 보내기(T2): 연결 확인 → 운동 끝나면 보냄 ✓, 실패하면 다음에 열 때 다시, 키는 어디에도 안 보임
+  -  148 [iphone-chromium] › e2e\app.spec.ts:1206:1 › S2a 실제 브라우저에서 예전 저장소(v3) → v4 옮김: 기록 그대로, 지우기는 지움 표시
+  -  149 [iphone-chromium] › e2e\app.spec.ts:1259:1 › S2b 양방향 동기화 (두 브라우저 + 가짜 서버, 실제 합치기 코드) › PC에서 만든 루틴 → 폰, 폰 운동 진행 중 → PC 읽기 전용, 끝낸 운동 → PC 기록, 지움 전파
+  -  150 [iphone-chromium] › e2e\app.spec.ts:1357:1 › S1 PC 넓은 화면: 왼쪽 메뉴, 플랜 2단, Enter·Ctrl+Enter, 폰 화면으로 보기
+  -  151 [iphone-chromium] › e2e\app.spec.ts:1416:1 › S3 개선 메모: 운동 중 어디서든 적기 → 화면·운동이 붙음 → 설정에서 상태 보기·지우기
+  -  152 [iphone-chromium] › e2e\app.spec.ts:1445:1 › 최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무게·시간·세트 → 저장 → 상세·통계 반영, 홈에서 삭제
+  -  153 [iphone-chromium] › e2e\app.spec.ts:1529:1 › 수정 화면: 입력 중 세트를 지워도 값이 옆 세트로 가지 않음, 시작을 옮겨도 운동 시간 그대로, 편집 중 메뉴 숨김
+  -  154 [iphone-chromium] › e2e\app.spec.ts:1556:1 › 수정 화면: 취소하면 기록 그대로
+  -  155 [iphone-chromium] › e2e\app.spec.ts:1574:1 › 앱 안 확인 창 (D-039): 삭제는 취소·Esc·닫기·화면 이동이면 그대로 / 동기화 중 초기화·불러오기 두 갈래: 닫으면 아무것도 안 바꿈, "이 기기만"은 동기화 끄고 진행
+  -  156 [iphone-chromium] › e2e\app.spec.ts:1674:1 › 기록 고치기 저장 (D-039): 고치는 동안 다른 기기에서 바뀌면 묻고, 묻는 동안 또 바뀌면 다시 물음 / 지워졌으면 되살려 저장
+  -  157 [iphone-chromium] › e2e\app.spec.ts:1731:1 › 플랜 바로 고치기 (D-036): 세트·횟수 따로 −/+, 순서 바꾸기, 운동 추가 → 저장하고 시작, 내 운동 DB 정보 버튼
+  -  158 [iphone-chromium] › e2e\app.spec.ts:1818:1 › 플랜 바로 고치기 (D-036): 시간 운동 초 −/+ 가 예상 시간에 반영, 잠금 다시 생성해도 바꾼 횟수·다른 부위 추가 운동 유지
+  -  159 [iphone-chromium] › e2e\app.spec.ts:1878:1 › 끌어서 순서 바꾸기 (D-037): 플랜 → 운동 중(끝낸 세트 유지, 현재 세트 따라감, 키보드) → 루틴 편집
+  -  160 [iphone-chromium] › e2e\app.spec.ts:1957:1 › 끌어서 순서 바꾸기 (D-037) PC 2단: 오른쪽 카드를 왼쪽으로, 놓을 칸 테두리, 끄는 도중 카드가 사라져도 멈추지 않음
+  -  161 [iphone-chromium] › e2e\app.spec.ts:1996:3 › D-081 시각 고정 (한국 시간) › 기록 탭 빈 이번 주 (D-054): 지난주에만 운동이 있으면 안내·지난주 요약·"운동 시작" → 운동 화면, 타일 증감 한 줄
+  -  162 [iphone-chromium] › e2e\app.spec.ts:2026:1 › D-055 탭 5개·위 원형 버튼·빈 홈, 새로 바뀐 점(예전 버전에서 올라왔을 때)·보러 가기·새 기능 점, 앱 정보, version.json
+  -  163 [iphone-chromium] › e2e\app.spec.ts:2140:1 › D-055 0.8.x 에서 올라옴: 마지막 본 버전 기록이 없고 루틴이 있으면 "새로 바뀐 점"(이번 버전만)을 보여 줌
+  -  164 [iphone-chromium] › e2e\app.spec.ts:2157:3 › D-055 실제 업데이트 경로 (흉내 이벤트 없이 서버 version.json 비교) › 서버가 더 새 버전(9.9.9)이면 배너 + 앱 정보 "새 버전 9.9.9가 있어요", 적용은 한 번만 새로 고침(무한 새로 고침 없음)
+  -  165 [iphone-chromium] › e2e\app.spec.ts:2189:1 › D-055 sw.js 는 빌드 이름(버전 포함)을 담음 (배포마다 바뀌어 새 서비스 워커가 설치됨)
+  -  166 [iphone-chromium] › e2e\app.spec.ts:2196:1 › D-055 새 버전 배너: 버전·바뀐 점 한 줄·[지금 적용][나중에], 파일을 못 읽으면 "새 버전이 있어요", 운동 중엔 작게·확인 후 적용
+  -  167 [iphone-chromium] › e2e\app.spec.ts:2226:1 › D-055 홈: 이번 주·다음 운동 [▶ 시작], 루틴 ⋯ 창(편집·지우기, Esc·초점 되돌림), 최근 운동은 기록 탭과 같은 카드
+  -  168 [iphone-chromium] › e2e\app.spec.ts:2286:1 › D-055 검토 R2: 서비스 워커를 켠 채 새 워커가 대기할 때, 서버 version.json 이 같은 버전이면 배너·새로 고침 없이 조용히 교체, 더 새로우면 배너 (배너 단계는 Chromium 만)
+  -  169 [iphone-chromium] › e2e\app.spec.ts:2324:1 › D-055 2단계 운동 화면: 숫자 3개·세트 표(지난번)·완료 줄 초록·휴식 알약(고리·±15)·기록 갱신 배지·⋯ 메뉴·끝낼 때 갱신 알림
+  -  170 [iphone-chromium] › e2e\app.spec.ts:2404:1 › D-055 3단계 플랜 단계 카드(1 부위 → 2 시간·등급 → 3 결과 숫자)·종목 줄 배지·상세 숫자
+  -  171 [iphone-chromium] › e2e\app.spec.ts:2439:1 › D-055 3단계 설정 묶음 카드: 운동·소리·화면·동기화·백업·데이터·앱 정보, 컨트롤 그대로
+  -  172 [iphone-chromium] › e2e\app.spec.ts:2453:1 › D-055 3단계 기록 탭: 부위 막대·몸 그림을 누르면 그 주 그 부위 운동 창, 10~20 참고 띠
+  -  173 [iphone-chromium] › e2e\app.spec.ts:2479:1 › D-055 3단계 운동 화면: 시간 운동 지난번(초), 고친 지난 기록 기준 기록 갱신, 번호 펼침 표시·[끝내기] 보통 버튼
+  -  174 [iphone-chromium] › e2e\app.spec.ts:2524:1 › 0.9.3 성능 관문: 화면을 나눠 받아도 한 번 연 뒤에는 인터넷 없이 안 열어 본 화면(종목·기록·플랜)까지 열림 (서비스 워커가 모든 묶음을 미리 담음, 오프라인 단계는 Chromium 만)
+  -  175 [iphone-chromium] › e2e\app.spec.ts:2551:3 › 0.9.3 검토: 나눠 받는 화면을 못 받으면 › "새 버전이 나왔거나 인터넷이 끊겼을 수 있어요" + [다시 시도], 다시 받을 수 있게 되면 다시 시도로 열림 (다시 시도 단계는 Chromium 만)
+  -  176 [iphone-chromium] › e2e\app.spec.ts:2571:3 › D-056 휴식 끝 진동 › 설정: 휴식 끝 진동 켜기/끄기(이 기기만), [소리·진동 시험] 결과 글, 숨긴 스위치는 초점·스크롤에 영향 없음, 안내 카드
+  -  177 [iphone-chromium] › e2e\app.spec.ts:2615:3 › D-056 휴식 끝 진동 › 휴식: 첫 휴식에 안내 한 줄(닫기), 10초 전 짧게 1번·끝에 3번 진동(한 번만), 늦게 돌아오면 진동 안 함
+  -  178 [iphone-chromium] › e2e\app.spec.ts:2652:3 › D-056 휴식 끝 진동 › 안내 한 줄은 닫을 수 있음
+  -  179 [iphone-chromium] › e2e\app.spec.ts:2668:3 › D-056 검토: 진동 끔·소리 끔, 실험 알림 › 진동 끔이면 첫 휴식 안내는 벨소리 이야기, 소리 끔 + 진동 켬이면 10초 전 진동은 그대로
+  -  180 [iphone-chromium] › e2e\app.spec.ts:2690:3 › D-056 검토: 진동 끔·소리 끔, 실험 알림 › 실험 알림: 켜면 권한을 묻고, [알림 시험]·휴식 끝에 한 번 보냄, 늦게 돌아오면 안 보냄 (Chromium, 권한 허용) / WebKit 은 안내만
+  -  181 [iphone-chromium] › e2e\app.spec.ts:2747:3 › D-057 회복 › 하체를 많이 하면 기록 탭 회복 중(남은 시간)·설명 창, 80시간 뒤 회복됨 · 홈 한 줄·다음 운동 안내 · 플랜 안내
+  -  182 [iphone-chromium] › e2e\app.spec.ts:2805:3 › D-057 회복 › 기록 없음: 회복 카드는 빈 안내, 홈 한 줄 없음
+  -  183 [iphone-chromium] › e2e\app.spec.ts:2811:3 › D-057 회복 › 회복 팁: 체중이 없으면 안내, 기록하면 단백질 1.6 g/kg 계산 · 근거 논문: 인용순·최신순·주제·규칙 거르기·DOI 링크
+  -  184 [iphone-chromium] › e2e\app.spec.ts:2869:3 › D-058 애플워치 연동 › 기록이 없으면 운동 카드에 심박 줄 없음, 연동 화면은 빈 안내
+  -  185 [iphone-chromium] › e2e\app.spec.ts:2883:3 › D-058 애플워치 연동 › 받은 심박·에너지가 운동 시간과 겹치면 카드·상세에 평균·최고 심박·kcal, 회복 카드에 어젯밤 수면(짧으면 팁), 연동 화면 상태
+  -  186 [iphone-chromium] › e2e\app.spec.ts:2973:3 › D-058 애플워치 연동 › D-061 iOS 27 설명으로 만들기: 설명 복사(주소·키는 클립보드에만, 화면·DOM에 키 없음), 영어 전환, 복사 실패 안내
+  -  187 [iphone-chromium] › e2e\app.spec.ts:3014:3 › D-058 애플워치 연동 › D-064 자동 보내기: 홈 화면 앱이 아니면 기본 꺼짐, 켜기 저장, 운동 끝내기 뒤 단축어 실행 링크(NFD 이름)
+  -  188 [iphone-chromium] › e2e\app.spec.ts:3057:3 › D-058 애플워치 연동 › D-059 서버가 저장한 운동별 요약(ws-운동ID)만 있고 원본 심박이 없어도(120일 정리 뒤) 카드·상세에 그대로
+  -  189 [iphone-chromium] › e2e\app.spec.ts:3106:3 › D-060 날짜·시각 표시 (고정 시각, 한국 시간) › 어제 한 운동: 홈·기록·상세·연동·앱 정보, 주가 바뀌면 날짜, 해가 바뀌면 연도
+  x  190 [iphone-chromium] › e2e\records.spec.ts:45:1 › 기본 주 보기: 7칸, 이번 주 이름, 비교 문장, 카드 4개 (0ms)
+  -  191 [iphone-chromium] › e2e\records.spec.ts:59:1 › 월·년으로 바꾸면 칸 수와 이름이 바뀐다
+  -  192 [iphone-chromium] › e2e\records.spec.ts:70:1 › 이전·다음 이동과 끝 비활성
+  -  193 [iphone-chromium] › e2e\records.spec.ts:88:1 › 볼륨 카드를 누르면 그래프 지표가 바뀐다
+  -  194 [iphone-chromium] › e2e\records.spec.ts:99:1 › 슬라이더: 화살표로 칸을 고르고 Esc 로 해제
+  -  195 [iphone-chromium] › e2e\records.spec.ts:121:1 › 고른 단위·지표는 새로 열어도 기억 (이동한 기간은 이번으로)
+  -  196 [iphone-chromium] › e2e\records.spec.ts:132:1 › 390px 가로 스크롤 없음 (주·월·년)
+  -  197 [iphone-chromium] › e2e\records.spec.ts:157:1 › 터치: 세로로 끌면 고르지 않고(스크롤), 가로로 끌면 훑고, 탭은 고름·다시 탭하면 해제, 취소는 원래대로
+  -  198 [iphone-chromium] › e2e\records.spec.ts:196:1 › 운동한 날 점·평균 범례·큰 숫자 쉼표·이동줄
+  -  199 [iphone-chromium] › e2e\records.spec.ts:207:1 › 지난 주 운동 안 한 날을 고르면 "운동 안 함", 일요일 라벨은 빨강·토요일은 파랑
+  -  200 [iphone-chromium] › e2e\records.spec.ts:219:1 › 운동한 칸이 하나뿐이면 평균 범례 없음, 기록 없는 기간은 한 줄 안내
+  -  201 [iphone-chromium] › e2e\records.spec.ts:230:1 › 볼륨 100만 kg 이상이면 카드가 톤으로, 한 줄에 들어감
+  -  202 [iphone-chromium] › e2e\records.spec.ts:250:1 › 좁은 화면(320px)에서도 한 문장 안의 값·라벨이 줄 중간에서 갈리지 않는다
+  -  203 [iphone-chromium] › e2e\records.spec.ts:262:1 › 자정을 넘기면 고른 칸만 비우고 보던 기간은 그대로 (N3·R5)
+  -  204 [iphone-chromium] › e2e\records.spec.ts:282:1 › 주가 바뀌는 자정: 지난 기간을 보던 중이면 같은 날짜 범위를 계속 보여 준다 (R5)
+  -  205 [iphone-chromium] › e2e\records.spec.ts:295:1 › 자정에 기간이 바뀌어도 이번 기간을 보던 중이면 새 이번 주·이번 달로 간다 (S1)
+  -  206 [iphone-chromium] › e2e\records.spec.ts:312:1 › 오늘 운동 전이면 지난주는 어제 같은 요일까지만 견준다 (P2)
+  -  207 [iphone-chromium] › e2e\records.spec.ts:329:1 › 320px: 네 카드의 큰 숫자 줄과 작은 줄이 모두 한 줄이고 안내 글이 보인다 (현재 주의 세 자리 시간·지난 주·지난 달의 16시간 28분) (Q4·R2)
+  -  208 [iphone-chromium] › e2e\records.spec.ts:364:1 › 기간 첫날 운동 전(일요일 아침): 배지·증감 없이 "운동하면 비교해요", 홈도 증감 없음 (Q2)
+  -  209 [iphone-chromium] › e2e\records.spec.ts:378:1 › 오늘 뒤 날짜로 적힌 기록은 기록 탭·홈 어디서도 이번 주에 안 센다 (Q3·P6)
+  -  210 [iphone-chromium] › e2e\records.spec.ts:388:1 › 월말: 이번 달이 더 길면 지난달 전체와 견주고 모든 문구가 같은 말을 한다 (3/30, 운동 전·후) (T1·U4)
+  -  211 [iphone-chromium] › e2e\records.spec.ts:408:1 › 320px 년 보기: 평균 안내의 값과 각주 날짜가 줄 중간에서 갈리지 않는다 (U1·U2)
+  x  212 [iphone-chromium] › e2e\swap.spec.ts:63:1 › D-080 운동 중 ⇄: 비슷한 운동 구역 + 지난 기록 → 완료 2세트는 그대로, 남은 2세트만 새 운동 카드로 (0ms)
+  -  213 [iphone-chromium] › e2e\swap.spec.ts:112:1 › D-080 운동 중 ⇄ 묶음: 완료 세트가 있으면 새 운동은 묶음 다음에 따로, 알림 한 줄
+  -  214 [iphone-chromium] › e2e\swap.spec.ts:134:1 › D-080 루틴 카드 → 내용 보기 → ⇄ 바로 교체: 루틴에 저장, [되돌리기]로 복구
+  -  215 [iphone-chromium] › e2e\swap.spec.ts:187:1 › D-080 홈 다음 운동 카드: 기존 한 줄은 그대로, 아래에 운동 줄 전부 + ⇄
+  -  216 [iphone-chromium] › e2e\swap.spec.ts:206:1 › D-080 루틴 편집: 펼친 운동 이름 옆 ⇄ 로 ⋯ 메뉴 없이 교체 (세트 수 유지), 기존 ⋯ 메뉴 교체도 그대로
+  -  217 [iphone-chromium] › e2e\swap.spec.ts:223:1 › D-080 검토: 4세트 중 2세트 하고 ⇄ → 끝낼 때 "교체:" 로 묻고, [루틴 업데이트] 뒤 루틴은 제자리·세트 수 그대로
+  -  218 [iphone-chromium] › e2e\swap.spec.ts:257:1 › D-080 검토 2차: 긴 루틴 미리보기에서 7번째 ⇄ → 고른 뒤 바뀐 줄·[되돌리기]가 화면 안, 초점은 그 줄 ⇄, 되돌리면 옛 줄 ⇄ 와 수정 시각 그대로
+  -  219 [iphone-chromium] › e2e\swap.spec.ts:287:1 › D-080 검토 2차: 플랜 교체 → 새 운동 직접 추가 → 추가하면 그 자리에 반영, 추가 없이 닫으면 고르기 창이 다시 보임
+  -  220 [iphone-chromium] › e2e\swap.spec.ts:310:1 › D-080 검토 2차: 고르기 창 줄의 읽는 이름에 지난 기록, Tab 으로 비슷한 운동 줄에 닿고 Enter 로 고름
+  -  221 [iphone-chromium] › e2e\swap.spec.ts:346:1 › D-080 검토 3차: 플랜 [운동 추가] → 새 운동 직접 추가 → 추가하면 맨 뒤에 붙고 초점은 [운동 추가] 로
+  -  222 [iphone-chromium] › e2e\swap.spec.ts:363:1 › D-080 검토 3차: 플랜 [묶음에 운동 추가] → 새 운동 직접 추가 → 추가하면 그 묶음 안에 들어감
+  -  223 [iphone-chromium] › e2e\swap.spec.ts:378:1 › D-080 검토 3차: 플랜 교체 → 검색어 입력 → 새 운동 직접 추가 → 닫으면 같은 검색어, 고르기 창을 닫으면 초점은 [교체] 로
+  -  224 [iphone-chromium] › e2e\swap.spec.ts:398:1 › D-080 검토 3차: 홈 ⇄ → 고르기 → [되돌리기] 로 원래 운동, 초점은 그 ⇄; 고르지 않고 닫으면 ⇄ 초점·스크롤 그대로
+  -  225 [iphone-chromium] › e2e\swap.spec.ts:423:1 › D-080 검토 4차: 미리보기에서 한 번 교체한 뒤 닫으면 초점은 그 루틴 카드의 내용 보기 버튼
+  -  226 [iphone-chromium] › e2e\swap.spec.ts:446:1 › D-080 5차: 미리보기 ⇄ → 고르기 → 다시 뜬 창에서 [시작]은 초점을 받지 않고 바뀐 줄 ⇄ 로 곧장
+  -  227 [iphone-chromium] › e2e\swap.spec.ts:471:1 › D-080 5차: 알림 시간 안에 두 번 바꾸면 "2개 바꿨어요", [되돌리기] 한 번에 처음 모습(수정 시각까지)으로, 초점은 첫 줄 ⇄
+  -  228 [iphone-chromium] › e2e\swap.spec.ts:497:1 › D-080 5차: 알림에 초점이 있는 동안 5초 타이머는 멈추고, 벗어나면 새 5초 (WCAG 2.2.1)
+  -  229 [iphone-chromium] › e2e\swap.spec.ts:517:1 › D-080 5차: 홈에서 루틴 숨기기 알림과 교체 알림이 함께 뜨면 겹치지 않고 세로로 쌓임
+  -  230 [iphone-chromium] › e2e\swap.spec.ts:541:1 › D-080 6차: 교체 창을 느리게 골라도(6초) 되돌리기 창이 이어져 "2개 바꿨어요", [되돌리기] 한 번에 둘 다 복구
+  -  231 [iphone-chromium] › e2e\swap.spec.ts:562:1 › D-080 6차: 교체 창이 떠 있는 동안 초점은 교체 창 안, 미리보기가 다시 뜨면 창 안 ⇄ (배경 카드로 가지 않음)
+  -  232 [iphone-chromium] › e2e\swap.spec.ts:594:1 › D-080 6차: 같은 줄을 A → B → A 로 되돌려 놓으면 "원래대로예요", [되돌리기] 없음
+  -  233 [iphone-chromium] › e2e\swap.spec.ts:613:1 › D-080 7차: 시간 운동(플랭크 60초) → 횟수 운동 → 플랭크로 돌아오면 저장된 루틴이 처음과 똑같음 (60초·수정 시각)
+  x  234 [iphone-chromium] › e2e\usage.spec.ts:52:1 › D-065 "운동 끝났나요?" 띠: 휴식 중엔 안 뜸, 30분 지나면 뜸, 아직 하는 중이면 다시 안 뜸 · 끝내기(마지막 세트 + 3분) (0ms)
+  -  235 [iphone-chromium] › e2e\usage.spec.ts:81:1 › D-065 끝내기: 마지막 세트 뒤 15분 넘으면 "마지막 세트 + 3분 / 지금" 고르기
+  -  236 [iphone-chromium] › e2e\usage.spec.ts:100:1 › D-065·D-070·D-072 기록 정리 카드: 목록 → 확인 → 끝난 시각·긴 기록·빈 기록·웜업 고침, 고르지 않은 것은 다시 안 물음
+  -  237 [iphone-chromium] › e2e\usage.spec.ts:158:1 › D-072 빈 운동: 새로 시작하면 "버리고 새로 시작", 끝내기는 "기록하지 않고 버리기"가 기본, 기록 남기기도 가능
+  -  238 [iphone-chromium] › e2e\usage.spec.ts:192:1 › D-070 웜업 미리 표시: 지난번 가벼운 첫 세트(50% 이하·15회 이상)는 W로, [웜업 W]로 끄고 켜기, 뒤 세트 무게는 그대로
+  -  239 [iphone-chromium] › e2e\usage.spec.ts:219:1 › D-066 묶음: 큰 ✓ 한 번에 라운드(A1+B1) 완료·라운드 휴식 한 번, 라운드 묶음 표시, 줄 ✓ 되돌리기
+  -  240 [iphone-chromium] › e2e\usage.spec.ts:255:1 › B1 묶음: 현재 줄의 ✓ 도 그 세트만 (줄마다 체크는 그대로), 라운드 한 번에는 아래 큰 ✓ 만
+  x  241 [iphone-chromium] › e2e\usage2.spec.ts:66:1 › D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 보기(목표 바꾸기) → 적용하면 75분 안 (0ms)
+  -  242 [iphone-chromium] › e2e\usage2.spec.ts:120:1 › 맞추기 창 PC 1280×860: 높이 제한, [취소]·[적용]이 창 아래에 붙어 보임
+  -  243 [iphone-chromium] › e2e\usage2.spec.ts:141:1 › D-067 기록이 3회보다 적으면 내 속도 줄은 안 보임
+  -  244 [iphone-chromium] › e2e\usage2.spec.ts:152:1 › D-067 같은 이름 루틴: 오래된 것 [숨기기](묻지 않고 바로 숨김·[되돌리기]) · [이름 바꾸기]
+  -  245 [iphone-chromium] › e2e\usage2.spec.ts:194:3 › D-068 끝낼 때 루틴 반영: 운동을 더했으면 묻기 → [루틴 업데이트]
+  -  246 [iphone-chromium] › e2e\usage2.spec.ts:194:3 › D-068 끝낼 때 루틴 반영: 운동을 더했으면 묻기 → [원래대로]
+  -  247 [iphone-chromium] › e2e\usage2.spec.ts:194:3 › D-068 끝낼 때 루틴 반영: 운동을 더했으면 묻기 → [새 루틴으로 저장]
+  -  248 [iphone-chromium] › e2e\usage2.spec.ts:228:1 › P4 운동 중 루틴이 바뀌었으면 [루틴 업데이트] 없이 경고, 기본은 원래대로 → [새 루틴으로 저장]
+  -  249 [iphone-chromium] › e2e\usage2.spec.ts:246:1 › D-068 무게·횟수만 바뀌었으면 묻지 않음
+  -  250 [iphone-chromium] › e2e\usage2.spec.ts:260:1 › 묶음 카드: 운동 글자(A·B)와 등급 배지를 구분 ("등급 S" 이름 뒤)
+  -  251 [iphone-chromium] › e2e\usage2.spec.ts:279:1 › D-078 기록 탭에서 운동 기록 직접 작성 (진입, 종목 추가, 세트 입력, 저장 및 상세 확인)
+  -  252 [iphone-chromium] › e2e\usage2.spec.ts:316:1 › D-078 빈 기록 상태에서 직접 작성 진입 및 취소 확인
+  x  253 [iphone-chromium] › e2e\uxui.spec.ts:144:1 › D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실선 0·초점 링·blur 뒤 검증 (0ms)
+  -  254 [iphone-chromium] › e2e\uxui.spec.ts:301:1 › N9 기록 정리: 아무것도 안 고르고 누르면 알림 + 첫 체크 상자로 초점
+  -  255 [iphone-chromium] › e2e\uxui.spec.ts:317:1 › N9 루틴 편집: 운동 없이 [저장하고 시작] → 알림 + [+ 운동 추가]로 초점
+  -  256 [iphone-chromium] › e2e\uxui.spec.ts:327:1 › N9 루틴 이름 바꾸기: 빈 이름 → 알림 + 입력 칸으로 초점
+  -  257 [iphone-chromium] › e2e\uxui.spec.ts:342:1 › N9 개선 메모: 빈 내용으로 저장 → 알림 + 글 칸으로 초점
+  -  258 [iphone-chromium] › e2e\uxui.spec.ts:350:1 › N9 자동 보내기: 빈 설정으로 [저장하고 연결 확인] → 알림 + 입력 칸으로 초점
+  -  259 [iphone-chromium] › e2e\uxui.spec.ts:359:1 › A05 필터 결과 0건: 진짜 0건과 구분해 [필터 초기화] → 목록이 돌아옴
+  -  260 [iphone-chromium] › e2e\uxui.spec.ts:372:1 › A05 루틴 검색 0건: [검색어 지우기] → 목록이 돌아오고 초점은 검색 칸
+  -  261 [iphone-chromium] › e2e\uxui.spec.ts:392:1 › M1·L1·L2 루틴 편집: 끝에서 ↑↓ 는 꺼짐·펼침 유지 / 이동·삭제·묶기 뒤 펼친 번호 / ⋯ 메뉴 교체·삭제 / 초점
+  -  262 [iphone-chromium] › e2e\uxui.spec.ts:465:1 › M2·M3·L3 바로 가기·설정 묶음 기억·멈춤 경고·기록 탭 키보드
+
+
+  1) [iphone-chromium] › e2e\app.spec.ts:124:1 › 핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3개 → 종료 (탭 수 12 이하) 
+
+    Error: worker process exited unexpectedly (code=3221225794, signal=null)
+
+  2) [iphone-chromium] › e2e\records.spec.ts:45:1 › 기본 주 보기: 7칸, 이번 주 이름, 비교 문장, 카드 4개 ─────────────
+
+    Error: worker process exited unexpectedly (code=3221225794, signal=null)
+
+  3) [iphone-chromium] › e2e\swap.spec.ts:63:1 › D-080 운동 중 ⇄: 비슷한 운동 구역 + 지난 기록 → 완료 2세트는 그대로, 남은 2세트만 새 운동 카드로 
+
+    Error: worker process exited unexpectedly (code=3221225794, signal=null)
+
+  4) [iphone-chromium] › e2e\usage.spec.ts:52:1 › D-065 "운동 끝났나요?" 띠: 휴식 중엔 안 뜸, 30분 지나면 뜸, 아직 하는 중이면 다시 안 뜸 · 끝내기(마지막 세트 + 3분) 
+
+    Error: worker process exited unexpectedly (code=3221225794, signal=null)
+
+  5) [iphone-chromium] › e2e\usage2.spec.ts:66:1 › D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 보기(목표 바꾸기) → 적용하면 75분 안 
+
+    Error: worker process exited unexpectedly (code=3221225794, signal=null)
+
+  6) [iphone-chromium] › e2e\uxui.spec.ts:144:1 › D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실선 0·초점 링·blur 뒤 검증 
+
+    Error: worker process exited unexpectedly (code=3221225794, signal=null)
+
+  Slow test file: [iphone-webkit] › e2e\app.spec.ts (7.6m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  6 failed
+    [iphone-chromium] › e2e\app.spec.ts:124:1 › 핵심 흐름: 플랜 → 루틴 저장 → 홈에서 시작 → 세트 3개 → 종료 (탭 수 12 이하) 
+    [iphone-chromium] › e2e\records.spec.ts:45:1 › 기본 주 보기: 7칸, 이번 주 이름, 비교 문장, 카드 4개 ──────────────
+    [iphone-chromium] › e2e\swap.spec.ts:63:1 › D-080 운동 중 ⇄: 비슷한 운동 구역 + 지난 기록 → 완료 2세트는 그대로, 남은 2세트만 새 운동 카드로 
+    [iphone-chromium] › e2e\usage.spec.ts:52:1 › D-065 "운동 끝났나요?" 띠: 휴식 중엔 안 뜸, 30분 지나면 뜸, 아직 하는 중이면 다시 안 뜸 · 끝내기(마지막 세트 + 3분) 
+    [iphone-chromium] › e2e\usage2.spec.ts:66:1 › D-067 내 속도: 카드·편집 화면 한 줄, [맞추기] → 미리 보기(목표 바꾸기) → 적용하면 75분 안 
+    [iphone-chromium] › e2e\uxui.spec.ts:144:1 › D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실선 0·초점 링·blur 뒤 검증 
+  125 did not run
+  131 passed (11.6m)
