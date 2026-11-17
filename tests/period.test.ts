@@ -160,6 +160,19 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
     expect(averageOver('month', v, act, st)).toEqual({ value: 4, n: 3 });
     expect(averageOver('year', [3], [true], ['now'])).toEqual({ value: 0, n: 0 });
   });
+  it('footnote: 끝이 같으면 오늘 운동하면 문구 없음, 이번 달이 더 길면 지난달 전체', () => {
+    // 3/30 운동 전: 어제(3/29)도 2/28 로 눌려 오늘 운동 뒤와 같은 끝
+    expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: false, streak: 0, today: '2026-03-30' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 더 길어요');
+    expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: false, streak: 0, today: '2026-03-29' })).toBe('▲▼ = 지난달 같은 날(1~28일)까지와 비교');
+    expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: true, streak: 0, today: '2026-03-29' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 더 길어요');
+    expect(footnote('month', true, { through: '2026-10-15', base: '2026-10-16', done: false, streak: 0, today: '2026-11-16' })).toBe('▲▼ = 지난달 같은 날(1~15일)까지와 비교 · 오늘 운동하면 16일까지');
+    expect(footnote('year', true, { through: '2027-02-28', base: '2027-02-28', done: false, streak: 0 })).toBe('▲▼ = 작년 같은 날(1월 1일~2월 28일)까지와 비교');
+  });
+  it('cardAria: 오늘 운동 전이면 전날까지', () => {
+    expect(cardAria({ kind: 'week', current: true, metric: 'sets', cur: 4, prev: 3, partial: true })).toBe('작업 세트 4세트, 지난주 같은 요일 전날까지 3세트보다 1세트 많음');
+    expect(cardAria({ kind: 'month', current: true, metric: 'count', cur: 1, prev: 1, partial: true })).toBe('운동 1회, 지난달 같은 날 전날까지 1회와 같음');
+    expect(cardAria({ kind: 'week', current: true, metric: 'sets', cur: 4, prev: 3 })).toBe('작업 세트 4세트, 지난주 같은 요일까지 3세트보다 1세트 많음');
+  });
   it('offsetOf: 보던 기간이 오늘 기준 몇 기간 전인지', () => {
     expect(offsetOf('week', '2026-11-08', '2026-11-16')).toBe(1);
     expect(offsetOf('week', '2026-11-08', '2026-11-22')).toBe(2);
@@ -243,11 +256,13 @@ describe('periodText', () => {
     expect(bigParts('time', 35000)).toEqual([[9, '시간'], [43, '분']]);
     expect(bigParts('time', 36000)).toEqual([[10, '시간']]);
     expect(bigParts('time', 168 * 3600 + 1700)).toEqual([[168, '시간'], [28, '분']]);
-    expect(avgText('week', 'sets', 8.6)).toBe('운동한 날 평균 9세트');
-    expect(avgText('year', 'count', 3.4)).toBe('운동한 달 평균 3회');
+    expect(avgText('week', 'sets', 8.6)).toBe('운동한 날 평균 8.6세트');
+    expect(avgText('week', 'sets', 9)).toBe('운동한 날 평균 9세트');
+    expect(avgText('year', 'count', 3.4)).toBe('운동한 달 평균 3.4회');
+    expect(avgText('year', 'count', 15.5, false, true)).toBe('운동한 달 평균(이번 달 제외) 15.5회');
     expect(avgText('month', 'volume', 1234.5)).toBe('운동한 날 평균 1,235kg');
     expect(avgText('week', 'time', 2900)).toBe('운동한 날 평균 48분');
-    expect(avgText('year', 'sets', 8.2, false, true)).toBe('운동한 달 평균(이번 달 제외) 8세트');
+    expect(avgText('year', 'sets', 8.2, false, true)).toBe('운동한 달 평균(이번 달 제외) 8.2세트');
     expect(valueText('volume', 1234567, true)).toBe('1,235톤');
     expect(bigParts('volume', 1234567, true)).toEqual([['1,235', '톤']]);
     expect(valueText('volume', 300, true)).toBe('0.3톤');

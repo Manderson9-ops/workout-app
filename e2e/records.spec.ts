@@ -5,7 +5,8 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
-const TODAY = new Date('2026-11-16T12:00:00');
+test.use({ timezoneId: 'Asia/Seoul', locale: 'ko-KR' }); // 날짜 계산이 시험 PC 의 시간대·언어에 안 흔들리게
+const TODAY = new Date('2026-11-16T12:00:00+09:00');
 const MIN = 60_000;
 type Row = Record<string, unknown>;
 const idbPut = (page: Page, store: string, rows: Row[]) => page.evaluate(async ([s, rs]) => {
@@ -15,7 +16,7 @@ const idbPut = (page: Page, store: string, rows: Row[]) => page.evaluate(async (
 }, [store, rows] as const);
 /** 끝낸 운동: 한 종목, 같은 세트 n 개 (로컬 시각 y-m-d 10시, 40분) */
 const done = (id: string, y: number, m: number, d: number, sets: number, weight = 50, reps = 10, mins = 40) => {
-  const start = new Date(y, m - 1, d, 10).getTime();
+  const start = Date.UTC(y, m - 1, d, 1); // 한국 시각 10시 (시험 PC 시간대와 무관)
   return { id, name: '기록 테스트', startedAt: new Date(start).toISOString(), endedAt: new Date(start + mins * MIN).toISOString(), timer: null,
     blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: [{ exerciseId: 'bench_press', target: { sets, reps }, sets: Array.from({ length: sets }, () => ({ warmup: false, done: true, weight, reps, doneAt: new Date(start + 5 * MIN).toISOString() })) }] }] };
 };
@@ -194,7 +195,7 @@ test('터치: 세로로 끌면 고르지 않고(스크롤), 가로로 끌면 훑
 
 test('운동한 날 점·평균 범례·큰 숫자 쉼표·이동줄', async ({ page }) => {
   await expect(chart(page).locator('circle.pb-dot')).toHaveCount(2); // 일·월
-  await expect(card(page).getByTestId('period-avg')).toHaveText('운동한 날 평균 4세트'); // (3+4)/2 = 3.5 → 4
+  await expect(card(page).getByTestId('period-avg')).toHaveText('운동한 날 평균 3.5세트'); // (3+4)/2
   await expect(card(page).getByTestId('period-range')).toHaveText('11월 15일~21일 vs. 지난주');
   await card(page).getByTestId('pm-count').click();
   await expect(card(page).getByTestId('period-avg')).toHaveCount(0); // 주·월 보기의 운동 수는 평균선 없음
@@ -259,7 +260,7 @@ test('좁은 화면(320px)에서도 한 문장 안의 값·라벨이 줄 중간�
 });
 
 test('자정을 넘기면 고른 칸만 비우고 보던 기간은 그대로 (N3·R5)', async ({ page }) => {
-  await page.clock.setFixedTime(new Date('2026-11-16T23:59:58'));
+  await page.clock.setFixedTime(new Date('2026-11-16T23:59:58+09:00'));
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   const cap = card(page).getByTestId('period-caption');
@@ -272,29 +273,46 @@ test('자정을 넘기면 고른 칸만 비우고 보던 기간은 그대로 (N3
   await chart(page).focus();
   await page.keyboard.press('ArrowLeft');
   await expect(cap).not.toHaveText(hint);
-  await page.clock.setFixedTime(new Date('2026-11-17T00:00:03')); // 앱은 1초마다 다시 그림
+  await page.clock.setFixedTime(new Date('2026-11-17T00:00:03+09:00')); // 앱은 1초마다 다시 그림
   await expect(cap).toHaveText(hint);
   await expect(card(page).getByTestId('period-label')).toHaveText('지난주'); // 같은 주 안이라 보던 지난주 그대로
   await expect(chart(page)).toHaveAttribute('aria-valuetext', /합계/);
 });
 
-test('주가 바뀌는 자정: 지난 기간을 보던 중이면 같은 날짜 범위를 계속 보여 준다, 이번 주를 보던 중이면 새 이번 주 (R5)', async ({ page }) => {
-  await page.clock.setFixedTime(new Date('2026-11-21T23:59:58')); // 토요일 밤
+test('주가 바뀌는 자정: 지난 기간을 보던 중이면 같은 날짜 범위를 계속 보여 준다 (R5)', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-21T23:59:58+09:00')); // 토요일 밤
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await card(page).getByRole('button', { name: '이전 주' }).click();
   await expect(card(page).getByTestId('period-label')).toHaveText('지난주'); // 11/8~14
-  await page.clock.setFixedTime(new Date('2026-11-22T00:00:03')); // 일요일 0시
+  await page.clock.setFixedTime(new Date('2026-11-22T00:00:03+09:00')); // 일요일 0시
   await expect(card(page).getByTestId('period-label')).toHaveText('11월 8일~14일'); // 이제 2주 전이지만 같은 주
   await card(page).getByRole('button', { name: '다음 주' }).click();
   await card(page).getByRole('button', { name: '다음 주' }).click();
   await expect(card(page).getByTestId('period-label')).toHaveText('이번 주');
 });
 
+test('자정에 기간이 바뀌어도 이번 기간을 보던 중이면 새 이번 주·이번 달로 간다 (S1)', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-21T23:59:58+09:00')); // 토요일 밤
+  await page.reload();
+  await page.getByRole('link', { name: '기록', exact: true }).click();
+  await expect(card(page).getByTestId('period-label')).toHaveText('이번 주');
+  await expect(card(page).getByTestId('period-range')).toContainText('11월 15일~21일');
+  await page.clock.setFixedTime(new Date('2026-11-22T00:00:04+09:00'));
+  await expect(card(page).getByTestId('period-label')).toHaveText('이번 주'); // 지난주가 아님
+  await expect(card(page).getByTestId('period-range')).toContainText('11월 22일~28일');
+  await kind(page, '월').click();
+  await page.clock.setFixedTime(new Date('2026-11-30T23:59:58+09:00'));
+  await expect(card(page).getByTestId('period-range')).toContainText('11월 1일~30일');
+  await page.clock.setFixedTime(new Date('2026-12-01T00:00:04+09:00'));
+  await expect(card(page).getByTestId('period-label')).toHaveText('이번 달');
+  await expect(card(page).getByTestId('period-range')).toContainText('12월 1일~31일');
+});
+
 test('오늘 운동 전이면 지난주는 어제 같은 요일까지만 견준다 (P2)', async ({ page }) => {
   // 화요일(11/17) 낮: 지난주 월(11/9) 5세트, 지난주 화(11/10) 4세트. 오늘 운동 전 = 월까지(5), 오늘 운동 뒤 = 화까지(9)
   await idbPut(page, 'workouts', [done('lt', 2026, 11, 10, 4)]);
-  await page.clock.setFixedTime(new Date('2026-11-17T12:00:00'));
+  await page.clock.setFixedTime(new Date('2026-11-17T12:00:00+09:00'));
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   const prev = card(page).getByTestId('pm-sets').locator('.pm-prev');
@@ -308,7 +326,7 @@ test('오늘 운동 전이면 지난주는 어제 같은 요일까지만 견준�
   await expect(card(page)).not.toContainText('오늘 운동하면 화요일까지');
 });
 
-test('320px: 네 카드의 큰 숫자 줄과 작은 줄이 모두 한 줄이고 안내 글이 보인다 (현재·지난 주·지난 달, 두 자리 시간) (Q4·R2)', async ({ page }) => {
+test('320px: 네 카드의 큰 숫자 줄과 작은 줄이 모두 한 줄이고 안내 글이 보인다 (현재 주의 세 자리 시간·지난 주·지난 달의 16시간 28분) (Q4·R2)', async ({ page }) => {
   await idbPut(page, 'workouts', [
     done('mega', 2026, 11, 15, 1, 50, 10, 10000), // 이번 주 시간 세 자리 시간 (168시간대)
     done('sepl', 2026, 9, 11, 3, 4000, 10, 948), // 9월 시간 16시간 28분 (+ 기본 40분), 볼륨 121,500kg
@@ -344,7 +362,7 @@ test('320px: 네 카드의 큰 숫자 줄과 작은 줄이 모두 한 줄이고 
 });
 
 test('기간 첫날 운동 전(일요일 아침): 배지·증감 없이 "운동하면 비교해요", 홈도 증감 없음 (Q2)', async ({ page }) => {
-  await page.clock.setFixedTime(new Date('2026-11-22T09:00:00')); // 일요일, 지난주(11/15~21)에 운동 있음
+  await page.clock.setFixedTime(new Date('2026-11-22T09:00:00+09:00')); // 일요일, 지난주(11/15~21)에 운동 있음
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await expect(card(page).locator('.pm-badge')).toHaveCount(0);

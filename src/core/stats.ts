@@ -130,17 +130,19 @@ export function durText(sec: number): string {
   if (s < 60) return `${s}초`;
   const m = Math.round(s / 60);
   if (m < 60) return `${m}분`;
-  return m % 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${m / 60}시간`;
+  const hh = (n: number) => n.toLocaleString('ko-KR'); // 1,000시간 이상은 쉼표
+  return m % 60 ? `${hh(Math.floor(m / 60))}시간 ${m % 60}분` : `${hh(m / 60)}시간`;
 }
 
 /** durText 를 숫자·단위 쌍으로 (큰 숫자 + 작은 단위 표시용, D-055). 글자를 이으면 durText 와 같음(띄어쓰기 제외) */
-export function durParts(sec: number): [number, string][] {
+export function durParts(sec: number): [number | string, string][] {
   const s = Math.max(0, Math.round(sec));
   if (s === 0) return [[0, '분']];
   if (s < 60) return [[s, '초']];
   const m = Math.round(s / 60);
   if (m < 60) return [[m, '분']];
-  return m % 60 ? [[Math.floor(m / 60), '시간'], [m % 60, '분']] : [[m / 60, '시간']];
+  const hh = (n: number): number | string => (n >= 1000 ? n.toLocaleString('ko-KR') : n);
+  return m % 60 ? [[hh(Math.floor(m / 60)), '시간'], [m % 60, '분']] : [[hh(m / 60), '시간']];
 }
 
 /** 통계에 셈하는 운동: 끝났고 완료한 작업 세트가 하나 이상 (D-054). 세트 0개 운동은 기록 목록에만 흐리게 보임 */
@@ -247,7 +249,7 @@ export function monthDays(workouts: Workout[], year: number, month: number): Map
 
 /** 연속 운동 주 (이번 주 포함, 한 번이라도 운동한 주가 이어진 수) */
 export function weekStreak(workouts: Workout[], today: string): number {
-  const weeks = new Set(workouts.filter(isCountedWorkout).map((w) => dayOf(w).week));
+  const weeks = new Set(workouts.filter((w) => isCountedWorkout(w) && dayOf(w).date <= today).map((w) => dayOf(w).week)); // 오늘 뒤 날짜 기록은 안 셈 (합계와 같음)
   let n = 0;
   let cur = weekStart(today);
   if (!weeks.has(cur)) { const [y, m, d] = cur.split('-').map(Number); cur = localDate(new Date(y!, m! - 1, d! - 7)); } // 이번 주는 아직 안 했어도 끊긴 것 아님

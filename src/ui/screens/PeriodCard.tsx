@@ -6,7 +6,7 @@ import type { Exercise } from '../../core/types';
 import { weekStreak } from '../../core/stats';
 import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, waitingForToday, averageOver, offsetOf, periodData, earliestPeriod } from '../../core/period';
 import type { PeriodKind, PeriodMetric } from '../../core/period';
-import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, WAITING_LINE, prevNote, avgText, metricValue, prevName, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
+import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, WAITING_LINE, prevNote, avgText, metricValue, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnote } from '../../core/periodText';
 import { WD } from '../../core/dateText';
 import { PeriodBars } from '../charts';
 import type { BucketState } from '../charts';
@@ -26,19 +26,18 @@ function writePref(kind: PeriodKind, metric: PeriodMetric) { try { localStorage.
 export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: Map<string, Exercise>; today: string; bw: AppState['bodyweight'] }) {
   const [pref, setPref] = useState(readPref);
   const { kind, metric } = pref;
-  const [off, setOff] = useState(0);
+  // 보는 기간: null = 이번 기간(자정·월말을 넘으면 새 이번 기간), 아니면 보던 지난 기간의 시작 날짜 (자정을 넘겨도 같은 날짜 범위). 몇 기간 전인지는 그리면서 셈
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const off = anchor ? offsetOf(kind, anchor, today) : 0;
   const [sel, setSel] = useState<number | null>(null);
-  const setKind = (k: PeriodKind) => { if (k === kind) return; setPref({ kind: k, metric }); writePref(k, metric); setOff(0); setSel(null); };
+  const setKind = (k: PeriodKind) => { if (k === kind) return; setPref({ kind: k, metric }); writePref(k, metric); setAnchor(null); setSel(null); };
   const setMetric = (m: PeriodMetric) => { setPref({ kind, metric: m }); writePref(kind, m); };
   const day0 = useRef(today);
-  const go = (n: number) => { setOff(n); setSel(null); };
+  useEffect(() => { if (day0.current !== today) { day0.current = today; setSel(null); } }, [today]); // 날이 바뀌면 고른 칸만 비움 (처음 그릴 때는 건드리지 않음)
+  const go = (n: number) => { setAnchor(n <= 0 ? null : shiftPeriod(periodOf(kind, today), -n).start); setSel(null); };
 
   const current = off === 0;
   const range = useMemo(() => shiftPeriod(periodOf(kind, today), -off), [kind, today, off]);
-  // 자정을 넘기면 고른 칸만 비움. 보던 기간은 그대로(같은 날짜 범위) 두고 몇 기간 전인지만 다시 셈 (이번 기간을 보던 중이면 계속 이번 기간). 처음 그릴 때는 건드리지 않음
-  const startRef = useRef(range.start);
-  if (day0.current === today) startRef.current = range.start;
-  useEffect(() => { if (day0.current !== today) { day0.current = today; setOff(offsetOf(kind, startRef.current, today)); setSel(null); } }, [today]);
   const earliest = useMemo(() => earliestPeriod(done, kind, today), [done, kind, today]);
   const todayDone = useMemo(() => hasWorkoutOn(done, today), [done, today]);
   const through = useMemo(() => compareThroughFor(periodOf(kind, today), today, todayDone), [kind, today, todayDone]);
@@ -107,7 +106,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
           const dir = cc > cp ? 'up' : cc < cp ? 'down' : 'same';
           return (
             <button key={m} class={`pm-card${metric === m ? ' on' : ''}`} aria-pressed={metric === m} data-testid={`pm-${m}`}
-              aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn, waiting })} onClick={() => setMetric(m)}>
+              aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn, waiting, partial: current && !todayDone })} onClick={() => setMetric(m)}>
               <span class="pm-top">{!waiting && <span class={`pm-badge ${dir}`} aria-hidden="true">{dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='}</span>}<span class="m-label" aria-hidden="true">{METRIC_NAME[m]}</span></span>
               <span class={`m-val${m === 'time' && c >= 360000 ? ' long' : ''}`} aria-hidden="true">{parts.map(([n, u], i) => <span key={i} class="m-pair"><span class="num">{n}</span>{u && <span class="unit">{u}</span>}</span>)}</span>
               <span class="pm-prev" aria-hidden="true">{waiting ? WAITING_LINE : `이전 ${valueText(m, pv, tn)}`}</span>
@@ -115,7 +114,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
           );
         })}
       </div>
-      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnote(kind, current, { through, base: baseThrough, done: todayDone, streak, waiting })}</p>
+      <p class="sub small" style={{ margin: '8px 0 0' }}>{footnote(kind, current, { through, base: baseThrough, done: todayDone, streak, today, waiting })}</p>
     </section>
   );
 }

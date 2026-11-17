@@ -53,7 +53,7 @@ export function cmpValues(m: PeriodMetric, cur: number, prev: number, ton = fals
 }
 /** 평균 문구: 운동한 날(년은 달) 평균, 횟수·세트·볼륨은 정수로 */
 export function avgText(kind: PeriodKind, m: PeriodMetric, v: number, ton = false, exclNow = false): string {
-  return `${kind === 'year' ? '운동한 달' : '운동한 날'} 평균${exclNow ? '(이번 달 제외)' : ''} ${m === 'time' ? durText(v) : valueText(m, Math.round(v), ton)}`;
+  return `${kind === 'year' ? '운동한 달' : '운동한 날'} 평균${exclNow ? '(이번 달 제외)' : ''} ${m === 'time' ? durText(v) : m === 'volume' ? valueText(m, Math.round(v), ton) : valueText(m, v)}`; // 횟수·세트는 소수 한 자리까지
 }
 export const metricValue = (m: PeriodMetric, totals: { count: number; sets: number; volume: number; durationSec: number }) =>
   m === 'count' ? totals.count : m === 'sets' ? totals.sets : m === 'volume' ? totals.volume : totals.durationSec;
@@ -121,10 +121,10 @@ export function headline(o: { kind: PeriodKind; current: boolean; metric: Period
 }
 
 /** 카드 aria-label: "운동 1회, 지난주 같은 요일까지 0회보다 1회 많음" */
-export function cardAria(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; ton?: boolean; waiting?: boolean }): string {
-  const { kind, current, metric, cur, prev, ton, waiting } = o;
+export function cardAria(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; ton?: boolean; waiting?: boolean; partial?: boolean }): string {
+  const { kind, current, metric, cur, prev, ton, waiting, partial } = o;
   if (waiting) return `${METRIC_NAME[metric]} ${valueText(metric, cur, ton)}, 오늘 운동하면 ${prevPhrase(kind, current)}와 비교해요`;
-  const pp = prevPhrase(kind, current), cv = valueText(metric, cur, ton), pv = valueText(metric, prev, ton);
+  const pp = prevPhrase(kind, current).replace('까지', partial ? ' 전날까지' : '까지'), cv = valueText(metric, cur, ton), pv = valueText(metric, prev, ton);
   const head = `${METRIC_NAME[metric]} ${cv}, ${pp} `;
   const [c, p] = cmpValues(metric, cur, prev, ton);
   if (c === p) return `${head}${josa(pv, '과', '와')} 같음`;
@@ -143,13 +143,19 @@ const wdOf = (date: string): number => { const [y, m, d] = date.split('-').map(N
  * 아래 작은 글씨. 현재 기간이면 through = 실제로 견주는 이전 기간 끝 날짜(오늘 운동 전이면 어제 기준), base = 오늘 운동하면 견줄 끝 날짜.
  * 운동 전이면 "오늘 운동하면 ○까지"로 바뀌는 구간을 알려 줌
  */
-export function footnote(kind: PeriodKind, current: boolean, o: { through: string; base: string; done: boolean; streak: number; waiting?: boolean }): string {
-  const { through, base, done, streak, waiting = false } = o;
+export function footnote(kind: PeriodKind, current: boolean, o: { through: string; base: string; done: boolean; streak: number; today?: string; waiting?: boolean }): string {
+  const { through, base, done, streak, today, waiting = false } = o;
+  const later = !done && through !== base; // 오늘 운동하면 견줄 끝이 달라질 때만 알림
   if (!current) return `▲▼ = ${prevName(kind, false)} 전체와 비교`;
   if (waiting) return kind === 'week' ? '▲▼ = 오늘 운동하면 지난주 같은 요일(일)까지와 비교' : kind === 'month' ? '▲▼ = 오늘 운동하면 지난달 같은 날(1일)까지와 비교' : '▲▼ = 오늘 운동하면 작년 같은 날(1월 1일)까지와 비교';
   const [, m, d] = through.split('-').map(Number);
   const [, bm, bd] = base.split('-').map(Number);
-  if (kind === 'week') { const w = wdOf(through); return `▲▼ = 지난주 같은 요일(일${w > 0 ? `~${WD[w]}` : ''})까지와 비교${done ? '' : ` · 오늘 운동하면 ${WD[wdOf(base)]}요일까지`} · 연속 ${streak}주 · 일요일~토요일 기준`; }
-  if (kind === 'month') return `▲▼ = 지난달 같은 날(${d === 1 ? '1일' : `1~${d}일`})까지와 비교${done ? '' : ` · 오늘 운동하면 ${bd}일까지`}`;
-  return `▲▼ = 작년 같은 날(${m === 1 && d === 1 ? '1월 1일' : `1월 1일~${m}월 ${d}일`})까지와 비교${done ? '' : ` · 오늘 운동하면 ${bm}월 ${bd}일까지`}`;
+  if (kind === 'week') { const w = wdOf(through); return `▲▼ = 지난주 같은 요일(일${w > 0 ? `~${WD[w]}` : ''})까지와 비교${later ? ` · 오늘 운동하면 ${WD[wdOf(base)]}요일까지` : ''} · 연속 ${streak}주 · 일요일~토요일 기준`; }
+  if (kind === 'month') {
+    // 이번 달이 더 길어 기준일이 지난달 말일을 넘으면 지난달 전체와 견줌
+    const basis = today ? Number(today.slice(8)) - (done ? 0 : 1) : 0;
+    if (basis > d!) return `▲▼ = 지난달 전체(${d === 1 ? '1일' : `1~${d}일`})와 비교 · 이번 달이 더 길어요`;
+    return `▲▼ = 지난달 같은 날(${d === 1 ? '1일' : `1~${d}일`})까지와 비교${later ? ` · 오늘 운동하면 ${bd}일까지` : ''}`;
+  }
+  return `▲▼ = 작년 같은 날(${m === 1 && d === 1 ? '1월 1일' : `1월 1일~${m}월 ${d}일`})까지와 비교${later ? ` · 오늘 운동하면 ${bm}월 ${bd}일까지` : ''}`;
 }

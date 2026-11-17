@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, isCountedWorkout, partWeekDetail, plannedVsActualRows, minutesLabel } from '../src/core/stats';
+import { localDate, bodyweightOn, exerciseHistory, summarize, weekStart, weeklyPartSets, weeklyTotals, plannedVsActual, monthDays, weekStreak, plateCalc, oneRMTable, addDays, weekSummary, bestSetLabel, exerciseLines, durText, durParts, isCountedWorkout, partWeekDetail, plannedVsActualRows, minutesLabel } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
 import { heatBucket } from '../src/ui/bodyMapView';
@@ -12,6 +12,21 @@ const at = (y: number, m: number, d: number, h = 10) => new Date(y, m - 1, d, h)
 const wk = (id: string, start: string, items: { id: string; sets: SetLog[] }[], endedMin = 60, extra: Partial<Workout> = {}): Workout => ({
   id, name: id, startedAt: start, endedAt: new Date(Date.parse(start) + endedMin * 60000).toISOString(), timer: null,
   blocks: [{ kind: 'single', restSec: 90, roundRestSec: 120, transitionSec: 10, items: items.map((i) => ({ exerciseId: i.id, target: { sets: 3, reps: 8 }, sets: i.sets })) }], ...extra,
+});
+
+describe('weekStreak·durParts 보강 (D-081)', () => {
+  it('오늘 뒤 날짜 기록은 연속 주에 안 센다', () => {
+    const w = (id: string, y: number, m: number, d: number) => wk(id, at(y, m, d), [{ id: 'bench', sets: [s(50, 10)] }]);
+    expect(weekStreak([w('a', 2026, 11, 10), w('b', 2026, 11, 18)], '2026-11-16')).toBe(1);
+    expect(weekStreak([w('b', 2026, 11, 18)], '2026-11-16')).toBe(0);
+  });
+  it('1,000시간 이상은 쉼표', () => {
+    expect(durText(3600 * 1000 + 120)).toBe('1,000시간 2분');
+    expect(durText(3600 * 1000)).toBe('1,000시간');
+    expect(durParts(3600 * 1000 + 120)).toEqual([['1,000', '시간'], [2, '분']]);
+    expect(durParts(3600 * 1000)).toEqual([['1,000', '시간']]);
+    expect(durParts(3600 * 999)).toEqual([[999, '시간']]);
+  });
 });
 
 describe('날짜·체중', () => {
