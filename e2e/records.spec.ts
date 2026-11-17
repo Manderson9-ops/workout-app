@@ -395,7 +395,7 @@ test('월말: 이번 달이 더 길면 지난달 전체와 견주고 모든 문�
     await expect(card(page).getByTestId('period-headline'), `${tag} 한 문장`).toContainText('지난달 전체');
     await expect(card(page).getByTestId('pm-note'), `${tag} 안내`).toHaveText('작은 글씨 = 지난달 전체 값');
     await expect(card(page).getByTestId('pm-sets'), `${tag} 카드 읽기`).toHaveAttribute('aria-label', /지난달 전체\(1~28일\)/);
-    await expect(card(page), `${tag} 각주`).toContainText(`지난달 전체(1~28일)와 비교 · 이번 달이 ${gap} 더 길어요`);
+    await expect(card(page), `${tag} 각주`).toContainText(`지난달 전체(1~28일)와 비교 · 이번 달 구간이 ${gap} 더 길어요`);
     await expect(card(page).getByTestId('period-range'), `${tag} 이동줄`).toContainText('vs. 지난달 전체');
   };
   await check('운동 전', '하루'); // 기준일 3/29 → 28일과 1일 차이
@@ -427,7 +427,7 @@ test('320px 년 보기: 평균 안내의 값과 각주 날짜가 줄 중간에�
 });
 
 test('320px: 1,000시간이 넘는 시간 카드도 카드 안에 한 줄 (W7)', async ({ page }) => {
-  await idbPut(page, 'workouts', [done('huge', 2026, 11, 14, 1, 50, 10, 60500)]); // 1,008시간 20분 (올해)
+  await idbPut(page, 'workouts', [done('huge', 2026, 11, 14, 1, 50, 10, 60500), done('huge25', 2025, 6, 8, 1, 50, 10, 60500)]); // 올해·작년 모두 1,008시간 20분 안팎
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await page.setViewportSize({ width: 320, height: 700 });
@@ -439,5 +439,11 @@ test('320px: 1,000시간이 넘는 시간 카드도 카드 안에 한 줄 (W7)',
   expect(v.x + v.width, '카드 안').toBeLessThanOrEqual(b.x + b.width + 0.5);
   const inner = await c.locator('.m-val').evaluate((e) => e.scrollWidth <= e.clientWidth + 1);
   expect(inner, '넘치지 않음').toBe(true);
+  const pv = c.locator('.pm-prev');
+  await expect(pv).toContainText('이전 1,0');
+  const pb = (await pv.boundingBox())!;
+  expect(pb.height, '이전 값 한 줄').toBeLessThan(20);
+  expect(pb.x + pb.width, '이전 값이 카드 안').toBeLessThanOrEqual(b.x + b.width + 0.5);
+  expect(await pv.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), '이전 값이 넘치지 않음').toBe(true);
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
 });

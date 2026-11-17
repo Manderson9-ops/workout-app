@@ -184,7 +184,7 @@ export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: 
   if (kind === 'week') { const w = wdOf(through); return [T('▲▼ = 지난주 같은 요일'), N(`(일${w > 0 ? `~${WD[w]}` : ''})`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${WD[wdOf(base)]}요일까지`)] : []), T(` · 연속 ${streak}주 · 일요일~토요일 기준`)]; }
   if (kind === 'month') {
     // 이번 달이 더 길어 기준일이 지난달 말일을 넘으면 지난달 전체와 견줌
-    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(`(1~${d}일)`), T('와 비교 · 이번 달이 '), N(dayGap(Number(today.slice(8)) - (done ? 0 : 1) - d!)), T(' 더 길어요')];
+    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(`(1~${d}일)`), T('와 비교 · 이번 달 구간이 '), N(dayGap(Number(today.slice(8)) - (done ? 0 : 1) - d!)), T(' 더 길어요')];
     return [T('▲▼ = 지난달 같은 날'), N(d === 1 ? '(1일)' : `(1~${d}일)`), T('까지와 비교'), ...(later ? [T(' · 오늘 운동하면 '), N(`${bd}일까지`)] : [])];
   }
   // 윤년이 끼면 두 구간 날수가 하루 다름 (오늘 운동 전이면 이번 해 구간도 어제까지)

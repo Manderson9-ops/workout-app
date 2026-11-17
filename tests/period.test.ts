@@ -165,9 +165,9 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
   });
   it('footnote: 끝이 같으면 오늘 운동하면 문구 없음, 이번 달이 더 길면 지난달 전체', () => {
     // 3/30 운동 전: 어제(3/29)도 2/28 로 눌려 오늘 운동 뒤와 같은 끝
-    expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: false, streak: 0, today: '2026-03-30' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 하루 더 길어요');
+    expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: false, streak: 0, today: '2026-03-30' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달 구간이 하루 더 길어요');
     expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: false, streak: 0, today: '2026-03-29' })).toBe('▲▼ = 지난달 같은 날(1~28일)까지와 비교');
-    expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: true, streak: 0, today: '2026-03-29' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 하루 더 길어요');
+    expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: true, streak: 0, today: '2026-03-29' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달 구간이 하루 더 길어요');
     expect(footnote('month', true, { through: '2026-10-15', base: '2026-10-16', done: false, streak: 0, today: '2026-11-16' })).toBe('▲▼ = 지난달 같은 날(1~15일)까지와 비교 · 오늘 운동하면 16일까지');
     expect(footnote('year', true, { through: '2027-02-28', base: '2027-02-28', done: false, streak: 0, today: '2028-02-29' })).toBe('▲▼ = 작년 같은 날(1월 1일~2월 28일)까지와 비교');
   });
@@ -176,7 +176,7 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
     for (const done of [false, true]) {
       const o = { through: '2026-02-28', today: '2026-03-30', done };
       expect(wholePrevMonth('month', true, o)).toBe(true);
-      expect(footnote('month', true, { ...o, base: '2026-02-28', streak: 0 })).toBe(`▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 ${done ? '2일' : '하루'} 더 길어요`);
+      expect(footnote('month', true, { ...o, base: '2026-02-28', streak: 0 })).toBe(`▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달 구간이 ${done ? '2일' : '하루'} 더 길어요`);
     }
     expect(prevNote('month', true, true)).toBe('작은 글씨 = 지난달 전체 값');
     expect(headlineText(headline({ kind: 'month', current: true, metric: 'sets', cur: 20, prev: 15, curCount: 4, prevCount: 4, label: '이번 달', whole: true }))).toBe('지난달 전체보다 작업 세트가 5세트 많아요');
@@ -231,9 +231,9 @@ describe('compareThroughFor / hasWorkoutOn (오늘 운동 전이면 어제까지
   });
   it('월말 차이를 수로: 3일 더 길어요 · 하루 · 지난 달 하루 차이', () => {
     const o = { streak: 0 };
-    expect(footnote('month', true, { ...o, through: '2027-02-28', base: '2027-02-28', done: true, today: '2027-03-31' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 3일 더 길어요');
-    expect(footnote('month', true, { ...o, through: '2027-02-28', base: '2027-02-28', done: true, today: '2027-03-29' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 하루 더 길어요');
-    expect(footnote('month', true, { ...o, through: '2027-02-28', base: '2027-02-28', done: false, today: '2027-03-31' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달이 2일 더 길어요');
+    expect(footnote('month', true, { ...o, through: '2027-02-28', base: '2027-02-28', done: true, today: '2027-03-31' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달 구간이 3일 더 길어요');
+    expect(footnote('month', true, { ...o, through: '2027-02-28', base: '2027-02-28', done: true, today: '2027-03-29' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달 구간이 하루 더 길어요');
+    expect(footnote('month', true, { ...o, through: '2027-02-28', base: '2027-02-28', done: false, today: '2027-03-31' })).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달 구간이 2일 더 길어요');
     const ex = { ...o, through: '', base: '', done: true, today: '2026-11-16' };
     expect(footnote('month', false, { ...ex, lens: [29, 28] })).toBe('▲▼ = 그 전 달 전체(28일)와 비교 · 이 달이 하루 더 길어요');
     expect(footnote('month', false, { ...ex, lens: [30, 31] })).toBe('▲▼ = 그 전 달 전체(31일)와 비교 · 이 달이 하루 더 짧아요');

@@ -113,7 +113,7 @@ export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: M
               aria-label={cardAria({ kind, current, metric: m, cur: c, prev: pv, ton: tn, waiting, partialThrough: current && !todayDone ? through : undefined, wholeDays })} onClick={() => setMetric(m)}>
               <span class="pm-top">{!waiting && <span class={`pm-badge ${dir}`} aria-hidden="true">{dir === 'up' ? '▲' : dir === 'down' ? '▼' : '='}</span>}<span class="m-label" aria-hidden="true">{METRIC_NAME[m]}</span></span>
               <span class={`m-val${m === 'time' && c >= 3600000 ? ' xlong' : m === 'time' && c >= 360000 ? ' long' : ''}`} aria-hidden="true">{parts.map(([n, u], i) => <span key={i} class="m-pair"><span class="num">{n}</span>{u && <span class="unit">{u}</span>}</span>)}</span>
-              <span class="pm-prev" aria-hidden="true">{waiting ? WAITING_LINE : `이전 ${valueText(m, pv, tn)}`}</span>
+              <span class={`pm-prev${m === 'time' && pv >= 3600000 ? ' xlong' : ''}`} aria-hidden="true">{waiting ? WAITING_LINE : `이전 ${valueText(m, pv, tn)}`}</span>
             </button>
           );
         })}
