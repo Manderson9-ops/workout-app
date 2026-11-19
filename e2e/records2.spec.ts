@@ -170,12 +170,12 @@ async function checkLoad(page: Page, W: MockRow[], today: string): Promise<{ thr
   for (const y of dots.thr) expect(Math.abs(y - dots.todayY), `기준값 글씨 y=${y} 가 오늘 값 글씨 y=${dots.todayY} 와 ${FS2}px 이상`).toBeGreaterThanOrEqual(FS2);
   for (let i = 0; i < dots.thr.length; i++) for (let j = i + 1; j < dots.thr.length; j++) expect(Math.abs(dots.thr[i]! - dots.thr[j]!), `기준값 글씨끼리 ${FS2}px 이상`).toBeGreaterThanOrEqual(FS2);
   expect(dots.thr.length, '기준선 수 ≥ 기준값 글씨 수').toBeLessThanOrEqual(dots.lines);
-  return dots;
   expect(dots.vals, '7일 점 값').toEqual(l.rs!.filter((x) => x !== null).map((x) => x!.toFixed(2)));
   expect(dots.none, '비율 없는 날 "–"').toBe(l.rs!.filter((x) => x === null).length);
   expect(dots.prev, '지난주 같은 요일 점 수').toBe(l.rp!.filter((x) => x !== null).length);
   expect(dots.today, '오늘 점 구간 색').toContain(l.zone!);
   expect(ZONE_NAME[l.zone!]).toBe(l.zoneName); // 오라클 자체 점검
+  return dots;
 }
 
 // ---------- 상황 11개 × 단위 4 × 보기 3 ----------
