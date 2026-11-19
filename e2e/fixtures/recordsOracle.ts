@@ -132,7 +132,13 @@ export function planOf(kind: Kind, today: string, first: string | null, done: bo
   const from = first > ps ? first : null;
   const curFrom = from ? alignFwd(kind, from) : r0;
   if (off > 0) return { mode: 'ok', from, curFrom, through: null, full: true, ps, pe, whole: false }; // 지난 기간은 이전 기간 전체와 견줌
-  if (!done && today === r0) return { mode: 'waiting', from, curFrom, through: null, full: true, ps, pe, whole: false };
+  if (!done && today === r0) {
+    // SPEC #13 셋째 줄: 이번 기간 진행 중 비교 끝날(D-081 = 오늘 운동한 뒤의 한 기간 전 같은 위치)이 첫 기록일보다 앞이면 "기록을 시작하기 전"과 같이 처리.
+    // 이 줄이 #12 의 첫날 운동 전 규칙보다 구체적이라 먼저 본다 (운동해도 비교가 안 되는데 "운동하면 비교해요"를 약속하지 않음)
+    const afterWorkout = kind === 'week' ? add(today, -7) : monthShift(today, kind === 'month' ? -1 : -12);
+    if (from && from > afterWorkout) return { mode: 'nohist', from, curFrom, through: null, full: true, ps, pe, whole: false };
+    return { mode: 'waiting', from, curFrom, through: null, full: true, ps, pe, whole: false };
+  }
   const basis = done ? today : add(today, -1);
   const through = kind === 'week' ? add(basis, -7) : kind === 'month' ? monthShift(basis, -1) : monthShift(basis, -12);
   const whole = kind === 'month' && Number(today.slice(8)) - (done ? 0 : 1) > Number(through.slice(8));
@@ -319,19 +325,24 @@ function footOf(W: MockRow[], today: string, kind: Kind, off: number, plan: Plan
   if (plan.mode === 'nohist' && first !== null) return `${josa(cur && plan.full ? `${PW[kind]} 이맘때` : pw, '은', '는')} 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요 (첫 기록 ${yNum(first) === yNum(today) ? '' : `${yNum(first)}년 `}${mdK(first)})`;
   const from = plan.mode === 'ok' ? plan.from : null;
   const same = from ? `(${josa(pw, '은', '는')} ${mdK(from)}부터 기록이라 같은 구간끼리)` : '';
-  const sameTail = from ? ` · ${josa(pw, '은', '는')} ${mdK(from)}부터 기록이라 같은 구간끼리` : '';
   const dayGap = (n: number) => (n === 1 ? '하루' : `${n}일`);
   if (!cur) {
+    if (from) {
+      // 일부 기록 지난 기간 (SPEC #13 둘째 줄): 이전 쪽 = 첫 기록일~이전 기간 끝, 이번 쪽 = 같은 위치(curFrom)~이번 기간 끝. "전체"라고 하지 않고 실제 구간 날짜를 적음
+      const curLast = kind === 'week' ? add(r0, 6) : kind === 'month' ? add(nextMonthFirst(r0), -1) : `${yNum(r0)}-12-31`;
+      const spanK = (a: string, b: string): string => (a === b ? mdK(a) : a.slice(0, 7) === b.slice(0, 7) ? `${mdK(a)}~${dNum(b)}일` : `${mdK(a)}~${mdK(b)}`);
+      return `▲▼ = ${PAST[kind]} 같은 구간(${spanK(from, add(plan.pe, -1))})과 비교 · ${josa(kind === 'week' ? '이 주' : kind === 'month' ? '이 달' : '이 해', '은', '는')} ${spanK(plan.curFrom, curLast)}`;
+    }
     if (kind === 'month') {
       const a = dim(yNum(r0), mNum(r0)), pm = monthShift(r0, -1), b = dim(yNum(pm), mNum(pm));
-      if (a !== b) return `▲▼ = 그 전 달 전체(${b}일)와 비교 · 이 달이 ${dayGap(Math.abs(a - b))} ${a > b ? '더 길어요' : '더 짧아요'}${sameTail}`;
+      if (a !== b) return `▲▼ = 그 전 달 전체(${b}일)와 비교 · 이 달이 ${dayGap(Math.abs(a - b))} ${a > b ? '더 길어요' : '더 짧아요'}`;
     }
     if (kind === 'year') {
       const ly = (y: number) => (new Date(Date.UTC(y, 1, 29)).getUTCMonth() === 1 ? 366 : 365);
       const a = ly(yNum(r0)), b = ly(yNum(r0) - 1);
-      if (a !== b) return `▲▼ = 전년 전체와 비교 · 이 해가 하루 ${a > b ? '더 길어요' : '더 짧아요'}${sameTail}`;
+      if (a !== b) return `▲▼ = 전년 전체와 비교 · 이 해가 하루 ${a > b ? '더 길어요' : '더 짧아요'}`;
     }
-    return `▲▼ = ${PAST[kind]} 전체와 비교${sameTail}`;
+    return `▲▼ = ${PAST[kind]} 전체와 비교`;
   }
   // 이번 기간: 견주는 끝(through)·오늘 운동하면 견줄 끝(base)은 plan 이 아니라 날짜에서 다시 구함 (기록이 없는 새 설치도 같은 일반 각주)
   const back = (d: string): string => (kind === 'week' ? add(d, -7) : monthShift(d, kind === 'month' ? -1 : -12));
@@ -367,9 +378,10 @@ export function selectedCaption(W: MockRow[], today: string, kind: Kind, metric:
   const cmpFrom = plan.from ?? plan.ps;
   const ton = tonAll(sumRows(W, 'volume', r0, today), sumRows(W, 'volume', plan.from ? plan.curFrom : r0, today), plan.mode === 'ok' ? sumRows(W, 'volume', cmpFrom, plan.through!) : 0, plan.full ? sumRows(W, 'volume', plan.ps, add(plan.pe, -1)) : 0);
   const name = wide ? ymK(b.start) : `${mdK(b.start)} (${WDN[dow(b.start)]})`;
-  if (mode === 'bar') return active ? `${name} · ${NAME[metric]} ${val(metric, v, ton)}${!wide && metric !== 'count' ? ` · 운동 ${countRows(W, b.start, endIn)}회` : ''}` : `${name} · 운동 안 함`;
+  const idle = first !== null && b.end <= first ? '기록 전' : '운동 안 함'; // 이 칸이 통째로 첫 기록일 전 (DA N1: 기록이 없던 날이 아니라 기록을 시작하기 전)
+  if (mode === 'bar') return active ? `${name} · ${NAME[metric]} ${val(metric, v, ton)}${!wide && metric !== 'count' ? ` · 운동 ${countRows(W, b.start, endIn)}회` : ''}` : `${name} · ${idle}`;
   const cum = sumRows(W, metric, r0, endIn);
-  const parts = [name, active ? `${NAME[metric]} ${val(metric, v, ton)}` : '운동 안 함', `누적 ${val(metric, cum, ton)}`];
+  const parts = [name, active ? `${NAME[metric]} ${val(metric, v, ton)}` : idle, `누적 ${val(metric, cum, ton)}`];
   if (plan.full && kind !== 'all') {
     const pb = bucketsOf(kind, plan.ps, plan.pe);
     if (i < pb.length) {

@@ -594,7 +594,7 @@ describe('comparePlan', () => {
     const past = comparePlan(periodOf('year', '2026-06-01'), false, today, true, '2025-03-03');
     expect(past).toMatchObject({ mode: 'ok', from: '2025-03-03', curFrom: '2026-03-03', fullPrev: true });
     expect(past.through).toBeUndefined();
-    expect(footnote('year', false, { through: '', base: '', done: true, streak: 0, today, plan: past })).toBe('▲▼ = 전년 전체와 비교 · 전년은 3월 3일부터 기록이라 같은 구간끼리');
+    expect(footnote('year', false, { through: '', base: '', done: true, streak: 0, today, plan: past })).toBe('▲▼ = 전년 같은 구간(3월 3일~12월 31일)과 비교 · 이 해는 3월 3일~12월 31일');
     expect(headSubs({ plan: past, kind: 'year', current: false, mode: 'both', metric: 'sets', c, pf })).toEqual(['전년 기록이 3월 3일부터라 3월 3일 이후끼리 견줬어요']); // 지난 기간이면 남은 양 줄 없음
   });
   it('기록 전: 이전 기간이 첫 기록일 전에 끝남 → nohist, ▲▼ 없음', () => {
@@ -628,15 +628,43 @@ describe('comparePlan', () => {
     expect(footnote('month', true, { through: '2026-10-17', base: '2026-10-17', done: true, streak: 0, today, plan, first: first! })).toBe('지난달 이맘때는 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요 (첫 기록 10월 28일)');
     expect(legendNames({ mode: 'both', kind: 'month', current: true, label: '이번 달', plan })).toEqual({ cur: '이번 달 (오늘까지)', prev: '지난달 (10/28부터 기록)' });
   });
-  it('waiting 은 일부 기록 비교 불가보다 먼저, 이전 기간 전체가 기록 전이면 waiting 보다 nohist 가 먼저', () => {
+  it('이전 기간 전체가 기록 전이면 waiting 보다 nohist 가 먼저, 이전 기간이 전부 기록돼 있으면 첫날 운동 전은 waiting', () => {
     const w = periodOf('week', '2026-11-15');
-    expect(comparePlan(w, true, '2026-11-15', false, '2026-11-10')).toMatchObject({ mode: 'waiting', from: '2026-11-10', curFrom: '2026-11-17', fullPrev: true });
     expect(comparePlan(w, true, '2026-11-15', false, '2025-01-01')).toMatchObject({ mode: 'waiting', curFrom: '2026-11-15' });
+    expect(comparePlan(w, true, '2026-11-15', false, '2026-11-08')).toMatchObject({ mode: 'waiting', curFrom: '2026-11-15' }); // 첫 기록 = 지난주 시작: 일부 기록 아님
     expect(comparePlan(w, true, '2026-11-15', false, '2026-11-15')).toMatchObject({ mode: 'nohist', fullPrev: false });
     expect(comparePlan(w, true, '2026-11-15', true, '2026-11-10')).toMatchObject({ mode: 'nohist', fullPrev: true }); // 운동했으면 비교 끝(11/8)이 첫 기록(11/10) 앞
-    const waiting = comparePlan(w, true, '2026-11-15', false, '2026-11-10');
+    const waiting = comparePlan(w, true, '2026-11-15', false, '2025-01-01');
     expect(cardSmall(waiting, 'sets', 0, 0)).toEqual(['운동하면 비교해요']);
-    expect(headSubs({ plan: waiting, kind: 'week', current: true, mode: 'both', metric: 'sets', c: 0, pf: 5 })).toEqual(['지난주 전체까지 5세트 남았어요 (지난주는 11/10부터 기록)']);
+    expect(cardAria({ kind: 'week', current: true, metric: 'sets', cur: 0, prev: 0, waiting: true, plan: waiting })).toBe('작업 세트 0세트, 오늘 운동하면 지난주 같은 요일까지와 비교해요');
+  });
+  it('첫날 운동 전 + 이전 기간 일부 기록: 운동해도 비교 끝이 첫 기록 앞이면 "운동하면 비교해요" 대신 nohist (SPEC #13 셋째 줄 > #12 첫날 규칙)', () => {
+    // 손계산: 운동 뒤의 비교 끝 = 오늘의 한 기간 전 같은 위치 (월 12/1 → 11/1, 주 일 11/15 → 11/8, 년 1/1 → 전년 1/1) 가 모두 첫 기록일보다 앞
+    const cases: { kind: 'week' | 'month' | 'year'; today: string; first: string; prev: string; wantFoot: string; prevName: string }[] = [
+      { kind: 'month', today: '2026-12-01', first: '2026-11-10', prev: '2026-11-01', wantFoot: '지난달 이맘때는 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요 (첫 기록 11월 10일)', prevName: '지난달 이맘때' },
+      { kind: 'week', today: '2026-11-15', first: '2026-11-11', prev: '2026-11-08', wantFoot: '지난주 이맘때는 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요 (첫 기록 11월 11일)', prevName: '지난주 이맘때' },
+      { kind: 'year', today: '2027-01-01', first: '2026-03-03', prev: '2026-01-01', wantFoot: '작년 이맘때는 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요 (첫 기록 2026년 3월 3일)', prevName: '작년 이맘때' },
+    ];
+    for (const c of cases) {
+      const range = periodOf(c.kind, c.today);
+      const plan = comparePlan(range, true, c.today, false, c.first);
+      expect(plan, c.kind).toEqual({ mode: 'nohist', prev: periodOf(c.kind, c.prev), from: c.first, fullPrev: true });
+      expect(cardSmall(plan, 'sets', 0, 0), c.kind).toEqual(['이전 기록 없음']);
+      expect(cardAria({ kind: c.kind, current: true, metric: 'sets', cur: 0, prev: 0, plan }), c.kind).toBe('작업 세트 0세트, 이전 기록 없음');
+      expect(headlineText(headline({ kind: c.kind, current: true, metric: 'sets', cur: 0, prev: 0, curCount: 0, prevCount: 0, label: '이번', mode: plan.mode, first: c.first })), c.kind).toBe(`${c.prevName}는 기록을 시작하기 전이에요`);
+      const through = compareThroughFor(range, c.today, false), base = compareThroughFor(range, c.today, true);
+      expect(footnote(c.kind, true, { through, base, done: false, streak: 0, today: c.today, waiting: false, plan, first: c.first }), c.kind).toBe(c.wantFoot);
+      expect(footnote(c.kind, true, { through, base, done: false, streak: 0, today: c.today, waiting: false, plan, first: c.first }), c.kind).not.toContain('오늘 운동하면');
+    }
+    // 남은 양 줄은 그대로 (이전 기간 전체 누적선·"N 남았어요")
+    const wkPlan = comparePlan(periodOf('week', '2026-11-15'), true, '2026-11-15', false, '2026-11-11');
+    expect(headSubs({ plan: wkPlan, kind: 'week', current: true, mode: 'both', metric: 'sets', c: 0, pf: 5 })).toEqual(['지난주 전체까지 5세트 남았어요 (지난주는 11/11부터 기록)']);
+    // 경계: 월 12/1, 첫 기록 11/2 도 (비교 끝 11/1 이 앞) nohist, 11/1(= 이전 기간 시작, 일부 기록 아님)은 waiting
+    expect(comparePlan(periodOf('month', '2026-12-01'), true, '2026-12-01', false, '2026-11-02')).toMatchObject({ mode: 'nohist', fullPrev: true });
+    expect(comparePlan(periodOf('month', '2026-12-01'), true, '2026-12-01', false, '2026-11-01')).toEqual({ mode: 'waiting', prev: periodOf('month', '2026-11-01'), from: undefined, curFrom: '2026-12-01', fullPrev: true });
+    // 오늘 운동 뒤는 이미 같은 결과 (nohist), 첫날이 아니면 기존 판정
+    expect(comparePlan(periodOf('month', '2026-12-01'), true, '2026-12-01', true, '2026-11-10')).toEqual({ mode: 'nohist', prev: periodOf('month', '2026-11-01'), from: '2026-11-10', fullPrev: true });
+    expect(comparePlan(periodOf('month', '2026-12-15'), true, '2026-12-15', false, '2026-11-10')).toMatchObject({ mode: 'ok', from: '2026-11-10', through: '2026-11-14' });
   });
   it('주: 일부 기록의 같은 구간 (첫 기록 2026-11-10 화, 오늘 2026-11-18 수)', () => {
     const w = periodOf('week', '2026-11-18');
@@ -654,9 +682,31 @@ describe('comparePlan', () => {
     const wp = comparePlan(periodOf('month', '2026-03-30'), true, '2026-03-30', true, '2026-02-10');
     expect(wp).toMatchObject({ mode: 'ok', from: '2026-02-10', through: '2026-02-28' });
     expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: true, streak: 0, today: '2026-03-30', plan: wp })).toBe('▲▼ = 지난달 전체(10~28일)와 비교 · 이번 달 구간(10~30일)이 2일 더 길어요 (지난달은 2월 10일부터 기록이라 같은 구간끼리)');
-    const past = (from: string): Parameters<typeof footnoteParts>[2]['plan'] => ({ mode: 'ok', prev: null, from, fullPrev: true });
-    expect(footnote('month', false, { through: '', base: '', done: true, streak: 0, today: '2026-11-16', lens: [31, 28], plan: past('2026-02-10') })).toBe('▲▼ = 그 전 달 전체(28일)와 비교 · 이 달이 3일 더 길어요 · 그 전 달은 2월 10일부터 기록이라 같은 구간끼리');
-    expect(footnote('year', false, { through: '', base: '', done: true, streak: 0, today: '2026-11-16', lens: [366, 365], plan: past('2027-02-10') })).toBe('▲▼ = 전년 전체와 비교 · 이 해가 하루 더 길어요 · 전년은 2월 10일부터 기록이라 같은 구간끼리');
+  });
+  it('지난 기간 + 일부 기록: "전체(N일)"·길이 차이 대신 실제로 견준 이전·이번 구간 날짜 (오늘 2026-12-10, 11월 보기)', () => {
+    const today = '2026-12-10', nov = periodOf('month', '2026-11-15');
+    // 첫 기록 10/20 → 이전 쪽 10/20~31, 이번 쪽 같은 위치 11/20~30 (11월은 30일까지)
+    const p1 = comparePlan(nov, false, today, true, '2026-10-20');
+    expect(p1).toMatchObject({ mode: 'ok', from: '2026-10-20', curFrom: '2026-11-20', fullPrev: true });
+    const f1 = footnote('month', false, { through: '', base: '', done: true, streak: 0, today, lens: [30, 31], plan: p1 });
+    expect(f1).toBe('▲▼ = 그 전 달 같은 구간(10월 20일~31일)과 비교 · 이 달은 11월 20일~30일');
+    expect(f1).not.toContain('전체');
+    expect(f1).not.toContain('더 짧아요');
+    // 하루뿐: 첫 기록 10/31 → 이전 쪽 10/31 하루, 이번 쪽 11/30 (31일이 없어 말일) 하루
+    const p2 = comparePlan(nov, false, today, true, '2026-10-31');
+    expect(p2).toMatchObject({ mode: 'ok', from: '2026-10-31', curFrom: '2026-11-30' });
+    expect(footnote('month', false, { through: '', base: '', done: true, streak: 0, today, lens: [30, 31], plan: p2 })).toBe('▲▼ = 그 전 달 같은 구간(10월 31일)과 비교 · 이 달은 11월 30일');
+    // 일부 기록이 아닌 지난 달은 그대로 (전체 + 길이 차이)
+    const full = comparePlan(nov, false, today, true, '2025-01-01');
+    expect(footnote('month', false, { through: '', base: '', done: true, streak: 0, today, lens: [30, 31], plan: full })).toBe('▲▼ = 그 전 달 전체(31일)와 비교 · 이 달이 하루 더 짧아요');
+    // 달이 바뀌는 구간: 첫 기록 2/10 → 3월 보기는 이전 2/10~28, 이번 3/10~31
+    expect(footnote('month', false, { through: '', base: '', done: true, streak: 0, today: '2026-11-16', lens: [31, 28], plan: comparePlan(periodOf('month', '2026-03-15'), false, '2026-11-16', true, '2026-02-10') })).toBe('▲▼ = 그 전 달 같은 구간(2월 10일~28일)과 비교 · 이 달은 3월 10일~31일');
+    // 주: 첫 기록 화 11/10, 지난주(11/15~21) 보기 → 이전 11/10~14, 이번 11/17~21
+    expect(footnote('week', false, { through: '', base: '', done: true, streak: 0, today: '2026-11-25', plan: comparePlan(periodOf('week', '2026-11-15'), false, '2026-11-25', true, '2026-11-10') })).toBe('▲▼ = 그 전 주 같은 구간(11월 10일~14일)과 비교 · 이 주는 11월 17일~21일');
+    // 년: 윤년(2028) 보기, 첫 기록 2027-02-10 → 이전 2/10~12/31, 이번 2028-2/10~12/31
+    expect(footnote('year', false, { through: '', base: '', done: true, streak: 0, today: '2029-05-05', lens: [366, 365], plan: comparePlan(periodOf('year', '2028-06-01'), false, '2029-05-05', true, '2027-02-10') })).toBe('▲▼ = 전년 같은 구간(2월 10일~12월 31일)과 비교 · 이 해는 2월 10일~12월 31일');
+    // 이전 기간이 기록 전이면 nohist (같은 구간 문구 없음)
+    expect(footnote('month', false, { through: '', base: '', done: true, streak: 0, today, plan: comparePlan(nov, false, today, true, '2026-11-02'), first: '2026-11-02' })).toBe('그 전 달은 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요 (첫 기록 11월 2일)');
   });
   it('년: 일부 기록도 두 구간 길이로 윤년 하루 차이를 말함 (2028-03-01, 첫 기록 2027-01-15), 하루뿐인 구간', () => {
     const plan = comparePlan(periodOf('year', '2028-03-01'), true, '2028-03-01', true, '2027-01-15');
@@ -817,6 +867,21 @@ describe('D-082 WP5 보완: 경계·새 설치·읽기 문구·톤·홈', () => 
     expect(comboLine({ ...v, prevActive: false, prevEnd: '2026-11-13', from: '2026-11-12' })).toContain('지난주 같은 요일 운동 안 함');
     // 운동이 있었던 칸은 첫 기록일 판정과 무관하게 값을 적음
     expect(comboLine({ ...v, prevActive: true, prevEnd: '2026-11-13', from: '2026-11-12' })).toContain('지난주 같은 요일 0kg');
+  });
+  it('comboLine: 이번 칸이 통째로 첫 기록일 전이면 "운동 안 함" 대신 "기록 전" (칸 끝 ≤ 첫 기록일)', () => {
+    const m = { kind: 'month' as const, metric: 'sets' as const, value: 0, active: false, cum: 0 };
+    // 첫 기록 11/10: 11/3 칸(끝 11/4)·11/9 칸(끝 11/10)은 기록 전, 11/10 칸(끝 11/11)은 기록일 당일이라 안 한 것
+    expect(comboLine({ ...m, start: '2026-11-03', end: '2026-11-04', first: '2026-11-10' })).toBe('11월 3일 (화) · 기록 전 · 누적 0세트');
+    expect(comboLine({ ...m, start: '2026-11-09', end: '2026-11-10', first: '2026-11-10' })).toBe('11월 9일 (월) · 기록 전 · 누적 0세트');
+    expect(comboLine({ ...m, start: '2026-11-10', end: '2026-11-11', first: '2026-11-10' })).toBe('11월 10일 (화) · 운동 안 함 · 누적 0세트');
+    // first·end 가 없으면 기존 문구, 운동한 칸은 값 그대로
+    expect(comboLine({ ...m, start: '2026-11-03' })).toBe('11월 3일 (화) · 운동 안 함 · 누적 0세트');
+    expect(comboLine({ ...m, start: '2026-11-03', end: '2026-11-04' })).toBe('11월 3일 (화) · 운동 안 함 · 누적 0세트');
+    expect(comboLine({ ...m, start: '2026-11-10', end: '2026-11-11', first: '2026-11-10', value: 4, active: true, cum: 4 })).toBe('11월 10일 (화) · 작업 세트 4세트 · 누적 4세트');
+    // 년: 첫 기록 3/3 → 2월 칸(끝 3/1)만 기록 전, 3월 칸(끝 4/1)은 운동 안 함.
+    const y = { ...m, kind: 'year' as const };
+    expect(comboLine({ ...y, start: '2026-02-01', end: '2026-03-01', first: '2026-03-03' })).toBe('2026년 2월 · 기록 전 · 누적 0세트');
+    expect(comboLine({ ...y, start: '2026-03-01', end: '2026-04-01', first: '2026-03-03' })).toBe('2026년 3월 · 운동 안 함 · 누적 0세트');
   });
   it('각주: 하루 구간은 "30일" 한 날로 (30~30일 없음), 주·년 하루도 기존대로', () => {
     const t2 = '2026-12-31';

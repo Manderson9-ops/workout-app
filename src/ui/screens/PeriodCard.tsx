@@ -153,12 +153,12 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
   const avgLeg = avgParts(kind, metric, avgV, ton, avgExcl);
   const unitWord = wide ? '달별' : '날짜별';
   /** 한 칸 문구(막대 보기): "11월 16일 (월) · 작업 세트 9세트 · 운동 1회" (일·월 보기에서 지표가 운동 수가 아니면 운동한 칸에 횟수를 덧붙임) */
-  const bucketLine = (i: number) => !cur.active[i] ? `${bucketText(kind, buckets[i]!.start)} · 운동 안 함` : `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!, ton)}${!wide && metric !== 'count' ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
+  const bucketLine = (i: number) => !cur.active[i] ? `${bucketText(kind, buckets[i]!.start)} · ${first !== null && buckets[i]!.end <= first ? '기록 전' : '운동 안 함'}` : `${bucketText(kind, buckets[i]!.start)} · ${METRIC_NAME[metric]} ${valueText(metric, vals[i]!, ton)}${!wide && metric !== 'count' ? ` · 운동 ${cur.series.count[i]}회` : ''}`;
   const legend = legendNames({ mode, kind, current, label, plan });
   const pwName = prevVals ? prevName(kind, current, true) : undefined;
   /** 한 칸 문구(막대+누적 보기): "11월 16일 (월) · 작업 세트 22세트 · 누적 22세트 · 지난주 같은 요일 15세트" */
   const prevBuckets = useMemo(() => (plan.prev ? periodBuckets(plan.prev) : null), [plan.prev]);
-  const comboText = (i: number) => comboLine({ kind, start: buckets[i]!.start, metric, value: vals[i]!, active: cur.active[i]!, cum: vals.slice(0, i + 1).reduce((a, b) => a + b, 0), prev: prevVals ? (i < prevVals.length ? prevVals[i]! : null) : null, prevActive: prevFull?.active[i], pw: pwName, ton, prevEnd: prevBuckets && i < prevBuckets.length ? prevBuckets[i]!.end : undefined, from: plan.from });
+  const comboText = (i: number) => comboLine({ kind, start: buckets[i]!.start, metric, value: vals[i]!, active: cur.active[i]!, cum: vals.slice(0, i + 1).reduce((a, b) => a + b, 0), prev: prevVals ? (i < prevVals.length ? prevVals[i]! : null) : null, prevActive: prevFull?.active[i], pw: pwName, ton, prevEnd: prevBuckets && i < prevBuckets.length ? prevBuckets[i]!.end : undefined, from: plan.from, end: buckets[i]!.end, first: first ?? undefined });
   const total = `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}`;
   const caption = empty ? '' : selv === null ? chartCaption({ mode, kind, label, pw: pwName }) : mode === 'both' ? comboText(selv) : bucketLine(selv);
   const cumLabel = `누적 ${METRIC_NAME[metric]} 그래프 · ${legend.cur} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}${legend.prev && prevVals ? ` · ${legend.prev} ${valueText(metric, prevVals.reduce((a, b) => a + b, 0), ton)}` : ''}`;

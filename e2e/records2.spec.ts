@@ -382,6 +382,42 @@ test('지난달 전체 비교 · 전체 기록 (오늘 12/31, 지난달은 30일
   await sweep(page, W, today);
 });
 
+test('월 첫날 운동 전 + 지난달 일부 기록 (오늘 12/1 화, 첫 기록 11/10): 운동해도 비교 끝(11/1)이 첫 기록 앞이라 "운동하면 비교해요" 대신 이전 기록 없음 (SPEC #13 셋째 줄)', async ({ page }) => {
+  const W = [row('2026-11-10', 3), row('2026-11-17', 4), row('2026-11-24', 2)], today = '2026-12-01';
+  await open(page, W, today);
+  await unitBtn(page, 'month').click();
+  await viewBtn(page, 'both').click();
+  await verify(page, W, today, 'month', 'sets', 'both');
+  await expect(card(page).getByTestId('period-headline')).toHaveText('이번 달: 지난달 이맘때는 기록을 시작하기 전이에요'); // 앞 이름은 화면 읽기용
+  await expect(card(page).getByTestId('period-foot')).toHaveText('지난달 이맘때는 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요 (첫 기록 11월 10일)');
+  await expect(card(page).getByTestId('period-sub')).toHaveText(['지난달 전체까지 9세트 남았어요 (지난달은 11/10부터 기록)']); // 지난달 전체 누적선·남은 양은 그대로
+  await expect(card(page).getByTestId('pm-note')).toHaveCount(0);
+  for (const m of METRICS) {
+    await expect(card(page).getByTestId(`pm-${m}`).locator('.pm-prev')).toHaveText('이전 기록 없음');
+    await expect(card(page).getByTestId(`pm-${m}`).locator('.pm-badge')).toHaveCount(0);
+  }
+  await expect(card(page)).not.toContainText('운동하면 비교해요');
+  await expect(card(page)).not.toContainText('오늘 운동하면');
+  await sweep(page, W, today, ['month']);
+});
+
+test('현재 기간에서 통째로 첫 기록일 전인 칸은 "기록 전" (오늘 목 11/19, 첫 기록 수 11/18): 일~화 칸, 첫 기록일 당일 이후 0 은 "운동 안 함"', async ({ page }) => {
+  const W = [row('2026-11-18', 3), row('2026-11-19', 2)], today = '2026-11-19';
+  await open(page, W, today);
+  await unitBtn(page, 'week').click();
+  const chart = page.getByTestId('period-chart'), cap = card(page).getByTestId('period-caption');
+  for (const mode of ['both', 'bar'] as const) {
+    await viewBtn(page, mode).click();
+    await chart.focus();
+    for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft'); // 첫 화살표는 오늘(목)을 고르고, 네 번 더 왼쪽 = 일요일 칸
+    await verify(page, W, today, 'week', 'sets', mode, 0);
+    await expect(cap).toHaveText(mode === 'both' ? '11월 15일 (일) · 기록 전 · 누적 0세트' : '11월 15일 (일) · 기록 전');
+    await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight'); // 화요일 칸 (첫 기록 하루 전)
+    await verify(page, W, today, 'week', 'sets', mode, 2);
+    await expect(cap).toContainText('11월 17일 (화) · 기록 전');
+  }
+});
+
 test('지난 기간: 작년(normal) 보기 = 전년이 기록 전 (이번 기간이 아닌 곳의 기록 전 비교)', async ({ page }) => {
   const { W, today } = gen('normal');
   await open(page, W, today);
@@ -403,7 +439,7 @@ test('지난 기간: 일부 기록의 같은 구간이 이번 기간이 아닌 �
   await verify(page, W1, t1, 'week', 'sets', 'both', null, 6);
   await expect(card(page).getByTestId('period-label')).toHaveText('2월 15일부터 한 주');
   await expect(card(page).getByTestId('period-sub')).toHaveText('그 전 주 기록이 2월 10일부터라 2월 17일 이후끼리 견줬어요');
-  await expect(card(page).getByTestId('period-foot')).toHaveText('▲▼ = 그 전 주 전체와 비교 · 그 전 주는 2월 10일부터 기록이라 같은 구간끼리');
+  await expect(card(page).getByTestId('period-foot')).toHaveText('▲▼ = 그 전 주 같은 구간(2월 10일~14일)과 비교 · 이 주는 2월 17일~21일');
   await card(page).getByRole('button', { name: '이전 주' }).click(); // 7주 전: 그 전 주(2/1~7)는 첫 기록 전
   await verify(page, W1, t1, 'week', 'sets', 'both', null, 7);
   await unitBtn(page, 'month').click();

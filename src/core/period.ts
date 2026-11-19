@@ -162,7 +162,7 @@ export function alignFwd(date: string, kind: PeriodKind): string {
 
 /**
  * 이전 기간과 견주는 방법. none = 전체 탭(견줄 이전 기간 없음), nohist = 이전 기간(또는 비교 구간)이 첫 기록일 전,
- * waiting = 기간 첫날 운동 전, ok = 비교.
+ * waiting = 기간 첫날 운동 전(오늘 운동한 뒤의 비교 구간이 첫 기록일 뒤일 때만), ok = 비교.
  * from = 이전 기간이 일부만 기록된 경우 첫 기록일(이전 쪽 비교 시작), curFrom = 이번 쪽 비교 시작(from 을 같은 위치로 옮긴 날, from 이 없으면 기간 시작),
  * through = 이전 쪽 비교 끝(현재 기간만), fullPrev = 이전 기간 전체 값(막대·누적선·남은 양)을 보여 줄 수 있음
  */
@@ -174,7 +174,10 @@ export function comparePlan(range: PeriodRange, current: boolean, today: string,
   const from = first > prev.start ? first : undefined;
   const curFrom = from ? alignFwd(from, range.kind) : range.start;
   if (!current) return { mode: 'ok', prev, from, curFrom, fullPrev: true };
-  if (waitingForToday(range, today, todayDone)) return { mode: 'waiting', prev, from, curFrom, fullPrev: true };
+  if (waitingForToday(range, today, todayDone)) {
+    if (from && from > compareThroughFor(range, today, true)) return { mode: 'nohist', prev, from, fullPrev: true }; // 운동해도 비교 끝이 첫 기록 앞: 지키지 못할 "운동하면 비교해요"를 약속하지 않음 (SPEC #13 셋째 줄이 #12 첫날 규칙보다 구체적)
+    return { mode: 'waiting', prev, from, curFrom, fullPrev: true };
+  }
   const through = compareThroughFor(range, today, todayDone);
   if (from && from > through) return { mode: 'nohist', prev, from, fullPrev: true };
   return { mode: 'ok', prev, from, curFrom, through, fullPrev: true };

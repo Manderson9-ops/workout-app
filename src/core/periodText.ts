@@ -1,6 +1,6 @@
 /** D-081·D-082 기간 요약 문구 (순수 함수). 조사(이/가·은/는·와/과)는 받침으로 고른다 */
 import { WD, weekRangeText } from './dateText';
-import { durText, durParts } from './stats';
+import { addDays, durText, durParts } from './stats';
 import { comparePlan, firstRecordDate, hasWorkoutOn, periodData, periodOf } from './period';
 import type { ComparePlan, PeriodKind, PeriodMetric, PeriodRange, PeriodTotals } from './period';
 import type { BodyweightEntry } from './stats';
@@ -200,10 +200,12 @@ const streakText = (n: number): string => (n > 0 ? ` · 연속 ${n}주` : '');
 /** 날수 차이 문구: 1일이면 "하루" */
 const dayGap = (n: number): string => (n === 1 ? '하루' : `${n}일`);
 const wdOf = (date: string): number => { const [y, m, d] = date.split('-').map(Number); return new Date(y!, m! - 1, d!).getDay(); };
+/** 일부 기록 지난 기간의 비교 구간 문구: 하루 "10월 31일", 같은 달 "10월 20일~31일", 달이 다르면 "3월 3일~12월 31일" */
+const spanText = (a: string, b: string): string => (a === b ? md(a) : a.slice(0, 7) === b.slice(0, 7) ? `${md(a)}~${Number(b.slice(8))}일` : `${md(a)}~${md(b)}`);
 /**
  * 아래 작은 글씨 조각 (날짜는 nw 라 줄 중간에서 안 갈림). 현재 기간이면 through = 실제로 견주는 이전 기간 끝 날짜(오늘 운동 전이면 어제 기준), base = 오늘 운동하면 견줄 끝 날짜.
  * 운동 전이면 "오늘 운동하면 ○까지"로 바뀌는 구간을 알려 줌. lens = 지난 달을 볼 때 [이 달 날수, 그 전 달 날수].
- * plan·first(D-082): 전체 탭 안내, 이전 기간이 기록 전이면 비교 안 함 안내(first = 첫 기록일), 일부 기록이면 범위 시작을 첫 기록일로 하고 같은 구간끼리 안내
+ * plan·first(D-082): 전체 탭 안내, 이전 기간이 기록 전이면 비교 안 함 안내(first = 첫 기록일), 일부 기록이면 범위 시작을 첫 기록일로 하고 같은 구간끼리 안내 (지난 기간은 "전체" 대신 이전·이번 쪽 실제 구간 날짜)
  */
 export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: string; base: string; done: boolean; streak: number; today: string; waiting?: boolean; lens?: [number, number]; plan?: ComparePlan; first?: string }): HeadlinePart[] {
   const { through, base, done, streak, today, waiting = false, lens, plan, first } = o;
@@ -212,12 +214,15 @@ export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: 
   if (plan?.mode === 'nohist' && first) return [T(`${josa(current && plan.fullPrev ? prevName(kind, true) : pw, '은', '는')} 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요`), ...(first ? [N(` (첫 기록 ${yPre(first, today)}${md(first)})`)] : [])];
   const from = plan?.mode === 'ok' ? plan.from : undefined;
   const same = from ? [T(`(${josa(pw, '은', '는')} ${md(from)}부터 기록이라 같은 구간끼리)`)] : []; // 현재 기간: "까지와 비교" 바로 뒤
-  const sameTail = from ? [T(` · ${josa(pw, '은', '는')} ${md(from)}부터 기록이라 같은 구간끼리`)] : []; // 지난 기간: 끝에
   const later = !done && through !== base; // 오늘 운동하면 견줄 끝이 달라질 때만 알림
   if (!current) {
-    if (kind === 'month' && lens && lens[0] !== lens[1]) return [T('▲▼ = 그 전 달 전체'), N(`(${lens[1]}일)`), T('와 비교 · 이 달이 '), N(dayGap(Math.abs(lens[0] - lens[1]))), T(lens[0] > lens[1] ? ' 더 길어요' : ' 더 짧아요'), ...sameTail];
-    if (kind === 'year' && lens && lens[0] !== lens[1]) return [T(`▲▼ = 전년 전체와 비교 · 이 해가 하루 ${lens[0] > lens[1] ? '더 길어요' : '더 짧아요'}`), ...sameTail];
-    return [T(`▲▼ = ${prevName(kind, false)} 전체와 비교`), ...sameTail];
+    if (plan?.mode === 'ok' && plan.from && plan.prev && plan.curFrom) { // 일부 기록: 전체가 아니라 첫 기록일부터의 같은 구간끼리 견줌 (이전 쪽 끝 = 이전 기간 마지막 날, 이번 쪽 끝 = 이번 기간 마지막 날)
+      const prevLast = addDays(plan.prev.end, -1), curLast = addDays(periodOf(kind, plan.curFrom).end, -1);
+      return [T(`▲▼ = ${pw} 같은 구간`), N(`(${spanText(plan.from, prevLast)})`), T(`과 비교 · ${josa(kind === 'week' ? '이 주' : kind === 'month' ? '이 달' : '이 해', '은', '는')} `), N(spanText(plan.curFrom, curLast))];
+    }
+    if (kind === 'month' && lens && lens[0] !== lens[1]) return [T('▲▼ = 그 전 달 전체'), N(`(${lens[1]}일)`), T('와 비교 · 이 달이 '), N(dayGap(Math.abs(lens[0] - lens[1]))), T(lens[0] > lens[1] ? ' 더 길어요' : ' 더 짧아요')];
+    if (kind === 'year' && lens && lens[0] !== lens[1]) return [T(`▲▼ = 전년 전체와 비교 · 이 해가 하루 ${lens[0] > lens[1] ? '더 길어요' : '더 짧아요'}`)];
+    return [T(`▲▼ = ${prevName(kind, false)} 전체와 비교`)];
   }
   if (waiting) return kind === 'week' ? [T('▲▼ = 오늘 운동하면 지난주 같은 요일'), N('(일)'), T(`까지와 비교${streakText(streak)} · 일요일~토요일 기준`)] : kind === 'month' ? [T('▲▼ = 오늘 운동하면 지난달 같은 날'), N('(1일)'), T('까지와 비교')] : [T('▲▼ = 오늘 운동하면 작년 같은 날'), N('(1월 1일)'), T('까지와 비교')];
   const [, m, d] = through.split('-').map(Number);
@@ -275,15 +280,17 @@ export function chartCaption(o: { mode: ChartMode; kind: PeriodKind; label: stri
  * 막대+누적 보기에서 칸을 골랐을 때 문구: "11월 16일 (월) · 작업 세트 22세트 · 누적 22세트 · 지난주 같은 요일 15세트".
  * active = 그 칸에 운동이 있었나, prev = 이전 기간 같은 칸(요일·날·달) 값 (이전 기간 선이 없거나 칸이 없으면 생략), prevActive = 이전 칸에 운동이 있었나:
  * 운동이 있었으면 값이 0 이어도 그 값(맨몸 운동의 볼륨 "0kg"), 없었으면 "운동 안 함".
- * prevEnd = 그 이전 칸의 끝 날짜(미포함), from = 이전 기간 첫 기록일: 칸이 통째로 첫 기록일 전(prevEnd ≤ from)이면 운동 없음은 "기록 전"
+ * prevEnd = 그 이전 칸의 끝 날짜(미포함), from = 이전 기간 첫 기록일: 칸이 통째로 첫 기록일 전(prevEnd ≤ from)이면 운동 없음은 "기록 전".
+ * end = 이 칸의 끝 날짜(미포함), first = 첫 기록일: 이 칸이 통째로 첫 기록일 전(end ≤ first)이면 "운동 안 함" 대신 "기록 전"
  */
-export function comboLine(o: { kind: PeriodKind; start: string; metric: PeriodMetric; value: number; active: boolean; cum: number; prev?: number | null; prevActive?: boolean; pw?: string; ton?: boolean; prevEnd?: string; from?: string }): string {
-  const { kind, start, metric, value, active, cum, prev, prevActive = false, pw, ton = false, prevEnd, from } = o;
+export function comboLine(o: { kind: PeriodKind; start: string; metric: PeriodMetric; value: number; active: boolean; cum: number; prev?: number | null; prevActive?: boolean; pw?: string; ton?: boolean; prevEnd?: string; from?: string; end?: string; first?: string }): string {
+  const { kind, start, metric, value, active, cum, prev, prevActive = false, pw, ton = false, prevEnd, from, end, first } = o;
   const prevZero = prevEnd && from && prevEnd <= from ? '기록 전' : '운동 안 함';
+  const idle = end && first && end <= first ? '기록 전' : '운동 안 함';
   const same = kind === 'week' ? '요일' : kind === 'month' ? '날' : '달';
   return [
     bucketText(kind, start),
-    active ? `${METRIC_NAME[metric]} ${valueText(metric, value, ton)}` : '운동 안 함',
+    active ? `${METRIC_NAME[metric]} ${valueText(metric, value, ton)}` : idle,
     `누적 ${valueText(metric, cum, ton)}`,
     ...(prev !== undefined && prev !== null && pw ? [`${pw} 같은 ${same} ${prevActive ? valueText(metric, prev, ton) : prevZero}`] : []),
   ].join(' · ');
