@@ -8,20 +8,24 @@ import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, 
 import type { PeriodKind, PeriodMetric } from '../../core/period';
 import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, wholePrevMonth, WAITING_LINE, prevNote, avgParts, metricValue, periodLabel, rangeText, compareLine, headline, cardAria, bucketText, footnoteParts } from '../../core/periodText';
 import { WD } from '../../core/dateText';
+import { parsePeriodPref, serializePeriodPref } from '../../core/periodPref';
 import { PeriodBars } from '../charts';
 import type { BucketState } from '../charts';
 
 const KEY = 'stats.period.v1';
 const KINDS: PeriodKind[] = ['week', 'month', 'year'];
-const UNIT_WORD: Record<PeriodKind, string> = { week: '주', month: '달', year: '해' };
+const UNIT_WORD: Record<PeriodKind, string> = { week: '주', month: '달', year: '해', all: '전체' };
 
+// 보기(mode)는 저장만 하고 아직 쓰지 않음, 전체 탭('all')도 이 화면에는 아직 없어 주로 되돌림
 function readPref(): { kind: PeriodKind; metric: PeriodMetric } {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as { kind?: unknown; metric?: unknown } | null;
-    return { kind: KINDS.find((k) => k === v?.kind) ?? 'week', metric: METRICS.find((m) => m === v?.metric) ?? 'sets' };
-  } catch { return { kind: 'week', metric: 'sets' }; }
+  let raw: string | null = null;
+  try { raw = localStorage.getItem(KEY); } catch { /* 못 읽으면 기본값 */ }
+  const p = parsePeriodPref(raw);
+  return { kind: p.kind === 'all' ? 'week' : p.kind, metric: p.metric };
 }
-function writePref(kind: PeriodKind, metric: PeriodMetric) { try { localStorage.setItem(KEY, JSON.stringify({ kind, metric })); } catch { /* 저장 못 해도 화면은 동작 */ } }
+function writePref(kind: PeriodKind, metric: PeriodMetric) {
+  try { localStorage.setItem(KEY, serializePeriodPref({ kind, metric, mode: parsePeriodPref(localStorage.getItem(KEY)).mode })); } catch { /* 저장 못 해도 화면은 동작 */ }
+}
 
 export function PeriodCard({ done, byId, today, bw }: { done: Workout[]; byId: Map<string, Exercise>; today: string; bw: AppState['bodyweight'] }) {
   const [pref, setPref] = useState(readPref);
