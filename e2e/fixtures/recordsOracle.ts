@@ -349,7 +349,7 @@ function footOf(W: MockRow[], today: string, kind: Kind, off: number, plan: Plan
   }
   if (kind === 'month') {
     const fd = from ? dNum(from) : 1, td = dNum(today) - (done ? 0 : 1);
-    if (td > dNum(through)) return `▲▼ = 지난달 전체${days(fd, dNum(through))}와 비교 · 이번 달 구간${days(fd, td)}이 ${dayGap(td - dNum(through))} 더 길어요${same}`;
+    if (td > dNum(through)) return `▲▼ = 지난달 전체${days(fd, dNum(through))}와 비교 · 이번 달 구간${days(fd, td)}이 ${dayGap(td - dNum(through))} 더 길어요${same ? ` ${same}` : ''}`;
     return `▲▼ = 지난달 같은 날${from ? span(from, through, `${mdK(from)}~${mdK(through)}`) : dNum(through) === 1 ? '(1일)' : `(1~${dNum(through)}일)`}까지와 비교${same}${later ? ` · 오늘 운동하면 ${dNum(base)}일까지` : ''}`;
   }
   const dn = (s: string): number => uT(s) / 86400000;
@@ -373,9 +373,9 @@ export function selectedCaption(W: MockRow[], today: string, kind: Kind, metric:
   if (plan.full && kind !== 'all') {
     const pb = bucketsOf(kind, plan.ps, plan.pe);
     if (i < pb.length) {
-      const pv = sumRows(W, metric, pb[i]!.start, add(pb[i]!.end, -1));
+      const pv = sumRows(W, metric, pb[i]!.start, add(pb[i]!.end, -1)), pActive = countRows(W, pb[i]!.start, add(pb[i]!.end, -1)) > 0; // 이전 칸에 운동이 있었나 (값이 0 이어도 운동은 있을 수 있음)
       const zero = plan.from && pb[i]!.end <= plan.from ? '기록 전' : '운동 안 함'; // 이전 칸이 통째로 첫 기록일 전
-      parts.push(`${PW[kind]} 같은 ${kind === 'week' ? '요일' : kind === 'month' ? '날' : '달'} ${pv > 0 ? val(metric, pv, ton) : zero}`);
+      parts.push(`${PW[kind]} 같은 ${kind === 'week' ? '요일' : kind === 'month' ? '날' : '달'} ${pActive ? val(metric, pv, ton) : zero}`);
     }
   }
   return parts.join(' · ');

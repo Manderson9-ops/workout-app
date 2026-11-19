@@ -228,7 +228,7 @@ export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: 
     // 이번 달이 더 길어 기준일이 지난달 말일을 넘으면 지난달 전체와 견줌
     const fd = from ? Number(from.slice(8)) : 1;
     const days = (a: number, b: number): string => (a === b ? `(${a}일)` : `(${a}~${b}일)`); // 하루뿐이면 "(30일)"
-    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(days(fd, d!)), T('와 비교 · 이번 달 구간'), N(days(fd, Number(today.slice(8)) - (done ? 0 : 1))), T('이 '), N(dayGap(Number(today.slice(8)) - (done ? 0 : 1) - d!)), T(' 더 길어요'), ...same];
+    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(days(fd, d!)), T('와 비교 · 이번 달 구간'), N(days(fd, Number(today.slice(8)) - (done ? 0 : 1))), T('이 '), N(dayGap(Number(today.slice(8)) - (done ? 0 : 1) - d!)), T(' 더 길어요'), ...(same.length ? [T(' '), ...same] : [])];
     return [T('▲▼ = 지난달 같은 날'), N(from ? span(from, through, `${md(from)}~${md(through)}`) : d === 1 ? '(1일)' : `(1~${d}일)`), T('까지와 비교'), ...same, ...(later ? [T(' · 오늘 운동하면 '), N(`${bd}일까지`)] : [])];
   }
   // 윤년이 끼면 두 구간 날수가 하루 다름 (오늘 운동 전이면 이번 해 구간도 어제까지)
@@ -273,18 +273,19 @@ export function chartCaption(o: { mode: ChartMode; kind: PeriodKind; label: stri
 
 /**
  * 막대+누적 보기에서 칸을 골랐을 때 문구: "11월 16일 (월) · 작업 세트 22세트 · 누적 22세트 · 지난주 같은 요일 15세트".
- * active = 그 칸에 운동이 있었나, prev = 이전 기간 같은 칸(요일·날·달) 값 (이전 기간 선이 없거나 칸이 없으면 생략, 0 이면 "운동 안 함").
- * prevEnd = 그 이전 칸의 끝 날짜(미포함), from = 이전 기간 첫 기록일: 칸이 통째로 첫 기록일 전(prevEnd ≤ from)이면 0 은 "기록 전"
+ * active = 그 칸에 운동이 있었나, prev = 이전 기간 같은 칸(요일·날·달) 값 (이전 기간 선이 없거나 칸이 없으면 생략), prevActive = 이전 칸에 운동이 있었나:
+ * 운동이 있었으면 값이 0 이어도 그 값(맨몸 운동의 볼륨 "0kg"), 없었으면 "운동 안 함".
+ * prevEnd = 그 이전 칸의 끝 날짜(미포함), from = 이전 기간 첫 기록일: 칸이 통째로 첫 기록일 전(prevEnd ≤ from)이면 운동 없음은 "기록 전"
  */
-export function comboLine(o: { kind: PeriodKind; start: string; metric: PeriodMetric; value: number; active: boolean; cum: number; prev?: number | null; pw?: string; ton?: boolean; prevEnd?: string; from?: string }): string {
-  const { kind, start, metric, value, active, cum, prev, pw, ton = false, prevEnd, from } = o;
+export function comboLine(o: { kind: PeriodKind; start: string; metric: PeriodMetric; value: number; active: boolean; cum: number; prev?: number | null; prevActive?: boolean; pw?: string; ton?: boolean; prevEnd?: string; from?: string }): string {
+  const { kind, start, metric, value, active, cum, prev, prevActive = false, pw, ton = false, prevEnd, from } = o;
   const prevZero = prevEnd && from && prevEnd <= from ? '기록 전' : '운동 안 함';
   const same = kind === 'week' ? '요일' : kind === 'month' ? '날' : '달';
   return [
     bucketText(kind, start),
     active ? `${METRIC_NAME[metric]} ${valueText(metric, value, ton)}` : '운동 안 함',
     `누적 ${valueText(metric, cum, ton)}`,
-    ...(prev !== undefined && prev !== null && pw ? [`${pw} 같은 ${same} ${prev > 0 ? valueText(metric, prev, ton) : prevZero}`] : []),
+    ...(prev !== undefined && prev !== null && pw ? [`${pw} 같은 ${same} ${prevActive ? valueText(metric, prev, ton) : prevZero}`] : []),
   ].join(' · ');
 }
 
@@ -299,11 +300,11 @@ export function legendNames(o: { mode: ChartMode; kind: PeriodKind; current: boo
 
 /**
  * 홈 "이번 주" 카드의 ▲▼ 재료: 기록 탭 주 카드와 같은 비교 구간(comparePlan)의 이번 주·지난주 합.
- * 첫 기록 전(nohist)·기록 없음·첫날 운동 전(waiting)이면 null (▲▼ 를 보여 주지 않음). 일부 기록이면 이번 쪽은 curFrom 부터, 지난주는 from~through 만
+ * 첫 기록 전(nohist)·기록 없음·첫날 운동 전(waiting)·일부 기록(plan.from: 지난주가 첫 기록일 뒤에 시작해 같은 구간끼리 견줘야 함)이면 null (▲▼ 를 보여 주지 않음)
  */
 export function homeWeekDelta(done: Workout[], byId: Map<string, Exercise>, bw: BodyweightEntry[], today: string): { cur: PeriodTotals; prev: PeriodTotals } | null {
   const week = periodOf('week', today);
   const plan = comparePlan(week, true, today, hasWorkoutOn(done, today), firstRecordDate(done, today));
-  if (plan.mode !== 'ok' || !plan.prev) return null;
+  if (plan.mode !== 'ok' || !plan.prev || plan.from) return null; // 일부 기록(plan.from)이면 홈엔 같은 구간 안내를 쓸 자리가 없어 ▲▼ 도 없음
   return { cur: periodData(done, byId, week, bw, today, plan.curFrom).totals, prev: periodData(done, byId, plan.prev, bw, plan.through, plan.from).totals };
 }

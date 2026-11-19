@@ -268,6 +268,28 @@ describe('7일 점 그래프 값', () => {
     expect(s.mk).toBe(50);
   });
 
+  it('첫 계산 폭이 딱 0.5(최소 0.6 미만)인 경계: 가운데 맞춤으로 0.6 이 되어 0.8 ~ 1.4', () => {
+    // 하루 2세트 61일 + 오늘 8일 전만 3세트. 4주 창 합 56(+1), 7일 합 14(+1): 비율 = 4×a7÷c28
+    //  · 3세트 날 이전 5일(오늘 13~9일 전): 4×14÷56 = 1.0
+    //  · 3세트 날부터 7일(8~2일 전): 4×15÷57 = 1.0526
+    //  · 그 뒤 2일(어제·오늘): 4×14÷57 = 0.9825
+    // 점 14개(오늘 7일 + 지난주 7일)의 최솟값 0.9825 → (0.9825 - 0.15) 소수 한 자리 내림 0.8, 최댓값 1.0526 → (1.0526 + 0.15) 올림 1.3: 폭 0.5
+    // 0.5 < 0.6 이라 가운데 1.05 에서 ±0.3 → lo = round(0.75×10)/10 = 0.8(0.75 는 반올림 위로), hi = 0.8 + 0.6 = 1.4
+    const first = '2026-08-01', today = ds(dn(first) + 60), counts: Record<string, number> = {};
+    for (let k = 0; k <= 60; k++) counts[ds(dn(first) + k)] = 2;
+    counts[ds(dn(today) - 8)] = 3;
+    const s = shown(view(fromCounts(counts), today));
+    const seen = [...s.days, ...s.days.map((d) => ds(dn(d) - 7))].map((d) => oracle(counts, first, d)!);
+    expect(Math.min(...seen)).toBeCloseTo(56 / 57, 10);
+    expect(Math.max(...seen)).toBeCloseTo(60 / 57, 10);
+    expect(Math.floor((Math.min(...seen) - 0.15) * 10) / 10).toBeCloseTo(0.8, 10); // 첫 계산 lo
+    expect(Math.ceil((Math.max(...seen) + 0.15) * 10) / 10).toBeCloseTo(1.3, 10); // 첫 계산 hi (폭 0.5)
+    expect(s.lo).toBeCloseTo(0.8, 10);
+    expect(s.hi).toBeCloseTo(1.4, 10);
+    expect(s.hi - s.lo).toBeCloseTo(0.6, 10);
+    for (const r of [...s.rs, ...s.rp]) { expect(r).not.toBeNull(); expect(r!).toBeGreaterThanOrEqual(s.lo); expect(r!).toBeLessThanOrEqual(s.hi); }
+  });
+
   it('값이 넓게 퍼지면 최소 폭 규칙 없이 ±0.15 바깥 한 칸 눈금', () => {
     const first = '2026-08-01', counts: Record<string, number> = {};
     for (let k = 0; k < 36; k++) counts[ds(dn(first) + k)] = k % 7 === 0 ? 6 : k >= 30 ? 0 : 1; // 일주일에 한 번 크게, 마지막 6일은 쉼

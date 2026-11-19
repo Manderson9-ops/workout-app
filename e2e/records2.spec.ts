@@ -361,7 +361,7 @@ test('지난달 전체 비교 + 일부 기록 (첫 기록 2/10, 오늘 3/30 운�
   await expect(card(page).getByTestId('period-headline')).toHaveText('이번 달: 지난달 전체보다 작업 세트가 6세트 많아요');
   await expect(card(page).getByTestId('period-range')).toHaveText('3월 1일~31일 vs. 지난달 전체');
   await expect(card(page).getByTestId('period-sub')).toHaveText(['지난달 기록이 2월 10일부터라 3월 10일 이후끼리 견줬어요', '지난달 전체(9세트)를 넘었어요 (지난달은 2/10부터 기록)']);
-  await expect(card(page).getByTestId('period-foot')).toHaveText('▲▼ = 지난달 전체(10~28일)와 비교 · 이번 달 구간(10~30일)이 2일 더 길어요(지난달은 2월 10일부터 기록이라 같은 구간끼리)');
+  await expect(card(page).getByTestId('period-foot')).toHaveText('▲▼ = 지난달 전체(10~28일)와 비교 · 이번 달 구간(10~30일)이 2일 더 길어요 (지난달은 2월 10일부터 기록이라 같은 구간끼리)');
   const sets = card(page).getByTestId('pm-sets');
   await expect(sets).toHaveAttribute('aria-label', '작업 세트 20세트, 3월 10일부터 15세트, 지난달 전체(10~28일) 9세트보다 6세트 많음');
   await expect(sets.locator('.pm-prev')).toHaveText(['3/10~ 15세트', '이전 9세트']);
@@ -439,7 +439,7 @@ test('새 설치 + 주 첫날(일요일): 각주는 0.9.17 대기 문구', async
   await sweep(page, [], today, ['week', 'month', 'year']);
 });
 
-test('홈 "이번 주" ▲▼ = 기록 탭 주 카드: 2주차 새 사용자(첫 기록 목 11/12, 오늘 목 11/19)는 둘 다 ▼ 1세트, 1주차(첫 기록 11/18)는 홈에 ▲▼ 없음', async ({ page }) => {
+test('홈 "이번 주" ▲▼: 2주차 새 사용자(첫 기록 목 11/12, 오늘 목 11/19)는 기록 탭만 같은 구간 ▼ 1세트(설명 있음), 홈은 ▲▼ 없음 — 1주차(첫 기록 11/18)도 홈 없음', async ({ page }) => {
   // 이번 쪽 11/19 하루(2세트·1회) vs 지난 쪽 11/12 하루(3세트·1회): 세트 ▼1, 운동 =
   const W = [row('2026-11-12', 3), row('2026-11-15', 4), row('2026-11-18', 1), row('2026-11-19', 2)];
   const today = '2026-11-19';
@@ -452,11 +452,10 @@ test('홈 "이번 주" ▲▼ = 기록 탭 주 카드: 2주차 새 사용자(첫
   await page.goto('./#/');
   const home = page.getByTestId('home-week');
   await expect(home).toBeVisible();
-  await expect(home.locator('.delta')).toHaveCount(2);
-  await expect(home.locator('.delta').nth(1)).toContainText('▼1');
-  await expect(home.locator('.delta').nth(1)).toContainText('지난주보다');
-  await expect(home.locator('.delta').nth(1)).toContainText('지난주보다 1 적음'); // 화면 읽기 문구
-  await expect(home.locator('.delta').nth(0)).toContainText('지난주와 같음');
+  await expect(home).toHaveAttribute('aria-label', /3회, 작업 세트 7개/); // 이번 주 전체 합은 그대로
+  await expect(home.locator('.delta')).toHaveCount(0); // 일부 기록(같은 구간끼리) 비교는 홈에 설명할 자리가 없어 ▲▼ 없음
+  await expect(home).not.toContainText('▼');
+  await expect(home).not.toContainText('▲');
   // 1주차: 지난주가 기록 전 → 홈 ▲▼ 없음, 기록 탭 카드는 "이전 기록 없음"
   const W2 = [row('2026-11-18', 2), row('2026-11-19', 1)];
   await idbPut(page, 'workouts', W2.map((r) => toWorkout(r)).concat([]));
@@ -522,6 +521,28 @@ test('전체 탭 긴 기록(60달, 320px): x 라벨은 1월·첫 칸만, 파랑 
   expect(Math.max(...g.cur), `파랑 막대 최대 너비 ${Math.max(...g.cur)} ≤ 칸 ${slot}`).toBeLessThanOrEqual(slot + 0.001);
   expect(Math.min(...g.cur)).toBeGreaterThan(1);
 });
+
+/** 전체 탭 x 라벨(그래프 아래 줄) 글씨 상자들, 왼쪽부터 */
+const allXLabels = (page: Page) => page.locator('[data-testid="period-chart"], [data-testid="period-cum"]').first().locator('svg').evaluate((svg) => {
+  const h = Number(svg.getAttribute('height'));
+  return [...svg.querySelectorAll('text')].filter((t) => Number(t.getAttribute('y')) > h / 2).map((t) => { const b = t.getBoundingClientRect(); return { text: t.textContent ?? '', left: b.left, right: b.right }; }).sort((p, q) => p.left - q.left);
+});
+for (const w of [320, 375]) {
+  test(`전체 탭 첫 기록 2025-12 · 오늘 2026-11-20 (12달, ${w}px): 누적·막대+누적 둘 다 x 라벨 글씨 상자가 겹치지 않고, 1월(26.1)이 남는다`, async ({ page }) => {
+    const today = '2026-11-20', W = synth('2025-12-03', today, 3);
+    await open(page, W, today);
+    await page.setViewportSize({ width: w, height: 800 });
+    await unitBtn(page, 'all').click();
+    for (const mode of ['both', 'cum'] as const) {
+      await viewBtn(page, mode).click();
+      await verify(page, W, today, 'all', 'sets', mode);
+      await expect.poll(async () => (await allXLabels(page)).map((l) => l.text).includes('26.1'), { message: `${w}px ${mode} 1월 라벨` }).toBe(true);
+      const labels = await allXLabels(page);
+      expect(labels.length, `${w}px ${mode} 라벨 ${labels.map((l) => l.text).join(' ')}`).toBeGreaterThanOrEqual(2);
+      for (let i = 1; i < labels.length; i++) expect(labels[i]!.left, `${w}px ${mode}: "${labels[i - 1]!.text}" 과 "${labels[i]!.text}" 가 겹침`).toBeGreaterThanOrEqual(labels[i - 1]!.right);
+    }
+  });
+}
 
 // ---------- 375px · 320px ----------
 for (const w of [375, 320]) {

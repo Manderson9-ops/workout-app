@@ -1,5 +1,5 @@
 /** D-081·D-082 기간 요약 카드: 주·월·년·전체 전환, 큰 숫자, 이전 기간과 비교 한 문장, 그래프 보기 3종(누적·막대·막대+누적), 지표 카드 4개 (Apple 피트니스 요약 모양) */
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import type { Workout } from '../../core/session';
 import type { Exercise } from '../../core/types';
@@ -100,6 +100,18 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
     };
   }, [done, byId, range, bw, current, today, plan]);
   const streak = useMemo(() => weekStreak(done, today), [done, today]);
+  const chartBox = useRef<HTMLDivElement | null>(null); // 그래프 칸 폭(전체 탭 x 라벨이 안 겹치게 고를 때 씀). 그래프(charts.tsx useWidth)와 같은 폭: 감싼 상자의 clientWidth
+  const [cw, setCw] = useState(340);
+  useLayoutEffect(() => {
+    const el = chartBox.current;
+    if (!el) return;
+    const set = () => { const w = Math.round(el.clientWidth); if (w > 0) setCw(w); };
+    set();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const t = cur.totals, tc = curCmp.totals, p = prevCmp?.totals ?? ZERO;
   const label = periodLabel(range, off, today);
@@ -114,6 +126,20 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
     if (kind === 'all') return mo === 1 || i === 0 ? `${Number(b.start.slice(2, 4))}.${mo}` : buckets.length <= 36 && (mo - 1) % 3 === 0 ? String(mo) : ''; // 36달 넘게 길면 1월과 첫 칸만 (글씨가 겹치지 않게)
     return String(i + 1);
   });
+  if (kind === 'all') {
+    // 전체 탭: 고른 글씨 중 앞 글씨와 겹치는 것은 뺌 (글씨 폭 ≈ 글자 수 × 0.6 × 글자 크기 11px(charts.tsx FS), 가운데 정렬이라 두 글씨 폭 절반의 합 + 4px 이상 떨어져야 함). 1월은 연도가 있어 앞의 첫 칸·분기 글씨를 밀어냄
+    const slot = (cw - 16) / buckets.length; // charts.tsx 가장자리 8px 씩
+    const half = (t: string) => t.length * 0.6 * 11 / 2;
+    const isJan = (i: number) => buckets[i]!.start.slice(5, 7) === '01';
+    const clash = (a: number, b: number) => (b - a) * slot < half(xLabels[a]!) + half(xLabels[b]!) + 4;
+    const kept: number[] = [];
+    xLabels.forEach((t, i) => {
+      if (!t) return;
+      if (isJan(i)) while (kept.length && !isJan(kept[kept.length - 1]!) && clash(kept[kept.length - 1]!, i)) kept.pop();
+      if (!kept.length || !clash(kept[kept.length - 1]!, i)) kept.push(i);
+    });
+    xLabels.forEach((_, i) => { if (!kept.includes(i)) xLabels[i] = ''; });
+  }
   const { value: avgV, n: avgN, excluded: avgExcl } = averageOver(kind, vals, cur.active, state); // 년·전체 보기는 진행 중인 이번 달을 평균에서 뺌
   const whole = plan.mode === 'ok' && wholePrevMonth(kind, current, { through, today, done: todayDone }); // 이번 달이 더 길어 지난달 전체와 견줌
   const wholeDays = whole ? Number(through.slice(8)) : 0;
@@ -132,7 +158,7 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
   const pwName = prevVals ? prevName(kind, current, true) : undefined;
   /** 한 칸 문구(막대+누적 보기): "11월 16일 (월) · 작업 세트 22세트 · 누적 22세트 · 지난주 같은 요일 15세트" */
   const prevBuckets = useMemo(() => (plan.prev ? periodBuckets(plan.prev) : null), [plan.prev]);
-  const comboText = (i: number) => comboLine({ kind, start: buckets[i]!.start, metric, value: vals[i]!, active: cur.active[i]!, cum: vals.slice(0, i + 1).reduce((a, b) => a + b, 0), prev: prevVals ? (i < prevVals.length ? prevVals[i]! : null) : null, pw: pwName, ton, prevEnd: prevBuckets && i < prevBuckets.length ? prevBuckets[i]!.end : undefined, from: plan.from });
+  const comboText = (i: number) => comboLine({ kind, start: buckets[i]!.start, metric, value: vals[i]!, active: cur.active[i]!, cum: vals.slice(0, i + 1).reduce((a, b) => a + b, 0), prev: prevVals ? (i < prevVals.length ? prevVals[i]! : null) : null, prevActive: prevFull?.active[i], pw: pwName, ton, prevEnd: prevBuckets && i < prevBuckets.length ? prevBuckets[i]!.end : undefined, from: plan.from });
   const total = `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}`;
   const caption = empty ? '' : selv === null ? chartCaption({ mode, kind, label, pw: pwName }) : mode === 'both' ? comboText(selv) : bucketLine(selv);
   const cumLabel = `누적 ${METRIC_NAME[metric]} 그래프 · ${legend.cur} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}${legend.prev && prevVals ? ` · ${legend.prev} ${valueText(metric, prevVals.reduce((a, b) => a + b, 0), ton)}` : ''}`;
@@ -174,6 +200,7 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
           {legend.prev && <span class="ps-lg-i">{mode === 'both' && <i class="lg-bar prev" aria-hidden="true" />}<i class="lg-line prev" aria-hidden="true" />{legend.prev}</span>}
         </div>
       )}
+      <div ref={chartBox}>
       {mode === 'cum'
         ? <PeriodCum values={vals} prev={prevVals} state={state} labels={xLabels} fmt={(x) => valueText(metric, x, ton)} label={cumLabel} empty={empty ? emptyText : undefined} />
         : <PeriodBars mode={mode} prev={prevVals} values={vals} labels={xLabels} state={state} selected={selv} onSelect={v.pick}
@@ -182,6 +209,7 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
           labelClass={kind === 'week' ? ['sun', '', '', '', '', '', 'sat'] : undefined}
           empty={empty ? emptyText : undefined}
           summary={`${total} · 방향키로 칸을 고르면 ${unitWord} 값`} label={`${kind === 'year' || kind === 'all' ? '월별' : '일별'} ${METRIC_NAME[metric]} 그래프`} />}
+      </div>
       {plan.mode === 'ok' && <p class="sub small pm-note" data-testid="pm-note">{prevNote(kind, current, whole)}</p>}
       <div class="pm-grid">
         {METRICS.map((m) => {

@@ -64,7 +64,7 @@ function ThisWeekCard({ s }: { s: AppState }) {
   const { done, cur, delta } = useMemo(() => {
     const byId = new Map(all.map((e) => [e.id, e]));
     const done = historyOf(s);
-    return { done, cur: weekSummary(done, byId, ws, s.bodyweight, today), delta: homeWeekDelta(done, byId, s.bodyweight, today) }; // delta = 기록 탭 주 카드와 같은 비교 구간 (첫 기록 전·첫날 운동 전은 null → ▲▼ 없음)
+    return { done, cur: weekSummary(done, byId, ws, s.bodyweight, today), delta: homeWeekDelta(done, byId, s.bodyweight, today) }; // delta = 기록 탭 주 카드와 같은 전체 주 비교 (첫 기록 전·첫날 운동 전·일부 기록(같은 구간끼리 견줘야 함)은 null → ▲▼ 없음: 홈엔 구간 안내를 쓸 자리가 없음)
   }, [all, s.workouts, s.bodyweight, ws, today]);
   const never = done.length === 0;
   const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
