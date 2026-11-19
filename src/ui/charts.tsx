@@ -4,6 +4,8 @@
  */
 import type { ComponentChildren } from 'preact';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { loadVd, loadZone } from '../core/stats';
+import { WD } from '../core/dateText';
 
 export interface Point { label: string; value: number }
 export interface PairPoint { label: string; planned: number; actual: number }
@@ -224,5 +226,55 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
         {avg !== undefined && avg > 0 && <line x1={pad.l} x2={w - pad.r} y1={y(avg)} y2={y(avg)} class="pb-avg" />}
       </svg>
     </div>
+  );
+}
+
+/**
+ * D-082 훈련 부하 7일 점 그래프: 실선 = 최근 7일 비율, 점선 = 각각 7일 전. 점 위치·세로 범위는 원래 값, 점 옆 숫자·오늘 점 색은 화면 값(vd).
+ * 구간 색 띠·기준선은 세로 범위 안에서만. 비율이 없는 날은 점 대신 "–", 실선은 빈 날을 건너뛰어 잇는다
+ */
+export function LoadDots({ days, rs, rp, lo, hi, label, height = 130 }: { days: string[]; rs: (number | null)[]; rp: (number | null)[]; lo: number; hi: number; label: string; height?: number }) {
+  const pl = 20, pr = 34, pt = 16, pb = 34, inner = height - pt - pb;
+  const y = (v: number) => pt + inner - (inner * (Math.min(Math.max(v, lo), hi) - lo)) / (hi - lo);
+  return (
+    <Frame h={height} label={label} render={(w) => {
+      const sx = (w - pl - pr) / 6, x = (i: number) => pl + i * sx;
+      const pts = (arr: (number | null)[]) => arr.flatMap((r, i) => (r === null ? [] : [{ i, r }]));
+      const ps = pts(rp), ss = pts(rs);
+      const poly = (a: { i: number; r: number }[]) => a.map((p) => `${x(p.i).toFixed(1)},${y(p.r).toFixed(1)}`).join(' ');
+      return (
+        <>
+          {([[0, 0.8, 'low'], [0.8, 1.3, 'ok'], [1.3, 1.5, 'warn'], [1.5, 99, 'bad']] as const).map(([a, b, z]) => {
+            const a2 = Math.max(a, lo), b2 = Math.min(b, hi);
+            return b2 > a2 ? <rect key={z} x={pl} y={y(b2)} width={w - pl - pr} height={y(a2) - y(b2)} class={`ld-band ${z}`} /> : null;
+          })}
+          {[0.8, 1.3, 1.5].filter((t) => t > lo && t < hi).map((t) => (
+            <g key={t}>
+              <line x1={pl} x2={w - pr} y1={y(t)} y2={y(t)} class="ch-grid" />
+              <text x={w - 4} y={y(t) + 4} class="ch-text" font-size={FS} text-anchor="end">{t.toFixed(1)}</text>
+            </g>
+          ))}
+          {ps.length > 1 && <polyline points={poly(ps)} class="ld-prev-line" />}
+          {ps.map((p) => <circle key={p.i} cx={x(p.i)} cy={y(p.r)} r="2.5" class="ld-prev-dot" />)}
+          {ss.length > 1 && <polyline points={poly(ss)} class="ld-line" />}
+          {rs.map((r, i) => {
+            const last = i === rs.length - 1, [yy, mm, dd] = (days[i] ?? '').split('-').map(Number);
+            const wd = WD[new Date(yy!, mm! - 1, dd!).getDay()];
+            return (
+              <g key={i}>
+                {r === null
+                  ? <text x={x(i)} y={pt + inner / 2} class="ch-text" font-size={FS} text-anchor="middle">–</text>
+                  : <>
+                      <circle cx={x(i)} cy={y(r)} r={last ? 6 : 4} class={last ? `ld-today ${loadZone(loadVd(r))}` : 'ld-dot'} />
+                      <text x={x(i)} y={Math.max(FS, y(r) - 9)} class="ch-val" font-size={FS} text-anchor="middle">{loadVd(r).toFixed(2)}</text>
+                    </>}
+                <text x={x(i)} y={height - 18} class={last ? 'ch-val ld-today-text' : 'ch-text'} font-size={FS} text-anchor="middle">{wd}</text>
+                <text x={x(i)} y={height - 5} class="ch-text" font-size={FS} text-anchor="middle">{dd}</text>
+              </g>
+            );
+          })}
+        </>
+      );
+    }} />
   );
 }

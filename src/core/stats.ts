@@ -344,3 +344,86 @@ export function plannedVsActual(sums: WorkoutSummary[], last = 10): { n: number;
   const avgRatio = Math.round((xs.reduce((s, x) => s + x.durationSec / x.plannedSec!, 0) / xs.length) * 100) / 100;
   return { n: xs.length, avgDiffSec, avgRatio };
 }
+
+// ---- D-082 훈련 부하 (SPEC #5): 최근 7일 작업 세트 ÷ 4주 평균. 계산식 정본 = docs/mockups/records/SPEC.md ----
+
+export type LoadZone = 'low' | 'ok' | 'warn' | 'bad';
+
+/** 날짜별 작업 세트 수: 센 운동만, 현지 날짜, 오늘까지. 완료했고 웜업이 아닌 세트는 맨몸·시간 운동도 1세트 */
+export function dailyWorkSets(workouts: Workout[], byId: Map<string, Exercise>, today: string): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const w of workouts) {
+    if (!isCountedWorkout(w)) continue;
+    const { date } = dayOf(w);
+    if (date > today) continue;
+    out.set(date, (out.get(date) ?? 0) + summarize(w, byId).workSets);
+  }
+  return out;
+}
+
+/** 달력 날짜 차이 (b − a) */
+function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  return Math.round((Date.UTC(by!, bm! - 1, bd!) - Date.UTC(ay!, am! - 1, ad!)) / 86400000);
+}
+
+/** day 의 부하 비율 (원래 값). 첫 기록일부터 21일이 안 됐으면 null, 4주 합이 0 이면 0. 분모는 쉰 날을 포함한 달력 날 수(최대 28) */
+export function loadRatio(daily: Map<string, number>, first: string, day: string): number | null {
+  const nd = Math.min(28, daysBetween(first, day) + 1);
+  if (nd < 21) return null;
+  let a7 = 0, c = 0;
+  for (let i = 0; i < nd; i++) {
+    const v = daily.get(addDays(day, -i)) ?? 0;
+    if (i < 7) a7 += v;
+    c += v;
+  }
+  return c === 0 ? 0 : a7 / (c / (nd / 7));
+}
+
+/** 화면 값: 소수 둘째 자리 (0.625 → 0.63). Math.round(v*100)/100 은 부동소수 때문에 틀릴 수 있어 toFixed 로 */
+export const loadVd = (v: number): number => Number(v.toFixed(2));
+
+/** 구간은 화면 값(vd)으로: 0.8 미만 / 1.3 이하 / 1.5 이하 / 그 위 */
+export function loadZone(vd: number): LoadZone {
+  return vd < 0.8 ? 'low' : vd <= 1.3 ? 'ok' : vd <= 1.5 ? 'warn' : 'bad';
+}
+
+export interface LoadHidden { show: false; histDays: number; nd: number }
+export interface LoadShown {
+  show: true; histDays: number; nd: number;
+  /** 오늘 화면 값·구간 */
+  vd: number; zone: LoadZone;
+  /** 오늘까지 7일 작업 세트 */
+  last7: number;
+  /** 지난주 같은 요일 화면 값 (없으면 null) */
+  prevVd: number | null;
+  /** 오늘−6 … 오늘 날짜와 비율(원래 값, 없는 날 null), 각각 7일 전 비율 */
+  days: string[]; rs: (number | null)[]; rp: (number | null)[];
+  /** 점 그래프 세로 범위 */
+  lo: number; hi: number;
+  /** 띠 위 표시 위치(%) = min(100, vd/2·100) */
+  mk: number;
+}
+export type LoadView = LoadHidden | LoadShown;
+
+/** 훈련 부하 카드 값 한 번에. first = 첫 기록일(period.ts firstRecordDate, 없으면 null) */
+export function loadView(workouts: Workout[], byId: Map<string, Exercise>, today: string, first: string | null): LoadView {
+  if (first === null) return { show: false, histDays: 0, nd: 0 };
+  const histDays = daysBetween(first, today) + 1;
+  const nd = Math.min(28, histDays);
+  if (histDays < 21) return { show: false, histDays, nd };
+  const daily = dailyWorkSets(workouts, byId, today);
+  const v = loadRatio(daily, first, today) ?? 0;
+  const vd = loadVd(v);
+  let last7 = 0;
+  for (let i = 0; i < 7; i++) last7 += daily.get(addDays(today, -i)) ?? 0;
+  const pv = loadRatio(daily, first, addDays(today, -7));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6));
+  const rs = days.map((d) => loadRatio(daily, first, d));
+  const rp = days.map((d) => loadRatio(daily, first, addDays(d, -7)));
+  const seen = [...rs, ...rp].filter((x): x is number => x !== null);
+  let lo = Math.max(0, Math.floor((Math.min(...seen) - 0.15) * 10) / 10), hi = Math.ceil((Math.max(...seen) + 0.15) * 10) / 10;
+  if (hi - lo < 0.6) { lo = Math.max(0, Math.round(((hi + lo) / 2 - 0.3) * 10) / 10); hi = Number((lo + 0.6).toFixed(1)); }
+  return { show: true, histDays, nd, vd, zone: loadZone(vd), last7, prevVd: pv === null ? null : loadVd(pv), days, rs, rp, lo, hi, mk: Math.min(100, vd / 2 * 100) };
+}

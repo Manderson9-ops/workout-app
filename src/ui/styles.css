@@ -954,3 +954,37 @@ button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opac
   button.pm-card .m-val.xlong .num { font-size: 12px; }
   button.pm-card .m-val.xlong .unit { font-size: 10px; }
 }
+
+/* D-082 훈련 부하 카드 (구간 색은 기존 토큰: 적음 = 옅은 파랑, 보통 = 초록, 많음 = 주황, 크게 많음 = 빨강) */
+.load-card { --z-low: var(--acc-text); --z-ok: var(--ok); --z-warn: var(--warn); --z-bad: var(--bad); }
+.load-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 8px; flex-wrap: wrap; margin: 0 0 8px; }
+.load-head .card-title { margin: 0; }
+.load-top { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.load-ratio { font-size: 44px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.load-zone { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: var(--r-pill); }
+.load-zone.low { background: var(--acc-soft); color: var(--z-low); }
+.load-zone.ok { background: var(--ok-soft); color: var(--z-ok); }
+.load-zone.warn { background: rgba(245, 158, 11, .16); color: var(--z-warn); }
+.load-zone.bad { background: var(--bad-soft); color: var(--bad-fg); }
+.load-band { position: relative; height: 10px; border-radius: 6px; margin: 14px 0 4px; opacity: .85;
+  background: linear-gradient(90deg, var(--z-low) 0 40%, var(--z-ok) 40% 65%, var(--z-warn) 65% 75%, var(--z-bad) 75% 100%); }
+.load-mk { position: absolute; top: -5px; width: 4px; height: 20px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px var(--card); }
+.load-band-l { position: relative; height: 16px; font-size: 11px; color: var(--sub); }
+.load-band-l span { position: absolute; transform: translateX(-50%); }
+.load-band-l span:first-child { transform: none; } .load-band-l span:last-child { transform: translateX(-100%); }
+.load-week { margin: 10px 0 0; font-size: 14px; font-weight: 700; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; }
+.load-say { margin: 8px 0 8px; font-size: 14px; line-height: 1.55; word-break: keep-all; overflow-wrap: break-word; }
+.load-wait { margin: 6px 0; font-size: 14px; color: var(--sub); line-height: 1.55; word-break: keep-all; }
+.load-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 0 0; }
+.load-legend i { display: inline-block; width: 18px; height: 0; vertical-align: middle; margin-right: 6px; border-top: 2px solid var(--text); opacity: .8; }
+.load-legend i.load-lg-dash { border-top: 2px dashed var(--sub); opacity: 1; }
+.load-note { margin: 10px 0 0; font-size: 12px; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; }
+.ld-band { opacity: .1; }
+.ld-band.low { fill: var(--z-low); } .ld-band.ok { fill: var(--z-ok); } .ld-band.warn { fill: var(--z-warn); } .ld-band.bad { fill: var(--z-bad); }
+.ld-line { fill: none; stroke: var(--text); stroke-opacity: .8; stroke-width: 2; }
+.ld-prev-line { fill: none; stroke: var(--sub); stroke-width: 2; stroke-dasharray: 4 3; }
+.ld-prev-dot { fill: var(--sub); }
+.ld-dot { fill: var(--card); stroke: var(--text); stroke-width: 2; }
+.ld-today { stroke: var(--bg); stroke-width: 2; }
+.ld-today.low { fill: var(--z-low); } .ld-today.ok { fill: var(--z-ok); } .ld-today.warn { fill: var(--z-warn); } .ld-today.bad { fill: var(--z-bad); }
+.ld-today-text { font-weight: 700; }
