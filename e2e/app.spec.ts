@@ -937,6 +937,10 @@ test.describe('D-081 시각 고정 (한국 시간)', () => {
     await expect(page.getByTestId('this-week')).toContainText('1회');
     // D-054·D-081: 이번 주 7칸 그래프(일요일 시작), 오늘 칸 하나, 운동 1회가 오늘 칸 값으로 보임
     const chart = page.getByTestId('period-chart');
+    await expect(page.getByTestId('view-both')).toHaveAttribute('aria-pressed', 'true'); // D-082: 처음 보기는 막대+누적
+    await expect(chart.locator('rect.pb-cur')).toHaveCount(1); // 막대+누적: 운동한 오늘 칸 하나
+    await expect(chart.locator('rect.pb-cur.now')).toHaveCount(1);
+    await page.getByTestId('view-bar').click(); // 7칸(미래 칸 포함)은 막대 보기에서
     await expect(chart.locator('rect.pb-bar')).toHaveCount(7);
     await expect(chart.locator('rect.pb-bar.now')).toHaveCount(1);
     await expect(page.getByTestId('this-week').getByRole('button', { name: /^운동 1회/ })).toBeVisible();
@@ -975,7 +979,7 @@ test.describe('D-081 시각 고정 (한국 시간)', () => {
     await expect(page.getByRole('img', { name: /체중: .*72\.5kg/ })).toBeVisible();
     await expect(page.getByRole('button', { name: '고치기' })).toBeVisible();
     await checkScreen(page, '10-stats');
-    await page.getByRole('tab', { name: '요약' }).click();
+    await page.getByRole('tab', { name: '운동 기록' }).click(); // D-082: 요약 탭의 "최근 운동" 3개는 기간 내역으로 바뀌어, 카드는 운동 기록 탭에서
     await expect(page.getByRole('button', { name: /^팔 테스트,.*세트 1,.*바벨 컬 1세트 최고 30kg × 10회/ }).first()).toBeVisible(); // 카드 요약 이름
     await expect(page.getByRole('button', { name: /팔 테스트/ }).first()).toContainText('바벨 컬 · 1세트 · 최고 30kg × 10회');
     await page.getByRole('button', { name: /팔 테스트/ }).first().click();
@@ -1504,6 +1508,7 @@ test('최근 운동 고치기·지우기 (D-035): 홈 카드 → 수정 → 무�
   await expect(page.getByRole('status').filter({ hasText: '홈에서 뺐어요' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '최근 운동' })).toHaveCount(0);
   await page.getByRole('link', { name: '기록' }).click();
+  await page.getByRole('tab', { name: '운동 기록' }).click(); // D-082: 카드는 운동 기록 탭 (요약은 기간 내역)
   const row = page.getByRole('button', { name: /^등 \(고침\),.*\(홈에서 뺌\)$/ });
   await expect(row).toBeVisible();
   await expect(row).toContainText('홈에서 뺌');
@@ -2951,6 +2956,7 @@ test.describe('D-058 애플워치 연동', () => {
     await page.getByRole('link', { name: '기록', exact: true }).click();
     await expect(page.getByTestId('rec-night')).toContainText('어젯밤 수면 5시간 30분 · 안정 심박 56 · HRV 48ms (애플워치, 참고)');
     await expect(page.getByTestId('rec-sleep-tip')).toHaveAttribute('href', '#/recovery');
+    await page.getByRole('tab', { name: '운동 기록' }).click(); // D-082: 카드는 운동 기록 탭 (요약은 기간 내역)
     await expect(page.locator('main').getByTestId('wc-watch-pending').first()).toHaveText('애플워치 값 확인 중');
     await checkScreen(page, '93-stats-watch');
     await page.locator('main .wcard').first().click();

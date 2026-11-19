@@ -58,7 +58,7 @@ export function usePeriodView(done: Workout[], today: string): PeriodView {
   const [shown, setShown] = useState(SHOWN);
   const off = anchor && kind !== 'all' ? offsetOf(kind, anchor, today) : 0;
   const reset = () => { setSel(null); setShown(SHOWN); };
-  const change = (next: Partial<PeriodPref>) => { const p = { ...pref, ...next }; setPref(p); writePref(p); reset(); };
+  const change = (next: Partial<PeriodPref>, keepSel = false) => { const p = { ...pref, ...next }; setPref(p); writePref(p); if (!keepSel) reset(); };
   const day0 = useRef(today);
   useEffect(() => { if (day0.current !== today) { day0.current = today; setSel(null); } }, [today]); // 날이 바뀌면 고른 칸만 비움 (처음 그릴 때는 건드리지 않음)
 
@@ -75,7 +75,7 @@ export function usePeriodView(done: Workout[], today: string): PeriodView {
   return {
     kind, metric, mode, off, current, range, first, todayDone, plan, buckets, state, selv, shown, atEnd,
     setKind: (k) => { if (k === kind) return; change({ kind: k }); setAnchor(null); },
-    setMetric: (m) => { if (m !== metric) change({ metric: m }); },
+    setMetric: (m) => { if (m !== metric) change({ metric: m }, true); },
     setMode: (m) => { if (m !== mode) change({ mode: m }); },
     go: (n) => { setAnchor(n <= 0 ? null : shiftPeriod(periodOf(kind, today), -n).start); reset(); },
     pick: (i) => { setSel(i); setShown(SHOWN); },

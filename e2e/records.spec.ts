@@ -32,6 +32,8 @@ test.beforeEach(async ({ page }) => {
     done('s1', 2026, 9, 10, 3), // 9월
     done('y1', 2025, 6, 7, 6), // 작년 (가장 오래된 기록)
   ]);
+  // D-082: 처음 보기는 막대+누적. 이 파일의 시험은 막대 보기 기준이라 새로 고치기 전에 저장값을 심는다 (addInitScript 는 "기억" 시험을 깨므로 쓰지 않음)
+  await page.evaluate(() => localStorage.setItem('stats.period.v1', JSON.stringify({ kind: 'week', metric: 'sets', mode: 'bar' })));
   await page.reload();
   await page.getByRole('link', { name: '기록', exact: true }).click();
   await expect(page.getByTestId('this-week')).toBeVisible();
@@ -82,7 +84,7 @@ test('이전·다음 이동과 끝 비활성', async ({ page }) => {
   await expect(card(page).getByTestId('period-label')).toHaveText('작년');
   await expect(py).toBeDisabled(); // 가장 오래된 기록이 2025년
   await expect(card(page).getByRole('button', { name: '다음 해' })).toBeEnabled();
-  await expect(card(page).getByTestId('period-headline')).toContainText('전년은 운동이 없었어요');
+  await expect(card(page).getByTestId('period-headline')).toContainText('전년은 기록을 시작하기 전이에요'); // D-082 #13: 전년(2024)이 첫 기록(2025-06) 전에 모두 끝남
 });
 
 test('볼륨 카드를 누르면 그래프 지표가 바뀐다', async ({ page }) => {
@@ -129,14 +131,15 @@ test('고른 단위·지표는 새로 열어도 기억 (이동한 기간은 이�
   await expect(card(page).getByTestId('period-label')).toHaveText('이번 달');
 });
 
-test('390px 가로 스크롤 없음 (주·월·년)', async ({ page }) => {
+test('390px 가로 스크롤 없음 (주·월·년·전체)', async ({ page }) => {
   const noScroll = async () => expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
-  for (const k of ['주', '월', '년']) {
+  for (const k of ['주', '월', '년', '전체']) {
     await kind(page, k).click();
     await card(page).getByTestId('pm-time').click();
     await noScroll();
   }
   await page.setViewportSize({ width: 390, height: 844 });
+  await kind(page, '년').click();
   await expect(bars(page)).toHaveCount(12);
   await noScroll();
 });
@@ -201,7 +204,7 @@ test('운동한 날 점·평균 범례·큰 숫자 쉼표·이동줄', async ({ 
   await expect(card(page).getByTestId('period-avg')).toHaveCount(0); // 주·월 보기의 운동 수는 평균선 없음
   await card(page).getByRole('button', { name: '이전 주' }).click();
   await card(page).getByRole('button', { name: '이전 주' }).click();
-  await expect(card(page).getByTestId('period-range')).toHaveText('vs. 그 전 주'); // 라벨이 날짜면 범위 줄은 없음
+  await expect(card(page).getByTestId('period-range')).toHaveText('11월 1일~7일 vs. 그 전 주'); // D-082: 이름이 "11월 1일부터 한 주"여도 날짜 범위 줄은 늘 보임
 });
 
 test('지난 주 운동 안 한 날을 고르면 "운동 안 함", 일요일 라벨은 빨강·토요일은 파랑', async ({ page }) => {
@@ -286,7 +289,7 @@ test('주가 바뀌는 자정: 지난 기간을 보던 중이면 같은 날짜 �
   await card(page).getByRole('button', { name: '이전 주' }).click();
   await expect(card(page).getByTestId('period-label')).toHaveText('지난주'); // 11/8~14
   await page.clock.setFixedTime(new Date('2026-11-22T00:00:03+09:00')); // 일요일 0시
-  await expect(card(page).getByTestId('period-label')).toHaveText('11월 8일~14일'); // 이제 2주 전이지만 같은 주
+  await expect(card(page).getByTestId('period-label')).toHaveText('11월 8일부터 한 주'); // 이제 2주 전이지만 같은 주 (D-082 이름 형식)
   await card(page).getByRole('button', { name: '다음 주' }).click();
   await card(page).getByRole('button', { name: '다음 주' }).click();
   await expect(card(page).getByTestId('period-label')).toHaveText('이번 주');
@@ -445,12 +448,15 @@ test('320px: 1,000시간이 넘는 시간 카드도 카드 안에 한 줄 (W7)',
   expect(v.x + v.width, '카드 안').toBeLessThanOrEqual(b.x + b.width + 0.5);
   const inner = await c.locator('.m-val').evaluate((e) => e.scrollWidth <= e.clientWidth + 1);
   expect(inner, '넘치지 않음').toBe(true);
-  const pv = c.locator('.pm-prev');
-  await expect(pv).toContainText('이전 1,0');
-  const pb = (await pv.boundingBox())!;
-  expect(pb.height, '이전 값 한 줄').toBeLessThan(20);
-  expect(pb.x + pb.width, '이전 값이 카드 안').toBeLessThanOrEqual(b.x + b.width + 0.5);
-  expect(await pv.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), '이전 값이 넘치지 않음').toBe(true);
+  const pvs = c.locator('.pm-prev'); // D-082: 일부 기록 기간(작년이 6/7부터 기록)은 두 줄 — "6/7~ 이번 쪽 값" / "이전 값"
+  await expect(pvs).toHaveCount(2);
+  await expect(pvs.last()).toContainText('이전 1,0');
+  for (const pv of await pvs.all()) {
+    const pb = (await pv.boundingBox())!;
+    expect(pb.height, '이전 값 한 줄').toBeLessThan(20);
+    expect(pb.x + pb.width, '이전 값이 카드 안').toBeLessThanOrEqual(b.x + b.width + 0.5);
+    expect(await pv.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), '이전 값이 넘치지 않음').toBe(true);
+  }
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth)).toBe(true);
 });
 
@@ -498,13 +504,15 @@ for (const w of [320, 341, 360, 375, 390]) {
     const measure = async (tag: string) => {
       const c = card(page).getByTestId('pm-time');
       const mv = await c.locator('.m-val').evaluate((e) => e.getBoundingClientRect().height);
-      const pv = await c.locator('.pm-prev').evaluate((e) => e.getBoundingClientRect().height);
-      const b = (await c.boundingBox())!, v = (await c.locator('.m-val').boundingBox())!, p = (await c.locator('.pm-prev').boundingBox())!;
-      console.log(`MEASURE w=${w} ${tag} m-val=${mv.toFixed(1)} pm-prev=${pv.toFixed(1)} valRight=${(v.x + v.width).toFixed(1)} prevRight=${(p.x + p.width).toFixed(1)} cardRight=${(b.x + b.width).toFixed(1)}`);
+      const b = (await c.boundingBox())!, v = (await c.locator('.m-val').boundingBox())!;
       expect(mv, `${tag} 큰 숫자 한 줄`).toBeLessThan(26);
-      expect(pv, `${tag} 이전 값 한 줄`).toBeLessThan(20);
       expect(v.x + v.width, `${tag} 큰 숫자가 카드 안`).toBeLessThanOrEqual(b.x + b.width + 0.5);
-      expect(p.x + p.width, `${tag} 이전 값이 카드 안`).toBeLessThanOrEqual(b.x + b.width + 0.5);
+      for (const [i, pl] of (await c.locator('.pm-prev').all()).entries()) { // D-082: 일부 기록 기간은 작은 줄이 두 줄 ("6/7~ 값" / "이전 값")
+        const p = (await pl.boundingBox())!;
+        console.log(`MEASURE w=${w} ${tag} m-val=${mv.toFixed(1)} pm-prev#${i}=${p.height.toFixed(1)} valRight=${(v.x + v.width).toFixed(1)} prevRight=${(p.x + p.width).toFixed(1)} cardRight=${(b.x + b.width).toFixed(1)}`);
+        expect(p.height, `${tag} 작은 줄 ${i + 1} 한 줄`).toBeLessThan(20);
+        expect(p.x + p.width, `${tag} 작은 줄 ${i + 1} 이 카드 안`).toBeLessThanOrEqual(b.x + b.width + 0.5);
+      }
       expect(await page.evaluate(() => document.scrollingElement!.scrollWidth <= document.scrollingElement!.clientWidth), `${tag} 가로 스크롤 없음`).toBe(true);
     };
     await expect(card(page).getByTestId('pm-time').locator('.num').first()).toHaveText(/^[0-9]{3}$/); // 이번 주 세 자리 시간

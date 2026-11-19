@@ -997,6 +997,7 @@ button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opac
   button.pm-card .m-val.xlong .m-pair:last-child { margin-right: 0; }
   button.pm-card .m-val.xlong .num { font-size: 12px; }
   button.pm-card .m-val.xlong .unit { font-size: 10px; }
+  button.pm-card .pm-prev.xlong { font-size: 10px; white-space: nowrap; } /* 일부 기록 기간 첫째 작은 줄("6/7~ 1,178시간 20분")도 341~375px 에서 한 줄 */
 }
 
 /* D-082 훈련 부하 카드 (구간 색은 기존 토큰: 적음 = 옅은 파랑, 보통 = 초록, 많음 = 주황, 크게 많음 = 빨강) */
