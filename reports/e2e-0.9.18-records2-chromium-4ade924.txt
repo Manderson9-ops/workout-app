@@ -1,0 +1,42 @@
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - import "./dateText" without a file extension (src/core/changelog.ts:1:26). Add the file extension
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - import "./dateText" without a file extension (src/core/changelog.ts:1:26). Add the file extension
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 30 tests using 1 worker
+
+[1/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › normal: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[2/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › normal: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[3/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › rest: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[4/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › rest: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[5/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › first: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[6/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › first: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[7/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › back1: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[8/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › back1: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[9/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › back2: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[10/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › back2: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[11/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › deload: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[12/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › deload: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[13/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › week3: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[14/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › week3: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[15/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › day20: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[16/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › day20: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[17/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › newbie: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[18/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › newbie: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[19/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › monthend: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[20/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › monthend: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[21/30] [iphone-chromium] › e2e\records2.spec.ts:148:3 › newyear: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)
+[22/30] [iphone-chromium] › e2e\records2.spec.ts:178:3 › newyear: 훈련 부하 카드 (숫자·구간·지난주 줄·해설 괄호·7일 점)
+[23/30] [iphone-chromium] › e2e\records2.spec.ts:210:1 › normal 주·막대+누적: 그래프 초점 → ArrowRight → SPEC #7 문구(지난주 값 포함)·aria-valuetext·내역 제목, 지표 바꿔도 고른 칸 유지
+[24/30] [iphone-chromium] › e2e\records2.spec.ts:250:1 › normal 내역: 행·5개씩 더 보기·초점·행을 누르면 그 기록 상세
+[25/30] [iphone-chromium] › e2e\records2.spec.ts:275:1 › 시간 지표: 보이는 분 끼리 방향·차이·같음이 문장·카드·남은 양에서 같은 말을 한다 (주 2분 짧아요, 월 같아요)
+[26/30] [iphone-chromium] › e2e\records2.spec.ts:294:1 › 보기 저장: 처음 막대+누적 → 막대 → 새로 고침 → 막대, 옛 값(mode 없음)은 막대+누적
+[27/30] [iphone-chromium] › e2e\records2.spec.ts:324:5 › 375px normal: 단위 4 × 막대+누적 — 가로 스크롤 없음, 카드·범례·둘째 줄이 카드 안, 월 파랑 막대 ≥5px, 터치 44pt
+[28/30] [iphone-chromium] › e2e\records2.spec.ts:324:5 › 375px monthend: 단위 4 × 막대+누적 — 가로 스크롤 없음, 카드·범례·둘째 줄이 카드 안, 월 파랑 막대 ≥5px, 터치 44pt
+[29/30] [iphone-chromium] › e2e\records2.spec.ts:324:5 › 320px normal: 단위 4 × 막대+누적 — 가로 스크롤 없음, 카드·범례·둘째 줄이 카드 안, 월 파랑 막대 ≥5px, 터치 44pt
+[30/30] [iphone-chromium] › e2e\records2.spec.ts:324:5 › 320px monthend: 단위 4 × 막대+누적 — 가로 스크롤 없음, 카드·범례·둘째 줄이 카드 안, 월 파랑 막대 ≥5px, 터치 44pt
+  30 passed (44.3s)

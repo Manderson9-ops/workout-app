@@ -1,0 +1,38 @@
+
+> workout-app@0.9.17-preview test:uxui
+> playwright test e2e/uxui.spec.ts && node tools/uxui_audit.ts --gate
+
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - import "./dateText" without a file extension (src/core/changelog.ts:1:26). Add the file extension
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - import "./dateText" without a file extension (src/core/changelog.ts:1:26). Add the file extension
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+Running 20 tests using 2 workers
+
+{"code_hash":"0a7ca3a0f9549644","primary_per_screen":1,"touch_under_44":0,"hscroll_screens":0,"line_boxes":0,"focus_ring":true,"validation_on_blur":true,"punct_breaks":0}
+  ok  1 [iphone-chromium] › e2e\uxui.spec.ts:144:1 › D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실선 0·초점 링·blur 뒤 검증 (32.4s)
+  ok  3 [iphone-chromium] › e2e\uxui.spec.ts:301:1 › N9 기록 정리: 아무것도 안 고르고 누르면 알림 + 첫 체크 상자로 초점 (599ms)
+  ok  4 [iphone-chromium] › e2e\uxui.spec.ts:317:1 › N9 루틴 편집: 운동 없이 [저장하고 시작] → 알림 + [+ 운동 추가]로 초점 (479ms)
+  ok  5 [iphone-chromium] › e2e\uxui.spec.ts:327:1 › N9 루틴 이름 바꾸기: 빈 이름 → 알림 + 입력 칸으로 초점 (426ms)
+  ok  6 [iphone-chromium] › e2e\uxui.spec.ts:342:1 › N9 개선 메모: 빈 내용으로 저장 → 알림 + 글 칸으로 초점 (309ms)
+  ok  7 [iphone-chromium] › e2e\uxui.spec.ts:350:1 › N9 자동 보내기: 빈 설정으로 [저장하고 연결 확인] → 알림 + 입력 칸으로 초점 (438ms)
+  ok  8 [iphone-chromium] › e2e\uxui.spec.ts:359:1 › A05 필터 결과 0건: 진짜 0건과 구분해 [필터 초기화] → 목록이 돌아옴 (397ms)
+  ok  9 [iphone-chromium] › e2e\uxui.spec.ts:372:1 › A05 루틴 검색 0건: [검색어 지우기] → 목록이 돌아오고 초점은 검색 칸 (410ms)
+  ok 10 [iphone-chromium] › e2e\uxui.spec.ts:392:1 › M1·L1·L2 루틴 편집: 끝에서 ↑↓ 는 꺼짐·펼침 유지 / 이동·삭제·묶기 뒤 펼친 번호 / ⋯ 메뉴 교체·삭제 / 초점 (1.2s)
+  ok 11 [iphone-chromium] › e2e\uxui.spec.ts:465:1 › M2·M3·L3 바로 가기·설정 묶음 기억·멈춤 경고·기록 탭 키보드 (1.5s)
+{"code_hash":"0a7ca3a0f9549644","primary_per_screen":1,"touch_under_44":0,"hscroll_screens":0,"line_boxes":0,"focus_ring":true,"validation_on_blur":true,"punct_breaks":24}
+  ok  2 [iphone-webkit] › e2e\uxui.spec.ts:144:1 › D-079 화면 측정: 주 버튼 1개·44pt·가로 스크롤 0·상자 실선 0·초점 링·blur 뒤 검증 (54.3s)
+  ok 12 [iphone-webkit] › e2e\uxui.spec.ts:301:1 › N9 기록 정리: 아무것도 안 고르고 누르면 알림 + 첫 체크 상자로 초점 (1.4s)
+  ok 13 [iphone-webkit] › e2e\uxui.spec.ts:317:1 › N9 루틴 편집: 운동 없이 [저장하고 시작] → 알림 + [+ 운동 추가]로 초점 (1.2s)
+  ok 14 [iphone-webkit] › e2e\uxui.spec.ts:327:1 › N9 루틴 이름 바꾸기: 빈 이름 → 알림 + 입력 칸으로 초점 (1.2s)
+  ok 15 [iphone-webkit] › e2e\uxui.spec.ts:342:1 › N9 개선 메모: 빈 내용으로 저장 → 알림 + 글 칸으로 초점 (952ms)
+  ok 16 [iphone-webkit] › e2e\uxui.spec.ts:350:1 › N9 자동 보내기: 빈 설정으로 [저장하고 연결 확인] → 알림 + 입력 칸으로 초점 (1.4s)
+  ok 17 [iphone-webkit] › e2e\uxui.spec.ts:359:1 › A05 필터 결과 0건: 진짜 0건과 구분해 [필터 초기화] → 목록이 돌아옴 (817ms)
+  ok 18 [iphone-webkit] › e2e\uxui.spec.ts:372:1 › A05 루틴 검색 0건: [검색어 지우기] → 목록이 돌아오고 초점은 검색 칸 (913ms)
+  ok 19 [iphone-webkit] › e2e\uxui.spec.ts:392:1 › M1·L1·L2 루틴 편집: 끝에서 ↑↓ 는 꺼짐·펼침 유지 / 이동·삭제·묶기 뒤 펼친 번호 / ⋯ 메뉴 교체·삭제 / 초점 (5.3s)
+  ok 20 [iphone-webkit] › e2e\uxui.spec.ts:465:1 › M2·M3·L3 바로 가기·설정 묶음 기억·멈춤 경고·기록 탭 키보드 (6.0s)
+
+  20 passed (1.3m)
+UX/UI 감사: PASS 22 · INFO 4 · JUDGED 11 · N/A 12
