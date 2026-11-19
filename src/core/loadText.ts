@@ -1,6 +1,7 @@
 /**
  * D-082 훈련 부하 카드 문구 (승인 목업 record-mock.html zoneOf·drawLoad·고정 안내 그대로). 계산은 core/stats.ts
  */
+import { addDays } from './stats';
 import type { LoadZone } from './stats';
 
 export const LOAD_ZONE_NAME: Record<LoadZone, string> = { low: '평소보다 적음', ok: '평소 수준', warn: '평소보다 많음', bad: '평소보다 크게 많음' };
@@ -17,13 +18,31 @@ export const LOAD_NOTE = "구간 값(0.8·1.3·1.5)은 팀 스포츠 연구에�
 
 const fmtInt = (n: number) => Math.round(n).toLocaleString('ko-KR');
 
-/** 구간 한 문장 + 괄호. nd < 28 일 때만 "기록이 nd일이라 nd일 평균과 비교" */
-export function loadSayText(zone: LoadZone, last7: number, nd: number): string {
-  return `${LOAD_ZONE_SAY[zone]} (오늘까지 7일 ${fmtInt(last7)}세트${nd < 28 ? ` · 기록이 ${nd}일이라 ${nd}일 평균과 비교` : ''})`;
+/** 4주 창에 작업 세트가 하나도 없을 때(비율 0)의 한 문장 */
+export const LOAD_EMPTY_SAY = '최근 4주 동안 운동 기록이 없어요. 다시 운동하면 평소와 견줘 보여 드려요.';
+/** 지난주와 이번 주 4주 창이 모두 비었을 때의 지난주 줄 */
+export const LOAD_EMPTY_WEEK = '지난주와 이번 주 모두 최근 4주 기록이 없어요.';
+
+/** day 에서 거꾸로 nd 일(day 포함) 작업 세트 합 (loadRatio 의 분모 c) */
+export function loadWindowSets(daily: Map<string, number>, day: string, nd: number): number {
+  let c = 0;
+  for (let i = 0; i < nd; i++) c += daily.get(addDays(day, -i)) ?? 0;
+  return c;
 }
 
-/** 지난주 같은 요일 비교 한 줄. wd = 오늘 요일 한 글자, vd·prevVd = 화면 값. 차이는 hundredths 정수로 구함 */
-export function loadWeekText(wd: string, vd: number, prevVd: number | null): string {
+/** 비율이 0 일 때 4주 창(오늘·지난주 같은 요일)이 정말 비었나. hasPrev = 지난주 같은 요일 비율이 있음 (그 창은 첫 기록일 기준 min(28, histDays − 7)일) */
+export function loadEmptyWindows(daily: Map<string, number>, today: string, nd: number, histDays: number, hasPrev: boolean): { empty: boolean; prevEmpty: boolean } {
+  return { empty: loadWindowSets(daily, today, nd) === 0, prevEmpty: hasPrev && loadWindowSets(daily, addDays(today, -7), Math.min(28, histDays - 7)) === 0 };
+}
+
+/** 구간 한 문장 + 괄호. nd < 28 일 때만 "기록이 nd일이라 nd일 평균과 비교". windowEmpty = 4주 창 합이 0 이면 한 문장을 안내로 바꿈 (숫자·구간은 그대로) */
+export function loadSayText(zone: LoadZone, last7: number, nd: number, windowEmpty = false): string {
+  return `${windowEmpty ? LOAD_EMPTY_SAY : LOAD_ZONE_SAY[zone]} (오늘까지 7일 ${fmtInt(last7)}세트${nd < 28 ? ` · 기록이 ${nd}일이라 ${nd}일 평균과 비교` : ''})`;
+}
+
+/** 지난주 같은 요일 비교 한 줄. wd = 오늘 요일 한 글자, vd·prevVd = 화면 값. 차이는 hundredths 정수로 구함. bothEmpty = 두 4주 창이 모두 비어 두 비율이 0 인 경우 */
+export function loadWeekText(wd: string, vd: number, prevVd: number | null, bothEmpty = false): string {
+  if (bothEmpty) return LOAD_EMPTY_WEEK;
   if (prevVd === null) return `지난주 ${wd}요일은 기록이 3주가 안 돼 견줄 비율이 없어요.`;
   const cur = Math.round(vd * 100), prev = Math.round(prevVd * 100);
   const head = `지난주 ${wd}요일 ${prevVd.toFixed(2)} → 오늘 ${vd.toFixed(2)}`;

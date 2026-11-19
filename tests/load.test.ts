@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { dailyWorkSets, loadRatio, loadVd, loadZone, loadView } from '../src/core/stats';
 import type { LoadShown } from '../src/core/stats';
 import { firstRecordDate } from '../src/core/period';
-import { LOAD_NOTE, LOAD_ZONE_NAME, LOAD_ZONE_SAY, loadChartLabel, loadSayText, loadWaitText, loadWeekText } from '../src/core/loadText';
+import { LOAD_EMPTY_SAY, LOAD_EMPTY_WEEK, LOAD_NOTE, LOAD_ZONE_NAME, LOAD_ZONE_SAY, loadChartLabel, loadEmptyWindows, loadSayText, loadWaitText, loadWeekText, loadWindowSets } from '../src/core/loadText';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
 
@@ -210,6 +210,48 @@ describe('화면 값 vd 와 구간', () => {
   });
 });
 
+describe('4주 창이 빈 경우 판정 (loadEmptyWindows)', () => {
+  const first = '2026-08-01';
+  const at = (k: number) => ds(dn(first) + k);
+  // 창 합은 표(오프셋 → 세트)를 직접 더해 구함: day 오프셋 e 의 창 = [e − nd + 1, e]
+  const windowSum = (counts: Record<string, number>, e: number, nd: number) => { let t = 0; for (let k = e - nd + 1; k <= e; k++) t += counts[at(k)] ?? 0; return t; };
+  it('첫 기록(오프셋 0~5)만 있고 오늘이 45일째: 오늘 창(18~45)·지난주 창(11~38) 모두 비어 둘 다 empty', () => {
+    const counts: Record<string, number> = { [at(0)]: 2, [at(5)]: 1 };
+    const today = at(45), ws = fromCounts(counts);
+    const s = shown(view(ws, today));
+    expect(s.vd).toBe(0);
+    expect(s.prevVd).toBe(0);
+    expect([windowSum(counts, 45, 28), windowSum(counts, 38, 28)]).toEqual([0, 0]);
+    const daily = dailyWorkSets(ws, byId, today);
+    expect(loadWindowSets(daily, today, 28)).toBe(0);
+    expect(loadEmptyWindows(daily, today, s.nd, s.histDays, s.prevVd !== null)).toEqual({ empty: true, prevEmpty: true });
+  });
+  it('4주 창 안에 7일 밖 세트가 있으면(오프셋 20, 오늘 45) 비율은 0 이지만 비지 않음', () => {
+    const counts: Record<string, number> = { [at(0)]: 2, [at(20)]: 3 };
+    const today = at(45), ws = fromCounts(counts);
+    const s = shown(view(ws, today));
+    expect(s.vd).toBe(0); // 최근 7일(39~45)에 없음
+    expect([windowSum(counts, 45, 28), windowSum(counts, 38, 28)]).toEqual([3, 3]);
+    expect(loadEmptyWindows(dailyWorkSets(ws, byId, today), today, s.nd, s.histDays, s.prevVd !== null)).toEqual({ empty: false, prevEmpty: false });
+  });
+  it('오늘 창만 비고 지난주 창에는 세트가 있음: empty 만 true (지난주 비율은 0 이 아님)', () => {
+    const counts: Record<string, number> = { [at(0)]: 2, [at(11)]: 4, [at(12)]: 4 };
+    const today = at(40), ws = fromCounts(counts); // 오늘 창 13~40 (비어 있음), 지난주 같은 요일 33 의 창 6~33 (11·12 포함)
+    const s = shown(view(ws, today));
+    expect([windowSum(counts, 40, 28), windowSum(counts, 33, 28)]).toEqual([0, 8]);
+    expect(s.vd).toBe(0);
+    expect(s.prevVd).toBe(0); // 지난주 같은 요일의 최근 7일(27~33)은 비어 있어 그날 비율도 0
+    expect(loadEmptyWindows(dailyWorkSets(ws, byId, today), today, s.nd, s.histDays, s.prevVd !== null)).toEqual({ empty: true, prevEmpty: false });
+  });
+  it('21~27일째(창이 28일보다 짧음): 지난주 같은 요일 비율이 없으면 prevEmpty false', () => {
+    const counts: Record<string, number> = { [at(0)]: 1 };
+    const today = at(22), ws = fromCounts(counts);
+    const s = shown(view(ws, today));
+    expect(s.prevVd).toBeNull();
+    expect(loadEmptyWindows(dailyWorkSets(ws, byId, today), today, s.nd, s.histDays, false)).toEqual({ empty: false, prevEmpty: false }); // 창(23일)에 첫 기록 1세트
+  });
+});
+
 describe('7일 점 그래프 값', () => {
   it('날마다 2세트 40일: 비율 모두 1.00, 세로 범위가 최소 폭 0.6 으로 넓어짐 (0.7 ~ 1.3)', () => {
     const first = '2026-08-01', counts: Record<string, number> = {};
@@ -282,9 +324,19 @@ describe('문구 (승인 목업 글자 그대로)', () => {
     expect(loadWeekText('화', 1.1, 0.7)).toBe('지난주 화요일 0.70 → 오늘 1.10 · 지난주보다 0.40 높아요');
     expect(loadWeekText('화', 0.7, 1.1)).toBe('지난주 화요일 1.10 → 오늘 0.70 · 지난주보다 0.40 낮아요');
     expect(loadWeekText('일', 1.3, 1.3)).toBe('지난주 일요일 1.30 → 오늘 1.30 · 지난주와 같아요');
-    expect(loadWeekText('수', 1.15, 1.1)).toBe('지난주 수요일 1.10 → 오늘 1.15 · 지난주보다 0.05 높아요'); // 1.15 − 1.1 = 0.04999… 를 정수 hundredths 로
+    expect(loadWeekText('수', 1.15, 1.1)).toBe('지난주 수요일 1.10 → 오늘 1.15 · 지난주보다 0.05 높아요'); // 회귀 고정값: 화면 값 1.15·1.10 의 차이는 hundredths 정수(115−110=5)로 구해 0.05 (부동소수 1.15−1.1 을 그대로 쓰지 않음)
     expect(loadWeekText('수', 0.3, 0.29)).toBe('지난주 수요일 0.29 → 오늘 0.30 · 지난주보다 0.01 높아요');
     expect(loadWeekText('금', 0.8, null)).toBe('지난주 금요일은 기록이 3주가 안 돼 견줄 비율이 없어요.');
+  });
+  it('4주 창이 비면(c = 0) 한 문장·지난주 줄을 안내 문구로, 숫자·괄호는 그대로', () => {
+    expect(LOAD_EMPTY_SAY).toBe('최근 4주 동안 운동 기록이 없어요. 다시 운동하면 평소와 견줘 보여 드려요.');
+    expect(LOAD_EMPTY_WEEK).toBe('지난주와 이번 주 모두 최근 4주 기록이 없어요.');
+    expect(loadSayText('low', 0, 28, true)).toBe('최근 4주 동안 운동 기록이 없어요. 다시 운동하면 평소와 견줘 보여 드려요. (오늘까지 7일 0세트)');
+    expect(loadSayText('low', 0, 23, true)).toBe('최근 4주 동안 운동 기록이 없어요. 다시 운동하면 평소와 견줘 보여 드려요. (오늘까지 7일 0세트 · 기록이 23일이라 23일 평균과 비교)');
+    expect(loadSayText('low', 0, 28)).toBe(`${LOAD_ZONE_SAY.low} (오늘까지 7일 0세트)`); // 창에 세트가 있고 최근 7일만 쉼: 기존 문장
+    expect(loadWeekText('목', 0, 0, true)).toBe('지난주와 이번 주 모두 최근 4주 기록이 없어요.');
+    expect(loadWeekText('목', 0, 0)).toBe('지난주 목요일 0.00 → 오늘 0.00 · 지난주와 같아요');
+    expect(loadWeekText('목', 0, 0.9, false)).toBe('지난주 목요일 0.90 → 오늘 0.00 · 지난주보다 0.90 낮아요');
   });
   it('기다림: 일수 있음/기록 0 이면 일수 생략', () => {
     expect(loadWaitText(20)).toBe('기록이 3주 쌓이면 부하 비율을 보여 드려요. 지금 20일째예요.');

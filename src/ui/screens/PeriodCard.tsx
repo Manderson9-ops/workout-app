@@ -4,9 +4,9 @@ import type { AppState } from '../store';
 import type { Workout } from '../../core/session';
 import type { Exercise } from '../../core/types';
 import { weekStreak } from '../../core/stats';
-import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, averageOver, offsetOf, daysInMonth, daysInYear, periodData, firstRecordDate, comparePlan } from '../../core/period';
+import { periodOf, shiftPeriod, periodBuckets, compareThroughFor, hasWorkoutOn, waitingForToday, averageOver, offsetOf, daysInMonth, daysInYear, periodData, firstRecordDate, comparePlan } from '../../core/period';
 import type { PeriodKind, PeriodMetric, ComparePlan, PeriodRange, Bucket } from '../../core/period';
-import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonMode, cmpValues, wholePrevMonth, prevNote, avgParts, metricValue, periodLabel, rangeText, compareLine, headline, headSubs, heroLabel, cardAria, cardSmall, bucketText, footnoteParts, chartCaption, comboLine, legendNames, prevName } from '../../core/periodText';
+import { METRICS, METRIC_NAME, KIND_LABEL, valueText, bigParts, tonOfAll, cmpValues, wholePrevMonth, prevNote, avgParts, metricValue, periodLabel, rangeText, compareLine, headline, headSubs, heroLabel, cardAria, cardSmall, bucketText, footnoteParts, chartCaption, comboLine, legendNames, prevName } from '../../core/periodText';
 import { WD } from '../../core/dateText';
 import { parsePeriodPref, serializePeriodPref } from '../../core/periodPref';
 import type { ChartMode, PeriodPref } from '../../core/periodPref';
@@ -111,18 +111,19 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
     const d = Number(b.start.slice(8)), mo = Number(b.start.slice(5, 7));
     if (kind === 'week') return `${state[i] === 'now' ? '오늘' : WD[i]}\n${d}`;
     if (kind === 'month') return [1, 8, 15, 22, 29].includes(d) ? String(d) : '';
-    if (kind === 'all') return mo === 1 || i === 0 ? `${Number(b.start.slice(2, 4))}.${mo}` : (mo - 1) % 3 === 0 ? String(mo) : '';
+    if (kind === 'all') return mo === 1 || i === 0 ? `${Number(b.start.slice(2, 4))}.${mo}` : buckets.length <= 36 && (mo - 1) % 3 === 0 ? String(mo) : ''; // 36달 넘게 길면 1월과 첫 칸만 (글씨가 겹치지 않게)
     return String(i + 1);
   });
   const { value: avgV, n: avgN, excluded: avgExcl } = averageOver(kind, vals, cur.active, state); // 년·전체 보기는 진행 중인 이번 달을 평균에서 뺌
   const whole = plan.mode === 'ok' && wholePrevMonth(kind, current, { through, today, done: todayDone }); // 이번 달이 더 길어 지난달 전체와 견줌
   const wholeDays = whole ? Number(through.slice(8)) : 0;
   const waiting = plan.mode === 'waiting'; // 첫날·운동 전: 견줄 구간이 비어 있음
+  const footWaiting = waiting || (first === null && current && waitingForToday(range, today, todayDone)); // 기록이 하나도 없는 새 설치의 각주는 0.9.17 그대로
   const hasCur = cur.active.some(Boolean);
   const empty = !hasCur && !(mode !== 'bar' && !!prevVals?.some((x) => x > 0)); // 누적·막대+누적은 이전 기간 선이 있으면 이번 기록이 없어도 그림
   // 평균선·범례(막대 보기): 운동한 칸이 둘 이상이고 평균이 최댓값과 같지 않을 때만 (한 칸뿐이면 같은 값이 되풀이됨)
   const showAvg = mode === 'bar' && avgV > 0 && avgN >= 2 && avgV < Math.max(...vals) && !(metric === 'count' && (kind === 'week' || kind === 'month'));
-  const ton = tonMode(t.volume, p.volume);
+  const ton = tonOfAll(t.volume, tc.volume, p.volume, prevFull?.totals.volume ?? 0); // 한 화면의 큰 숫자·한 문장·둘째 줄·카드·범례가 같은 단위(kg 또는 톤)를 쓰도록 한 번만 정함
   const avgLeg = avgParts(kind, metric, avgV, ton, avgExcl);
   const unitWord = wide ? '달별' : '날짜별';
   /** 한 칸 문구(막대 보기): "11월 16일 (월) · 작업 세트 9세트 · 운동 1회" (일·월 보기에서 지표가 운동 수가 아니면 운동한 칸에 횟수를 덧붙임) */
@@ -130,13 +131,14 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
   const legend = legendNames({ mode, kind, current, label, plan });
   const pwName = prevVals ? prevName(kind, current, true) : undefined;
   /** 한 칸 문구(막대+누적 보기): "11월 16일 (월) · 작업 세트 22세트 · 누적 22세트 · 지난주 같은 요일 15세트" */
-  const comboText = (i: number) => comboLine({ kind, start: buckets[i]!.start, metric, value: vals[i]!, active: cur.active[i]!, cum: vals.slice(0, i + 1).reduce((a, b) => a + b, 0), prev: prevVals ? (i < prevVals.length ? prevVals[i]! : null) : null, pw: pwName, ton });
+  const prevBuckets = useMemo(() => (plan.prev ? periodBuckets(plan.prev) : null), [plan.prev]);
+  const comboText = (i: number) => comboLine({ kind, start: buckets[i]!.start, metric, value: vals[i]!, active: cur.active[i]!, cum: vals.slice(0, i + 1).reduce((a, b) => a + b, 0), prev: prevVals ? (i < prevVals.length ? prevVals[i]! : null) : null, pw: pwName, ton, prevEnd: prevBuckets && i < prevBuckets.length ? prevBuckets[i]!.end : undefined, from: plan.from });
   const total = `합계 · ${METRIC_NAME[metric]} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}`;
   const caption = empty ? '' : selv === null ? chartCaption({ mode, kind, label, pw: pwName }) : mode === 'both' ? comboText(selv) : bucketLine(selv);
   const cumLabel = `누적 ${METRIC_NAME[metric]} 그래프 · ${legend.cur} ${valueText(metric, vals.reduce((a, b) => a + b, 0), ton)}${legend.prev && prevVals ? ` · ${legend.prev} ${valueText(metric, prevVals.reduce((a, b) => a + b, 0), ton)}` : ''}`;
   const emptyText = current ? '운동을 끝내면 여기에 막대가 생겨요' : '이 기간에는 운동 기록이 없어요';
 
-  const headParts = headline({ kind, current, metric, cur: metricValue(metric, tc), prev: metricValue(metric, p), curCount: t.count, prevCount: p.count, label, whole, mode: plan.mode, first: first ?? today, curSets: t.sets, curFull: metricValue(metric, t) });
+  const headParts = headline({ kind, current, metric, cur: metricValue(metric, tc), prev: metricValue(metric, p), curCount: t.count, prevCount: p.count, label, whole, mode: plan.mode, first, curSets: t.sets, curFull: metricValue(metric, t), ton });
   const subs = headSubs({ plan, kind, current, mode, metric, c: metricValue(metric, t), pf: prevFull ? metricValue(metric, prevFull.totals) : 0, ton: metric === 'volume' && ton });
   const hero = bigParts(metric, metricValue(metric, t), metric === 'volume' && ton);
   const heroV = metricValue(metric, t);
@@ -198,7 +200,7 @@ export function PeriodCard({ v, done, byId, today, bw }: { v: PeriodView; done: 
           );
         })}
       </div>
-      <p class="sub small" data-testid="period-foot" style={{ margin: '8px 0 0' }}>{footnoteParts(kind, current, { through, base: baseThrough, done: todayDone, streak, today, waiting, lens, plan, first: first ?? undefined }).map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
+      <p class="sub small" data-testid="period-foot" style={{ margin: '8px 0 0' }}>{footnoteParts(kind, current, { through, base: baseThrough, done: todayDone, streak, today, waiting: footWaiting, lens, plan, first: first ?? undefined }).map((h, i) => (h.nw ? <span key={i} class="nw">{h.text}</span> : h.text))}</p>
     </section>
   );
 }

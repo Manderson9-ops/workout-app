@@ -181,7 +181,7 @@ export function PeriodBars({ mode = 'bar', prev, values, labels, labelClass, emp
   const max = both ? Math.max(1, ...values, ...pv) : Math.max(1, ...values, avg ?? 0);
   const slot = (w - pad.l - pad.r) / n;
   const bw = Math.min(34, slot * 0.64);
-  const pbw = Math.min(34, slot * 0.9), cbw = Math.min(14, Math.max(5, slot * 0.45)); // both: 이전(넓게) · 이번(좁게, 월 보기에서도 5px 아래로 안 가게)
+  const pbw = Math.min(34, slot * 0.9), cbw = Math.min(14, Math.max(Math.min(5, slot * 0.8), slot * 0.45)); // both: 이전(넓게) · 이번(좁게, 월 보기에서도 5px 아래로 안 가게. 칸이 6.25px 보다 좁은 전체 탭 긴 기록은 칸의 0.8배까지만 줄여 이웃 막대와 안 겹침)
   const lastOk = (() => { for (let i = state.length - 1; i >= 0; i--) if (state[i] !== 'future') return i; return 0; })();
   const gest = useRef<{ x: number; y: number; before: number | null; mode: 'wait' | 'scrub' | 'dead' } | null>(null);
   const raw = (e: PointerEvent) => slot > 0 ? Math.floor((e.clientX - (e.currentTarget as HTMLElement).getBoundingClientRect().left - pad.l) / slot) : -1;
@@ -319,6 +319,14 @@ export function LoadDots({ days, rs, rp, lo, hi, label, height = 130 }: { days: 
       const sx = (w - pl - pr) / 6, x = (i: number) => pl + i * sx;
       const pts = (arr: (number | null)[]) => arr.flatMap((r, i) => (r === null ? [] : [{ i, r }]));
       const ps = pts(rp), ss = pts(rs);
+      // 기준값 글씨는 이미 그린 글씨(오늘 값이 먼저, 그다음 위에서부터 기준값)와 세로로 글자 크기+2px 안쪽이면 그리지 않음 (선은 그대로)
+      const lastR = rs[rs.length - 1];
+      const taken: number[] = lastR === null || lastR === undefined ? [] : [Math.max(FS, y(lastR) - 9)];
+      const thresholds = [0.8, 1.3, 1.5].filter((t) => t > lo && t < hi).map((t) => {
+        const ty = y(t) + 4, show = taken.every((o) => Math.abs(o - ty) >= FS + 2);
+        if (show) taken.push(ty);
+        return { t, ty, show };
+      });
       const poly = (a: { i: number; r: number }[]) => a.map((p) => `${x(p.i).toFixed(1)},${y(p.r).toFixed(1)}`).join(' ');
       return (
         <>
@@ -326,10 +334,10 @@ export function LoadDots({ days, rs, rp, lo, hi, label, height = 130 }: { days: 
             const a2 = Math.max(a, lo), b2 = Math.min(b, hi);
             return b2 > a2 ? <rect key={z} x={pl} y={y(b2)} width={w - pl - pr} height={y(a2) - y(b2)} class={`ld-band ${z}`} /> : null;
           })}
-          {[0.8, 1.3, 1.5].filter((t) => t > lo && t < hi).map((t) => (
+          {thresholds.map(({ t, ty, show }) => (
             <g key={t}>
               <line x1={pl} x2={w - pr} y1={y(t)} y2={y(t)} class="ch-grid" />
-              <text x={w - 4} y={y(t) + 4} class="ch-text" font-size={FS} text-anchor="end">{t.toFixed(1)}</text>
+              {show && <text x={w - 4} y={ty} class="ch-text" font-size={FS} text-anchor="end">{t.toFixed(1)}</text>}
             </g>
           ))}
           {ps.length > 1 && <polyline points={poly(ps)} class="ld-prev-line" />}

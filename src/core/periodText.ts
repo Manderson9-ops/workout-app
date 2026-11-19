@@ -1,7 +1,11 @@
 /** D-081·D-082 기간 요약 문구 (순수 함수). 조사(이/가·은/는·와/과)는 받침으로 고른다 */
 import { WD, weekRangeText } from './dateText';
 import { durText, durParts } from './stats';
-import type { ComparePlan, PeriodKind, PeriodMetric, PeriodRange } from './period';
+import { comparePlan, firstRecordDate, hasWorkoutOn, periodData, periodOf } from './period';
+import type { ComparePlan, PeriodKind, PeriodMetric, PeriodRange, PeriodTotals } from './period';
+import type { BodyweightEntry } from './stats';
+import type { Workout } from './session';
+import type { Exercise } from './types';
 import type { ChartMode } from './periodPref';
 
 /** 마지막 글자에 받침이 있나 (한글 음절, 'g'(kg = 킬로그램)는 있음, 그 밖은 없음으로 본다) */
@@ -44,6 +48,8 @@ export function bigParts(m: PeriodMetric, v: number, ton = false): [string | num
 }
 /** 볼륨이 100만 kg 이상이면 카드의 큰 숫자·이전 값 줄을 톤으로 (390px 에서 일곱 자리 숫자가 안 들어감) */
 export const tonMode = (cur: number, prev: number): boolean => Math.max(cur, prev) >= 1_000_000;
+/** 한 화면이 보여 주는 모든 볼륨 값(기간 합·같은 구간 합·이전 구간·이전 기간 전체)으로 톤 여부를 한 번에 정함 — 어느 한 값이라도 100만 kg 이상이면 모두 톤 */
+export const tonOfAll = (...volumes: number[]): boolean => Math.max(0, ...volumes) >= 1_000_000;
 /**
  * 견줄 때 쓰는 값: 사용자에게 보이는 정밀도로 맞춘 같은 단위(시간 초, 볼륨 kg) 값 둘.
  * 시간 = 보이는 값(1분 미만은 초, 그 이상은 분 단위로 반올림) 끼리의 차이, 볼륨 kg = 정수, 톤 = 보이는 단계(10톤 미만 0.1톤, 이상 1톤, 0 초과 50kg 미만은 따로 한 단계).
@@ -135,17 +141,19 @@ const N = (text: string): HeadlinePart => ({ text, nw: true });
 const J = (word: string, withBatchim: string, without: string): HeadlinePart[] => [N(word), T(hasBatchim(word) ? withBatchim : without)];
 
 /** 한 줄 요약 (고른 지표 기준). 운동이 있었는지는 운동 수(curCount·prevCount)로 가림: 지표 값이 0이어도 운동은 있을 수 있음(맨몸 운동의 볼륨) */
-export function headline(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; curCount: number; prevCount: number; label: string; whole?: boolean; mode?: ComparePlan['mode']; first?: string; curSets?: number; curFull?: number }): HeadlinePart[] {
+export function headline(o: { kind: PeriodKind; current: boolean; metric: PeriodMetric; cur: number; prev: number; curCount: number; prevCount: number; label: string; whole?: boolean; mode?: ComparePlan['mode']; first?: string | null; curSets?: number; curFull?: number; ton?: boolean }): HeadlinePart[] {
   const { kind, current, metric, cur, prev, curCount, prevCount, label, whole, mode } = o;
   const full = o.curFull ?? cur; // 일부 기록 기간: cur·prev = 같은 구간 합, curFull = 이번 기간 전체 합 ("· 이번 달 N" 처럼 전체를 보여 줄 때)
   const name = METRIC_NAME[metric];
-  if (kind === 'all') return [T(`${ym(o.first ?? '')}부터 운동 ${curCount.toLocaleString('ko-KR')}회 · 작업 세트 ${(o.curSets ?? 0).toLocaleString('ko-KR')}세트`)];
-  if (mode === 'nohist') return [...J(prevName(kind, current), '은', '는'), T(' 기록을 시작하기 전이에요'), ...(curCount > 0 ? [T(' · '), N(label), T(' '), N(valueText(metric, full, metric === 'volume' && tonMode(full, prev)))] : [])];
+  const tonOf = (a: number, b: number): boolean => metric === 'volume' && (o.ton ?? tonMode(a, b)); // o.ton = 카드가 화면 전체 값으로 한 번 정한 톤 (한 화면에 kg·톤이 섞이지 않게)
   const none = (): HeadlinePart[] => (current ? [...J(label, '은', '는'), T(' 아직 운동 기록이 없어요')] : [T('이 기간에는 운동 기록이 없어요')]);
+  if (kind === 'all') return o.first === null ? [T('아직 운동 기록이 없어요')] : [T(`${ym(o.first ?? '')}부터 운동 ${curCount.toLocaleString('ko-KR')}회 · 작업 세트 ${(o.curSets ?? 0).toLocaleString('ko-KR')}세트`)];
+  if (o.first === null) return none(); // 기록이 하나도 없는 새 설치: 0.9.17 문구 (기록 전 문구보다 먼저)
+  if (mode === 'nohist') return [...J(prevName(kind, current), '은', '는'), T(' 기록을 시작하기 전이에요'), ...(curCount > 0 ? [T(' · '), N(label), T(' '), N(valueText(metric, full, tonOf(full, prev)))] : [])];
   if (curCount === 0 && prevCount === 0) return none();
-  const ton = metric === 'volume' && tonMode(cur, prev);
+  const ton = tonOf(cur, prev);
   const pn = whole ? '지난달 전체' : prevName(kind, current);
-  if (prevCount === 0) return [...J(pn, '은', '는'), T(' 운동이 없었어요 · '), N(label), T(' '), N(valueText(metric, full, metric === 'volume' && tonMode(full, prev)))];
+  if (prevCount === 0) return [...J(pn, '은', '는'), T(' 운동이 없었어요 · '), N(label), T(' '), N(valueText(metric, full, tonOf(full, prev)))];
   if (metric === 'volume' && cur === 0 && prev === 0) return curCount === 0 ? none() : [T('무게를 적은 세트가 없어 볼륨은 0kg이에요')];
   const [c, p] = cmpValues(metric, cur, prev, ton);
   if (c === p) return [...J(pn, '과', '와'), T(` ${josa(name, '이', '가')} 같아요`)];
@@ -169,7 +177,8 @@ export function cardAria(o: { kind: PeriodKind; current: boolean; metric: Period
   if (plan?.mode === 'nohist') return `${METRIC_NAME[metric]} ${valueText(metric, cur, ton)}, 이전 기록 없음`;
   if (waiting) return `${METRIC_NAME[metric]} ${valueText(metric, cur, ton)}, 오늘 운동하면 ${prevPhrase(kind, current)}와 비교해요`;
   const partial = plan?.mode === 'ok' && plan.from && plan.curFrom && o.cc !== undefined ? o.cc : undefined;
-  const pp = wholeDays ? `지난달 전체(1~${wholeDays}일)` : partialThrough ? partialPhrase(kind, partialThrough) : prevPhrase(kind, current), cv = valueText(metric, cur, ton), pv = valueText(metric, prev, ton);
+  const fromDay = plan?.mode === 'ok' && plan.from ? Number(plan.from.slice(8)) : 1; // 각주와 같은 범위 시작 (일부 기록이면 첫 기록일)
+  const pp = wholeDays ? `지난달 전체(${fromDay === wholeDays ? `${wholeDays}일` : `${fromDay}~${wholeDays}일`})` : partialThrough ? partialPhrase(kind, partialThrough) : prevPhrase(kind, current), cv = valueText(metric, cur, ton), pv = valueText(metric, prev, ton);
   const head = `${METRIC_NAME[metric]} ${cv}, ${partial === undefined ? '' : `${md(plan!.curFrom!)}부터 ${valueText(metric, partial, ton)}, `}${pp} `;
   const [c, p] = cmpValues(metric, partial ?? cur, prev, ton);
   if (c === p) return `${head}${josa(pv, '과', '와')} 같음`;
@@ -200,7 +209,7 @@ export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: 
   const { through, base, done, streak, today, waiting = false, lens, plan, first } = o;
   if (kind === 'all') return [T('전체 = 처음 기록한 달부터. 비교할 이전 기간이 없어 ▲▼ 는 없어요.')];
   const pw = prevName(kind, current, true);
-  if (plan?.mode === 'nohist') return [T(`${josa(current && plan.fullPrev ? prevName(kind, true) : pw, '은', '는')} 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요`), ...(first ? [N(` (첫 기록 ${yPre(first, today)}${md(first)})`)] : [])];
+  if (plan?.mode === 'nohist' && first) return [T(`${josa(current && plan.fullPrev ? prevName(kind, true) : pw, '은', '는')} 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요`), ...(first ? [N(` (첫 기록 ${yPre(first, today)}${md(first)})`)] : [])];
   const from = plan?.mode === 'ok' ? plan.from : undefined;
   const same = from ? [T(`(${josa(pw, '은', '는')} ${md(from)}부터 기록이라 같은 구간끼리)`)] : []; // 현재 기간: "까지와 비교" 바로 뒤
   const sameTail = from ? [T(` · ${josa(pw, '은', '는')} ${md(from)}부터 기록이라 같은 구간끼리`)] : []; // 지난 기간: 끝에
@@ -218,7 +227,8 @@ export function footnoteParts(kind: PeriodKind, current: boolean, o: { through: 
   if (kind === 'month') {
     // 이번 달이 더 길어 기준일이 지난달 말일을 넘으면 지난달 전체와 견줌
     const fd = from ? Number(from.slice(8)) : 1;
-    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(`(${fd}~${d}일)`), T('와 비교 · 이번 달 구간'), N(`(${fd}~${Number(today.slice(8)) - (done ? 0 : 1)}일)`), T('이 '), N(dayGap(Number(today.slice(8)) - (done ? 0 : 1) - d!)), T(' 더 길어요'), ...same];
+    const days = (a: number, b: number): string => (a === b ? `(${a}일)` : `(${a}~${b}일)`); // 하루뿐이면 "(30일)"
+    if (wholePrevMonth(kind, current, { through, today, done })) return [T('▲▼ = 지난달 전체'), N(days(fd, d!)), T('와 비교 · 이번 달 구간'), N(days(fd, Number(today.slice(8)) - (done ? 0 : 1))), T('이 '), N(dayGap(Number(today.slice(8)) - (done ? 0 : 1) - d!)), T(' 더 길어요'), ...same];
     return [T('▲▼ = 지난달 같은 날'), N(from ? span(from, through, `${md(from)}~${md(through)}`) : d === 1 ? '(1일)' : `(1~${d}일)`), T('까지와 비교'), ...same, ...(later ? [T(' · 오늘 운동하면 '), N(`${bd}일까지`)] : [])];
   }
   // 윤년이 끼면 두 구간 날수가 하루 다름 (오늘 운동 전이면 이번 해 구간도 어제까지)
@@ -263,16 +273,18 @@ export function chartCaption(o: { mode: ChartMode; kind: PeriodKind; label: stri
 
 /**
  * 막대+누적 보기에서 칸을 골랐을 때 문구: "11월 16일 (월) · 작업 세트 22세트 · 누적 22세트 · 지난주 같은 요일 15세트".
- * active = 그 칸에 운동이 있었나, prev = 이전 기간 같은 칸(요일·날·달) 값 (이전 기간 선이 없거나 칸이 없으면 생략, 0 이면 "운동 안 함")
+ * active = 그 칸에 운동이 있었나, prev = 이전 기간 같은 칸(요일·날·달) 값 (이전 기간 선이 없거나 칸이 없으면 생략, 0 이면 "운동 안 함").
+ * prevEnd = 그 이전 칸의 끝 날짜(미포함), from = 이전 기간 첫 기록일: 칸이 통째로 첫 기록일 전(prevEnd ≤ from)이면 0 은 "기록 전"
  */
-export function comboLine(o: { kind: PeriodKind; start: string; metric: PeriodMetric; value: number; active: boolean; cum: number; prev?: number | null; pw?: string; ton?: boolean }): string {
-  const { kind, start, metric, value, active, cum, prev, pw, ton = false } = o;
+export function comboLine(o: { kind: PeriodKind; start: string; metric: PeriodMetric; value: number; active: boolean; cum: number; prev?: number | null; pw?: string; ton?: boolean; prevEnd?: string; from?: string }): string {
+  const { kind, start, metric, value, active, cum, prev, pw, ton = false, prevEnd, from } = o;
+  const prevZero = prevEnd && from && prevEnd <= from ? '기록 전' : '운동 안 함';
   const same = kind === 'week' ? '요일' : kind === 'month' ? '날' : '달';
   return [
     bucketText(kind, start),
     active ? `${METRIC_NAME[metric]} ${valueText(metric, value, ton)}` : '운동 안 함',
     `누적 ${valueText(metric, cum, ton)}`,
-    ...(prev !== undefined && prev !== null && pw ? [`${pw} 같은 ${same} ${prev > 0 ? valueText(metric, prev, ton) : '운동 안 함'}`] : []),
+    ...(prev !== undefined && prev !== null && pw ? [`${pw} 같은 ${same} ${prev > 0 ? valueText(metric, prev, ton) : prevZero}`] : []),
   ].join(' · ');
 }
 
@@ -283,4 +295,15 @@ export function legendNames(o: { mode: ChartMode; kind: PeriodKind; current: boo
   if (mode === 'bar' || kind === 'all' || !plan.prev || !plan.fullPrev) return { cur, prev: null };
   const pName = `${prevName(kind, current, true)}${plan.from ? ` (${mdS(plan.from)}부터 기록)` : ''}`;
   return { cur, prev: mode === 'cum' ? `${pName} 전체` : pName };
+}
+
+/**
+ * 홈 "이번 주" 카드의 ▲▼ 재료: 기록 탭 주 카드와 같은 비교 구간(comparePlan)의 이번 주·지난주 합.
+ * 첫 기록 전(nohist)·기록 없음·첫날 운동 전(waiting)이면 null (▲▼ 를 보여 주지 않음). 일부 기록이면 이번 쪽은 curFrom 부터, 지난주는 from~through 만
+ */
+export function homeWeekDelta(done: Workout[], byId: Map<string, Exercise>, bw: BodyweightEntry[], today: string): { cur: PeriodTotals; prev: PeriodTotals } | null {
+  const week = periodOf('week', today);
+  const plan = comparePlan(week, true, today, hasWorkoutOn(done, today), firstRecordDate(done, today));
+  if (plan.mode !== 'ok' || !plan.prev) return null;
+  return { cur: periodData(done, byId, week, bw, today, plan.curFrom).totals, prev: periodData(done, byId, plan.prev, bw, plan.through, plan.from).totals };
 }

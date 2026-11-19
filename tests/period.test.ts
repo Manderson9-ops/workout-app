@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compareThroughFor, hasWorkoutOn, periodOf, shiftPeriod, periodBuckets, compareThrough, waitingForToday, averageOver, offsetOf, daysInYear, periodData, earliestPeriod, activeAverage, daysInMonth, firstRecordDate, alignFwd, comparePlan } from '../src/core/period';
-import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgParts, footnoteParts, timeDiffText, tonMode, cmpValues, WAITING_LINE, prevNote, headline, wholePrevMonth, cardAria, bucketText, heroLabel, KIND_LABEL, cardSmall, headSubs, chartCaption, comboLine, legendNames } from '../src/core/periodText';
+import { hasBatchim, josa, valueText, metricValue, prevName, prevPhrase, periodLabel, rangeText, compareLine, bigParts, avgParts, footnoteParts, timeDiffText, tonMode, cmpValues, WAITING_LINE, prevNote, headline, wholePrevMonth, cardAria, bucketText, heroLabel, KIND_LABEL, cardSmall, headSubs, chartCaption, comboLine, legendNames, tonOfAll, homeWeekDelta } from '../src/core/periodText';
 import { weekSummary } from '../src/core/stats';
 import type { Workout, SetLog } from '../src/core/session';
 import type { Exercise } from '../src/core/types';
@@ -723,5 +723,166 @@ describe('남은 양: 시간·볼륨은 화면에 보이는 값끼리', () => {
     expect(headSubs({ plan: planV, kind: 'month', current: true, mode: 'both', metric: 'volume', c: 999.6, pf: 1000.4 })).toEqual(['지난달 전체(1,000kg)를 넘었어요']);
     expect(headSubs({ plan: planV, kind: 'month', current: true, mode: 'both', metric: 'volume', c: 1_040_300, pf: 1_039_800, ton: true })).toEqual(['지난달 전체(1,040톤)를 넘었어요']);
     expect(headSubs({ plan: planV, kind: 'month', current: true, mode: 'both', metric: 'volume', c: 900, pf: 2500 })).toEqual(['지난달 전체까지 1,600kg 남았어요']);
+  });
+});
+
+describe('D-082 WP5 보완: 경계·새 설치·읽기 문구·톤·홈', () => {
+  const FIRST_PREV = periodOf('week', '2026-11-19'); // 일요일 11-15 시작 (이번 주)
+  it('comparePlan 경계: 첫 기록일 = 이전 기간 시작일 → 일부 기록 아님 (from 없음), 작은 줄 한 줄, "이후끼리" 줄 없음', () => {
+    const t = table([['2026-11-08', 3], ['2026-11-10', 2], ['2026-11-16', 2], ['2026-11-19', 1]]); // 첫 기록 = 지난주 시작(일요일 11-08)
+    const today = '2026-11-19'; // 목, 오늘 운동함
+    const first = firstRecordDate(t.ws, today);
+    expect(first).toBe('2026-11-08');
+    const plan = comparePlan(FIRST_PREV, true, today, true, first);
+    expect(plan.mode).toBe('ok');
+    expect(plan.prev).toEqual(periodOf('week', '2026-11-08'));
+    expect(plan.from).toBeUndefined(); // first === prev.start
+    expect(plan.curFrom).toBe('2026-11-15');
+    expect(plan.through).toBe('2026-11-12');
+    const cc = t.sum('2026-11-15', today), p = t.sum('2026-11-08', '2026-11-12'), pf = t.sum('2026-11-08', '2026-11-14');
+    expect([cc, p, pf]).toEqual([3, 5, 5]);
+    expect(cardSmall(plan, 'sets', cc, p)).toEqual(['이전 5세트']);
+    const subs = headSubs({ plan, kind: 'week', current: true, mode: 'both', metric: 'sets', c: cc, pf });
+    expect(subs).toEqual(['지난주 전체까지 2세트 남았어요']); // 5 − 3, "(지난주는 …부터 기록)"·"이후끼리" 없음
+    expect(subs.join('|')).not.toContain('이후끼리');
+    expect(cardAria({ kind: 'week', current: true, metric: 'sets', cur: cc, prev: p, plan, cc })).toBe('작업 세트 3세트, 지난주 같은 요일까지 5세트보다 2세트 적음');
+    expect(legendNames({ mode: 'both', kind: 'week', current: true, label: '이번 주', plan }).prev).toBe('지난주'); // "(M/D부터 기록)" 없음
+  });
+  it('새 설치(기록 전혀 없음): 한 문장은 0.9.17 문구, 기록 전 각주 없음(일반 각주), 전체 탭은 "아직 운동 기록이 없어요"', () => {
+    const today = '2026-11-19';
+    const plan = comparePlan(periodOf('week', today), true, today, false, null);
+    expect(plan).toMatchObject({ mode: 'nohist', fullPrev: false });
+    const base = { current: true, metric: 'sets' as const, cur: 0, prev: 0, curCount: 0, prevCount: 0, mode: 'nohist' as const, first: null };
+    expect(headlineText(headline({ ...base, kind: 'week', label: '이번 주' }))).toBe('이번 주는 아직 운동 기록이 없어요');
+    expect(headlineText(headline({ ...base, kind: 'month', label: '이번 달' }))).toBe('이번 달은 아직 운동 기록이 없어요');
+    expect(headlineText(headline({ ...base, kind: 'year', label: '올해' }))).toBe('올해는 아직 운동 기록이 없어요');
+    expect(headlineText(headline({ ...base, kind: 'all', label: '처음부터 지금까지', curSets: 0 }))).toBe('아직 운동 기록이 없어요');
+    // 첫 기록이 있으면 기존 문구 그대로
+    expect(headlineText(headline({ ...base, kind: 'week', label: '이번 주', first: '2026-11-19' }))).toBe('지난주 이맘때는 기록을 시작하기 전이에요');
+    expect(headlineText(headline({ ...base, kind: 'all', label: '처음부터 지금까지', first: '2026-03-10', curCount: 4, curSets: 12 }))).toBe('2026년 3월부터 운동 4회 · 작업 세트 12세트');
+    // 각주: first 없음(새 설치)은 기록 전 문구가 아니라 0.9.17 의 일반 각주 (오늘 운동 안 한 목요일: 지난주 수요일까지, 운동하면 목요일까지)
+    const f = footnote('week', true, { through: '2026-11-11', base: '2026-11-12', done: false, streak: 0, today, plan });
+    expect(f).toBe('▲▼ = 지난주 같은 요일(일~수)까지와 비교 · 오늘 운동하면 목요일까지 · 일요일~토요일 기준');
+    expect(f).not.toContain('기록을 시작하기 전');
+    // 첫 기록이 있는 nohist 는 기록 전 각주
+    expect(footnote('week', true, { through: '2026-11-11', base: '2026-11-12', done: false, streak: 0, today, plan: comparePlan(periodOf('week', today), true, today, true, '2026-11-18'), first: '2026-11-18' })).toBe('지난주는 기록을 시작하기 전이라 ▲▼ 비교를 하지 않아요 (첫 기록 11월 18일)');
+    // 작은 줄은 그대로 "이전 기록 없음"
+    expect(cardSmall(plan, 'sets', 0, 0)).toEqual(['이전 기록 없음']);
+  });
+  it('읽기 문구: 일부 기록 + 지난달 전체 → 범위 시작이 첫 기록일 (각주와 같은 "10~28일"), 하루뿐이면 한 날', () => {
+    const today = '2026-03-30';
+    const plan = comparePlan(periodOf('month', today), true, today, true, '2026-02-10'); // 지난달 2/10~28 (전체 비교), 이번 달은 3/10~
+    expect(plan).toMatchObject({ mode: 'ok', from: '2026-02-10', curFrom: '2026-03-10', through: '2026-02-28' });
+    expect(wholePrevMonth('month', true, { through: '2026-02-28', today, done: true })).toBe(true);
+    expect(cardAria({ kind: 'month', current: true, metric: 'sets', cur: 7, prev: 4, plan, cc: 5, wholeDays: 28 })).toBe('작업 세트 7세트, 3월 10일부터 5세트, 지난달 전체(10~28일) 4세트보다 1세트 많음');
+    // 첫 기록이 없던 평소: 1~28일
+    const full = comparePlan(periodOf('month', today), true, today, true, '2025-01-01');
+    expect(cardAria({ kind: 'month', current: true, metric: 'sets', cur: 7, prev: 4, plan: full, cc: 7, wholeDays: 28 })).toBe('작업 세트 7세트, 지난달 전체(1~28일) 4세트보다 3세트 많음');
+    // 지난달 말일 하나뿐: 12/31, 첫 기록 11/30 → 지난달 전체 "(30일)", 이번 달 구간 30~31일
+    const t2 = '2026-12-31';
+    const one = comparePlan(periodOf('month', t2), true, t2, true, '2026-11-30');
+    expect(one).toMatchObject({ mode: 'ok', from: '2026-11-30', curFrom: '2026-12-30', through: '2026-11-30' });
+    expect(cardAria({ kind: 'month', current: true, metric: 'sets', cur: 5, prev: 2, plan: one, cc: 3, wholeDays: 30 })).toBe('작업 세트 5세트, 12월 30일부터 3세트, 지난달 전체(30일) 2세트보다 1세트 많음');
+    expect(footnote('month', true, { through: '2026-11-30', base: '2026-11-30', done: true, streak: 0, today: t2, plan: one })).toBe('▲▼ = 지난달 전체(30일)와 비교 · 이번 달 구간(30~31일)이 하루 더 길어요(지난달은 11월 30일부터 기록이라 같은 구간끼리)');
+    expect(footnote('month', true, { through: '2026-11-30', base: '2026-11-30', done: true, streak: 0, today: t2, plan: one })).not.toContain('30~30');
+    // 보기 쪽 각주 이어짐: 일부 기록 2/10, 3/30 → "(10~28일)"
+    expect(footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: true, streak: 0, today, plan })).toContain('지난달 전체(10~28일)와 비교 · 이번 달 구간(10~30일)');
+  });
+  it('comboLine: 이전 기간 칸이 통째로 첫 기록일 전이면 "기록 전", 기록일 이후의 0 은 "운동 안 함"', () => {
+    const o = { kind: 'week' as const, start: '2026-11-18', metric: 'sets' as const, value: 2, active: true, cum: 3, prev: 0, pw: '지난주' };
+    // 지난주 수요일 칸 = 11-11 (끝 11-12), 첫 기록 11-12(목)
+    expect(comboLine({ ...o, prevEnd: '2026-11-12', from: '2026-11-12' })).toBe('11월 18일 (수) · 작업 세트 2세트 · 누적 3세트 · 지난주 같은 요일 기록 전');
+    // 목요일 칸 = 11-12 (끝 11-13): 기록일 당일 → 0 이면 안 한 것
+    expect(comboLine({ ...o, start: '2026-11-19', prevEnd: '2026-11-13', from: '2026-11-12' })).toBe('11월 19일 (목) · 작업 세트 2세트 · 누적 3세트 · 지난주 같은 요일 운동 안 함');
+    // 값이 있으면 그대로, from 이 없으면(전체 기록) 늘 "운동 안 함"
+    expect(comboLine({ ...o, prev: 4, prevEnd: '2026-11-12', from: '2026-11-12' })).toContain('지난주 같은 요일 4세트');
+    expect(comboLine({ ...o, prevEnd: '2026-11-12' })).toContain('지난주 같은 요일 운동 안 함');
+    // 달 칸: 3월 1일~ 칸은 끝 4/1, 첫 기록 3/3 이면 2월 칸(끝 3/1)만 기록 전
+    const y = { kind: 'year' as const, start: '2027-02-01', metric: 'sets' as const, value: 1, active: true, cum: 1, prev: 0, pw: '작년' };
+    expect(comboLine({ ...y, prevEnd: '2026-03-01', from: '2026-03-03' })).toContain('작년 같은 달 기록 전');
+    expect(comboLine({ ...y, start: '2027-03-01', prevEnd: '2026-04-01', from: '2026-03-03' })).toContain('작년 같은 달 운동 안 함');
+  });
+  it('각주: 하루 구간은 "30일" 한 날로 (30~30일 없음), 주·년 하루도 기존대로', () => {
+    const t2 = '2026-12-31';
+    const f = footnote('month', true, { through: '2026-11-30', base: '2026-11-30', done: true, streak: 0, today: t2, plan: comparePlan(periodOf('month', t2), true, t2, true, '2026-11-30') });
+    expect(f).toContain('지난달 전체(30일)와 비교');
+    expect(f).not.toContain('30~30');
+    // 일부 기록 아닌 월말: 1~28일 그대로
+    const g = footnote('month', true, { through: '2026-02-28', base: '2026-02-28', done: true, streak: 0, today: '2026-03-30', plan: comparePlan(periodOf('month', '2026-03-30'), true, '2026-03-30', true, '2025-01-01') });
+    expect(g).toBe('▲▼ = 지난달 전체(1~28일)와 비교 · 이번 달 구간(1~30일)이 2일 더 길어요');
+  });
+  it('톤은 한 화면에서 한 번만: 어느 값이든 100만 kg 이상이면 모두 톤 (합·같은 구간·이전·이전 전체)', () => {
+    expect(tonOfAll(400_000, 300_000, 200_000, 999_999)).toBe(false);
+    expect(tonOfAll(400_000, 300_000, 200_000, 1_000_000)).toBe(true); // 이전 기간 전체만 큼 → 카드 전체 톤
+    expect(tonOfAll(1_000_000, 0, 0, 0)).toBe(true);
+    expect(tonOfAll()).toBe(false);
+    // 같은 구간 합 300,000 vs 200,000 (둘 다 100만 미만)이어도 카드가 톤으로 정했으면 한 문장·차이도 톤: 100,000kg = 100톤
+    const base = { kind: 'week' as const, current: true, metric: 'volume' as const, cur: 300_000, prev: 200_000, curCount: 2, prevCount: 1, label: '이번 주' };
+    expect(headlineText(headline(base))).toBe('지난주 이맘때보다 볼륨이 100,000kg 많아요'); // ton 을 안 넘기면 두 값만 보고 정함 (기존)
+    expect(headlineText(headline({ ...base, ton: true }))).toBe('지난주 이맘때보다 볼륨이 100톤 많아요');
+    expect(headlineText(headline({ ...base, ton: false, cur: 1_200_000 }))).toContain('kg'); // 카드가 kg 로 정했으면 kg (카드가 그 값으로 ton 을 계산하므로 일관)
+    // 이전 기간 없음·기록 전 문구도 같은 ton
+    expect(headlineText(headline({ ...base, prevCount: 0, ton: true }))).toBe('지난주 이맘때는 운동이 없었어요 · 이번 주 300톤');
+    expect(headlineText(headline({ ...base, prevCount: 0, mode: 'nohist', first: '2026-11-18', ton: true }))).toBe('지난주 이맘때는 기록을 시작하기 전이에요 · 이번 주 300톤');
+  });
+  it('시간 보이는 값 경계(분 반올림, 1분 미만은 초): 59.5분·60.5분 직접 계산', () => {
+    // 3570초 = 59.5분 → 60분(3600), 3630초 = 60.5분 → 61분(3660)
+    expect(cmpValues('time', 3570, 3630)).toEqual([3600, 3660]);
+    // 3569초 = 59.48분 → 59분(3540), 3629초 = 60.48분 → 60분(3600)
+    expect(cmpValues('time', 3569, 3629)).toEqual([3540, 3600]);
+    // 3629초(60.48분 → 60분)와 3571초(59.52분 → 60분)는 보이는 값이 같음, 실제 차는 58초
+    expect(cmpValues('time', 3629, 3571)).toEqual([3600, 3600]);
+    expect(headlineText(headline({ kind: 'week', current: true, metric: 'time', cur: 3629, prev: 3571, curCount: 1, prevCount: 1, label: '이번 주' }))).toBe('지난주 이맘때와 시간이 같아요');
+    // 1분 미만은 초: 59.5초는 60초로 반올림되어 1분과 같음, 59.4초는 59초
+    expect(cmpValues('time', 59.5, 60)).toEqual([60, 60]);
+    expect(cmpValues('time', 59.4, 60.4)).toEqual([59, 60]);
+    // 남은 양: 이번 3571초(60분) 지난 3629초(60분) → 넘었어요, 3570(60분)·3690(61.5→62분) → 2분 남음
+    const plan = comparePlan(periodOf('week', '2026-11-18'), true, '2026-11-18', true, '2025-01-01');
+    expect(headSubs({ plan, kind: 'week', current: true, mode: 'both', metric: 'time', c: 3571, pf: 3629 })).toEqual(['지난주 전체(1시간)를 넘었어요']);
+    expect(headSubs({ plan, kind: 'week', current: true, mode: 'both', metric: 'time', c: 3570, pf: 3690 })).toEqual(['지난주 전체까지 2분 남았어요']);
+  });
+});
+
+describe('홈 "이번 주" ▲▼ = 기록 탭 주 카드와 같은 비교 구간 (homeWeekDelta)', () => {
+  const sums = (r: ReturnType<typeof homeWeekDelta>) => (r === null ? null : { cur: [r.cur.count, r.cur.sets], prev: [r.prev.count, r.prev.sets] });
+  it('2주차 새 사용자 (첫 기록 목 11-12, 오늘 목 11-19, 오늘 운동함): 이번 쪽은 11-19 부터, 지난 쪽은 11-12 하루 → 기록 탭 "1세트 적어요"(▼)와 같은 방향', () => {
+    const t = table([['2026-11-12', 3], ['2026-11-15', 4], ['2026-11-18', 1], ['2026-11-19', 2]]);
+    const today = '2026-11-19';
+    const d = homeWeekDelta(t.ws, byId, [], today);
+    // 표에서 직접: 이번 쪽 = 11-19 하루(2세트·1회), 지난 쪽 = 11-12 하루(3세트·1회)
+    expect(sums(d)).toEqual({ cur: [t.count('2026-11-19', today), t.sum('2026-11-19', today)], prev: [t.count('2026-11-12', '2026-11-12'), t.sum('2026-11-12', '2026-11-12')] });
+    expect(sums(d)).toEqual({ cur: [1, 2], prev: [1, 3] });
+    // 기록 탭 카드: 같은 구간 합 → 한 문장·작은 줄
+    const plan = comparePlan(periodOf('week', today), true, today, true, firstRecordDate(t.ws, today));
+    expect(plan).toMatchObject({ mode: 'ok', from: '2026-11-12', curFrom: '2026-11-19', through: '2026-11-12' });
+    expect(headlineText(headline({ kind: 'week', current: true, metric: 'sets', cur: d!.cur.sets, prev: d!.prev.sets, curCount: d!.cur.count, prevCount: d!.prev.count, label: '이번 주', mode: 'ok' }))).toBe('지난주 이맘때보다 작업 세트가 1세트 적어요');
+    // 옛 홈 방식(이번 주 전체 7세트 vs 지난주 월~목 3세트)은 ▲ 였음: 전체 합 = 4+1+2
+    expect(t.sum('2026-11-15', today)).toBe(7);
+  });
+  it('1주차 (첫 기록 11-18, 오늘 11-19): 지난주가 기록 전 → 없음', () => {
+    const t = table([['2026-11-18', 2], ['2026-11-19', 1]]);
+    expect(homeWeekDelta(t.ws, byId, [], '2026-11-19')).toBeNull();
+  });
+  it('첫날(일요일 11-15) 운동 전이면 없음, 운동했으면 첫 기록이 지난 주일 때만', () => {
+    const t = table([['2026-11-10', 3]]);
+    expect(homeWeekDelta(t.ws, byId, [], '2026-11-15')).toBeNull(); // waiting
+    const t2 = table([['2026-11-10', 3], ['2026-11-15', 2]]);
+    // 첫 기록 화 11-10, 오늘 일 11-15 운동함: 비교 끝 11-08(일) 이 첫 기록(11-10) 앞 → nohist
+    expect(homeWeekDelta(t2.ws, byId, [], '2026-11-15')).toBeNull();
+  });
+  it('기록 없음 → 없음', () => {
+    expect(homeWeekDelta([], byId, [], '2026-11-19')).toBeNull();
+  });
+  it('오래된 사용자: 이번 주 오늘까지 vs 지난주 같은 요일까지 (일부 기록 아님)', () => {
+    const t = table([['2026-01-05', 3], ['2026-11-08', 3], ['2026-11-10', 2], ['2026-11-13', 6], ['2026-11-15', 1], ['2026-11-17', 4], ['2026-11-19', 2]]);
+    const today = '2026-11-19';
+    expect(sums(homeWeekDelta(t.ws, byId, [], today))).toEqual({
+      cur: [t.count('2026-11-15', today), t.sum('2026-11-15', today)], // 11-15·17·19 → 3회 7세트
+      prev: [t.count('2026-11-08', '2026-11-12'), t.sum('2026-11-08', '2026-11-12')], // 11-08·10 → 2회 5세트 (11-13 은 지난주 금요일이라 제외)
+    });
+    expect(sums(homeWeekDelta(t.ws, byId, [], today))).toEqual({ cur: [3, 7], prev: [2, 5] });
+    // 오늘 운동 전(오늘 11-19 기록 뺌): 어제(11-18)까지 비교 → 지난주 11-08~11-11
+    const t3 = table([['2026-01-05', 3], ['2026-11-08', 3], ['2026-11-10', 2], ['2026-11-13', 6], ['2026-11-15', 1], ['2026-11-17', 4]]);
+    expect(sums(homeWeekDelta(t3.ws, byId, [], today))).toEqual({ cur: [2, 5], prev: [2, 5] });
   });
 });
