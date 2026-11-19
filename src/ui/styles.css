@@ -13,7 +13,7 @@
   /* 흰 글자가 올라가는 채운 파랑(주 버튼·선택 칩·운동한 날): 흰 글자 대비 5.17:1 (--acc 위 흰 글자는 3.68:1 이라 본문 기준 4.5 미달) */
   --acc-fill: #2563eb; --acc-fill-press: #1d4ed8;
   /* 의미 색 */
-  --ok: #22c55e; --ok-soft: rgba(34, 197, 94, .16); --on-ok: #06210f; --pr: #f5b83d; --warn: #f59e0b; --bad: #ef4444; --bad-soft: rgba(239, 68, 68, .14); --bad-text: #fecaca;
+  --ok: #22c55e; --ok-soft: rgba(34, 197, 94, .16); --on-ok: #06210f; --pr: #f5b83d; --warn: #f59e0b; --warn-soft: rgba(245, 158, 11, .16); --bad: #ef4444; --bad-soft: rgba(239, 68, 68, .14); --bad-text: #fecaca;
   /* 어두운 버튼 위 빨간 글자 (지우기 등): card2 위 5.51:1 (--bad 는 4.05:1) */
   --bad-fg: #f87171;
   --video: #a78bfa; --on-video: #1b1033; --est: #64748b; --on-warn: #2b1a00;
@@ -1009,7 +1009,7 @@ button.pm-card.on .unit, button.pm-card.on .pm-prev { color: var(--on-acc); opac
 .load-zone { font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: var(--r-pill); }
 .load-zone.low { background: var(--acc-soft); color: var(--z-low); }
 .load-zone.ok { background: var(--ok-soft); color: var(--z-ok); }
-.load-zone.warn { background: rgba(245, 158, 11, .16); color: var(--z-warn); }
+.load-zone.warn { background: var(--warn-soft); color: var(--z-warn); }
 .load-zone.bad { background: var(--bad-soft); color: var(--bad-fg); }
 .load-band { position: relative; height: 10px; border-radius: 6px; margin: 14px 0 4px; opacity: .85;
   background: linear-gradient(90deg, var(--z-low) 0 40%, var(--z-ok) 40% 65%, var(--z-warn) 65% 75%, var(--z-bad) 75% 100%); }
