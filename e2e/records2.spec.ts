@@ -71,6 +71,27 @@ const snap = (page: Page): Promise<Snap> => page.evaluate(() => {
   };
 });
 
+/** 요약 탭 카드 세로 위치: 기간 카드 → 훈련 부하 → 회복 → 기간 내역 (SPEC #2). 내역이 비면 제목이 없어 '기간 내역' h2 로 대신 */
+const cardTops = (page: Page): Promise<Record<'period' | 'load' | 'recovery' | 'history', number | null>> => page.evaluate(() => {
+  const top = (e: Element | null | undefined) => (e ? e.getBoundingClientRect().top : null);
+  const q = (id: string) => document.querySelector(`[data-testid="${id}"]`);
+  const hist = q('history-title') ?? [...document.querySelectorAll('h2')].find((h) => h.textContent === '기간 내역');
+  return { period: top(q('this-week')), load: top(q('load-card')), recovery: top(q('recovery-card')), history: top(hist) };
+});
+
+/** 막대+누적 그래프의 svg 기하: 글씨 y(기준선 위 글씨 = 눈금), 막대 맨 위 y, 두 누적선 맨 위 y (둘 다 svg 속성에서 읽음, 고정 픽셀 없음) */
+const bothGeom = (page: Page) => page.getByTestId('period-chart').locator('svg').evaluate((svg) => {
+  const num = (e: Element, a: string) => Number(e.getAttribute(a));
+  const base = num(svg.querySelector('line.ch-grid')!, 'y1');
+  const rects = [...svg.querySelectorAll('rect.pb-prev, rect.pb-cur')];
+  const pts = [...svg.querySelectorAll('polyline.pb-cum')].flatMap((p) => (p.getAttribute('points') ?? '').split(' ').map((s) => Number(s.split(',')[1])));
+  return {
+    base, textsAboveBase: [...svg.querySelectorAll('text')].filter((t) => num(t, 'y') < base).map((t) => t.textContent ?? ''), allTexts: svg.querySelectorAll('text').length,
+    barTop: rects.length ? Math.min(...rects.map((r) => num(r, 'y'))) : NaN, barH: rects.length ? Math.max(...rects.map((r) => num(r, 'height'))) : NaN,
+    barBottoms: rects.map((r) => num(r, 'y') + num(r, 'height')), lineTop: pts.length ? Math.min(...pts) : NaN, h: num(svg, 'height'),
+  };
+});
+
 const ws = (s: string | null) => (s ?? '').replace(/\s+/g, ' ').trim();
 const nows = (s: string | null) => (s ?? '').replace(/\s+/g, '');
 
@@ -126,11 +147,24 @@ for (const sc of SCEN_IDS) {
 
   test(`${sc}: 단위 4 × 보기 3 (이름·범위·큰 숫자·한 문장·둘째 줄·카드·범례·막대 수·내역)`, async ({ page }) => {
     await open(page, W, today);
+    const t = await cardTops(page); // SPEC #2: 위에서 아래로 기간 카드 → 훈련 부하 → 회복 → 내역
+    expect(Object.values(t).every((y) => y !== null), `카드 4개 모두 있음 ${JSON.stringify(t)}`).toBe(true);
+    expect(t.period! < t.load! && t.load! < t.recovery! && t.recovery! < t.history!, `카드 순서 기간<부하<회복<내역 ${JSON.stringify(t)}`).toBe(true);
     for (const kind of KINDS) {
       await unitBtn(page, kind).click();
       for (const mode of MODES) {
         await viewBtn(page, mode).click();
         await verify(page, W, today, kind, 'sets', mode);
+        if (mode === 'both' && await page.getByTestId('period-chart').count()) {
+          const g = await bothGeom(page);
+          const tag = `${sc} ${KIND_BUTTON[kind]} 막대+누적`;
+          expect(g.textsAboveBase, `${tag}: 눈금·최댓값 글씨 없음 (기준선 위 <text>)`).toEqual([]);
+          if (sc === 'normal' && kind === 'week') { // SPEC #7: 막대 높이는 두 막대 최댓값, 선 높이는 두 누적선 최댓값을 따로 기준으로
+            expect(Number.isFinite(g.barTop) && Number.isFinite(g.lineTop), `${tag}: 막대·누적선 있음 ${JSON.stringify(g)}`).toBe(true);
+            expect(Math.max(...g.barBottoms) - g.barTop, `${tag}: 가장 높은 막대 = 그래프 전체 높이(기준선~맨 위)`).toBeCloseTo(g.base - Math.min(g.barTop, g.lineTop), 0);
+            expect(g.lineTop, `${tag}: 누적선 맨 위 = 그래프 맨 위 (가장 높은 막대 위와 같음)`).toBeCloseTo(g.barTop, 0);
+          }
+        }
       }
       // 다른 지표 3개 (막대+누적 보기): 문장·큰 숫자·카드는 지표마다 다름. 지표를 바꿔도 보기는 그대로
       for (const metric of ['count', 'volume', 'time'] as const) {
