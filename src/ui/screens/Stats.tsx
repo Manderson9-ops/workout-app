@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppState } from '../store';
 import { mutate, historyOf, flushPending } from '../store';
@@ -12,7 +13,9 @@ import type { Workout } from '../../core/session';
 import { BodyHeat } from '../bodyMapView';
 import { recoveryByPart } from '../../core/recovery';
 import { RecoveryCard } from './RecoveryCard';
-import { PeriodCard } from './PeriodCard';
+import { PeriodCard, usePeriodView } from './PeriodCard';
+import { PeriodHistory } from './PeriodHistory';
+import { LoadCard } from './LoadCard';
 import { RecordFixCard } from './RecordFix';
 import { lastNight, watchReason, watchReasonLines, WATCH_PENDING, WATCH_GATE } from '../../core/health';
 import { LineChart, BarChart, PairBarChart } from '../charts';
@@ -130,6 +133,30 @@ function PartWeekSheet({ part, rows, week, onClose }: { part: Part; rows: PartWe
   );
 }
 
+/** 요약 탭의 기간 묶음: 기간 카드 → 훈련 부하 → 회복(recovery) → 기간 내역. 보는 기간·고른 칸은 카드와 내역이 usePeriodView 로 나눠 씀 */
+function PeriodSummary({ done, sorted, byId, bw, today, recovery, onAll }: { done: Workout[]; sorted: Workout[]; byId: Map<string, Exercise>; bw: AppState['bodyweight']; today: string; recovery: ComponentChildren; onAll: () => void }) {
+  const v = usePeriodView(done, today);
+  return (
+    <>
+      <PeriodCard v={v} done={done} byId={byId} today={today} bw={bw} />
+      <LoadCard workouts={done} byId={byId} today={today} />
+      {recovery}
+      {sorted.length ? <PeriodHistory v={v} sorted={sorted} byId={byId} bw={bw} today={today} onAll={onAll} /> : (
+        <>
+          <div class="row between" style={{ alignItems: 'center', margin: '20px 0 10px' }}>
+            <h2 style={{ margin: 0 }}>기간 내역</h2>
+            <button class="ghost" style={{ minHeight: '44px', padding: '0 12px' }} onClick={onAll}>전체 기록 보기</button>
+          </div>
+          <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 기간별 내역이 보여요.">
+            <button class="tonal" onClick={() => go('#/workout')}>운동 시작</button>
+            <button onClick={() => go('#/stats/new')}>직접 작성</button>
+          </Empty>
+        </>
+      )}
+    </>
+  );
+}
+
 type StatsTab = 'summary' | 'log' | 'analysis';
 const STATS_TABS: { id: StatsTab; label: string; q: string }[] = [{ id: 'summary', label: '요약', q: 'summary' }, { id: 'log', label: '운동 기록', q: 'log' }, { id: 'analysis', label: '분석', q: 'analysis' }];
 const TAB_KEY = 'stats.tab.v1';
@@ -223,19 +250,8 @@ export function Stats({ s }: { s: AppState }) {
       {tab === 'summary' && (
         <div role="tabpanel" id="stats-panel-summary" aria-labelledby="stats-tab-summary" aria-label="요약">
           <RecordFixCard s={s} byId={byId} />
-          <PeriodCard done={done} byId={byId} today={today} bw={s.bodyweight} />
-          <RecoveryCard m={rec} night={night} />
-          <div class="row between" style={{ alignItems: 'center', margin: '20px 0 10px' }}>
-            <h2 style={{ margin: 0 }}>최근 운동</h2>
-            <button class="ghost" style={{ minHeight: '44px', padding: '0 12px' }} onClick={() => { pickTab('log'); document.getElementById('stats-tab-log')?.focus(); }}>전체 기록 보기</button>
-          </div>
-          {!sorted.length && (
-            <Empty text="아직 끝낸 운동이 없어요" hint="운동을 끝내면 여기에 최근 3개가 보여요.">
-              <button class="tonal" onClick={() => go('#/workout')}>운동 시작</button>
-              <button onClick={() => go('#/stats/new')}>직접 작성</button>
-            </Empty>
-          )}
-          {take(3).map(card)}
+          <PeriodSummary done={done} sorted={sorted} byId={byId} bw={s.bodyweight} today={today} recovery={<RecoveryCard m={rec} night={night} />}
+            onAll={() => { pickTab('log'); document.getElementById('stats-tab-log')?.focus(); }} />
         </div>
       )}
       {tab === 'log' && (

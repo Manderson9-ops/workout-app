@@ -124,25 +124,45 @@ export function PairBarChart({ points, unit, label, height = 150 }: { points: Pa
 
 export type BucketState = 'past' | 'now' | 'future';
 
+/** 오늘까지 그리는 칸 수 (첫 미래 칸 앞까지) */
+const uptoOf = (state: BucketState[]): number => { const i = state.indexOf('future'); return i < 0 ? state.length : i; };
+/** 앞에서부터 쌓은 합계 (upto 칸까지) */
+const cumOf = (v: number[], upto = v.length): number[] => { let t = 0; return v.slice(0, upto).map((x) => (t += x)); };
+
+/** x 라벨 문구 목록 (줄바꿈 '\n' = 두 줄) */
+function XLabels({ n, labels, labelClass, selected, cx, y }: { n: number; labels: string[]; labelClass?: string[]; selected: number | null; cx: (i: number) => number; y: number }) {
+  return (
+    <>
+      {Array.from({ length: n }, (_, i) => (labels[i] ?? '').split('\n').map((t, k) => t && (
+        <text key={`${i}-${k}`} x={cx(i)} y={y + k * 13} class={`ch-text${selected === i ? ' pb-sel-text' : ''}${labelClass?.[i] ? ` ${labelClass[i]}` : ''}`} font-size={FS} text-anchor="middle">{t}</text>
+      )))}
+    </>
+  );
+}
+
 /**
- * D-081 기간 막대 그래프 (주·월·년). 그래프 전체가 슬라이더 하나: 화살표(↑↓ 포함)·PageUp/Down·Home·End·Esc, 손가락·마우스로 훑어 고름.
+ * D-081·D-082 기간 막대 그래프 (주·월·년·전체). mode 'bar' = 막대만, 'both' = 막대+누적 (이전 기간 넓은 회색 막대·점선 누적 위에 이번 기간 좁은 파랑 막대·실선 누적).
+ * 그래프 전체가 슬라이더 하나: 화살표(↑↓ 포함)·PageUp/Down·Home·End·Esc, 손가락·마우스로 훑어 고름.
  * 손가락: 세로로 끌면 화면 스크롤(고르지 않음), 가로로 8px 넘게 끌면 훑기, 거의 안 움직이고 떼면 탭(고름/다시 탭하면 해제).
- * 미래 칸은 못 고름. x 라벨의 줄바꿈('\n')은 두 줄. 맨 위 줄은 최댓값 눈금, 평균선은 점선(글씨는 그래프 밖 범례)
+ * 미래 칸은 못 고름. x 라벨의 줄바꿈('\n')은 두 줄. bar: 맨 위 줄은 최댓값 눈금, 평균선은 점선(글씨는 그래프 밖 범례). both: 눈금 글씨 없음, 막대 높이는 두 막대 최댓값·선 높이는 두 누적선 최댓값을 따로 기준으로
  */
-export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg, selected, onSelect, valueText, fmt, label, summary, jump = 7, height = 150 }: {
+export function PeriodBars({ mode = 'bar', prev, values, labels, labelClass, empty, state, dots, avg, selected, onSelect, valueText, fmt, label, summary, jump = 7, height = 150 }: {
+  mode?: 'bar' | 'both';
+  /** both: 이전 기간 칸별 값 (없으면 이번 기간만) */
+  prev?: number[];
   values: number[]; labels: string[]; state: BucketState[];
   /** x 라벨별 글자색 클래스 ('sun' · 'sat', D-054 일요일 빨강·토요일 파랑) */
   labelClass?: string[];
   /** 기록이 없을 때 그래프 대신 보여 줄 한 줄 (슬라이더 없음) */
   empty?: string;
-  /** 운동한 칸 표시 (기준선 아래 작은 점) */
+  /** 운동한 칸 표시 (기준선 아래 작은 점, bar 보기만) */
   dots?: boolean[];
-  /** 평균선 값 (글씨 없음) */
+  /** 평균선 값 (글씨 없음, bar 보기만) */
   avg?: number;
   selected: number | null; onSelect: (i: number | null) => void;
   /** 고른 칸 문구 (aria-valuetext) */
   valueText: (i: number) => string;
-  /** 맨 위 눈금 값 문구 */
+  /** 맨 위 눈금 값 문구 (bar 보기만) */
   fmt: (v: number) => string;
   label: string;
   /** 고른 칸이 없을 때 aria-valuetext */
@@ -152,14 +172,17 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
   height?: number;
 }) {
   const [ref, w] = useWidth();
-  const n = values.length;
+  const both = mode === 'both';
+  const pv = both ? (prev ?? []) : [];
+  const n = Math.max(values.length, pv.length); // 칸 = 이번·이전 기간 중 많은 쪽 (이전 칸 i 는 이번 칸 i 와 겹침)
   const twoLine = labels.some((l) => l.includes('\n'));
-  const h = height, pad = { l: 8, r: 8, t: 20, b: twoLine ? 40 : 26 };
+  const h = height, pad = { l: 8, r: 8, t: both ? 12 : 20, b: twoLine ? 40 : 26 };
   const inner = h - pad.t - pad.b;
-  const max = Math.max(1, ...values, avg ?? 0);
+  const max = both ? Math.max(1, ...values, ...pv) : Math.max(1, ...values, avg ?? 0);
   const slot = (w - pad.l - pad.r) / n;
   const bw = Math.min(34, slot * 0.64);
-  const lastOk = (() => { for (let i = n - 1; i >= 0; i--) if (state[i] !== 'future') return i; return 0; })();
+  const pbw = Math.min(34, slot * 0.9), cbw = Math.min(14, Math.max(5, slot * 0.45)); // both: 이전(넓게) · 이번(좁게, 월 보기에서도 5px 아래로 안 가게)
+  const lastOk = (() => { for (let i = state.length - 1; i >= 0; i--) if (state[i] !== 'future') return i; return 0; })();
   const gest = useRef<{ x: number; y: number; before: number | null; mode: 'wait' | 'scrub' | 'dead' } | null>(null);
   const raw = (e: PointerEvent) => slot > 0 ? Math.floor((e.clientX - (e.currentTarget as HTMLElement).getBoundingClientRect().left - pad.l) / slot) : -1;
   const clamp = (i: number) => Math.max(0, Math.min(lastOk, i));
@@ -173,8 +196,15 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
     onSelect(clamp(to));
   };
   const y = (v: number) => pad.t + inner - inner * (v / max);
+  const xs = (i: number) => pad.l + i * slot + slot / 2;
   const hasData = values.some((v) => v > 0);
   if (empty) return <div class="pb-empty" ref={ref} data-testid="period-chart-empty">{empty}</div>;
+  const upto = uptoOf(state), curC = cumOf(values, upto), prevC = cumOf(pv);
+  const cmax = Math.max(1, ...curC, ...prevC);
+  const yc = (v: number) => pad.t + inner - inner * (v / cmax);
+  const line = (c: number[]) => c.map((v, i) => `${xs(i).toFixed(1)},${yc(v).toFixed(1)}`).join(' ');
+  const endAt = selected !== null && selected < upto ? selected : upto - 1;
+  const dimCls = (i: number) => (selected === null ? '' : selected === i ? ' sel' : ' dim');
   return (
     <div class="pbars" ref={ref} role="slider" tabIndex={0} aria-label={label} aria-valuemin={1} aria-valuemax={lastOk + 1}
       aria-valuenow={(selected ?? lastOk) + 1} aria-valuetext={selected === null ? summary : valueText(selected)} data-testid="period-chart"
@@ -207,23 +237,71 @@ export function PeriodBars({ values, labels, labelClass, empty, state, dots, avg
       onLostPointerCapture={() => { gest.current = null; }}
       onPointerCancel={() => { const g = gest.current; gest.current = null; if (g && g.mode === 'scrub') onSelect(g.before); }}>
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" focusable="false">
-        {hasData && <line x1={pad.l} x2={w - pad.r} y1={pad.t} y2={pad.t} class="ch-grid pb-top" />}
-        {hasData && <text x={w - pad.r} y={pad.t - 5} class="ch-text" font-size={FS} text-anchor="end">{fmt(max)}</text>}
+        {!both && hasData && <line x1={pad.l} x2={w - pad.r} y1={pad.t} y2={pad.t} class="ch-grid pb-top" />}
+        {!both && hasData && <text x={w - pad.r} y={pad.t - 5} class="ch-text" font-size={FS} text-anchor="end">{fmt(max)}</text>}
         <line x1={pad.l} x2={w - pad.r} y1={h - pad.b} y2={h - pad.b} class="ch-grid" />
-        {values.map((v, i) => {
-          const cx = pad.l + i * slot + slot / 2;
+        {both ? (
+          <>
+            {pv.map((v, i) => { if (!(v > 0)) return null; const bh = Math.max(2, inner * (v / max)); return <rect key={`p${i}`} class={`pb-prev${dimCls(i) === ' dim' ? ' dim' : ''}`} x={xs(i) - pbw / 2} y={h - pad.b - bh} width={pbw} height={bh} rx={Math.min(4, pbw / 2)} />; })}
+            {values.map((v, i) => { if (state[i] === 'future' || !(v > 0)) return null; const bh = Math.max(2, inner * (v / max)); return <rect key={`c${i}`} class={`pb-cur ${state[i]}${dimCls(i)}`} x={xs(i) - cbw / 2} y={h - pad.b - bh} width={cbw} height={bh} rx={Math.min(3, cbw / 2)} />; })}
+            <XLabels n={n} labels={labels} labelClass={labelClass} selected={selected} cx={xs} y={h - pad.b + 20} />
+            {prevC.length > 1 && <polyline class="pb-cum prev" points={line(prevC)} />}
+            {curC.length > 1 && <polyline class="pb-cum cur" points={line(curC)} />}
+            {curC.length > 0 && <circle class="pb-cum-end" cx={xs(endAt)} cy={yc(curC[endAt]!)} r="5" />}
+          </>
+        ) : values.map((v, i) => {
+          const cx = xs(i);
           const bh = v > 0 ? Math.max(2, inner * (v / max)) : 2;
-          const cls = `pb-bar ${state[i]}${selected === null ? '' : selected === i ? ' sel' : ' dim'}`;
-          const lines = (labels[i] ?? '').split('\n');
+          const cls = `pb-bar ${state[i]}${dimCls(i)}`;
           return (
             <g key={i}>
               <rect x={cx - bw / 2} y={h - pad.b - bh} width={bw} height={bh} rx={Math.min(4, bw / 2)} class={cls} />
               {dots?.[i] && <circle cx={cx} cy={h - pad.b + 5} r="2.5" class="pb-dot" />}
-              {lines.map((t, k) => t && <text key={k} x={cx} y={h - pad.b + 20 + k * 13} class={`ch-text${selected === i ? ' pb-sel-text' : ''}${labelClass?.[i] ? ` ${labelClass[i]}` : ''}`} font-size={FS} text-anchor="middle">{t}</text>)}
+              {(labels[i] ?? '').split('\n').map((t, k) => t && <text key={k} x={cx} y={h - pad.b + 20 + k * 13} class={`ch-text${selected === i ? ' pb-sel-text' : ''}${labelClass?.[i] ? ` ${labelClass[i]}` : ''}`} font-size={FS} text-anchor="middle">{t}</text>)}
             </g>
           );
         })}
-        {avg !== undefined && avg > 0 && <line x1={pad.l} x2={w - pad.r} y1={y(avg)} y2={y(avg)} class="pb-avg" />}
+        {!both && avg !== undefined && avg > 0 && <line x1={pad.l} x2={w - pad.r} y1={y(avg)} y2={y(avg)} class="pb-avg" />}
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * D-082 누적 보기: 이번 기간(오늘까지) 실선 + 이전 기간 전체 점선, 같은 칸에 맞춤. 맨 위 줄에 두 선 중 최댓값, 슬라이더 없음(role="img")
+ */
+export function PeriodCum({ values, prev, state, labels, labelClass, empty, fmt, label, height = 150 }: {
+  values: number[]; prev?: number[]; state: BucketState[]; labels: string[]; labelClass?: string[];
+  empty?: string;
+  /** 맨 위 최댓값 문구 */
+  fmt: (v: number) => string;
+  /** 그래프 읽기 문구 */
+  label: string;
+  height?: number;
+}) {
+  const [ref, w] = useWidth();
+  const pv = prev ?? [];
+  const n = Math.max(values.length, pv.length);
+  const twoLine = labels.some((l) => l.includes('\n'));
+  const h = height, pad = { l: 8, r: 8, t: 20, b: twoLine ? 40 : 26 };
+  const inner = h - pad.t - pad.b;
+  const slot = (w - pad.l - pad.r) / n;
+  const upto = uptoOf(state), curC = cumOf(values, upto), prevC = cumOf(pv);
+  const cmax = Math.max(1, ...curC, ...prevC);
+  const xs = (i: number) => pad.l + i * slot + slot / 2;
+  const yc = (v: number) => pad.t + inner - inner * (v / cmax);
+  const line = (c: number[]) => c.map((v, i) => `${xs(i).toFixed(1)},${yc(v).toFixed(1)}`).join(' ');
+  if (empty) return <div class="pb-empty" ref={ref} data-testid="period-chart-empty">{empty}</div>;
+  return (
+    <div class="pcum" ref={ref} role="img" aria-label={label} data-testid="period-cum">
+      <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" focusable="false">
+        <line x1={pad.l} x2={w - pad.r} y1={pad.t} y2={pad.t} class="ch-grid pb-top" />
+        <text x={w - pad.r} y={pad.t - 5} class="ch-text" font-size={FS} text-anchor="end">{fmt(cmax)}</text>
+        <line x1={pad.l} x2={w - pad.r} y1={h - pad.b} y2={h - pad.b} class="ch-grid" />
+        <XLabels n={n} labels={labels} labelClass={labelClass} selected={null} cx={xs} y={h - pad.b + 20} />
+        {prevC.length > 1 && <polyline class="pb-cum prev" points={line(prevC)} />}
+        {curC.length > 1 && <polyline class="pb-cum cur" points={line(curC)} />}
+        {curC.length > 0 && <circle class="pb-cum-end" cx={xs(curC.length - 1)} cy={yc(curC[curC.length - 1]!)} r="5" />}
       </svg>
     </div>
   );

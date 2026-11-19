@@ -183,6 +183,9 @@ export function bucketText(kind: PeriodKind, start: string): string {
   return `${m}월 ${d}일 (${WD[new Date(y!, m! - 1, d!).getDay()]})`;
 }
 
+/** 기간 내역 제목에 쓰는 칸 이름 (요일 없이): week·month "11월 16일", year·all "2026년 3월" */
+export const bucketTitle = (kind: PeriodKind, start: string): string => (kind === 'year' || kind === 'all' ? ym(start) : md(start));
+
 /** 연속 주 문구 (0주면 없음) */
 const streakText = (n: number): string => (n > 0 ? ` · 연속 ${n}주` : '');
 /** 날수 차이 문구: 1일이면 "하루" */
