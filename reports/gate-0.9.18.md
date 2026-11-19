@@ -12,7 +12,7 @@
 | UX/UI 감사 게이트 | 5d9c899 에서 `npm run test:uxui` exit 0 — uxui.spec 20/20, 감사 PASS 22 · INFO 4 · JUDGED 11 · N/A 12 (reports/uxui-audit-0.9.18-5d9c899.txt). 그 전 M04(직접 쓴 색 1개) FAIL → `:root` 토큰 `--warn-soft` 로 고침(값 같음) |
 | 동기화 서버 | syncMerge·syncStamp·hlc·tools/gas 변경 없음 → Apps Script 재배포 불필요 |
 | 저장 구조 | DB·백업 변경 없음. 기기 설정 localStorage `stats.period.v1` 에 `mode` 추가(옛 값 → 막대+누적, 단위 시험 periodPref.test.ts) |
-| 독립 검토 (Opus) | 1차 9.60 PASS(5d9c899), **2차 9.63 PASS(2af721a) — 조건 '최종 커밋 전체 e2e 실패 0' 은 아직 미충족**(위 E2E). WP7(980531f) 뒤 독립 검토는 없음 — docs/reviews/v0.9.18.md |
+| 독립 검토 (Opus) | 1차 9.60 PASS(5d9c899), **2차 9.63 PASS(2af721a) — 조건 '최종 커밋 전체 e2e 실패 0' 은 아직 미충족**(위 E2E). **3차 9.60 PASS(605817b = 코드 980531f, WP7 집중 판정 통과)** — 배포 조건: chromium e2e 실패 0 + uxui — docs/reviews/v0.9.18.md |
 | role-stacking 패널 (/fgf, 평균 ≥9.25·최저 ≥8.0, 최대 3회) | 1회 8.67(ML 9.3·Repl 7.8·DA 8.3) → WP5 · 2회 ML 9.2·DA 8.2 → WP6 · **3회 8.85(ML 9.2·DA 8.6·Repl 8.4) — 3회 모두 미달로 종료**(DA 3회 지적은 WP7 로 고침, 그 뒤 재채점 없음) — docs/reviews/v0.9.18.md |
 | 사용자 확인 | 미리 보기 판 뒤, 본판은 "메인 배포" 승인 후 |
 
